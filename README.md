@@ -21,6 +21,8 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
+- [Reference-Aligned Implementation Profile v1 — canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V1.md)
+- [Open Source Reference Review — archived research](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
 - [AI Native Engineering Platform v1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1.md)
 - [Architecture Review Round 2](docs/reviews/ARCHITECTURE_REVIEW_ROUND2_2026-09-23.md)
@@ -53,3 +55,19 @@ See:
 Build a narrow vertical slice first. Do not start with multi-agent planning, skill marketplaces, or knowledge ingestion.
 
 M0 freezes domain contracts and invariants. M1 proves a single WorkBuddy → Control Plane → Ubuntu → Codex → Git/CI → Artifact/Evidence → Closure path. Device/HIL, multiple runtimes, planner/skills, and knowledge follow only after the core loop is reliable.
+
+## Implementation strategy
+
+**Own authority, reuse mechanisms.**
+
+The platform keeps Requirement/Run/Target/Evidence/Verification/Release authority in engineering-platform, while selectively reusing mature implementations behind replaceable adapters:
+
+- Temporal — durable workflow
+- labgrid — Device/HIL backend candidate
+- in-toto/SLSA/Sigstore — provenance/attestation alignment
+- OpenHands SDK / SWE-ReX — Runtime/Session design references
+- Coder — Worker/Workspace governance reference and future backend option
+- Dagger — optional controlled/reproducible build backend
+- RAUC — optional embedded Linux OTA backend
+
+External component state never becomes hidden engineering authority.
