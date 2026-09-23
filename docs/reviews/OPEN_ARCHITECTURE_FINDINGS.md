@@ -1,7 +1,7 @@
 # Open Architecture Findings
 
 Date: 2026-09-23
-Status: **Authoritative review backlog before v1.2**
+Status: **Absorbed into v1.2; retained as M0 implementation checklist**
 Sources:
 - Architecture Review Round 2
 - Architecture Review Round 3
@@ -14,9 +14,7 @@ Sources:
 
 ## Purpose
 
-This document consolidates unresolved architecture findings that must be incorporated into the next baseline before M0 contracts are frozen.
-
-The goal is to stop review findings from fragmenting across documents.
+This document preserves the findings that were absorbed into `AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md`. It is no longer a list of unresolved top-level architecture decisions; unchecked items now mean the corresponding ADR/schema/protocol/test contract still needs to be implemented or frozen during M0.
 
 ---
 
@@ -287,7 +285,7 @@ M1 is NO-GO if any of these remain true:
 - Capability-based policy.
 - Build-once / verify / promote exact Artifact as preferred rule.
 
-### Not yet implementation-frozen
+### Architecture absorbed into v1.2; M0 contracts not yet implementation-frozen
 
 - manifest canonicalization;
 - trust-root / issuer-key lifecycle;
@@ -308,12 +306,10 @@ M1 is NO-GO if any of these remain true:
 
 ## Recommendation
 
-Do not add more top-level architecture.
+Do not add more top-level architecture. v1.2 is now the canonical target architecture.
 
-The next work should be:
-1. incorporate this P0 backlog into a v1.2 baseline;
-2. freeze ADRs and schemas;
-3. write invariant tests before large implementation;
+The next work is M0 Contract Freeze:
+1. freeze ADRs and schemas;
+2. freeze state guards, policy and protocols;
+3. write invariant/property/failure-injection tests;
 4. then start the M1 vertical slice.
-
-The architecture review phase should now optimize for **semantic closure**, not additional features.
