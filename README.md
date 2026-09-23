@@ -21,7 +21,9 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v17 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V17.md)
+- [Reference-Aligned Implementation Profile v21 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md)
+- [Reference-Aligned Implementation Profile v20 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V20.md)
+- [Reference-Aligned Implementation Profile v17 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V17.md)
 - [Reference-Aligned Implementation Profile v16 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V16.md)
 - [Reference-Aligned Implementation Profile v15 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V15.md)
 - [Reference-Aligned Implementation Profile v14 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V14.md)
@@ -55,6 +57,11 @@ See:
 - [Open Source Reference Review Round 15 — formal methods/model checking](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND15_FORMAL_METHODS_MODEL_CHECKING_2026-09-23.md)
 - [Open Source Reference Review Round 16 — interface contract compatibility](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND16_INTERFACE_CONTRACT_COMPATIBILITY_2026-09-23.md)
 - [Open Source Reference Review Round 17 — configuration and constraints](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND17_CONFIGURATION_CONSTRAINTS_2026-09-23.md)
+- [Open Source Reference Synthesis Rounds 11–17](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_ROUNDS11_17_2026-09-24.md)
+- [Open Source Reference Review Round 18 — manufacturing and fleet](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND18_MANUFACTURING_FLEET_2026-09-24.md)
+- [Open Source Reference Review Round 19 — knowledge freshness](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND19_KNOWLEDGE_FRESHNESS_2026-09-24.md)
+- [Open Source Reference Review Round 20 — AI code review](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND20_AI_CODE_REVIEW_2026-09-24.md)
+- [Open Source/Public Practice Review Round 21 — empirical AI governance](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND21_EMPIRICAL_AI_GOVERNANCE_2026-09-24.md)
 - [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
@@ -110,7 +117,9 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v17 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V17.md)
+- [M0 Reference Adoption Plan v21 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md)
+- [M0 Reference Adoption Plan v20 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V20.md)
+- [M0 Reference Adoption Plan v17 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V17.md)
 - [M0 Reference Adoption Plan v16 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V16.md)
 - [M0 Reference Adoption Plan v15 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V15.md)
 - [M0 Reference Adoption Plan v14 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V14.md)
