@@ -21,10 +21,12 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v2 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V2.md)
+- [Reference-Aligned Implementation Profile v3 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V3.md)
+- [Reference-Aligned Implementation Profile v2 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V2.md)
 - [Reference-Aligned Implementation Profile v1 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V1.md)
 - [Open Source Reference Review Round 1 — archived research](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_2026-09-23.md)
 - [Open Source Reference Review Round 2 — policy, identity, supply chain, embedded test](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND2_2026-09-23.md)
+- [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
 - [AI Native Engineering Platform v1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1.md)
 - [Architecture Review Round 2](docs/reviews/ARCHITECTURE_REVIEW_ROUND2_2026-09-23.md)
@@ -64,16 +66,19 @@ M0 freezes domain contracts and invariants. M1 proves a single WorkBuddy → Con
 
 The platform keeps Requirement/Run/Target/Evidence/Verification/Release authority in engineering-platform, while selectively reusing mature implementations behind replaceable adapters:
 
-- Temporal — durable workflow
-- labgrid — Device/HIL backend candidate
+- Temporal — durable workflow (M1 required)
+- OPA — authorization evaluator (M1 default)
+- S3/MinIO-compatible store — Artifact/Evidence bytes (M1 required)
+- OpenTelemetry — observability (M1 required)
+- Toxiproxy — deterministic failure tests (M0/M1 required)
 - in-toto/SLSA/Sigstore — provenance/attestation alignment
-- OpenHands SDK / SWE-ReX — Runtime/Session design references
-- Coder — Worker/Workspace governance reference and future backend option
-- Dagger — optional controlled/reproducible build backend
-- RAUC — optional embedded Linux OTA backend
+- OpenHands SDK / SWE-ReX / Cline — Runtime/Session design references
+- labgrid + pytest/OpenHTF — M2 Device/HIL and procedure candidates
+- SPIRE/OpenBao/Coder/Dagger/RAUC — milestone- or scale-triggered options
 
 External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v2](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V2.md)
+- [M0 Reference Adoption Plan v3 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V3.md)
+- [M0 Reference Adoption Plan v2 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V2.md)
