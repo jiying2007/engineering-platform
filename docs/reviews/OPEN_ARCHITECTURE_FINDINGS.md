@@ -7,6 +7,10 @@ Sources:
 - Architecture Review Round 3
 - Architecture Review Round 4
 - Architecture Review Round 5
+- Architecture Review Round 6
+- Architecture Review Round 7
+- Architecture Review Round 8
+- Architecture Review Round 9
 
 ## Purpose
 
@@ -112,9 +116,86 @@ The goal is to stop review findings from fragmenting across documents.
 
 ---
 
+## P0 — Trust roots, audit integrity and hostile execution
+
+- [ ] Define Trust Root / Evidence Issuer Registry with key/certificate identity and scope.
+- [ ] Define issuer key rotation, suspension and revocation semantics.
+- [ ] Propagate compromised issuer/key impact to dependent Evidence/Verification/Release.
+- [ ] Add tamper-evident audit checkpoints independent of mutable PostgreSQL rows.
+- [ ] Separate platform administration from engineering/release Human Authority.
+- [ ] Treat repository/context/tool output as hostile data for Runtime reasoning.
+- [ ] Treat generated build/test scripts as hostile code inside sandbox.
+- [ ] Keep production signing/privileged credentials outside user-controlled build/runtime steps.
+- [ ] Control dependency/package resolution and record resolved dependency identities.
+- [ ] CI Evidence must bind trusted verifier/workflow definition digest, not only CI run ID.
+- [ ] Verify Artifact digest at every authoritative consumption boundary.
+- [ ] Define Evidence freshness/revocation beyond simple subject equality.
+- [ ] Define recovery_epoch + reconciliation after authoritative-state rollback restore.
+- [ ] Prevent approval replay across project/environment/action/time.
+- [ ] Scope Session attach/steering tokens to Run + execution epoch + audience + expiry.
+- [ ] Treat Runtime provider as an external trust/data-residency boundary.
+- [ ] Define secret redaction/no-leak invariants for manifests/events/transcripts/artifacts.
+- [ ] Define deletion/tombstone semantics for immutable historical records.
+
+---
+
+## P0 — Integration and final release exactness
+
+- [ ] Add immutable Integration Subject for PR/change + target base + merge strategy + candidate tree.
+- [ ] Base-branch drift invalidates previous integration assumptions unless explicit no-impact policy applies.
+- [ ] Reconcile actual final merge commit/tree after provider merge.
+- [ ] Support merge-queue/candidate identity in provider-neutral Git contract.
+- [ ] Represent multi-PR/multi-repo integration dependencies explicitly.
+- [ ] Add Artifact Derivation Graph and Transform Receipt.
+- [ ] Model signing as privileged byte-changing Artifact transform.
+- [ ] Define Evidence reuse rules across signing/packaging/encryption/compression transforms.
+- [ ] Require final-stage Verification against exact final Release Bundle bytes as policy requires.
+- [ ] Treat version stamping/build metadata as deterministic build input or explicit transform.
+- [ ] Separate Integration lifecycle from Release lifecycle.
+- [ ] Reconcile remote release/promotion bytes/state after external promotion.
+- [ ] Bind exact rollback Release/Bundle/procedure before production authorization.
+
+---
+
+## P0 — Readiness, assurance and lifecycle governance
+
+- [ ] Define guarded Requirement READY semantics, not field-presence validation.
+- [ ] Give each required AC a declared verification mode/verifiability contract.
+- [ ] Add versioned Assurance Profile selected from risk attributes.
+- [ ] Freeze Verification Plan before implementation completion.
+- [ ] Superseded Requirement/Task immediately affects active Run authority/capabilities.
+- [ ] Define explicit disposition for old Runs after Task replan.
+- [ ] Cancellation revokes future execution/privileged authority and reconciles UNKNOWN side effects.
+- [ ] Risk Acceptance/Waiver/Policy Exception has exact scope, digest binding and expiry.
+- [ ] Distinguish identified risk from authorized accepted risk.
+- [ ] Define guarded Work Closure policy and immutable Closure Decision.
+- [ ] Reopen preserves historical Closure Manifest rather than rewriting history.
+- [ ] Separate Work completion from Release eligibility/production release.
+- [ ] approve_plan binds exact immutable Plan/Task graph/Verification Plan digest.
+- [ ] Define authority delegation lifecycle without bypassing separation-of-duties.
+- [ ] Clarification answers have typed authority/scope and trigger Steering/Task Revision/Requirement Revision appropriately.
+
+---
+
+## P0 — Common schema and reference contract
+
+- [ ] Define a common schema envelope before per-object schemas proliferate.
+- [ ] Define which envelope fields participate in canonical hash vs metadata only.
+- [ ] Define typed reference model separating business ID, external locator and content digest.
+- [ ] Define null-vs-absent, extension namespace, enum evolution and size limits.
+- [ ] Define data authority/recovery criticality classification per persistent store.
+
+---
+
 ## P1 — Supply chain and archival
 
 - [ ] Build provenance/attestation support is provider-neutral.
+- [ ] High-value approvals/releases may use independent KMS/enterprise signatures.
+- [ ] Security-sensitive platform-control changes get stronger independent review.
+- [ ] Security incident/quarantine propagation can target issuer/worker/toolchain/dependency/release sets.
+- [ ] Preserve release-grade source snapshots/bundles according to retention policy.
+- [ ] Formal Run policy supports wall-clock/model/tool/retry/network resource limits.
+- [ ] Provider/tool/runtime/context changes trigger adversarial security regression.
 - [ ] SBOM support is optional but first-class where required.
 - [ ] Two-phase Artifact upload/finalization.
 - [ ] Immutable release artifacts have retention/lock policy.
@@ -209,6 +290,12 @@ M1 is NO-GO if any of these remain true:
 ### Not yet implementation-frozen
 
 - manifest canonicalization;
+- trust-root / issuer-key lifecycle;
+- tamper-evident audit checkpointing;
+- integration subject / merge reconciliation;
+- artifact transform/signing lineage;
+- requirement readiness / assurance profile;
+- verification plan / waiver / closure semantics;
 - trusted Evidence issuer model;
 - revision/invalidation propagation;
 - side-effect reconciliation semantics;
