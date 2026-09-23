@@ -26,6 +26,7 @@ See:
 - [Architecture Review Round 3 — implementation readiness](docs/reviews/ARCHITECTURE_REVIEW_ROUND3_IMPLEMENTATION_READINESS_2026-09-23.md)
 - [Architecture Review Round 4 — trust, determinism and recovery](docs/reviews/ARCHITECTURE_REVIEW_ROUND4_TRUST_DETERMINISM_RECOVERY_2026-09-23.md)
 - [Architecture Review Round 5 — embedded configuration and release integrity](docs/reviews/ARCHITECTURE_REVIEW_ROUND5_EMBEDDED_CONFIGURATION_RELEASE_2026-09-23.md)
+- [Open architecture findings — authoritative pre-v1.2 backlog](docs/reviews/OPEN_ARCHITECTURE_FINDINGS.md)
 
 ## Core invariants
 
