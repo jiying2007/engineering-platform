@@ -21,7 +21,10 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v7 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V7.md)
+- [Reference-Aligned Implementation Profile v10 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V10.md)
+- [Reference-Aligned Implementation Profile v9 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V9.md)
+- [Reference-Aligned Implementation Profile v8 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V8.md)
+- [Reference-Aligned Implementation Profile v7 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V7.md)
 - [Reference-Aligned Implementation Profile v6 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V6.md)
 - [Reference-Aligned Implementation Profile v5 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V5.md)
 - [Reference-Aligned Implementation Profile v4 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V4.md)
@@ -34,6 +37,11 @@ See:
 - [Open Source Reference Review Round 4 — large-scale engineering](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND4_LARGE_SCALE_ENGINEERING_2026-09-23.md)
 - [Open Source Reference Review Round 5 — task execution and reproducibility](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND5_TASK_EXECUTION_REPRODUCIBILITY_2026-09-23.md)
 - [Open Source Reference Review Round 6 — code intelligence and observability](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND6_CODE_INTELLIGENCE_OBSERVABILITY_2026-09-23.md)
+- [Open Source Reference Review Round 7 — test quality and change impact](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND7_TEST_QUALITY_IMPACT_2026-09-23.md)
+- [Open Source Reference Review Round 8 — requirements traceability](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND8_REQUIREMENTS_TRACEABILITY_2026-09-23.md)
+- [Open Source Reference Review Round 9 — MBSE and assurance case](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND9_MBSE_ASSURANCE_CASE_2026-09-23.md)
+- [Open Source Reference Review Round 10 — simulation and verification fidelity](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND10_SIMULATION_VERIFICATION_FIDELITY_2026-09-23.md)
+- [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
 - [AI Native Engineering Platform v1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1.md)
@@ -88,7 +96,10 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v7 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V7.md)
+- [M0 Reference Adoption Plan v10 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V10.md)
+- [M0 Reference Adoption Plan v9 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V9.md)
+- [M0 Reference Adoption Plan v8 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V8.md)
+- [M0 Reference Adoption Plan v7 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V7.md)
 - [M0 Reference Adoption Plan v6 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V6.md)
 - [M0 Reference Adoption Plan v5 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V5.md)
 - [M0 Reference Adoption Plan v4 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V4.md)
