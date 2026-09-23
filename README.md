@@ -21,8 +21,10 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v1 — canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V1.md)
-- [Open Source Reference Review — archived research](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_2026-09-23.md)
+- [Reference-Aligned Implementation Profile v2 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V2.md)
+- [Reference-Aligned Implementation Profile v1 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V1.md)
+- [Open Source Reference Review Round 1 — archived research](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_2026-09-23.md)
+- [Open Source Reference Review Round 2 — policy, identity, supply chain, embedded test](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND2_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
 - [AI Native Engineering Platform v1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1.md)
 - [Architecture Review Round 2](docs/reviews/ARCHITECTURE_REVIEW_ROUND2_2026-09-23.md)
@@ -71,3 +73,7 @@ The platform keeps Requirement/Run/Target/Evidence/Verification/Release authorit
 - RAUC — optional embedded Linux OTA backend
 
 External component state never becomes hidden engineering authority.
+
+## Current M0 execution plan
+
+- [M0 Reference Adoption Plan v2](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V2.md)
