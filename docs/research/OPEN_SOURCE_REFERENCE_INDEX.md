@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V10.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V17.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V10.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V17.md
 
 ## 1. Research rounds
 
@@ -23,6 +23,13 @@ Execution:
 | 8 | Requirements traceability | Capra, StrictDoc, Doorstop, OpenFastTrace, ReqIF concepts | TraceLink; trace matrix/coverage projection; explicit impact traversal |
 | 9 | MBSE/high assurance | SysML v2, OpenSysML, Capella, Resolute, SACM/GSN | ModelArtifact; optional AssuranceCaseArtifact for A3/A4 |
 | 10 | Simulation/emulation/HIL fidelity | Renode, QEMU, Gazebo, Webots, syzkaller | VerificationEnvironmentClass; explicit environment equivalence; fidelity ladder |
+| 11 | Engineering metrics / progressive delivery / AI governance | DevLake, OpenSLO, OpenFeature, Argo Rollouts, ToolHive, Docker MCP Gateway, Promptfoo | derived MetricDefinition; PromotionPlan; ToolProfile; RuntimeQualificationProfile |
+| 12 | Incident / regression / knowledge closure | Keep, Sentry, ClusterFuzz, mozregression, rustc-perf, Rundeck | Incident; ReproductionCase; bisection; FixVerification; curated KnowledgeCandidate |
+| 13 | ML experiment / dataset / model lineage | MLflow, MLMD, Kubeflow, ClearML, Metaflow, W&B, CML | DatasetArtifact; ExperimentDefinition; MLModelArtifact; CalibrationArtifact; qualification lineage |
+| 14 | Device identity / provisioning / attestation | Keylime, TPM2, TF-M/PSA, MCUboot, wolfBoot, FDO, Caliptra | DeviceProvisioningReceipt; DeviceTrustProfile; Boot/Attestation Evidence |
+| 15 | Formal methods / model checking | TLA+, Alloy, CBMC, Kani, Frama-C, VeriFast | FormalSpecificationArtifact; formal Evidence; model-check platform invariants |
+| 16 | Interface contract compatibility | Buf, Pact, AsyncAPI, Schemathesis, Protovalidate | multidimensional compatibility; ConsumerContract; breaking-change Evidence |
+| 17 | Configuration / constraints / resolved config | JSON Schema, CEL, CUE, KCL, HCL/Jsonnet | ResolvedConfigurationArtifact; layered schema/constraint/policy validation |
 
 ---
 
@@ -87,6 +94,10 @@ Prefer:
 - CloudEvents + CDEvents for external CI/CD event projection
 - ReqIF for future requirement interchange
 - GSN/SACM export only for future high-assurance use
+- OpenFeature-style vendor-neutral flag evaluation where runtime flags are used
+- Buf-style breaking checks for Protobuf; OpenAPI/AsyncAPI/Pact where interface kind fits
+- JSON Schema/native typed schema for structure; CEL-style bounded local constraints where useful
+- ML lineage mapped into common Run/Artifact/Evidence semantics rather than a parallel authority model
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -109,6 +120,15 @@ Do not let any standard become the mutable engineering business authority.
 13. generated code intelligence and telemetry remain context/observability, not authority.
 14. simulation evidence records fidelity and does not implicitly replace HIL/physical proof.
 15. high-assurance argumentation is optional and evidence-citing, not evidence-generating.
+16. progressive promotion and runtime configuration are exact-subject concerns, not mutable side notes.
+17. MCP/tool discovery never implies tool authority; Formal Runs bind exact ToolProfile.
+18. operational incidents feed Reproduction/FixVerification/Postmortem before curated Knowledge.
+19. datasets/models/calibration reuse the same Artifact/Evidence/Verification authority model.
+20. physical Device identity/provisioning/boot/attestation trust are separate from Target and Worker identity.
+21. formal verification is scoped Evidence with explicit assumptions/bounds, never automatic release authority.
+22. interface compatibility is multidimensional and exact-revision bound.
+23. configuration authoring sources are distinct from resolved canonical configuration used for execution.
+24. derived analytics, external registries and dashboards remain projections rather than hidden sources of truth.
 
 ---
 
