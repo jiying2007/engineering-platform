@@ -20,7 +20,8 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 
 See:
 
-- [AI Native Engineering Platform v1.1 — current baseline; Round 4/5 findings pending v1.2](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
+- [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
+- [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
 - [AI Native Engineering Platform v1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1.md)
 - [Architecture Review Round 2](docs/reviews/ARCHITECTURE_REVIEW_ROUND2_2026-09-23.md)
 - [Architecture Review Round 3 — implementation readiness](docs/reviews/ARCHITECTURE_REVIEW_ROUND3_IMPLEMENTATION_READINESS_2026-09-23.md)
