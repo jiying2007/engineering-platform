@@ -1,13 +1,13 @@
 # Open Source Reference Research Index
 
-Date: 2026-09-23
+Date: 2026-09-24
 Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V17.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V17.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md
 
 ## 1. Research rounds
 
@@ -30,6 +30,10 @@ Execution:
 | 15 | Formal methods / model checking | TLA+, Alloy, CBMC, Kani, Frama-C, VeriFast | FormalSpecificationArtifact; formal Evidence; model-check platform invariants |
 | 16 | Interface contract compatibility | Buf, Pact, AsyncAPI, Schemathesis, Protovalidate | multidimensional compatibility; ConsumerContract; breaking-change Evidence |
 | 17 | Configuration / constraints / resolved config | JSON Schema, CEL, CUE, KCL, HCL/Jsonnet | ResolvedConfigurationArtifact; layered schema/constraint/policy validation |
+| 18 | Manufacturing traceability / fleet rollout | BaSyx, OpenTAP, OPC UA/open62541, ERPNext, hawkBit, Mender | trusted Station/Recipe/Result receipts; per-device rollout; SystemUpdateManifest |
+| 19 | Knowledge freshness / revalidation | DataHub, OpenMetadata, Backstage concepts | KnowledgeItem lifecycle; freshness policy; validation receipts; scoped trusted retrieval |
+| 20 | AI code review quality / independence | PR-Agent, reviewdog, Code Review Bench, AACR-Bench, Google review guidance | ReviewExecution/Finding/Resolution; reviewer qualification; independence and replay corpus |
+| 21 | Empirical AI coding governance | DORA, METR, OpenSSF public guidance | AIUsagePolicy; RuntimeInstructionProfile; paired metrics; versioned measurement studies |
 
 ---
 
@@ -98,6 +102,10 @@ Prefer:
 - Buf-style breaking checks for Protobuf; OpenAPI/AsyncAPI/Pact where interface kind fits
 - JSON Schema/native typed schema for structure; CEL-style bounded local constraints where useful
 - ML lineage mapped into common Run/Artifact/Evidence semantics rather than a parallel authority model
+- AAS/OPC UA/OpenTAP only as manufacturing interoperability/execution mechanisms where useful
+- staged OTA/fleet systems modeled through per-device attempts and explicit cohort semantics
+- knowledge/context catalogs treated as governed projections around KnowledgeItem lifecycle
+- AI code review tools qualified through benchmark + project failure replay, not trusted by brand
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -129,6 +137,12 @@ Do not let any standard become the mutable engineering business authority.
 22. interface compatibility is multidimensional and exact-revision bound.
 23. configuration authoring sources are distinct from resolved canonical configuration used for execution.
 24. derived analytics, external registries and dashboards remain projections rather than hidden sources of truth.
+25. manufacturing stations/recipes/results connect Release identity to each physical serial without turning the platform into an MES.
+26. fleet promotion is per-device, stage-based and reconciliation-driven; abort is not assumed atomic.
+27. durable Knowledge is scoped, provenance-backed, freshness-managed and revalidated.
+28. AI review produces Findings under explicit reviewer identity/qualification; it does not self-approve.
+29. AI usage policy and instructions are versioned, but instructions never replace capability enforcement.
+30. AI productivity claims are local/time/profile scoped and paired with quality/assurance outcomes.
 
 ---
 
