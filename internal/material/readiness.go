@@ -14,17 +14,17 @@ const (
 )
 
 type Manifest struct {
-	TaskType             string   `json:"task_type"`
-	Repository           string   `json:"repository"`
-	BaseCommit           string   `json:"base_commit"`
-	TargetID             string   `json:"target_id,omitempty"`
-	AcceptanceCriteria   []string `json:"acceptance_criteria"`
-	HasAuthoritativeLog  bool     `json:"has_authoritative_log,omitempty"`
-	HasReproduction      bool     `json:"has_reproduction,omitempty"`
-	RequiresDevice       bool     `json:"requires_device,omitempty"`
-	DeviceID             string   `json:"device_id,omitempty"`
-	FirmwareIdentity     string   `json:"firmware_identity,omitempty"`
-	DegradationApproved  bool     `json:"degradation_approved,omitempty"`
+	TaskType            string   `json:"task_type"`
+	Repository          string   `json:"repository"`
+	BaseCommit          string   `json:"base_commit"`
+	TargetID            string   `json:"target_id,omitempty"`
+	AcceptanceCriteria  []string `json:"acceptance_criteria"`
+	HasAuthoritativeLog bool     `json:"has_authoritative_log,omitempty"`
+	HasReproduction     bool     `json:"has_reproduction,omitempty"`
+	RequiresDevice      bool     `json:"requires_device,omitempty"`
+	DeviceID            string   `json:"device_id,omitempty"`
+	FirmwareIdentity    string   `json:"firmware_identity,omitempty"`
+	DegradationApproved bool     `json:"degradation_approved,omitempty"`
 }
 
 type Result struct {
@@ -33,39 +33,46 @@ type Result struct {
 }
 
 func Evaluate(m Manifest) Result {
-	var reasons []string
+	var hard []string
+	var degradable []string
+
 	if m.Repository == "" {
-		reasons = append(reasons, "missing repository")
+		hard = append(hard, "missing repository")
 	}
 	if !isFullCommit(m.BaseCommit) {
-		reasons = append(reasons, "missing exact full commit SHA")
+		hard = append(hard, "missing exact full commit SHA")
 	}
 	if len(m.AcceptanceCriteria) == 0 {
-		reasons = append(reasons, "missing acceptance criteria")
+		hard = append(hard, "missing acceptance criteria")
 	}
+
 	switch strings.ToUpper(m.TaskType) {
 	case "DEBUG":
 		if !m.HasAuthoritativeLog && !m.HasReproduction {
-			reasons = append(reasons, "debug requires authoritative log or reproduction")
+			degradable = append(degradable, "debug requires authoritative log or reproduction")
 		}
 	case "DEVICE_TEST":
 		if m.DeviceID == "" {
-			reasons = append(reasons, "device test requires exact device identity")
+			hard = append(hard, "device test requires exact device identity")
 		}
 		if m.FirmwareIdentity == "" {
-			reasons = append(reasons, "device test requires exact firmware identity")
+			hard = append(hard, "device test requires exact firmware identity")
 		}
 	}
 	if m.RequiresDevice && m.DeviceID == "" {
-		reasons = append(reasons, "task requires exact device identity")
+		hard = append(hard, "task requires exact device identity")
 	}
-	if len(reasons) == 0 {
+
+	if len(hard) > 0 {
+		return Result{Status: Blocked, Reasons: append(hard, degradable...)}
+	}
+	if len(degradable) == 0 {
 		return Result{Status: Ready}
 	}
 	if m.DegradationApproved {
-		return Result{Status: Degraded, Reasons: reasons}
+		return Result{Status: Degraded, Reasons: degradable}
 	}
-	return Result{Status: Blocked, Reasons: reasons}
+	return Result{Status: Blocked, Reasons: degradable}
 }
 
 func isFullCommit(v string) bool {
