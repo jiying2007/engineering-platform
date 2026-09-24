@@ -20,6 +20,7 @@ type Store interface {
 	GetWork(string) (core.WorkItem, error)
 	CreateTask(core.TaskContract) error
 	GetTask(string) (core.TaskContract, error)
+	GetTaskRevision(string, uint64) (core.TaskContract, error)
 	GetTaskByDigest(string) (core.TaskContract, error)
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
@@ -27,21 +28,23 @@ type Store interface {
 }
 
 type Memory struct {
-	mu       sync.RWMutex
-	works    map[string]core.WorkItem
-	tasks         map[string]core.TaskContract
+	mu            sync.RWMutex
+	works         map[string]core.WorkItem
+	tasks         map[string]map[uint64]core.TaskContract
+	latestTaskRev map[string]uint64
 	tasksByDigest map[string]core.TaskContract
-	runs     map[string]run.Run
-	sessions map[string]session.Session
+	runs          map[string]run.Run
+	sessions      map[string]session.Session
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		works:    make(map[string]core.WorkItem),
-		tasks:         make(map[string]core.TaskContract),
+		works:         make(map[string]core.WorkItem),
+		tasks:         make(map[string]map[uint64]core.TaskContract),
+		latestTaskRev: make(map[string]uint64),
 		tasksByDigest: make(map[string]core.TaskContract),
-		runs:     make(map[string]run.Run),
-		sessions: make(map[string]session.Session),
+		runs:          make(map[string]run.Run),
+		sessions:      make(map[string]session.Session),
 	}
 }
 
@@ -66,27 +69,63 @@ func (m *Memory) GetWork(id string) (core.WorkItem, error) {
 }
 
 func (m *Memory) CreateTask(task core.TaskContract) error {
+	if task.Revision == 0 {
+		return ErrConflict
+	}
 	digest, err := task.Digest()
 	if err != nil {
 		return err
 	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.tasks[task.ID]; ok {
-		return ErrExists
-	}
+
 	if _, ok := m.tasksByDigest[digest]; ok {
 		return ErrExists
 	}
-	m.tasks[task.ID] = task
+
+	versions := m.tasks[task.ID]
+	latest := m.latestTaskRev[task.ID]
+	if versions == nil {
+		if task.Revision != 1 {
+			return ErrConflict
+		}
+		versions = make(map[uint64]core.TaskContract)
+		m.tasks[task.ID] = versions
+	} else {
+		if _, exists := versions[task.Revision]; exists {
+			return ErrExists
+		}
+		if task.Revision != latest+1 {
+			return ErrConflict
+		}
+	}
+
+	versions[task.Revision] = task
+	m.latestTaskRev[task.ID] = task.Revision
 	m.tasksByDigest[digest] = task
 	return nil
 }
 
+// GetTask returns the latest revision for human/API lookup.
 func (m *Memory) GetTask(id string) (core.TaskContract, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	task, ok := m.tasks[id]
+	latest, ok := m.latestTaskRev[id]
+	if !ok {
+		return core.TaskContract{}, ErrNotFound
+	}
+	return m.tasks[id][latest], nil
+}
+
+func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	versions, ok := m.tasks[id]
+	if !ok {
+		return core.TaskContract{}, ErrNotFound
+	}
+	task, ok := versions[revision]
 	if !ok {
 		return core.TaskContract{}, ErrNotFound
 	}
