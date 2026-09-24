@@ -66,6 +66,8 @@ jobs:
         run: |
           go test -race -count=20 -timeout 1m ./internal/outbox
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run 'TestPostgres(Outbox|EverySettlement|RecoveryAfterClaim|DispatchHolds|ConcurrentDispatch|MismatchedRisk|ExpiredAndCancelled|UnknownOutcome|RiskRejection|FaultInjectionSchemaIsolation)'
+      - name: Prepared Runtime and Context repeated regression
+        run: go test -race -count=10 -timeout 2m ./internal/runtime/codexapp ./internal/contextbundle
       - name: Vet
         run: go vet ./...
       - name: Build binaries

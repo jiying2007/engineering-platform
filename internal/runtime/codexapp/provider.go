@@ -3,6 +3,8 @@ package codexapp
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -10,58 +12,107 @@ import (
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
-type Provider struct {
-	executable string
-}
+type Provider struct{ executable string }
 
-func NewProvider(executable string) *Provider {
-	if executable == "" {
-		executable = "codex"
-	}
-	return &Provider{executable: executable}
-}
+func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
+func (p *Provider) Name() string              { return "codex-app-server" }
 
-func (p *Provider) Name() string {
-	return "codex-app-server"
-}
-
+// Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
+// paths, separate identities/read-only mounts and resource limits remain required.
+// Credentials are explicit inputs; no parent environment is inherited.
 func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec) (*exec.Cmd, error) {
-	if p == nil || p.executable == "" {
-		return nil, fmt.Errorf("codex executable is required")
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	if spec.Dir == "" {
-		return nil, fmt.Errorf("workspace directory is required")
+	if p == nil || !filepath.IsAbs(p.executable) || len(spec.Args) != 0 || spec.Executable != "" {
+		return nil, fmt.Errorf("absolute configured executable required; launch overrides are forbidden")
 	}
-	absolute, err := filepath.Abs(spec.Dir)
+	executable, err := canonicalPath(p.executable, false)
 	if err != nil {
-		return nil, fmt.Errorf("resolve workspace directory: %w", err)
+		return nil, err
 	}
-	home, ok := envValue(spec.Env, "HOME")
-	if !ok || strings.TrimSpace(home) == "" {
-		return nil, fmt.Errorf("isolated HOME is required for codex app-server")
+	fi, err := os.Stat(executable)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o022 != 0 || fi.Mode().Perm()&0o111 == 0 {
+		return nil, fmt.Errorf("trusted executable required")
 	}
-	home, err = filepath.Abs(home)
+	work, err := canonicalPath(spec.Dir, true)
 	if err != nil {
-		return nil, fmt.Errorf("resolve isolated HOME: %w", err)
+		return nil, err
 	}
-	if filepath.Clean(home) == filepath.Clean(absolute) ||
-		strings.HasPrefix(filepath.Clean(home), filepath.Clean(absolute)+string(filepath.Separator)) {
-		return nil, fmt.Errorf("isolated HOME must live outside the source worktree")
+	values := map[string]string{}
+	for _, value := range spec.Env {
+		key, val, ok := strings.Cut(value, "=")
+		if !ok || strings.ContainsRune(val, 0) {
+			return nil, fmt.Errorf("invalid runtime environment")
+		}
+		if _, exists := values[key]; exists {
+			return nil, fmt.Errorf("duplicate runtime environment key")
+		}
+		switch key {
+		case "HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL":
+		default:
+			return nil, fmt.Errorf("runtime environment key is not allowlisted")
+		}
+		if strings.TrimSpace(val) == "" {
+			return nil, fmt.Errorf("empty runtime environment value")
+		}
+		values[key] = val
 	}
-
-	args := append([]string{"app-server"}, spec.Args...)
-	cmd := exec.CommandContext(ctx, p.executable, args...)
-	cmd.Dir = absolute
-	cmd.Env = append(cmd.Environ(), spec.Env...)
+	home, err := canonicalPath(values["HOME"], true)
+	if err != nil {
+		return nil, err
+	}
+	if overlaps(home, work) {
+		return nil, fmt.Errorf("isolated HOME and worktree must be disjoint")
+	}
+	info, err := os.Stat(home)
+	if err != nil || info.Mode().Perm()&0o077 != 0 {
+		return nil, fmt.Errorf("isolated HOME must be owner-only")
+	}
+	// A freshly allocated HOME cannot import stale provider/XDG configuration.
+	entries, err := os.ReadDir(home)
+	if err != nil || len(entries) != 0 {
+		return nil, fmt.Errorf("fresh empty isolated HOME required")
+	}
+	env := []string{"PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "TZ=UTC", "HOME=" + home, "CODEX_HOME=" + filepath.Join(home, ".codex"), "XDG_CONFIG_HOME=" + filepath.Join(home, ".config"), "XDG_CACHE_HOME=" + filepath.Join(home, ".cache")}
+	if key, ok := values["OPENAI_API_KEY"]; ok {
+		env = append(env, "OPENAI_API_KEY="+key)
+	}
+	if base, ok := values["OPENAI_BASE_URL"]; ok {
+		u, e := url.Parse(base)
+		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return nil, fmt.Errorf("explicit provider endpoint must be HTTPS without credentials or query")
+		}
+		env = append(env, "OPENAI_BASE_URL="+base)
+	}
+	cmd := exec.CommandContext(ctx, executable, "app-server", "--listen", "stdio")
+	cmd.Dir = work
+	cmd.Env = env
 	return cmd, nil
 }
-
-func envValue(env []string, key string) (string, bool) {
-	prefix := key + "="
-	for i := len(env) - 1; i >= 0; i-- {
-		if strings.HasPrefix(env[i], prefix) {
-			return strings.TrimPrefix(env[i], prefix), true
-		}
+func canonicalPath(path string, directory bool) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("absolute existing path required")
 	}
-	return "", false
+	clean := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(clean)
+	if err != nil {
+		return "", err
+	}
+	if resolved != clean {
+		return "", fmt.Errorf("symlink path alias is not allowed")
+	}
+	info, err := os.Stat(clean)
+	if err != nil {
+		return "", err
+	}
+	if directory && !info.IsDir() {
+		return "", fmt.Errorf("directory required")
+	}
+	return clean, nil
+}
+func overlaps(a, b string) bool { return inside(a, b) || inside(b, a) }
+func inside(a, b string) bool {
+	rel, err := filepath.Rel(a, b)
+	return err == nil && (rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))))
 }

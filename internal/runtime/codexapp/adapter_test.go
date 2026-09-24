@@ -1,0 +1,260 @@
+package codexapp
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"io"
+	"os"
+	"testing"
+	"time"
+)
+
+// The helper is this test binary in a dedicated subprocess. It has no network,
+// provider key, model or shell execution; this proves protocol wiring, not Codex.
+func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == "app-server" {
+		if helperServer() != nil {
+			os.Exit(2)
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+func helperServer() error {
+	if len(os.Args) != 4 || os.Args[2] != "--listen" || os.Args[3] != "stdio" {
+		return errors.New("bad launch")
+	}
+	if os.Getenv("EP_HOST_SECRET") != "" {
+		return errors.New("host secret leaked")
+	}
+	in := bufio.NewScanner(os.Stdin)
+	out := json.NewEncoder(os.Stdout)
+	initialized := false
+	ready := false
+	thread := false
+	active := false
+	send := func(id json.RawMessage, result any) error {
+		return out.Encode(map[string]any{"id": id, "result": result})
+	}
+	event := func(method string, params any) error {
+		return out.Encode(map[string]any{"method": method, "params": params})
+	}
+	for in.Scan() {
+		var m Message
+		if json.Unmarshal(in.Bytes(), &m) != nil {
+			return ErrProtocol
+		}
+		if m.Method == "" {
+			var answer struct {
+				Decision string `json:"decision"`
+			}
+			if json.Unmarshal(m.Result, &answer) != nil || answer.Decision != "decline" {
+				return errors.New("approval not declined")
+			}
+			continue
+		}
+		switch m.Method {
+		case "initialize":
+			if initialized {
+				return ErrLifecycle
+			}
+			initialized = true
+			if err := send(m.ID, map[string]string{"userAgent": "offline-helper"}); err != nil {
+				return err
+			}
+		case "initialized":
+			if !initialized {
+				return ErrLifecycle
+			}
+			ready = true
+		case "thread/start":
+			if !ready || thread {
+				return ErrLifecycle
+			}
+			var p struct {
+				CWD     string `json:"cwd"`
+				Sandbox string `json:"sandbox"`
+				Policy  string `json:"approvalPolicy"`
+			}
+			if json.Unmarshal(m.Params, &p) != nil || p.Sandbox != "readOnly" || p.Policy != "unlessTrusted" {
+				return ErrProtocol
+			}
+			if _, err := os.Stat(p.CWD); err != nil {
+				return err
+			}
+			thread = true
+			if err := send(m.ID, map[string]any{"thread": map[string]string{"id": "thread-1"}}); err != nil {
+				return err
+			}
+		case "turn/start":
+			if !thread || active {
+				return ErrLifecycle
+			}
+			active = true
+			if err := send(m.ID, map[string]any{"turn": map[string]string{"id": "turn-1"}}); err != nil {
+				return err
+			}
+			if err := out.Encode(map[string]any{"id": "approval-1", "method": "item/commandExecution/requestApproval", "params": map[string]string{"threadId": "thread-1", "turnId": "turn-1"}}); err != nil {
+				return err
+			}
+		case "turn/steer":
+			var p struct {
+				Expected string `json:"expectedTurnId"`
+			}
+			if json.Unmarshal(m.Params, &p) != nil || p.Expected != "turn-1" || !active {
+				return ErrLifecycle
+			}
+			if err := send(m.ID, map[string]string{"turnId": "turn-1"}); err != nil {
+				return err
+			}
+		case "turn/interrupt":
+			if !active {
+				return ErrLifecycle
+			}
+			if err := send(m.ID, map[string]any{}); err != nil {
+				return err
+			}
+			active = false
+			if err := event("turn/completed", map[string]any{"threadId": "thread-1", "turn": map[string]string{"id": "turn-1", "status": "interrupted"}}); err != nil {
+				return err
+			}
+		default:
+			return ErrProtocol
+		}
+	}
+	return in.Err()
+}
+func exerciseProcess(t *testing.T, p *Provider, spec runtimeprovider.LaunchSpec) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd, err := p.Command(ctx, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd.Stderr = io.Discard
+	input, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	c := NewClient(output, input)
+	defer func() { _ = c.Close(); cancel(); _ = cmd.Wait() }()
+	a, err := NewAdapter(c, spec.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.StartTurn(ctx, "too early"); !errors.Is(err, ErrLifecycle) {
+		t.Fatal(err)
+	}
+	if err := a.Initialize(ctx, "offline-test-v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Initialize(ctx, "twice"); !errors.Is(err, ErrLifecycle) {
+		t.Fatal(err)
+	}
+	if _, err := a.StartThread(ctx, "operator-selected-model"); err != nil {
+		t.Fatal(err)
+	}
+	turn, err := a.StartTurn(ctx, "Inspect the prepared workspace read-only.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := a.Next(ctx)
+	if err != nil || e.Kind != ServerRequest {
+		t.Fatal(e, err)
+	}
+	if err := a.Steer(ctx, "stale", "do not change scope"); !errors.Is(err, ErrLifecycle) {
+		t.Fatal(err)
+	}
+	if err := a.Steer(ctx, turn, "Focus on the frozen acceptance criteria."); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Interrupt(ctx, turn); err != nil {
+		t.Fatal(err)
+	}
+	e, err = a.Next(ctx)
+	if err != nil || e.Message.Method != "turn/completed" {
+		t.Fatal(e, err)
+	}
+	if err := a.Interrupt(ctx, turn); !errors.Is(err, ErrLifecycle) {
+		t.Fatal(err)
+	}
+	_ = c.Close()
+	wait, stop := context.WithTimeout(context.Background(), time.Second)
+	defer stop()
+	_ = c.Wait(wait)
+	if wait.Err() != nil {
+		t.Fatal("transport did not terminate")
+	}
+}
+func TestAppServerSubprocessLifecycle(t *testing.T) {
+	p, spec := launchFixture(t)
+	t.Setenv("EP_HOST_SECRET", "must-not-leak")
+	exerciseProcess(t, p, spec)
+}
+func TestCompletionBeforeStartResponse(t *testing.T) {
+	c, p := pair(t)
+	a, err := NewAdapter(c, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.initialized = true
+	a.thread = "thread"
+	completed := make(chan struct{})
+	go func() {
+		d := json.NewDecoder(p)
+		var m Message
+		if d.Decode(&m) != nil {
+			return
+		}
+		_, _ = io.WriteString(p, `{"method":"turn/completed","params":{"threadId":"thread","turn":{"id":"turn","status":"completed"}}}`+"\n")
+		<-completed
+		_, _ = io.WriteString(p, `{"id":`+string(m.ID)+`,"result":{"turn":{"id":"turn"}}}`+"\n")
+	}()
+	done := make(chan error, 1)
+	callContext := deadline(t)
+	go func() { _, err := a.StartTurn(callContext, "instant"); done <- err }()
+	if _, err := a.Next(deadline(t)); err != nil {
+		t.Fatal(err)
+	}
+	close(completed)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.turn != "" {
+		t.Fatal("completed turn revived")
+	}
+}
+func TestUnknownServerRequestGetsNoGrant(t *testing.T) {
+	c, p := pair(t)
+	a, err := NewAdapter(c, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer := make(chan Message, 1)
+	go func() {
+		_, _ = io.WriteString(p, `{"id":99,"method":"new/permission","params":{}}`+"\n")
+		var r Message
+		_ = json.NewDecoder(p).Decode(&r)
+		answer <- r
+	}()
+	if _, err := a.Next(deadline(t)); err != nil {
+		t.Fatal(err)
+	}
+	r := <-answer
+	if len(r.Error) == 0 || len(r.Result) != 0 {
+		t.Fatal("unknown request was approved")
+	}
+}
