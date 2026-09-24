@@ -186,6 +186,13 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	return receiptFromOperation(req.ID, *op, s.now()), nil
 }
 
+func (s *Service) Get(operationID string) (Operation, error) {
+	if s == nil || s.repository == nil {
+		return Operation{}, fmt.Errorf("action service repository is not configured")
+	}
+	return s.repository.Get(operationID)
+}
+
 func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, error) {
 	op, err := s.repository.Get(operationID)
 	if err != nil {
