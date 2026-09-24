@@ -27,8 +27,9 @@ type Store interface {
 	GetTaskByDigest(string) (core.TaskContract, error)
 	GetVerificationPlanByDigest(string) (verification.Plan, error)
 
-	CreateExecution(run.Run, session.Session) error
+	CreateExecution(run.Run, session.Session, core.RunInputManifest) error
 	GetExecution(string) (run.Run, session.Session, error)
+	GetRunInputByDigest(string) (core.RunInputManifest, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
 
 	CreateDelivery(core.DeliveryReceipt) error
@@ -53,6 +54,7 @@ type Memory struct {
 	verificationPlans   map[string]verification.Plan
 	runs                map[string]run.Run
 	sessions            map[string]session.Session
+	runInputs            map[string]core.RunInputManifest
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
@@ -68,6 +70,7 @@ func NewMemory() *Memory {
 		verificationPlans:   make(map[string]verification.Plan),
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
+		runInputs:            make(map[string]core.RunInputManifest),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
@@ -210,7 +213,15 @@ func (m *Memory) GetVerificationPlanByDigest(digest string) (verification.Plan, 
 	return plan, nil
 }
 
-func (m *Memory) CreateExecution(value run.Run, sess session.Session) error {
+func (m *Memory) CreateExecution(value run.Run, sess session.Session, input core.RunInputManifest) error {
+	inputDigest, err := input.Digest()
+	if err != nil {
+		return err
+	}
+	if inputDigest != value.RunInputManifestDigest || input.RunID != value.ID || input.TaskContractDigest != value.TaskContractDigest {
+		return ErrConflict
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.runs[value.ID]; ok {
@@ -219,11 +230,15 @@ func (m *Memory) CreateExecution(value run.Run, sess session.Session) error {
 	if _, ok := m.sessions[value.ID]; ok {
 		return ErrExists
 	}
+	if _, ok := m.runInputs[inputDigest]; ok {
+		return ErrExists
+	}
 	if value.Version == 0 {
 		value.Version = 1
 	}
 	m.runs[value.ID] = value
 	m.sessions[value.ID] = sess
+	m.runInputs[inputDigest] = input
 	return nil
 }
 
@@ -239,6 +254,16 @@ func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
 		return run.Run{}, session.Session{}, ErrNotFound
 	}
 	return value, sess, nil
+}
+
+func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	input, ok := m.runInputs[digest]
+	if !ok {
+		return core.RunInputManifest{}, ErrNotFound
+	}
+	return input, nil
 }
 
 func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
