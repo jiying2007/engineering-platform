@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V39.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V41.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V39.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V41.md
 
 ## 1. Research rounds
 
@@ -52,6 +52,8 @@ Execution:
 | 37 | Laboratory sample / cross-enterprise traceability | SENAITE, Tractus-X Trace-X/IRS | SampleInstance/custody; lab import receipts; SupplyChainTraceEvent; PartGenealogyProjection |
 | 38 | Digital Product Passport | EU DPP Registry/standards, Tractus-X | DigitalProductPassportArtifact; DPPProfile; projection/registration receipts |
 | 39 | Digital calibration / metrology | PTB DCC | quantity/unit/uncertainty-aware MeasurementResult; DCC Artifact; measurement traceability |
+| 40 | System safety / STPA | XSTAMPP, OSATE/AADL, Resolute | SafetyLoss/Hazard/UCA/LossScenario; SafetyConstraint; SafeStateDefinition |
+| 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
 
 ---
 
@@ -139,6 +141,8 @@ Prefer:
 - cross-enterprise trace data treated as provenance-rich observations and genealogy projections
 - Digital Product Passport generated as an immutable external projection over lifecycle facts
 - PTB DCC-inspired measurement semantics for units, uncertainty, instrument/calibration and influence conditions
+- STPA/AADL-inspired system safety chain for losses, hazards, unsafe control actions and safety constraints
+- ASAM-inspired optional HIL/test interoperability while retaining internal Procedure/Measurement/Evidence authority
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -197,6 +201,10 @@ Do not let any standard become the mutable engineering business authority.
 49. Digital Product Passport is a versioned projection/export, never the mutable source of product facts.
 50. formal measurements preserve quantity, unit, uncertainty, instrument, calibration and influence conditions.
 51. raw measurement data remains immutable beneath derived/calculated/evaluated results.
+52. system safety hazards/control actions are distinct from cybersecurity threats and component failures.
+53. safety constraints trace into ordinary Requirement/Evidence authority and safe state is explicit.
+54. standardized test/measurement formats never replace internal Verification authority.
+55. multi-source HIL timing Evidence declares timebase/synchronization assumptions.
 
 ---
 
