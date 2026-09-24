@@ -47,16 +47,12 @@ func main() {
 
 	handler := api.NewServer(backend).Handler()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 	server := &http.Server{
-		Addr:              ":" + port,
+		Addr:              controlPlaneAddress(os.Getenv("LISTEN_HOST"), os.Getenv("PORT")),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
-	log.Printf("engineering control plane listening on %s", server.Addr)
+	log.Printf("engineering control plane listening on %s (bootstrap API: no production authentication)", server.Addr)
 	log.Fatal(server.ListenAndServe())
 }

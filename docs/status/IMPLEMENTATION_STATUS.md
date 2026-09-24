@@ -1,253 +1,69 @@
 # Implementation Status
 
 Date: 2026-09-24
-Stage: **M0 core implementation**
+Stage: **M0 Core implemented in parts; M1 execution components, not an assembled pilot**
 
-## 1. Canonical scope
+## Canonical scope
 
-Current:
 - `docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md`
 - `docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md`
 - `docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md`
 - `docs/extensions/EXTENSION_CATALOG_V1.md`
 - `docs/adr/ADR-001-clean-slate-embedded-platform-scope.md`
 - `docs/adr/ADR-002-postgres-transaction-audit-outbox.md`
+- `docs/adr/ADR-003-go-postgres-baseline.md`
 
-Historical v1.2 / profile-v43 / M0-v43 documents remain research/design evidence only.
+This platform is independent of digital-worker. Historical architecture profiles
+are research evidence, not an expanding Core implementation checklist.
 
-## 2. Implemented and CI-verified
+## Implemented components
 
-### Repository / build
-- Go module.
-- `cmd/control-plane`.
-- `cmd/eng`.
-- `cmd/worker`.
-- Makefile.
-- GitHub Actions:
-  - gofmt;
-  - `go test ./...`;
-  - `go vet ./...`;
-  - build all three binaries.
-- current Actions use `actions/checkout@v7` and `actions/setup-go@v7`.
+| Area | Implemented | Boundary still to close |
+| --- | --- | --- |
+| Contracts | Work, immutable Task revisions and frozen VerificationPlan; RunInput digest; epoch/CAS; Session/Steering/Checkpoint; Delivery/Evidence/Verification/Closure | In-memory alias protection/conformance and authenticated authority |
+| Embedded domain | Six capabilities, eight defined Skills, explicit routing, fail-closed Material Readiness, evidence-backed debugging contract | Retained Feature/Debug pilot evidence; Skills are not yet PILOTED/PROVEN |
+| PostgreSQL | Core Store, lifecycle integration, state + audit + outbox transaction, action repository/audit, recovery transition audit, DATABASE_URL backend switch | Operational migration/recovery drills and whole-product runtime wiring |
+| Outbox | PostgreSQL SKIP LOCKED claim, lease/reclaim, retry/dead-letter; recovery filter at claim; dispatcher library | Lease generation/expiry fencing, actual-dispatch recovery guard, safe risk defaults, bounded handler lifecycle and driving loop |
+| Action Gateway | Policy/epoch/recovery guard components, idempotency/external operation ledger, UNKNOWN/reconciliation and API tests | Gateway is NOT injected by the current control-plane executable; real privileged adapters/authentication remain absent |
+| Workspace | Exact full-SHA detached worktree, new-worktree clean check, separate HOME and cleanup tests | Parent-symlink/ownership and Git environment/config/hook hardening; OS sandbox |
+| Runtime | Provider-neutral process supervisor; Codex app-server command builder and JSONL transport | Initialized thread/turn/steering/approval lifecycle, bounded transport shutdown, environment policy and real Worker integration |
+| Context (this change) | Structured refs, raw-byte hash, independent authorization port, bounded resolver reads, staged read-only bundle, deterministic manifest, Verify/revocation/tamper checks | Concrete trusted Resolver/Authorizer, Worker consumption, sandbox read-only mount and durable receipt |
+| HTTP (this change) | Bootstrap API defaults to 127.0.0.1; explicit LISTEN_HOST/PORT overrides | Authenticated principal/capabilities; trusted recovery-completion/evidence issuers; remote API must not be exposed as production-ready |
 
-### Clean-slate embedded domain
-- 6 initial embedded capabilities.
-- 8 initial engineering Skills.
-- explicit M1 task routing.
-- fail-closed Material Readiness.
-- DEGRADED material path requires explicit approver + reason.
-- exact source/device identity remains a non-degradable hard gate.
+## Verification evidence
 
-### Task / verification contract
-- immutable monotonic TaskContract revisions.
-- historical revisions remain addressable by digest.
-- VerificationPlan is frozen before execution.
-- TaskContract binds exact VerificationPlan digest.
-- frozen plan expresses evidence requirements by procedure/issuer rather than future Evidence IDs.
-- verification criteria must cover the Task acceptance criteria.
+The reviewed baseline is `c4c93c1880e9f7dd648b1e6e736e0612e96a384a`.
+Its main CI run `35993962820` / job `107614384742` passed module hygiene, gofmt,
+all tests with PostgreSQL 17, vet and binary builds. PRs #26, #27 and #28 were
+merged component-validation checkpoints.
 
-### Run identity / interactive execution
-- RunAttempt.
-- `execution_epoch`.
-- stale-epoch rejection.
-- Human Takeover revokes prior Runtime epoch.
-- structured Steering sequence.
-- Checkpoint contract.
-- optimistic Run aggregate version / CAS semantics.
-- immutable RunInputManifest.
-- Run binds exact RunInputManifest digest.
-- Runtime / Tool / Worker / Policy profiles are frozen before Run start.
+This change upgrades CI to `go test -race -timeout 5m ./...`, while retaining the
+Go version from go.mod, PostgreSQL 17, module hygiene, gofmt, vet and builds.
+Its authoritative result is the exact PR head check, followed by fresh main CI
+following merge; the baseline result is NOT substituted for new-change evidence.
+No marker-only PR is required to query push/main CI.
 
-### Session Supervisor
-- local provider-neutral process supervisor.
-- stdout/stderr capture.
-- stdin input.
-- epoch guard.
-- Linux SIGSTOP/SIGCONT pause/resume.
-- abort/wait/PID.
-- tested on GitHub Ubuntu runner.
+## Immediate queue
 
-### Action Gateway
-- ActionRequest / Receipt.
-- capability authorization boundary.
-- epoch guard.
-- External Operation Ledger.
-- `DISPATCHED -> UNKNOWN -> RECONCILING`.
-- no blind retry after ambiguous provider outcome.
-- idempotency key + immutable request digest.
-- duplicate identical request does not dispatch twice.
-- same idempotency key with different request fails closed.
+P0: outbox lease/recovery/risk semantics and negative DB tests; trusted HTTP/action
+and Worker assembly; approved Context consumption; workspace/env/sandbox safety.
+Do not drive irreversible handlers before these gates are closed.
 
-### Delivery / Evidence / Verification / Closure
-- Run completion is explicit and terminal.
-- DeliveryReceipt requires a completed Run.
-- Delivery subject digest is calculated by the platform from:
-  - TaskContract digest;
-  - Run;
-  - Target;
-  - base/result commit;
-  - sorted Artifact identities/digests.
-- Evidence registration binds to an existing DeliveryReceipt; caller cannot self-declare subject.
-- Verification consumes only registered Evidence.
-- frozen VerificationPlan is loaded from the TaskContract; caller cannot replace the plan after implementation.
-- stale/different-subject Evidence cannot pass.
-- wrong procedure/issuer cannot satisfy a frozen EvidenceRequirement.
-- FAIL Verification cannot close Work.
-- ClosureReceipt requires PASS Verification for the exact Delivery subject.
-- Work lifecycle is fail-closed through DRAFT -> READY -> EXECUTING -> VERIFYING -> CLOSED/REVIEWING.
+P1: bounded Codex protocol lifecycle; immutable memory-store conformance; concrete
+Git/CI/artifact adapters; retained Feature pilot and Debug pilot; restore/drill
+proof. Temporal/OPA integration should serve that bounded path, not introduce
+another independent authority or expand the domain catalogue.
 
-### Debug discipline
-- HypothesisRegistry.
-- Observed/Inferred separation in contract.
-- root-cause confirmation requires Evidence.
+See `CORE_REVIEW_2026-09-24.md` for exact findings and acceptance tests, and
+`docs/implementation/CONTEXT_MATERIALIZATION_V1.md` for Context semantics.
 
-### Audit / recovery
-- tamper-evident audit hash chain.
-- audit integrity verification.
-- audit checkpoint.
-- recovery_epoch.
-- RECOVERY_RECONCILIATION mode.
-- irreversible actions blocked until reconciliation completes.
+## Readiness
 
-### Database contract
-- focused PostgreSQL schema exists for Core only.
-- Work / immutable Task + frozen VerificationPlan.
-- immutable RunInputManifest.
-- Run/Attempt/Session/Steering/Checkpoint.
-- Action ledger.
-- Artifact/Delivery/Evidence/Verification/Closure.
-- Audit / Outbox / Worker.
-- no Extension Catalog tables.
+Core PostgreSQL persistence and tested execution building blocks are real, not
+just tables/dependencies. However library/contract CI is not command-level product
+execution. There is no retained real Feature pilot or Debug pilot. WorkBuddy
+front-door integration, authenticated policy/credentials, independent Review,
+trusted evidence issuers and Artifact-byte authority remain incomplete.
 
-## 3. Real GitHub CI evidence
-
-Validated with fresh PRs cut from current main during implementation.
-
-Successful examples:
-
-- PR #2 / run `35949487711`
-  - gofmt PASS
-  - test PASS
-  - vet PASS
-  - binary builds PASS
-
-- PR #3 / run `35949673286`
-  - Session Supervisor tests PASS on Ubuntu
-  - gofmt/test/vet/build all PASS
-
-- PR #6 / run `35950353698`
-  - frozen VerificationPlan / EvidenceRequirement model PASS
-  - gofmt/test/vet/build all PASS
-
-- PR #8 / run `35950752163`
-  - frozen RunInputManifest model PASS
-  - gofmt/test/vet/build all PASS
-
-Marker-only validation PRs are used because the current connector exposes pull-request workflow runs reliably.
-
-## 4. Implemented bootstrap API
-
-Current in-memory bootstrap API covers:
-
-~~~text
-WorkItem
- -> TaskContract + frozen VerificationPlan
- -> Run + frozen RunInputManifest
- -> Steering / Pause / Resume / Takeover
- -> Run Complete
- -> DeliveryReceipt
- -> Evidence
- -> Verification
- -> Closure
-~~~
-
-This is a contract/invariant vertical slice.
-
-It is not yet durable production execution.
-
-## 5. Not implemented yet
-
-### Durable persistence
-- PostgreSQL Store adapter is not implemented yet.
-- business-state + audit + outbox atomic transaction is defined by ADR-002 but not yet executed against PostgreSQL.
-- migration exists but has not yet been validated by a real PostgreSQL integration test.
-
-### Orchestration
-- Temporal workflow implementation.
-- outbox dispatcher.
-- durable waits/retries.
-
-### Runtime/product execution
-- Codex-specific Runtime adapter/profile.
-- Workspace/worktree manager.
-- rootless sandbox/resource/network policy.
-- Context attachment/materialization.
-- Session Gateway/WebSocket attach.
-
-### Policy / identity
-- OPA integration.
-- worker enrollment/mTLS.
-- credential broker.
-- production capability grants.
-
-### External engineering facts
-- Git provider adapter.
-- CI provider adapter.
-- Artifact store integration.
-- Device/HIL adapter.
-
-### Assurance
-- independent Review workflow.
-- Evidence issuer/trust registry.
-- Artifact-byte verification/store.
-
-### WorkBuddy
-- WorkBuddy connector/front-door integration.
-
-### Real product evidence
-- no retained real Feature pilot yet.
-- no retained real Debug pilot yet.
-- Skills remain DEFINED, not PILOTED/PROVEN.
-
-## 6. Immediate implementation queue
-
-P0:
-1. PostgreSQL Store adapter.
-2. PostgreSQL integration test for CAS + state/audit/outbox atomicity.
-3. outbox dispatcher contract.
-4. durable audit writes/checkpoints.
-5. workspace/worktree manager.
-6. Codex Runtime adapter on top of Session Supervisor.
-7. Control API persistence switch.
-
-P1:
-8. Temporal Run lifecycle.
-9. OPA Action Gateway authorizer.
-10. Git/CI provider adapter.
-11. Artifact store.
-12. CLI commands for full work/run lifecycle.
-13. first retained Feature pilot.
-
-P2:
-14. Debug pilot with HypothesisRegistry.
-15. sandbox/resource policy.
-16. recovery/reconciliation drill against real PostgreSQL.
-17. M2 Device/HIL only after Feature + Debug pilots are retained.
-
-## 7. Readiness statement
-
-Current claimable maturity:
-
-> **Core architecture: clean-slate and implementation-focused.**
->
-> **Core invariants: implemented with unit/API tests.**
->
-> **Current Go main: repeatedly verified by real GitHub PR CI.**
->
-> **M0: materially underway, not complete.**
->
-> **M1: not yet achieved because persistence, real Runtime/workspace, external facts and real pilots are missing.**
->
-> **Production readiness: not claimed.**
-
-No research-round count, schema count or green bootstrap CI may be used to claim M1/production maturity.
+**M1 and production readiness are not claimed.** Device/HIL and other extension
+domains remain deferred until the two Core pilots have retained exact evidence.

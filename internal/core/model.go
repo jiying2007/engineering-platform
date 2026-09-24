@@ -55,16 +55,19 @@ func (t TaskContract) Digest() (string, error) {
 }
 
 type RunInputManifest struct {
-	RunID              string   `json:"run_id"`
-	TaskContractDigest string   `json:"task_contract_digest"`
-	ContextRefs        []string `json:"context_refs,omitempty"`
-	RuntimeProfile     string   `json:"runtime_profile"`
-	ToolProfile        string   `json:"tool_profile"`
-	WorkerProfile      string   `json:"worker_profile"`
-	PolicyProfile      string   `json:"policy_profile"`
+	RunID              string       `json:"run_id"`
+	TaskContractDigest string       `json:"task_contract_digest"`
+	ContextRefs        []ContextRef `json:"context_refs,omitempty"`
+	RuntimeProfile     string       `json:"runtime_profile"`
+	ToolProfile        string       `json:"tool_profile"`
+	WorkerProfile      string       `json:"worker_profile"`
+	PolicyProfile      string       `json:"policy_profile"`
 }
 
 func (m RunInputManifest) Digest() (string, error) {
+	if err := ValidateContextRefs(m.ContextRefs); err != nil {
+		return "", err
+	}
 	return canonical.Digest(m)
 }
 
