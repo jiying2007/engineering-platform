@@ -147,3 +147,20 @@ func TestRecoveryEpochMustMatchEvenForObserve(t *testing.T) {
 		t.Fatalf("expected stale recovery epoch, got %v", err)
 	}
 }
+
+type failingGatewayState struct {
+	State
+	err error
+}
+
+func (s failingGatewayState) GetRecovery() (recovery.Manager, error) {
+	return recovery.Manager{}, s.err
+}
+
+func TestRecoveryReadFailureFailsClosed(t *testing.T) {
+	expected := errors.New("recovery state unavailable")
+	auth := NewAuthority(failingGatewayState{err: expected})
+	if err := auth.CheckRecoveryEpoch(context.Background(), 0, action.Observe); !errors.Is(err, expected) {
+		t.Fatalf("expected recovery source error, got %v", err)
+	}
+}
