@@ -520,6 +520,7 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item := req.Evidence
+	item.DeliveryReceiptID = delivery.ID
 	item.SubjectDigest = delivery.SubjectDigest
 	if err := s.store.CreateEvidence(item); err != nil {
 		if errors.Is(err, store.ErrExists) {
