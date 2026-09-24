@@ -285,8 +285,8 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"run":     value,
-		"attempt": attempt,
+		"run":       value,
+		"attempt":   attempt,
 		"session":   sess,
 		"run_input": req.RunInput,
 	})
