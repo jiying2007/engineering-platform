@@ -87,7 +87,7 @@ func NewAuthenticatedHandler(backend store.Store, actions ActionGateway, policy 
 			return
 		}
 		r = r.Clone(context.WithValue(r.Context(), identityKey{}, identity))
-		if r.Method == http.MethodPost && pattern != "POST /api/v1/actions/{id}/reconcile" {
+		if r.Method == http.MethodPost {
 			mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 			if err != nil || mediaType != "application/json" || r.Header.Get("Content-Encoding") != "" {
 				writeError(w, http.StatusUnsupportedMediaType, "unencoded application/json required")

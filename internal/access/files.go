@@ -69,3 +69,4 @@ func LoadServerTLS(certFile, keyFile, clientCAFile string) (*tls.Config, error) 
 		return nil, fmt.Errorf("client CA is empty")
 	}
 	return &tls.Config{MinVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots, Certificates: []tls.Certificate{cert}, SessionTicketsDisabled: true}, nil
+}
