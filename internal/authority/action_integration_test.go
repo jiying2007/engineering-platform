@@ -65,7 +65,7 @@ func TestActionServiceUsesRealRunAndRecoveryAuthority(t *testing.T) {
 		},
 		guard,
 		provider,
-		action.NewMemoryRepository(),
+		s,
 	)
 
 	_, err := svc.Execute(context.Background(), action.Request{
