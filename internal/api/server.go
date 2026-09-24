@@ -179,9 +179,9 @@ func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 type createRunRequest struct {
-	RunID          string `json:"run_id"`
-	TaskContractID string `json:"task_contract_id"`
-	AttemptID      string `json:"attempt_id"`
+	RunID              string `json:"run_id"`
+	TaskContractDigest string `json:"task_contract_digest"`
+	AttemptID          string `json:"attempt_id"`
 }
 
 func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
@@ -189,21 +189,15 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.RunID == "" || req.TaskContractID == "" || req.AttemptID == "" {
-		writeError(w, http.StatusBadRequest, "run_id, task_contract_id and attempt_id are required")
+	if req.RunID == "" || req.TaskContractDigest == "" || req.AttemptID == "" {
+		writeError(w, http.StatusBadRequest, "run_id, task_contract_digest and attempt_id are required")
 		return
 	}
-	task, err := s.store.GetTask(req.TaskContractID)
-	if err != nil {
+	if _, err := s.store.GetTaskByDigest(req.TaskContractDigest); err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	digest, err := task.Digest()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	value := run.New(req.RunID, digest)
+	value := run.New(req.RunID, req.TaskContractDigest)
 	attempt, err := value.StartAttempt(req.AttemptID, s.now())
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
