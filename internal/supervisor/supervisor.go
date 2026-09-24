@@ -139,8 +139,11 @@ func (s *Supervisor) Start(ctx context.Context, runID, attemptID string, epoch u
 	go s.capture(m, Stderr, stderr, &readers)
 
 	go func() {
-		waitErr := cmd.Wait()
+		// StdoutPipe/StderrPipe require readers to drain before Wait closes the
+		// underlying pipes. The child can exit independently; readers observe
+		// EOF, then Wait safely reaps the process without losing tail output.
 		readers.Wait()
+		waitErr := cmd.Wait()
 
 		exitCode := 0
 		if waitErr != nil {
