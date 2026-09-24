@@ -45,18 +45,18 @@ type Store interface {
 }
 
 type Memory struct {
-	mu                    sync.RWMutex
-	works                 map[string]core.WorkItem
-	tasks                 map[string]map[uint64]core.TaskContract
-	latestTaskRev         map[string]uint64
-	tasksByDigest         map[string]core.TaskContract
-	verificationPlans     map[string]verification.Plan
-	runs                  map[string]run.Run
-	sessions              map[string]session.Session
-	deliveries            map[string]core.DeliveryReceipt
-	evidence              map[string]core.EvidenceRef
-	verificationReports   map[string]verification.Report
-	closures              map[string]core.ClosureReceipt
+	mu                  sync.RWMutex
+	works               map[string]core.WorkItem
+	tasks               map[string]map[uint64]core.TaskContract
+	latestTaskRev       map[string]uint64
+	tasksByDigest       map[string]core.TaskContract
+	verificationPlans   map[string]verification.Plan
+	runs                map[string]run.Run
+	sessions            map[string]session.Session
+	deliveries          map[string]core.DeliveryReceipt
+	evidence            map[string]core.EvidenceRef
+	verificationReports map[string]verification.Report
+	closures            map[string]core.ClosureReceipt
 }
 
 func NewMemory() *Memory {
