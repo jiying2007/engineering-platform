@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/jiying2007/engineering-platform/internal/audit"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
@@ -465,7 +466,7 @@ WHERE work_item_id=$4 AND version=$5`
 			AggregateID:   value.ID,
 			Payload: map[string]any{
 				"run_id":                    value.ID,
-				"task_contract_digest":       value.TaskContractDigest,
+				"task_contract_digest":      value.TaskContractDigest,
 				"run_input_manifest_digest": value.RunInputManifestDigest,
 				"execution_epoch":           value.CurrentEpoch,
 			},
@@ -506,10 +507,14 @@ SELECT attempt_id,execution_epoch,started_at,ended_at
 FROM run_attempts
 WHERE run_id=$1 AND attempt_id=$2`
 	var item run.Attempt
+	var endedAt pgtype.Timestamptz
 	if err := s.pool.QueryRow(bg(), q, runID, attemptID).Scan(
-		&item.ID, &item.Epoch, &item.StartedAt, &item.EndedAt,
+		&item.ID, &item.Epoch, &item.StartedAt, &endedAt,
 	); err != nil {
 		return run.Attempt{}, mapReadError(err)
+	}
+	if endedAt.Valid {
+		item.EndedAt = endedAt.Time
 	}
 	return item, nil
 }
@@ -946,7 +951,7 @@ func (s *Store) CreateClosureAndUpdateWork(
 	}
 	payload := struct {
 		Closure core.ClosureReceipt `json:"closure"`
-		Work    core.WorkItem      `json:"work"`
+		Work    core.WorkItem       `json:"work"`
 	}{Closure: item, Work: work}
 	input, err := auditInput("work.closed", "WorkItem", work.ID, payload)
 	if err != nil {
