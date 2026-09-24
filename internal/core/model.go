@@ -1,0 +1,88 @@
+package core
+
+import (
+	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/canonical"
+)
+
+type WorkState string
+
+const (
+	WorkDraft      WorkState = "DRAFT"
+	WorkReady      WorkState = "READY"
+	WorkExecuting  WorkState = "EXECUTING"
+	WorkVerifying  WorkState = "VERIFYING"
+	WorkReviewing  WorkState = "REVIEWING"
+	WorkClosed     WorkState = "CLOSED"
+	WorkCancelled  WorkState = "CANCELLED"
+)
+
+type WorkItem struct {
+	ID             string    `json:"work_item_id"`
+	Title          string    `json:"title"`
+	SourceRef      string    `json:"source_ref,omitempty"`
+	HumanOwner     string    `json:"human_owner"`
+	TargetID       string    `json:"target_id,omitempty"`
+	AssuranceClass string    `json:"assurance_class,omitempty"`
+	State          WorkState `json:"state"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type TaskContract struct {
+	ID                 string   `json:"task_contract_id"`
+	WorkItemID         string   `json:"work_item_id"`
+	TaskType           string   `json:"task_type"`
+	CapabilityIDs      []string `json:"capability_ids"`
+	SkillIDs           []string `json:"skill_ids"`
+	Repository         string   `json:"repository"`
+	BaseCommit         string   `json:"base_commit"`
+	TargetID           string   `json:"target_id,omitempty"`
+	AcceptanceCriteria []string `json:"acceptance_criteria"`
+	AllowedActions     []string `json:"allowed_actions,omitempty"`
+	ExpectedOutputs    []string `json:"expected_outputs,omitempty"`
+	VerificationPlanID string   `json:"verification_plan_id,omitempty"`
+	Revision           uint64   `json:"revision"`
+}
+
+func (t TaskContract) Digest() (string, error) {
+	return canonical.Digest(t)
+}
+
+type RunInputManifest struct {
+	RunID              string   `json:"run_id"`
+	TaskContractDigest string   `json:"task_contract_digest"`
+	ContextRefs        []string `json:"context_refs,omitempty"`
+	RuntimeProfile     string   `json:"runtime_profile"`
+	ToolProfile        string   `json:"tool_profile,omitempty"`
+	WorkerProfile      string   `json:"worker_profile,omitempty"`
+	PolicyProfile      string   `json:"policy_profile,omitempty"`
+}
+
+type ArtifactRef struct {
+	ID       string `json:"artifact_id"`
+	Digest   string `json:"digest"`
+	MediaType string `json:"media_type,omitempty"`
+	Locator  string `json:"locator,omitempty"`
+}
+
+type EvidenceRef struct {
+	ID            string   `json:"evidence_id"`
+	SubjectDigest string   `json:"subject_digest"`
+	Issuer        string   `json:"issuer"`
+	Procedure     string   `json:"procedure"`
+	Result        string   `json:"result"`
+	ArtifactRefs  []string `json:"artifact_refs,omitempty"`
+	Applicable    bool     `json:"applicable"`
+}
+
+type DeliveryReceipt struct {
+	ID          string        `json:"delivery_receipt_id"`
+	WorkItemID  string        `json:"work_item_id"`
+	RunID       string        `json:"run_id"`
+	BaseCommit  string        `json:"base_commit"`
+	ResultCommit string       `json:"result_commit,omitempty"`
+	Artifacts   []ArtifactRef `json:"artifacts,omitempty"`
+	KnownLimits []string      `json:"known_limits,omitempty"`
+	CreatedAt   time.Time     `json:"created_at"`
+}
