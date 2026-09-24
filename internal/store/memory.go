@@ -31,6 +31,8 @@ type Store interface {
 	GetExecution(string) (run.Run, session.Session, error)
 	GetRunInputByDigest(string) (core.RunInputManifest, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
+	CreateCheckpoint(session.Checkpoint) (string, error)
+	GetCheckpoint(string) (session.Checkpoint, string, error)
 
 	CreateDelivery(core.DeliveryReceipt) error
 	GetDelivery(string) (core.DeliveryReceipt, error)
@@ -55,6 +57,8 @@ type Memory struct {
 	runs                map[string]run.Run
 	sessions            map[string]session.Session
 	runInputs           map[string]core.RunInputManifest
+	checkpoints          map[string]session.Checkpoint
+	checkpointDigests    map[string]string
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
@@ -71,6 +75,8 @@ func NewMemory() *Memory {
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
 		runInputs:           make(map[string]core.RunInputManifest),
+		checkpoints:          make(map[string]session.Checkpoint),
+		checkpointDigests:    make(map[string]string),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
@@ -264,6 +270,38 @@ func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, erro
 		return core.RunInputManifest{}, ErrNotFound
 	}
 	return input, nil
+}
+
+func (m *Memory) CreateCheckpoint(item session.Checkpoint) (string, error) {
+	digest, err := item.Digest()
+	if err != nil {
+		return "", err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.checkpoints[item.ID]; ok {
+		return "", ErrExists
+	}
+	if _, ok := m.checkpointDigests[digest]; ok {
+		return "", ErrExists
+	}
+	m.checkpoints[item.ID] = item
+	m.checkpointDigests[digest] = item.ID
+	return digest, nil
+}
+
+func (m *Memory) GetCheckpoint(id string) (session.Checkpoint, string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	item, ok := m.checkpoints[id]
+	if !ok {
+		return session.Checkpoint{}, "", ErrNotFound
+	}
+	digest, err := item.Digest()
+	if err != nil {
+		return session.Checkpoint{}, "", err
+	}
+	return item, digest, nil
 }
 
 func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
