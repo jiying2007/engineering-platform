@@ -49,16 +49,14 @@ func TestWorkspaceCreateIsExactCleanAndIsolated(t *testing.T) {
 		t.Fatal("isolated HOME must live outside the source worktree")
 	}
 
-	if err := os.WriteFile(filepath.Join(workspace.WorktreePath, "hello.txt"), []byte("workspace change
-"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(workspace.WorktreePath, "hello.txt"), []byte("workspace change\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	mainContent, err := os.ReadFile(filepath.Join(repo, "hello.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(mainContent) != "base
-" {
+	if string(mainContent) != "base\n" {
 		t.Fatalf("workspace mutation leaked into source checkout: %q", mainContent)
 	}
 	clean, err = manager.IsClean(ctx, workspace)
@@ -130,8 +128,7 @@ func initRepository(t *testing.T) (string, string) {
 	runGit(t, repo, "init")
 	runGit(t, repo, "config", "user.email", "test@example.com")
 	runGit(t, repo, "config", "user.name", "Engineering Platform Test")
-	if err := os.WriteFile(filepath.Join(repo, "hello.txt"), []byte("base
-"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repo, "hello.txt"), []byte("base\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runGit(t, repo, "add", "hello.txt")
