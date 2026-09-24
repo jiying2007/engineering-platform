@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V42.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V43.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V42.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V43.md
 
 ## 1. Research rounds
 
@@ -55,6 +55,7 @@ Execution:
 | 40 | System safety / STPA | XSTAMPP, OSATE/AADL, Resolute | SafetyLoss/Hazard/UCA/LossScenario; SafetyConstraint; SafeStateDefinition |
 | 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
 | 42 | Device diagnostics / service interface | OpenSOVD, ISO 17978-3:2026, UDS/iso14229 | DiagnosticServiceProfile; snapshot-before-mutation; diagnostic query/operation receipts |
+| 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |
 
 ---
 
@@ -145,6 +146,7 @@ Prefer:
 - STPA/AADL-inspired system safety chain for losses, hazards, unsafe control actions and safety constraints
 - ASAM-inspired optional HIL/test interoperability while retaining internal Procedure/Measurement/Evidence authority
 - SOVD/UDS-inspired governed diagnostics with snapshot-before-mutation and Action-Gateway receipts
+- GS1/EPCIS-inspired external identifier bindings and supply-chain event interoperability
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -210,6 +212,9 @@ Do not let any standard become the mutable engineering business authority.
 56. diagnostics is a governed service surface, not arbitrary debug access.
 57. destructive/state-changing diagnostics can require immutable pre-operation snapshots.
 58. privileged diagnostic mutation always produces an auditable receipt and reconciled observed state.
+59. internal canonical identity remains independent from PLM/MES/GS1/DPP/customer identifiers.
+60. external identifiers are issuer/namespace/effectivity scoped and scans are observations until validated.
+61. EPCIS-style supply-chain events preserve What/When/Where/Why/How while remaining external observations.
 
 ---
 
