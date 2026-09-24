@@ -1,0 +1,17 @@
+# Go
+/control-plane
+/eng
+/worker
+*.test
+coverage.out
+
+# local runtime
+.env
+.local/
+.tmp/
+artifacts/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
