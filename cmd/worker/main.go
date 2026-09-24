@@ -8,11 +8,11 @@ import (
 )
 
 type registration struct {
-	WorkerID          string   `json:"worker_id"`
-	RuntimeProviders  []string `json:"runtime_providers"`
-	ProtocolVersion   string   `json:"protocol_version"`
-	Status            string   `json:"status"`
-	RegisteredAt      string   `json:"registered_at"`
+	WorkerID         string   `json:"worker_id"`
+	RuntimeProviders []string `json:"runtime_providers"`
+	ProtocolVersion  string   `json:"protocol_version"`
+	Status           string   `json:"status"`
+	RegisteredAt     string   `json:"registered_at"`
 }
 
 func main() {
