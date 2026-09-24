@@ -47,3 +47,15 @@ func TestVerificationPassesExactApplicableEvidence(t *testing.T) {
 		t.Fatalf("expected PASS, got %s", got.Result)
 	}
 }
+
+func TestCriterionWithoutEvidenceCannotPass(t *testing.T) {
+	plan := Plan{
+		ID:            "vp-empty",
+		SubjectDigest: "sha256:subject",
+		Criteria:      []Criterion{{ID: "ac-empty"}},
+	}
+	got := Evaluate(plan, nil)
+	if got.Result != "FAIL" {
+		t.Fatalf("expected FAIL for criterion without evidence, got %s", got.Result)
+	}
+}
