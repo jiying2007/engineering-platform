@@ -14,6 +14,7 @@ type Request struct {
 	ID               string    `json:"action_request_id"`
 	RunID            string    `json:"run_id"`
 	ExecutionEpoch   uint64    `json:"execution_epoch"`
+	RecoveryEpoch    uint64    `json:"recovery_epoch"`
 	Action           string    `json:"action"`
 	RiskClass        RiskClass `json:"risk_class"`
 	Capability       string    `json:"capability"`
