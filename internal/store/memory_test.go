@@ -196,3 +196,170 @@ func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 		t.Fatalf("unexpected completed recovery state: %#v", completed)
 	}
 }
+
+
+func TestCreateTaskAndUpdateWorkIsAtomicOnStaleVersion(t *testing.T) {
+	s := NewMemory()
+	work := core.WorkItem{
+		ID: "work-atomic-task", Title: "atomic task", HumanOwner: "owner",
+		State: core.WorkDraft, Version: 1, CreatedAt: time.Unix(1, 0),
+	}
+	if err := s.CreateWork(work); err != nil {
+		t.Fatal(err)
+	}
+	plan := planFor("A", "ci.test")
+	task := core.TaskContract{
+		ID: "task-atomic", WorkItemID: work.ID, TaskType: "FEATURE",
+		Repository: "repo", BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"A"}, Revision: 1,
+	}
+	bindPlan(t, &task, plan)
+	taskDigest, _ := task.Digest()
+
+	desired := work
+	desired.ActiveTaskContractDigest = taskDigest
+	if err := desired.Transition(core.WorkReady); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.CreateTaskAndUpdateWork(task, plan, 0, desired); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected stale work conflict, got %v", err)
+	}
+	if _, err := s.GetTask(task.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("task survived failed atomic mutation: %v", err)
+	}
+	unchanged, err := s.GetWork(work.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unchanged.State != core.WorkDraft || unchanged.ActiveTaskContractDigest != "" {
+		t.Fatalf("work changed during failed atomic mutation: %#v", unchanged)
+	}
+
+	if err := s.CreateTaskAndUpdateWork(task, plan, 1, desired); err != nil {
+		t.Fatal(err)
+	}
+	ready, err := s.GetWork(work.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ready.State != core.WorkReady || ready.ActiveTaskContractDigest != taskDigest || ready.Version != 2 {
+		t.Fatalf("unexpected ready work: %#v", ready)
+	}
+}
+
+func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
+	s := NewMemory()
+	work := core.WorkItem{
+		ID: "work-atomic-run", Title: "atomic run", HumanOwner: "owner",
+		State: core.WorkDraft, Version: 1, CreatedAt: time.Unix(1, 0),
+	}
+	if err := s.CreateWork(work); err != nil {
+		t.Fatal(err)
+	}
+	plan := planFor("A", "ci.test")
+	task := core.TaskContract{
+		ID: "task-atomic-run", WorkItemID: work.ID, TaskType: "FEATURE",
+		Repository: "repo", BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"A"}, Revision: 1,
+	}
+	bindPlan(t, &task, plan)
+	taskDigest, _ := task.Digest()
+	readyWork := work
+	readyWork.ActiveTaskContractDigest = taskDigest
+	if err := readyWork.Transition(core.WorkReady); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateTaskAndUpdateWork(task, plan, 1, readyWork); err != nil {
+		t.Fatal(err)
+	}
+	readyWork, _ = s.GetWork(work.ID)
+
+	input := core.RunInputManifest{
+		RunID: "run-atomic", TaskContractDigest: taskDigest,
+		RuntimeProfile: "codex/default", ToolProfile: "tools/m1",
+		WorkerProfile: "worker/ubuntu", PolicyProfile: "policy/m1",
+	}
+	inputDigest, _ := input.Digest()
+	value := run.New(input.RunID, taskDigest, inputDigest)
+	attempt, err := value.StartAttempt("attempt-1", time.Unix(2, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess := session.New(value.ID, attempt.Epoch)
+	executingWork := readyWork
+	executingWork.ActiveRunID = value.ID
+	if err := executingWork.Transition(core.WorkExecuting); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, readyWork.Version-1, executingWork); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected stale work conflict, got %v", err)
+	}
+	if _, _, err := s.GetExecution(value.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("run survived failed atomic create: %v", err)
+	}
+	if _, err := s.GetAttempt(value.ID, attempt.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("attempt survived failed atomic create: %v", err)
+	}
+
+	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, readyWork.Version, executingWork); err != nil {
+		t.Fatal(err)
+	}
+	persistedAttempt, err := s.GetAttempt(value.ID, attempt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if persistedAttempt.Epoch != attempt.Epoch {
+		t.Fatalf("unexpected attempt: %#v", persistedAttempt)
+	}
+
+	currentRun, currentSession, err := s.GetExecution(value.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentWork, err := s.GetWork(work.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	completedRun := currentRun
+	if err := completedRun.Complete(completedRun.CurrentEpoch); err != nil {
+		t.Fatal(err)
+	}
+	verifyingWork := currentWork
+	if err := verifyingWork.Transition(core.WorkVerifying); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.UpdateExecutionAndWork(
+		value.ID,
+		currentRun.Version,
+		completedRun,
+		currentSession,
+		currentWork.Version-1,
+		verifyingWork,
+	); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected stale completion conflict, got %v", err)
+	}
+	stillRunning, _, _ := s.GetExecution(value.ID)
+	stillExecuting, _ := s.GetWork(work.ID)
+	if stillRunning.State != run.Running || stillExecuting.State != core.WorkExecuting {
+		t.Fatalf("failed completion partially persisted run=%s work=%s", stillRunning.State, stillExecuting.State)
+	}
+
+	if err := s.UpdateExecutionAndWork(
+		value.ID,
+		currentRun.Version,
+		completedRun,
+		currentSession,
+		currentWork.Version,
+		verifyingWork,
+	); err != nil {
+		t.Fatal(err)
+	}
+	finished, _, _ := s.GetExecution(value.ID)
+	verifying, _ := s.GetWork(work.ID)
+	if finished.State != run.Completed || verifying.State != core.WorkVerifying {
+		t.Fatalf("atomic completion failed run=%s work=%s", finished.State, verifying.State)
+	}
+}
