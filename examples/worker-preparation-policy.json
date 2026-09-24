@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "principals": [
+    {
+      "subject": "urn:engineering-platform:worker:preparer",
+      "scope": "platform",
+      "capabilities": ["worker:poll", "worker:report", "worker:prepare"],
+      "worker_profiles": ["worker/preparation"]
+    }
+  ]
+}

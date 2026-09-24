@@ -1,74 +1,70 @@
 # Implementation Status
 
-Stage: **Core persistence + authenticated API + prepared Runtime + durable Worker input admission; no real M1 pilot**
-Reviewed base: `4c1a226b696221e5a3fa82b6a7e425fc301b21bb`.
+Stage: **Authenticated Core + durable Worker + actual approved Context/workspace preparation; no real M1 pilot**
+Reviewed base: `71a4877e2eb4973196cd612852fba19277919197`.
 
 ## Scope and assembly
 
 Core architecture, Embedded Domain Capability Model, Core M0/M1 plan and
-ADR-001/002/003 remain canonical. This platform is independent of digital-worker.
-No extension domain or service is introduced by the Worker/Runtime/Context work.
+ADR-001/002/003 remain canonical. Independent of digital-worker; no new domain
+or service is added. WorkBuddy remains a future authenticated front door.
 
 | Area | Implemented | Remaining acceptance boundary |
 | --- | --- | --- |
-| Core | Work/Task/frozen VerificationPlan and RunInput, epoch/CAS, Session/Steering/Checkpoint, Delivery/Evidence/Verification/Closure | Memory deep-copy/conformance, independent real evidence and Review |
-| PostgreSQL | Core/action persistence, business + audit + outbox, recovery audit; additive inbox migration | Restore/migration operational drills and complete execution assembly |
-| Outbox v2 | Live generation/expiry fencing, recovery-serialized dispatch, risk registry, bounded retry, UNKNOWN quarantine | External recipients remain responsible for idempotency/reconciliation |
-| Authenticated HTTP | mTLS certificate URI principals, explicit platform capabilities, bound actors/actions/issuers, strict JSON | Single trust domain; no Work-level ACL or automated certificate lifecycle |
-| Worker admission (this change) | Actual Control Plane loop atomically transfers run.started to durable inbox; profile/identity-bound claim, bounded renewal, generation/epoch fencing, pause deferral and retained INPUT_VALIDATED receipts | No code/provider execution or automatic advancement to completed Run/Evidence |
-| Worker/CLI clients (this change) | Actual admission-only Worker and eng api with shared direct mTLS client; bounded I/O and no proxy/redirect/insecure fallback | Operator-issued credentials, lifecycle/restart policy and WorkBuddy connector |
-| Recovery completion | Protected API requires independent exact-epoch reconciliation gate | Concrete verifier absent; completion remains unavailable in command |
-| Action Gateway | Durable ledger and contract/epoch/recovery components with HTTP grants | Privileged provider/effect boundary is not injected into command |
-| Workspace | Exact-base detached worktree, fresh HOME and cleanup | Git environment/config/hooks, shared metadata and parent-path hardening; OS isolation |
-| Codex Runtime (#32) | Allowlisted environment, fixed stdio launch, bounded correlated JSONL, typed initialize/thread/turn/steer/interrupt, deny-only approvals | Qualified real binary/schema, Core execution authority and approval grants |
-| Context (#32) | Structured refs/materializer/Verify, content-addressed LocalSource and exact frozen-input operator approval snapshot | Authenticated approval lifecycle, Worker execution consumption and durable prepared receipt |
-| Embedded Skills | Six capabilities/eight defined Skills and material/routing rules | No retained Feature/Debug pilot; no PILOTED/PROVEN claim |
+| Core | Work/Task/frozen VerificationPlan and RunInput, epoch/CAS, Session/Steering/Checkpoint, Delivery/Evidence/Verification/Closure | Memory deep-copy/conformance; independent real evidence and Review |
+| PostgreSQL | Core/action persistence, business + audit + outbox; Worker inbox and separately attributed preparation receipt transactions | Operational restore/recovery drills; no source merge runs production migration |
+| Outbox / Worker admission | Actual Control Plane atomic relay; certificate/profile-bound claims, bounded renewal, generation/recovery fences and deterministic input receipts | Input receipt is not execution authority |
+| mTLS API / clients | Explicit URI identity and capabilities, bound actors/issuers, actual Worker and eng API, no ambient proxy/redirect/insecure fallback | Single administrative trust domain; credential lifecycle and Work-level ACL |
+| Worker preparation (this change) | Actual prepare-only command: exact operator approval, local Context byte verification, independent exact-base workspace, periodic lease renewal, recheck, same-transaction preparation/input/audit and CLI readback | Worker filesystem attestation, not server byte observation; no model execution or OS sandbox |
+| Workspace (this change) | Independent fresh Git objects instead of linked worktrees; explicit sanitized local Git, owner-fenced slots, source/config byte checks without mutable Git execution, bounded cancellation | Trusted Git/source metadata and host parents; disk quota/retention and separate OS isolation |
+| Context | Structured refs, raw-byte hash, materialize/Verify plus exact operator LocalSource; now consumed by preparation Worker | Startup approval snapshot only; online lifecycle and future sandbox mount |
+| Codex Runtime | Bounded correlated JSONL, isolated environment, typed initialize/thread/turn/steer/interrupt and deny-only approvals | Pinned real binary/schema qualification; live Core execution authority and approval grants |
+| Action / recovery | Durable action ledger and contract/epoch/recovery components; authenticated grants and independent completion gate | Real provider/effect boundary and concrete trusted recovery completion verifier absent |
+| Embedded Skills | Six capabilities/eight defined Skills; explicit material/routing | No retained Feature/Debug pilot; no PILOTED/PROVEN claim |
 
-The old #31-base ZIP is superseded by the reviewed new-base Worker code in this
-change. Do not apply that stale patch on top of current main. Input validation
-always records context_bytes_verified=false and execution_started=false.
+The preparation receipt is WORKER_ATTESTED_PREPARATION. execution_started and
+os_isolated must be false. Its nested INPUT_VALIDATED receipt keeps its original
+meaning; no Context-byte or execution assertions are silently promoted there.
+No preparation transition completes a Run or fabricates engineering Evidence.
+Use dedicated preparation profiles to avoid input-only workers consuming them.
 
-## Evidence
+## Retained checkpoints and new verification
 
 - #29 Context: PR `35998634850`; main `35998821289`.
 - #30 outbox: PR `36003408959`; main `36003703669`.
 - #31 authentication: PR `36007219869`; main `36007507189`.
-- #32 prepared Runtime/Context: final PR head
-  `c995062b477c45c8e0da311a179c0fb61efad431`, PR CI `36023841471`.
-- This Worker change requires its exact final PR-head CI and fresh main CI.
-  Older green component checks and partial local tests do not prove it.
+- #32 prepared protocol: final head `c995062b477c45c8e0da311a179c0fb61efad431`,
+  PR CI `36023841471`; offline helper is not real Codex qualification.
+- #33 admission: main `71a4877e2eb4973196cd612852fba19277919197`,
+  PR CI `36031414023`, fresh main CI `36031860646`, all passed.
+- This preparation change requires its exact final PR CI and fresh main CI.
+  No earlier green checkpoint or local formatting substitutes for that proof.
 
-CI preserves full Go 1.25 PostgreSQL 17 race tests, outbox repetitions, ten prepared
-Runtime/Context repetitions, vet/build. It adds 20 Worker/client/loop/unit
-repetitions, three shuffled Worker DB repetitions, and three command repetitions.
-Command tests use the actual shared HTTP/relay lifecycle and compile/run real
-Worker and eng binaries over mTLS against an isolated PostgreSQL schema. They
-verify durable input receipts, not a model/provider task. The #32 subprocess
-protocol test is still an offline helper, not installed Codex qualification.
-
-The Worker suite additionally exercises pause-after-selection row-lock races,
-expiry after audit-lock waits, same-identity concurrent claims, transfer/audit
-rollback, stale generation/epoch, same-receipt replay and repeat migration.
-No temporary credentials or destructive shared-public-schema reset are retained.
+Existing full Go 1.25/PostgreSQL 17 race tests, outbox repetitions, ten Runtime/
+Context repetitions and Worker admission/client/command repetitions remain.
+Added tests cover actual prepared bytes/workspace through compiled Worker/eng,
+real mTLS and an isolated schema with the live Control Plane relay; dedicated
+permission rejection; hash/approval/tamper failures; config/hook isolation;
+concurrent ownership/reports; audit rollback; final expiry after journal waits;
+migration replay and no false execution/Evidence. No shared public schema reset.
 
 ## Next delivery gates
 
-1. Bind approved Context preparation and exact workspace to durable execution
-   receipts with OS isolation, current Run/lease authority and trusted capability
-   profiles. A validated input is not authorization to start an unsandboxed agent.
-2. Qualify a pinned real Codex binary/schema; connect interactive approvals through
-   Action Gateway and retain exact Git/CI/Artifact facts plus independent Review.
-3. Implement retained reconciliation authority, memory-store conformance and
-   operational restore/recovery drills without creating duplicate authorities.
-4. Retain Feature/Debug pilots, then assess M1. No new extension domains yet.
+1. OS-isolated supervised execution using a fresh Core authorization, rechecked
+   approved Context/workspace and actual execution receipts. Preparation history
+   must not grant a stale worker permission to launch later.
+2. Pinned real Codex binary/schema qualification, authorized interactive approval
+   integration and current Action/reconciliation authority at the effect boundary.
+3. Actual Git/CI/Artifact-byte facts and independent Review, memory-store
+   conformance, retained reconciliation and operational restore/recovery drills.
+4. Real Feature/Debug pilots before assessing M1. No new extension domains.
 
-Operator local approvals remain immutable restart snapshots, not an online
-registry. Source merge does not deploy, provision credentials or run a production
-migration. **M1 and production readiness remain unclaimed.**
+The old local Worker ZIP is superseded by #33. The new workspace recipe does not
+adopt old linked-worktree slots: drain and reconcile them explicitly. Preparation
+requires explicit version-4 migration, operator source/approval/configuration and
+a dedicated credential/profile. No production deployment or credential is created
+by merging these files. **M1 and production readiness remain unclaimed.**
 
-Contracts:
-- `docs/implementation/WORKER_ADMISSION_V1.md`
-- `docs/implementation/PREPARED_RUNTIME_PROTOCOL_V1.md`
-- `docs/implementation/AUTHENTICATED_CONTROL_API_V1.md`
-- `docs/implementation/OUTBOX_DISPATCH_AUTHORITY_V2.md`
-- `docs/implementation/CONTEXT_MATERIALIZATION_V1.md`
+Details: `docs/implementation/WORKER_PREPARATION_V1.md` and the retained
+WORKER_ADMISSION_V1 / PREPARED_RUNTIME_PROTOCOL_V1 / AUTHENTICATED_CONTROL_API_V1 /
+OUTBOX_DISPATCH_AUTHORITY_V2 / CONTEXT_MATERIALIZATION_V1 contracts.
