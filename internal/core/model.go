@@ -25,7 +25,9 @@ type WorkItem struct {
 	SourceRef      string    `json:"source_ref,omitempty"`
 	HumanOwner     string    `json:"human_owner"`
 	TargetID       string    `json:"target_id,omitempty"`
-	AssuranceClass string    `json:"assurance_class,omitempty"`
+	AssuranceClass           string    `json:"assurance_class,omitempty"`
+	ActiveTaskContractDigest string    `json:"active_task_contract_digest,omitempty"`
+	ActiveRunID              string    `json:"active_run_id,omitempty"`
 	State          WorkState `json:"state"`
 	Version        uint64    `json:"version"`
 	CreatedAt      time.Time `json:"created_at"`
