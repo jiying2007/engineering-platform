@@ -20,7 +20,7 @@ var (
 type State interface {
 	GetExecution(string) (run.Run, session.Session, error)
 	GetTaskByDigest(string) (core.TaskContract, error)
-	GetRecovery() recovery.Manager
+	GetRecovery() (recovery.Manager, error)
 }
 
 type Authority struct {
@@ -75,7 +75,10 @@ func (a *Authority) CheckRecoveryEpoch(_ context.Context, epoch uint64, risk act
 	if a == nil || a.state == nil {
 		return fmt.Errorf("gateway authority state is not configured")
 	}
-	state := a.state.GetRecovery()
+	state, err := a.state.GetRecovery()
+	if err != nil {
+		return err
+	}
 	if err := state.CheckEpoch(epoch); err != nil {
 		return err
 	}
