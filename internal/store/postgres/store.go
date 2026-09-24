@@ -78,7 +78,18 @@ func (s *Store) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
-	const query = `
+	expectedState := recovery.Manager{
+		Epoch: expectedEpoch + 1,
+		Mode:  recovery.RecoveryReconciliation,
+	}
+	input, err := auditInput("recovery.started", "PlatformState", "singleton", expectedState)
+	if err != nil {
+		return recovery.Manager{}, err
+	}
+	var result recovery.Manager
+	_, err = s.Mutate(context.Background(), Mutation{
+		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			const query = `
 UPDATE platform_state
 SET recovery_epoch = recovery_epoch + 1,
     recovery_mode = 'RECOVERY_RECONCILIATION',
@@ -87,17 +98,23 @@ WHERE singleton_id = true
   AND recovery_epoch = $1
   AND recovery_mode = 'NORMAL'
 RETURNING recovery_epoch,recovery_mode`
-
-	var epoch uint64
-	var mode string
-	err := s.pool.QueryRow(context.Background(), query, expectedEpoch).Scan(&epoch, &mode)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return recovery.Manager{}, corestore.ErrConflict
-	}
+			var mode string
+			scanErr := tx.QueryRow(ctx, query, expectedEpoch).Scan(&result.Epoch, &mode)
+			if errors.Is(scanErr, pgx.ErrNoRows) {
+				return corestore.ErrConflict
+			}
+			if scanErr != nil {
+				return fmt.Errorf("begin recovery: %w", scanErr)
+			}
+			result.Mode = recovery.Mode(mode)
+			return nil
+		},
+		Audit: input,
+	})
 	if err != nil {
-		return recovery.Manager{}, fmt.Errorf("begin recovery: %w", err)
+		return recovery.Manager{}, err
 	}
-	return recovery.Manager{Epoch: epoch, Mode: recovery.Mode(mode)}, nil
+	return result, nil
 }
 
 func (s *Store) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
@@ -107,7 +124,18 @@ func (s *Store) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manage
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
-	const query = `
+	expectedState := recovery.Manager{
+		Epoch: epoch,
+		Mode:  recovery.Normal,
+	}
+	input, err := auditInput("recovery.completed", "PlatformState", "singleton", expectedState)
+	if err != nil {
+		return recovery.Manager{}, err
+	}
+	var result recovery.Manager
+	_, err = s.Mutate(context.Background(), Mutation{
+		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			const query = `
 UPDATE platform_state
 SET recovery_mode = 'NORMAL',
     updated_at = now()
@@ -115,15 +143,21 @@ WHERE singleton_id = true
   AND recovery_epoch = $1
   AND recovery_mode = 'RECOVERY_RECONCILIATION'
 RETURNING recovery_epoch,recovery_mode`
-
-	var returnedEpoch uint64
-	var mode string
-	err := s.pool.QueryRow(context.Background(), query, epoch).Scan(&returnedEpoch, &mode)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return recovery.Manager{}, corestore.ErrConflict
-	}
+			var mode string
+			scanErr := tx.QueryRow(ctx, query, epoch).Scan(&result.Epoch, &mode)
+			if errors.Is(scanErr, pgx.ErrNoRows) {
+				return corestore.ErrConflict
+			}
+			if scanErr != nil {
+				return fmt.Errorf("complete recovery: %w", scanErr)
+			}
+			result.Mode = recovery.Mode(mode)
+			return nil
+		},
+		Audit: input,
+	})
 	if err != nil {
-		return recovery.Manager{}, fmt.Errorf("complete recovery: %w", err)
+		return recovery.Manager{}, err
 	}
-	return recovery.Manager{Epoch: returnedEpoch, Mode: recovery.Mode(mode)}, nil
+	return result, nil
 }
