@@ -96,6 +96,14 @@ func (r *Run) Takeover(epoch uint64) (uint64, error) {
 	return r.CurrentEpoch, nil
 }
 
+func (r *Run) Complete(epoch uint64) error {
+	if err := r.CheckEpoch(epoch); err != nil {
+		return err
+	}
+	r.State = Completed
+	return nil
+}
+
 func (r *Run) Abort(epoch uint64) error {
 	if err := r.CheckEpoch(epoch); err != nil {
 		return err
