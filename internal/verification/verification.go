@@ -36,6 +36,10 @@ func Evaluate(plan Plan, evidence []core.EvidenceRef) Report {
 	report := Report{PlanID: plan.ID, SubjectDigest: plan.SubjectDigest, Result: "PASS"}
 	for _, criterion := range plan.Criteria {
 		result := CriterionResult{CriterionID: criterion.ID, Result: "PASS"}
+		if len(criterion.RequiredEvidence) == 0 {
+			result.Result = "FAIL"
+			result.Reason = "criterion has no required evidence"
+		}
 		for _, evidenceID := range criterion.RequiredEvidence {
 			item, ok := byID[evidenceID]
 			if !ok {
