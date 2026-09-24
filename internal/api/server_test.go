@@ -511,3 +511,69 @@ func TestRecoveryLifecycleIsEpochBound(t *testing.T) {
 		"reconciled":     true,
 	}, http.StatusBadRequest)
 }
+
+
+func TestSupersededTaskRevisionCannotStartRun(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	oldDigest := createWorkAndTask(t, h, "work-rev", "task-rev", "FEATURE", "driver")
+
+	newTaskBody := mustRequest(t, h, http.MethodPost, "/api/v1/task-contracts", map[string]any{
+		"contract": map[string]any{
+			"task_contract_id": "task-rev",
+			"work_item_id":     "work-rev",
+			"task_type":        "FEATURE",
+			"revision":         2,
+		},
+		"material": map[string]any{
+			"repository":          "repo",
+			"base_commit":         "0123456789abcdef0123456789abcdef01234567",
+			"target_id":           "target-1",
+			"acceptance_criteria": []string{"tests pass"},
+		},
+		"subsystem": "driver",
+		"verification_plan": map[string]any{
+			"verification_plan_id": "vp-task-rev-2",
+			"criteria": []any{
+				map[string]any{
+					"criterion_id": "ac-1",
+					"statement":    "tests pass",
+					"evidence_requirements": []any{
+						map[string]any{
+							"requirement_id": "req-1",
+							"procedure":      "ci.test",
+						},
+					},
+				},
+			},
+		},
+	}, http.StatusCreated)
+	var newTask struct {
+		Digest string `json:"digest"`
+	}
+	mustJSON(t, newTaskBody, &newTask)
+	if newTask.Digest == "" || newTask.Digest == oldDigest {
+		t.Fatalf("expected a new active task digest old=%s new=%s", oldDigest, newTask.Digest)
+	}
+
+	runInput := map[string]any{
+		"runtime_profile": "codex/default",
+		"tool_profile":    "tools/m1",
+		"worker_profile":  "worker/ubuntu",
+		"policy_profile":  "policy/m1",
+	}
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs", map[string]any{
+		"run_id":               "run-old-rev",
+		"task_contract_digest": oldDigest,
+		"attempt_id":           "attempt-old",
+		"run_input":            runInput,
+	}, http.StatusConflict)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs", map[string]any{
+		"run_id":               "run-new-rev",
+		"task_contract_digest": newTask.Digest,
+		"attempt_id":           "attempt-new",
+		"run_input":            runInput,
+	}, http.StatusCreated)
+}
