@@ -104,7 +104,7 @@ func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
 		return recovery.Manager{}, ErrConflict
 	}
 	if m.recoveryState.Mode != recovery.Normal {
-		return recovery.Manager{}, recovery.ErrRecoveryMode
+		return recovery.Manager{}, recovery.ErrAlreadyRecovering
 	}
 	m.recoveryState.Begin()
 	return m.recoveryState, nil
