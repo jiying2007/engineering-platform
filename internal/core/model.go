@@ -43,7 +43,8 @@ type TaskContract struct {
 	AcceptanceCriteria []string `json:"acceptance_criteria"`
 	AllowedActions     []string `json:"allowed_actions,omitempty"`
 	ExpectedOutputs    []string `json:"expected_outputs,omitempty"`
-	VerificationPlanID string   `json:"verification_plan_id,omitempty"`
+	VerificationPlanID     string   `json:"verification_plan_id"`
+	VerificationPlanDigest string   `json:"verification_plan_digest"`
 	Revision           uint64   `json:"revision"`
 }
 
