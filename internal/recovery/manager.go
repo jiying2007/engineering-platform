@@ -3,8 +3,10 @@ package recovery
 import "errors"
 
 var (
-	ErrStaleEpoch   = errors.New("stale recovery epoch")
-	ErrRecoveryMode = errors.New("irreversible actions are blocked during recovery reconciliation")
+	ErrStaleEpoch             = errors.New("stale recovery epoch")
+	ErrRecoveryMode           = errors.New("mutating external actions are blocked during recovery reconciliation")
+	ErrAlreadyRecovering      = errors.New("recovery reconciliation is already active")
+	ErrReconciliationRequired = errors.New("reconciliation must be confirmed before leaving recovery mode")
 )
 
 type Mode string
@@ -51,7 +53,7 @@ func (m *Manager) Complete(epoch uint64, reconciled bool) error {
 		return err
 	}
 	if !reconciled {
-		return ErrRecoveryMode
+		return ErrReconciliationRequired
 	}
 	m.Mode = Normal
 	return nil
