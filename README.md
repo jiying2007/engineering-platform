@@ -21,7 +21,8 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v41 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V41.md)
+- [Reference-Aligned Implementation Profile v42 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V42.md)
+- [Reference-Aligned Implementation Profile v41 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V41.md)
 - [Reference-Aligned Implementation Profile v40 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V40.md)
 - [Reference-Aligned Implementation Profile v39 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V39.md)
 - [Reference-Aligned Implementation Profile v38 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V38.md)
@@ -90,6 +91,7 @@ See:
 - [Public Standard Reference Review Round 39 — digital calibration and metrology](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND39_DIGITAL_CALIBRATION_METROLOGY_2026-09-24.md)
 - [Open Source Reference Review Round 40 — system safety and STPA](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND40_SYSTEM_SAFETY_STPA_2026-09-24.md)
 - [Public Standard / Open Source Reference Review Round 41 — HIL measurement and test interoperability](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND41_HIL_MEASUREMENT_TEST_INTEROP_2026-09-24.md)
+- [Open Source / Standard Reference Review Round 42 — device diagnostics and service interfaces](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND42_DEVICE_DIAGNOSTICS_2026-09-24.md)
 - [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
@@ -145,7 +147,8 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v41 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V41.md)
+- [M0 Reference Adoption Plan v42 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V42.md)
+- [M0 Reference Adoption Plan v41 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V41.md)
 - [M0 Reference Adoption Plan v40 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V40.md)
 - [M0 Reference Adoption Plan v39 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V39.md)
 - [M0 Reference Adoption Plan v38 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V38.md)
