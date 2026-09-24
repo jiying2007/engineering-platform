@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 )
 
 var (
-	ErrDenied          = errors.New("action denied")
-	ErrOperationExists = errors.New("operation already exists")
-	ErrOperationAbsent = errors.New("operation not found")
+	ErrDenied              = errors.New("action denied")
+	ErrOperationExists     = errors.New("operation already exists")
+	ErrOperationAbsent     = errors.New("operation not found")
+	ErrIdempotencyConflict = errors.New("idempotency key reused for different request")
 )
 
 type DispatchOutcome string
@@ -57,6 +60,7 @@ type Provider interface {
 type Repository interface {
 	Create(Operation) error
 	Get(string) (Operation, error)
+	GetByIdempotencyKey(string) (Operation, error)
 	Update(Operation) error
 }
 
@@ -78,10 +82,50 @@ func NewService(authorizer Authorizer, guard EpochGuard, provider Provider, repo
 	}
 }
 
+type requestIdentity struct {
+	ID               string    `json:"action_request_id"`
+	RunID            string    `json:"run_id"`
+	ExecutionEpoch   uint64    `json:"execution_epoch"`
+	Action           string    `json:"action"`
+	RiskClass        RiskClass `json:"risk_class"`
+	Capability       string    `json:"capability"`
+	ParametersDigest string    `json:"parameters_digest"`
+	RequestedBy      string    `json:"requested_by"`
+}
+
+func requestDigest(req Request) (string, error) {
+	return canonical.Digest(requestIdentity{
+		ID:               req.ID,
+		RunID:            req.RunID,
+		ExecutionEpoch:   req.ExecutionEpoch,
+		Action:           req.Action,
+		RiskClass:        req.RiskClass,
+		Capability:       req.Capability,
+		ParametersDigest: req.ParametersDigest,
+		RequestedBy:      req.RequestedBy,
+	})
+}
+
 func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if s.authorizer == nil || s.guard == nil || s.provider == nil || s.repository == nil {
 		return Receipt{}, fmt.Errorf("action service is not fully configured")
 	}
+	if req.IdempotencyKey == "" {
+		return Receipt{}, fmt.Errorf("idempotency key is required")
+	}
+	digest, err := requestDigest(req)
+	if err != nil {
+		return Receipt{}, err
+	}
+	if existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey); getErr == nil {
+		if existing.RequestDigest != digest {
+			return Receipt{}, ErrIdempotencyConflict
+		}
+		return receiptFromOperation(req.ID, existing, s.now()), nil
+	} else if !errors.Is(getErr, ErrOperationAbsent) {
+		return Receipt{}, getErr
+	}
+
 	if err := s.authorizer.Authorize(ctx, req); err != nil {
 		return Receipt{}, fmt.Errorf("%w: %v", ErrDenied, err)
 	}
@@ -90,8 +134,14 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	}
 
 	now := s.now()
-	op := New(req.ID, req.RunID, req.Action, req.IdempotencyKey, now)
+	op := NewWithRequestDigest(req.ID, req.RunID, req.Action, req.IdempotencyKey, digest, now)
 	if err := s.repository.Create(*op); err != nil {
+		if errors.Is(err, ErrOperationExists) {
+			existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey)
+			if getErr == nil && existing.RequestDigest == digest {
+				return receiptFromOperation(req.ID, existing, s.now()), nil
+			}
+		}
 		return Receipt{}, err
 	}
 	if err := op.Transition(Dispatched, now); err != nil {
@@ -103,18 +153,11 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 
 	result, err := s.provider.Dispatch(ctx, req)
 	if err != nil {
-		// Once Dispatch has been called, a transport/provider error is ambiguous.
 		if transitionErr := op.Transition(Unknown, s.now()); transitionErr != nil {
 			return Receipt{}, transitionErr
 		}
 		_ = s.repository.Update(*op)
-		return Receipt{
-			ID:          "receipt:" + req.ID,
-			RequestID:   req.ID,
-			OperationID: op.ID,
-			Result:      string(Unknown),
-			CreatedAt:   s.now(),
-		}, nil
+		return receiptFromOperation(req.ID, *op, s.now()), nil
 	}
 
 	switch result.Outcome {
@@ -130,18 +173,11 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		return Receipt{}, fmt.Errorf("unsupported dispatch outcome %q", result.Outcome)
 	}
 	op.ExternalRef = result.ExternalRef
+	op.ObservedState = result.ObservedState
 	if err := s.repository.Update(*op); err != nil {
 		return Receipt{}, err
 	}
-	return Receipt{
-		ID:            "receipt:" + req.ID,
-		RequestID:     req.ID,
-		OperationID:   op.ID,
-		Result:        string(op.State),
-		ExternalRef:   result.ExternalRef,
-		ObservedState: result.ObservedState,
-		CreatedAt:     s.now(),
-	}, nil
+	return receiptFromOperation(req.ID, *op, s.now()), nil
 }
 
 func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, error) {
@@ -164,12 +200,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 		op.State = Manual
 		op.UpdatedAt = s.now()
 		_ = s.repository.Update(op)
-		return Receipt{
-			ID:          "receipt:reconcile:" + op.ID,
-			OperationID: op.ID,
-			Result:      string(Manual),
-			CreatedAt:   s.now(),
-		}, nil
+		return receiptFromOperation("", op, s.now()), nil
 	}
 
 	switch result.Outcome {
@@ -186,26 +217,39 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 		return Receipt{}, err
 	}
 	op.ExternalRef = result.ExternalRef
+	op.ObservedState = result.ObservedState
 	if err := s.repository.Update(op); err != nil {
 		return Receipt{}, err
 	}
+	return receiptFromOperation("", op, s.now()), nil
+}
+
+func receiptFromOperation(requestID string, op Operation, now time.Time) Receipt {
+	if requestID == "" {
+		requestID = op.ID
+	}
 	return Receipt{
-		ID:            "receipt:reconcile:" + op.ID,
+		ID:            "receipt:" + op.ID + ":" + string(op.State),
+		RequestID:     requestID,
 		OperationID:   op.ID,
 		Result:        string(op.State),
-		ExternalRef:   result.ExternalRef,
-		ObservedState: result.ObservedState,
-		CreatedAt:     s.now(),
-	}, nil
+		ExternalRef:   op.ExternalRef,
+		ObservedState: op.ObservedState,
+		CreatedAt:     now,
+	}
 }
 
 type MemoryRepository struct {
-	mu    sync.RWMutex
-	items map[string]Operation
+	mu          sync.RWMutex
+	items       map[string]Operation
+	idempotency map[string]string
 }
 
 func NewMemoryRepository() *MemoryRepository {
-	return &MemoryRepository{items: make(map[string]Operation)}
+	return &MemoryRepository{
+		items:       make(map[string]Operation),
+		idempotency: make(map[string]string),
+	}
 }
 
 func (r *MemoryRepository) Create(op Operation) error {
@@ -214,13 +258,31 @@ func (r *MemoryRepository) Create(op Operation) error {
 	if _, ok := r.items[op.ID]; ok {
 		return ErrOperationExists
 	}
+	if _, ok := r.idempotency[op.IdempotencyKey]; ok {
+		return ErrOperationExists
+	}
 	r.items[op.ID] = op
+	r.idempotency[op.IdempotencyKey] = op.ID
 	return nil
 }
 
 func (r *MemoryRepository) Get(id string) (Operation, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	op, ok := r.items[id]
+	if !ok {
+		return Operation{}, ErrOperationAbsent
+	}
+	return op, nil
+}
+
+func (r *MemoryRepository) GetByIdempotencyKey(key string) (Operation, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	id, ok := r.idempotency[key]
+	if !ok {
+		return Operation{}, ErrOperationAbsent
+	}
 	op, ok := r.items[id]
 	if !ok {
 		return Operation{}, ErrOperationAbsent
