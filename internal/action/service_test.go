@@ -16,13 +16,17 @@ func (g fixedGuard) CheckRunEpoch(context.Context, string, uint64) error {
 }
 
 type fakeProvider struct {
-	dispatch    DispatchResult
-	dispatchErr error
-	reconcile   ReconcileResult
-	reconcileErr error
+	dispatch      DispatchResult
+	dispatchErr   error
+	reconcile     ReconcileResult
+	reconcileErr  error
+	dispatchCalls *int
 }
 
 func (p fakeProvider) Dispatch(context.Context, Request) (DispatchResult, error) {
+	if p.dispatchCalls != nil {
+		(*p.dispatchCalls)++
+	}
 	return p.dispatch, p.dispatchErr
 }
 
@@ -106,5 +110,65 @@ func TestStaleEpochBlocksDispatchBeforeProvider(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected epoch guard failure")
+	}
+}
+
+func TestIdempotentRetryDoesNotDispatchTwice(t *testing.T) {
+	calls := 0
+	repo := NewMemoryRepository()
+	svc := NewService(
+		AllowCapabilities{"ci.dispatch": true},
+		fixedGuard{},
+		fakeProvider{
+			dispatch:      DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "ci-1"},
+			dispatchCalls: &calls,
+		},
+		repo,
+	)
+	req := Request{
+		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1,
+		Action: "ci.dispatch", RiskClass: ControlledMutation,
+		Capability: "ci.dispatch", ParametersDigest: "sha256:params",
+		IdempotencyKey: "idem-1", RequestedBy: "runtime",
+	}
+	first, err := svc.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected one provider dispatch, got %d", calls)
+	}
+	if first.OperationID != second.OperationID || second.Result != string(Confirmed) {
+		t.Fatalf("unexpected duplicate result: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestIdempotencyKeyCannotBeReusedForDifferentRequest(t *testing.T) {
+	repo := NewMemoryRepository()
+	svc := NewService(
+		AllowCapabilities{"ci.dispatch": true, "device.flash": true},
+		fixedGuard{},
+		fakeProvider{dispatch: DispatchResult{Outcome: DispatchConfirmed}},
+		repo,
+	)
+	first := Request{
+		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1,
+		Action: "ci.dispatch", Capability: "ci.dispatch",
+		ParametersDigest: "sha256:a", IdempotencyKey: "same-key", RequestedBy: "runtime",
+	}
+	if _, err := svc.Execute(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.ID = "op-2"
+	second.Action = "device.flash"
+	second.Capability = "device.flash"
+	second.ParametersDigest = "sha256:b"
+	if _, err := svc.Execute(context.Background(), second); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("expected idempotency conflict, got %v", err)
 	}
 }
