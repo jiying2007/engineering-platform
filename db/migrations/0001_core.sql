@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS work_items (
     human_owner         text NOT NULL,
     target_id           text,
     assurance_class     text,
+    active_task_contract_digest text,
+    active_run_id        text,
     state               text NOT NULL,
     version             bigint NOT NULL DEFAULT 1 CHECK (version > 0),
     created_at          timestamptz NOT NULL,
