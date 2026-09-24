@@ -57,8 +57,8 @@ type Memory struct {
 	runs                map[string]run.Run
 	sessions            map[string]session.Session
 	runInputs           map[string]core.RunInputManifest
-	checkpoints          map[string]session.Checkpoint
-	checkpointDigests    map[string]string
+	checkpoints         map[string]session.Checkpoint
+	checkpointDigests   map[string]string
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
@@ -75,8 +75,8 @@ func NewMemory() *Memory {
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
 		runInputs:           make(map[string]core.RunInputManifest),
-		checkpoints:          make(map[string]session.Checkpoint),
-		checkpointDigests:    make(map[string]string),
+		checkpoints:         make(map[string]session.Checkpoint),
+		checkpointDigests:   make(map[string]string),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
