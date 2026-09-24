@@ -197,7 +197,6 @@ func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 	}
 }
 
-
 func TestCreateTaskAndUpdateWorkIsAtomicOnStaleVersion(t *testing.T) {
 	s := NewMemory()
 	work := core.WorkItem{
