@@ -9,13 +9,13 @@ import (
 type WorkState string
 
 const (
-	WorkDraft      WorkState = "DRAFT"
-	WorkReady      WorkState = "READY"
-	WorkExecuting  WorkState = "EXECUTING"
-	WorkVerifying  WorkState = "VERIFYING"
-	WorkReviewing  WorkState = "REVIEWING"
-	WorkClosed     WorkState = "CLOSED"
-	WorkCancelled  WorkState = "CANCELLED"
+	WorkDraft     WorkState = "DRAFT"
+	WorkReady     WorkState = "READY"
+	WorkExecuting WorkState = "EXECUTING"
+	WorkVerifying WorkState = "VERIFYING"
+	WorkReviewing WorkState = "REVIEWING"
+	WorkClosed    WorkState = "CLOSED"
+	WorkCancelled WorkState = "CANCELLED"
 )
 
 type WorkItem struct {
@@ -60,10 +60,10 @@ type RunInputManifest struct {
 }
 
 type ArtifactRef struct {
-	ID       string `json:"artifact_id"`
-	Digest   string `json:"digest"`
+	ID        string `json:"artifact_id"`
+	Digest    string `json:"digest"`
 	MediaType string `json:"media_type,omitempty"`
-	Locator  string `json:"locator,omitempty"`
+	Locator   string `json:"locator,omitempty"`
 }
 
 type EvidenceRef struct {
@@ -77,12 +77,12 @@ type EvidenceRef struct {
 }
 
 type DeliveryReceipt struct {
-	ID          string        `json:"delivery_receipt_id"`
-	WorkItemID  string        `json:"work_item_id"`
-	RunID       string        `json:"run_id"`
-	BaseCommit  string        `json:"base_commit"`
-	ResultCommit string       `json:"result_commit,omitempty"`
-	Artifacts   []ArtifactRef `json:"artifacts,omitempty"`
-	KnownLimits []string      `json:"known_limits,omitempty"`
-	CreatedAt   time.Time     `json:"created_at"`
+	ID           string        `json:"delivery_receipt_id"`
+	WorkItemID   string        `json:"work_item_id"`
+	RunID        string        `json:"run_id"`
+	BaseCommit   string        `json:"base_commit"`
+	ResultCommit string        `json:"result_commit,omitempty"`
+	Artifacts    []ArtifactRef `json:"artifacts,omitempty"`
+	KnownLimits  []string      `json:"known_limits,omitempty"`
+	CreatedAt    time.Time     `json:"created_at"`
 }
