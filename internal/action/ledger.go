@@ -22,7 +22,11 @@ var ErrInvalidTransition = errors.New("invalid external operation transition")
 type Operation struct {
 	ID             string    `json:"operation_id"`
 	RunID          string    `json:"run_id"`
+	ExecutionEpoch uint64    `json:"execution_epoch"`
+	RecoveryEpoch  uint64    `json:"recovery_epoch"`
 	Action         string    `json:"action"`
+	RiskClass      RiskClass `json:"risk_class"`
+	Capability     string    `json:"capability"`
 	IdempotencyKey string    `json:"idempotency_key"`
 	RequestDigest  string    `json:"request_digest,omitempty"`
 	State          State     `json:"state"`
@@ -32,15 +36,24 @@ type Operation struct {
 }
 
 func New(id, runID, actionName, idempotencyKey string, now time.Time) *Operation {
-	return NewWithRequestDigest(id, runID, actionName, idempotencyKey, "", now)
-}
-
-func NewWithRequestDigest(id, runID, actionName, idempotencyKey, requestDigest string, now time.Time) *Operation {
-	return &Operation{
+	return NewWithRequestDigest(Request{
 		ID:             id,
 		RunID:          runID,
 		Action:         actionName,
 		IdempotencyKey: idempotencyKey,
+	}, "", now)
+}
+
+func NewWithRequestDigest(req Request, requestDigest string, now time.Time) *Operation {
+	return &Operation{
+		ID:             req.ID,
+		RunID:          req.RunID,
+		ExecutionEpoch: req.ExecutionEpoch,
+		RecoveryEpoch:  req.RecoveryEpoch,
+		Action:         req.Action,
+		RiskClass:      req.RiskClass,
+		Capability:     req.Capability,
+		IdempotencyKey: req.IdempotencyKey,
 		RequestDigest:  requestDigest,
 		State:          Planned,
 		UpdatedAt:      now,
