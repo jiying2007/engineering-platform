@@ -57,9 +57,13 @@ type RunInputManifest struct {
 	TaskContractDigest string   `json:"task_contract_digest"`
 	ContextRefs        []string `json:"context_refs,omitempty"`
 	RuntimeProfile     string   `json:"runtime_profile"`
-	ToolProfile        string   `json:"tool_profile,omitempty"`
-	WorkerProfile      string   `json:"worker_profile,omitempty"`
-	PolicyProfile      string   `json:"policy_profile,omitempty"`
+	ToolProfile        string   `json:"tool_profile"`
+	WorkerProfile      string   `json:"worker_profile"`
+	PolicyProfile      string   `json:"policy_profile"`
+}
+
+func (m RunInputManifest) Digest() (string, error) {
+	return canonical.Digest(m)
 }
 
 type ArtifactRef struct {
