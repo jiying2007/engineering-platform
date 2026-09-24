@@ -52,10 +52,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/takeover", s.handleTakeover)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/complete", s.handleCompleteRun)
+	s.mux.HandleFunc("POST /api/v1/deliveries", s.handleCreateDelivery)
+	s.mux.HandleFunc("GET /api/v1/deliveries/{id}", s.handleGetDelivery)
 	s.mux.HandleFunc("POST /api/v1/evidence", s.handleCreateEvidence)
 	s.mux.HandleFunc("GET /api/v1/evidence/{id}", s.handleGetEvidence)
 	s.mux.HandleFunc("POST /api/v1/verifications", s.handleCreateVerification)
 	s.mux.HandleFunc("GET /api/v1/verifications/{id}", s.handleGetVerification)
+	s.mux.HandleFunc("POST /api/v1/closures", s.handleCreateClosure)
+	s.mux.HandleFunc("GET /api/v1/closures/{id}", s.handleGetClosure)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -83,6 +88,9 @@ func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
 	}
 	if item.State == "" {
 		item.State = core.WorkDraft
+	}
+	if item.Version == 0 {
+		item.Version = 1
 	}
 	if item.CreatedAt.IsZero() {
 		item.CreatedAt = s.now()
@@ -122,8 +130,13 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "task_contract_id, work_item_id and task_type are required")
 		return
 	}
-	if _, err := s.store.GetWork(req.Contract.WorkItemID); err != nil {
+	work, err := s.store.GetWork(req.Contract.WorkItemID)
+	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	if work.State != core.WorkDraft && work.State != core.WorkReady {
+		writeError(w, http.StatusConflict, "task contract revisions are only accepted while work is DRAFT or READY")
 		return
 	}
 	req.Material.TaskType = req.Contract.TaskType
@@ -162,6 +175,17 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if work.State == core.WorkDraft {
+		expectedVersion := work.Version
+		if err := work.Transition(core.WorkReady); err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if err := s.store.UpdateWork(work.ID, expectedVersion, work); err != nil {
+			writeMutationError(w, err)
+			return
+		}
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"contract":  req.Contract,
 		"digest":    digest,
@@ -198,8 +222,18 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "run_id, task_contract_digest and attempt_id are required")
 		return
 	}
-	if _, err := s.store.GetTaskByDigest(req.TaskContractDigest); err != nil {
+	task, err := s.store.GetTaskByDigest(req.TaskContractDigest)
+	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	work, err := s.store.GetWork(task.WorkItemID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if work.State != core.WorkReady {
+		writeError(w, http.StatusConflict, "work must be READY before starting a run")
 		return
 	}
 	value := run.New(req.RunID, req.TaskContractDigest)
@@ -215,6 +249,15 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	expectedWorkVersion := work.Version
+	if err := work.Transition(core.WorkExecuting); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := s.store.UpdateWork(work.ID, expectedWorkVersion, work); err != nil {
+		writeMutationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -339,15 +382,145 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
+	var req epochRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	runID := r.PathValue("id")
+	err := s.mutateExecution(runID, func(value *run.Run, _ *session.Session) error {
+		return value.Complete(req.ExecutionEpoch)
+	})
+	if err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	value, _, err := s.store.GetExecution(runID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	task, err := s.store.GetTaskByDigest(value.TaskContractDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	work, err := s.store.GetWork(task.WorkItemID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	expectedVersion := work.Version
+	if err := work.Transition(core.WorkVerifying); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := s.store.UpdateWork(work.ID, expectedVersion, work); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	s.writeExecution(w, runID)
+}
+
+type createDeliveryRequest struct {
+	ID           string             `json:"delivery_receipt_id"`
+	RunID        string             `json:"run_id"`
+	ResultCommit string             `json:"result_commit,omitempty"`
+	Artifacts    []core.ArtifactRef `json:"artifacts,omitempty"`
+	KnownLimits  []string           `json:"known_limits,omitempty"`
+}
+
+func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
+	var req createDeliveryRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ID == "" || req.RunID == "" {
+		writeError(w, http.StatusBadRequest, "delivery_receipt_id and run_id are required")
+		return
+	}
+	value, _, err := s.store.GetExecution(req.RunID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if value.State != run.Completed {
+		writeError(w, http.StatusConflict, "run must be COMPLETED before creating delivery")
+		return
+	}
+	task, err := s.store.GetTaskByDigest(value.TaskContractDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if req.ResultCommit == "" && len(req.Artifacts) == 0 {
+		writeError(w, http.StatusBadRequest, "delivery requires result_commit or at least one artifact")
+		return
+	}
+	for _, artifact := range req.Artifacts {
+		if artifact.ID == "" || artifact.Digest == "" {
+			writeError(w, http.StatusBadRequest, "artifact_id and digest are required")
+			return
+		}
+	}
+	item := core.DeliveryReceipt{
+		ID:                 req.ID,
+		WorkItemID:         task.WorkItemID,
+		TaskContractDigest: value.TaskContractDigest,
+		RunID:              value.ID,
+		TargetID:           task.TargetID,
+		BaseCommit:         task.BaseCommit,
+		ResultCommit:       req.ResultCommit,
+		Artifacts:          append([]core.ArtifactRef(nil), req.Artifacts...),
+		KnownLimits:        append([]string(nil), req.KnownLimits...),
+		CreatedAt:          s.now(),
+	}
+	item.SubjectDigest, err = item.CalculateSubjectDigest()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.store.CreateDelivery(item); err != nil {
+		if errors.Is(err, store.ErrExists) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, item)
+}
+
+func (s *Server) handleGetDelivery(w http.ResponseWriter, r *http.Request) {
+	item, err := s.store.GetDelivery(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+type createEvidenceRequest struct {
+	DeliveryReceiptID string           `json:"delivery_receipt_id"`
+	Evidence          core.EvidenceRef `json:"evidence"`
+}
+
 func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
-	var item core.EvidenceRef
-	if !decodeJSON(w, r, &item) {
+	var req createEvidenceRequest
+	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if item.ID == "" || item.SubjectDigest == "" || item.Issuer == "" || item.Procedure == "" || item.Result == "" {
-		writeError(w, http.StatusBadRequest, "evidence_id, subject_digest, issuer, procedure and result are required")
+	if req.DeliveryReceiptID == "" || req.Evidence.ID == "" || req.Evidence.Issuer == "" || req.Evidence.Procedure == "" || req.Evidence.Result == "" {
+		writeError(w, http.StatusBadRequest, "delivery_receipt_id, evidence_id, issuer, procedure and result are required")
 		return
 	}
+	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	item := req.Evidence
+	item.SubjectDigest = delivery.SubjectDigest
 	if err := s.store.CreateEvidence(item); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
@@ -369,10 +542,11 @@ func (s *Server) handleGetEvidence(w http.ResponseWriter, r *http.Request) {
 }
 
 type createVerificationRequest struct {
-	ReportID    string            `json:"verification_report_id"`
-	Verifier    string            `json:"verifier"`
-	Plan        verification.Plan `json:"plan"`
-	EvidenceIDs []string          `json:"evidence_ids"`
+	ReportID          string            `json:"verification_report_id"`
+	DeliveryReceiptID string            `json:"delivery_receipt_id"`
+	Verifier          string            `json:"verifier"`
+	Plan              verification.Plan `json:"plan"`
+	EvidenceIDs       []string          `json:"evidence_ids"`
 }
 
 func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request) {
@@ -380,10 +554,16 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.ReportID == "" || req.Verifier == "" || req.Plan.ID == "" || req.Plan.SubjectDigest == "" {
-		writeError(w, http.StatusBadRequest, "verification_report_id, verifier, plan id and subject_digest are required")
+	if req.ReportID == "" || req.DeliveryReceiptID == "" || req.Verifier == "" || req.Plan.ID == "" {
+		writeError(w, http.StatusBadRequest, "verification_report_id, delivery_receipt_id, verifier and plan id are required")
 		return
 	}
+	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	req.Plan.SubjectDigest = delivery.SubjectDigest
 	evidence := make([]core.EvidenceRef, 0, len(req.EvidenceIDs))
 	for _, id := range req.EvidenceIDs {
 		item, err := s.store.GetEvidence(id)
@@ -395,6 +575,7 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 	}
 	report := verification.Evaluate(req.Plan, evidence)
 	report.ID = req.ReportID
+	report.DeliveryReceiptID = delivery.ID
 	report.Verifier = req.Verifier
 	report.CreatedAt = s.now()
 	if err := s.store.CreateVerification(report); err != nil {
@@ -419,6 +600,83 @@ func (s *Server) handleGetVerification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, report)
+}
+
+type createClosureRequest struct {
+	ID                   string `json:"closure_receipt_id"`
+	DeliveryReceiptID    string `json:"delivery_receipt_id"`
+	VerificationReportID string `json:"verification_report_id"`
+	ReviewReportID       string `json:"review_report_id,omitempty"`
+}
+
+func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
+	var req createClosureRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ID == "" || req.DeliveryReceiptID == "" || req.VerificationReportID == "" {
+		writeError(w, http.StatusBadRequest, "closure_receipt_id, delivery_receipt_id and verification_report_id are required")
+		return
+	}
+	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	report, err := s.store.GetVerification(req.VerificationReportID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if report.Result != "PASS" || report.DeliveryReceiptID != delivery.ID || report.SubjectDigest != delivery.SubjectDigest {
+		writeError(w, http.StatusUnprocessableEntity, "closure requires PASS verification for the exact delivery subject")
+		return
+	}
+	value, _, err := s.store.GetExecution(delivery.RunID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if value.State != run.Completed || value.TaskContractDigest != delivery.TaskContractDigest {
+		writeError(w, http.StatusConflict, "delivery does not match a completed run")
+		return
+	}
+	work, err := s.store.GetWork(delivery.WorkItemID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	expectedVersion := work.Version
+	if err := work.Transition(core.WorkClosed); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	closure := core.ClosureReceipt{
+		ID:                   req.ID,
+		WorkItemID:           delivery.WorkItemID,
+		TaskContractDigest:   delivery.TaskContractDigest,
+		RunID:                delivery.RunID,
+		DeliveryReceiptID:    delivery.ID,
+		VerificationReportID: report.ID,
+		ReviewReportID:       req.ReviewReportID,
+		SubjectDigest:        delivery.SubjectDigest,
+		Result:               "CLOSED",
+		CreatedAt:            s.now(),
+	}
+	if err := s.store.CreateClosureAndUpdateWork(closure, expectedVersion, work); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, closure)
+}
+
+func (s *Server) handleGetClosure(w http.ResponseWriter, r *http.Request) {
+	item, err := s.store.GetClosure(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) error) error {
