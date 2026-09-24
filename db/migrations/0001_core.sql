@@ -250,14 +250,23 @@ CREATE TABLE IF NOT EXISTS outbox_events (
     topic               text NOT NULL,
     aggregate_type      text,
     aggregate_id        text,
+    risk_class          text NOT NULL DEFAULT 'OBSERVE'
+                        CHECK (risk_class IN ('OBSERVE', 'CONTROLLED_MUTATION', 'HIGH_RISK')),
     payload_json        jsonb NOT NULL,
+    state               text NOT NULL DEFAULT 'PENDING'
+                        CHECK (state IN ('PENDING', 'LEASED', 'DISPATCHED', 'DEAD_LETTER')),
+    lease_owner         text,
+    lease_until         timestamptz,
+    attempt_count       bigint NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+    next_attempt_at     timestamptz NOT NULL DEFAULT now(),
+    last_error          text,
     created_at          timestamptz NOT NULL DEFAULT now(),
     dispatched_at       timestamptz
 );
 
-CREATE INDEX IF NOT EXISTS outbox_pending_idx
-    ON outbox_events(outbox_id)
-    WHERE dispatched_at IS NULL;
+CREATE INDEX IF NOT EXISTS outbox_claim_idx
+    ON outbox_events(next_attempt_at,outbox_id)
+    WHERE state IN ('PENDING','LEASED');
 
 CREATE TABLE IF NOT EXISTS workers (
     worker_id           text PRIMARY KEY,
