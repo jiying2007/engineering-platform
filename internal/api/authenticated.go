@@ -70,6 +70,7 @@ func NewAuthenticatedHandler(backend store.Store, actions ActionGateway, policy 
 		return nil, fmt.Errorf("store and access policy are required")
 	}
 	s := NewServerWithActionGateway(backend, actions)
+	s.workerRoutes()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := s.mux.Handler(r)
 		if pattern == "GET /healthz" {
@@ -82,6 +83,9 @@ func NewAuthenticatedHandler(backend store.Store, actions ActionGateway, policy 
 			return
 		}
 		capability, registered := routeCapabilities[pattern]
+		if !registered {
+			capability, registered = workerRouteCapabilities[pattern]
+		}
 		if !registered || !identity.Allows(capability) {
 			writeError(w, http.StatusForbidden, "capability denied")
 			return

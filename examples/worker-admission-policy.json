@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "principals": [
+    {
+      "subject": "urn:engineering-platform:worker:ubuntu-01",
+      "scope": "platform",
+      "capabilities": ["worker:poll", "worker:report"],
+      "worker_profiles": ["worker/ubuntu"]
+    }
+  ]
+}
