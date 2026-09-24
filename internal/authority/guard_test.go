@@ -23,8 +23,11 @@ func (f fakeSource) GetExecution(string) (run.Run, session.Session, error) {
 	return f.value, f.sess, f.err
 }
 
-func (f fakeSource) GetRecovery() recovery.Manager {
-	return f.rec
+func (f fakeSource) GetRecovery() (recovery.Manager, error) {
+	if f.err != nil {
+		return recovery.Manager{}, f.err
+	}
+	return f.rec, nil
 }
 
 func TestGuardChecksRunAndSessionEpoch(t *testing.T) {
@@ -69,5 +72,13 @@ func TestRecoveryRejectsStaleEpochEvenForObserve(t *testing.T) {
 	g := New(fakeSource{rec: rec})
 	if err := g.CheckRecoveryEpoch(context.Background(), epoch-1, action.Observe); !errors.Is(err, recovery.ErrStaleEpoch) {
 		t.Fatalf("expected stale recovery epoch, got %v", err)
+	}
+}
+
+func TestRecoveryReadFailureFailsClosed(t *testing.T) {
+	expected := errors.New("database unavailable")
+	g := New(fakeSource{err: expected})
+	if err := g.CheckRecoveryEpoch(context.Background(), 0, action.Observe); !errors.Is(err, expected) {
+		t.Fatalf("expected recovery source error to propagate, got %v", err)
 	}
 }
