@@ -31,3 +31,37 @@ func TestTakeoverRevokesRuntimeSteering(t *testing.T) {
 		t.Fatalf("expected runtime write revocation, got %v", err)
 	}
 }
+
+func TestCheckpointDigestExcludesBusinessIDAndTimestamp(t *testing.T) {
+	base := Checkpoint{
+		ID:                     "cp-1",
+		RunID:                  "run-1",
+		TaskContractDigest:     "sha256:task",
+		RunInputManifestDigest: "sha256:input",
+		ExecutionEpoch:         2,
+		SourceTreeDigest:       "sha256:tree",
+		DiffDigest:             "sha256:diff",
+		Objective:              "finish driver fix",
+		Completed:              []string{"analysis"},
+		Pending:                []string{"test"},
+		Questions:              []string{"which fixture"},
+		LastEventSequence:      7,
+		ExternalOperationCursor:"op-3",
+		CreatedAt:              time.Unix(1, 0),
+	}
+	other := base
+	other.ID = "cp-2"
+	other.CreatedAt = time.Unix(999, 0)
+
+	d1, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2, err := other.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d1 != d2 {
+		t.Fatalf("checkpoint content digest must ignore business id/time: %s != %s", d1, d2)
+	}
+}
