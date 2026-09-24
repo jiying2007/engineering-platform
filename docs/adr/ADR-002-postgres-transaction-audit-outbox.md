@@ -75,6 +75,27 @@ The event stores:
 Audit transport/export may be asynchronous.
 Audit fact creation is not.
 
+The audit sequence MUST NOT use a PostgreSQL sequence/identity value. PostgreSQL sequences are not transactional and can leave gaps after rollback, while the audit hash chain requires an exact contiguous sequence. The mutation transaction instead locks the singleton `audit_journal_state` row, reads `last_sequence/last_digest`, builds the next event, inserts it, and advances the journal head in the same transaction.
+
+Conceptually:
+
+~~~sql
+SELECT last_sequence, last_digest
+FROM audit_journal_state
+WHERE singleton_id = true
+FOR UPDATE;
+
+-- Build sequence = last_sequence + 1 and event_digest in application code.
+
+INSERT INTO audit_events (...);
+UPDATE audit_journal_state
+SET last_sequence = $next_sequence,
+    last_digest = $event_digest
+WHERE singleton_id = true;
+~~~
+
+If the business mutation transaction rolls back, the journal-head update rolls back too; no logical audit sequence number is consumed.
+
 ### 4. Outbox is part of the same transaction
 
 If committed business state requires:
