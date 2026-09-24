@@ -21,7 +21,9 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v21 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md)
+- [Reference-Aligned Implementation Profile v29 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md)
+- [Reference-Aligned Implementation Profile v25 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V25.md)
+- [Reference-Aligned Implementation Profile v21 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md)
 - [Reference-Aligned Implementation Profile v20 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V20.md)
 - [Reference-Aligned Implementation Profile v17 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V17.md)
 - [Reference-Aligned Implementation Profile v16 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V16.md)
@@ -62,6 +64,15 @@ See:
 - [Open Source Reference Review Round 19 — knowledge freshness](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND19_KNOWLEDGE_FRESHNESS_2026-09-24.md)
 - [Open Source Reference Review Round 20 — AI code review](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND20_AI_CODE_REVIEW_2026-09-24.md)
 - [Open Source/Public Practice Review Round 21 — empirical AI governance](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND21_EMPIRICAL_AI_GOVERNANCE_2026-09-24.md)
+- [Open Source Reference Review Round 22 — PLM, hardware design and engineering change](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND22_PLM_HARDWARE_CHANGE_2026-09-24.md)
+- [Open Source / Regulatory Reference Review Round 23 — PSIRT, CRA and vulnerability response](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND23_PSIRT_CRA_VULNERABILITY_RESPONSE_2026-09-24.md)
+- [Open Source Reference Review Round 24 — RMA, repair and failure analysis](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND24_RMA_REPAIR_FAILURE_ANALYSIS_2026-09-24.md)
+- [Open Source Reference Review Round 25 — product family and variants](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND25_PRODUCT_FAMILY_VARIANTS_2026-09-24.md)
+- [Open Source Reference Review Round 26 — supplier lifecycle, CAPA and compliance](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND26_SUPPLIER_CAPA_COMPLIANCE_2026-09-24.md)
+- [Open Source Reference Review Round 27 — machine-readable compliance / OSCAL](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND27_COMPLIANCE_OSCAL_2026-09-24.md)
+- [Open Source Reference Review Round 28 — digital twin and observed device state](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND28_DIGITAL_TWIN_DEVICE_STATE_2026-09-24.md)
+- [Open Source Reference Review Round 29 — FOSS / license compliance](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND29_FOSS_LICENSE_COMPLIANCE_2026-09-24.md)
+- [Open Source Reference Review Round 30 — reliability/FMEA/FRACAS negative result](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND30_RELIABILITY_NEGATIVE_RESULT_2026-09-24.md)
 - [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
@@ -117,7 +128,9 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v21 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md)
+- [M0 Reference Adoption Plan v29 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md)
+- [M0 Reference Adoption Plan v25 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V25.md)
+- [M0 Reference Adoption Plan v21 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md)
 - [M0 Reference Adoption Plan v20 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V20.md)
 - [M0 Reference Adoption Plan v17 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V17.md)
 - [M0 Reference Adoption Plan v16 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V16.md)
