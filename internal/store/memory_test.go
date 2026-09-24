@@ -166,7 +166,10 @@ func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 
 func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 	s := NewMemory()
-	initial := s.GetRecovery()
+	initial, err := s.GetRecovery()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if initial.Epoch != 0 || initial.Mode != recovery.Normal {
 		t.Fatalf("unexpected initial recovery state: %#v", initial)
 	}
