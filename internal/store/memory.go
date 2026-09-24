@@ -20,6 +20,7 @@ type Store interface {
 	GetWork(string) (core.WorkItem, error)
 	CreateTask(core.TaskContract) error
 	GetTask(string) (core.TaskContract, error)
+	GetTaskByDigest(string) (core.TaskContract, error)
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
@@ -28,7 +29,8 @@ type Store interface {
 type Memory struct {
 	mu       sync.RWMutex
 	works    map[string]core.WorkItem
-	tasks    map[string]core.TaskContract
+	tasks         map[string]core.TaskContract
+	tasksByDigest map[string]core.TaskContract
 	runs     map[string]run.Run
 	sessions map[string]session.Session
 }
@@ -36,7 +38,8 @@ type Memory struct {
 func NewMemory() *Memory {
 	return &Memory{
 		works:    make(map[string]core.WorkItem),
-		tasks:    make(map[string]core.TaskContract),
+		tasks:         make(map[string]core.TaskContract),
+		tasksByDigest: make(map[string]core.TaskContract),
 		runs:     make(map[string]run.Run),
 		sessions: make(map[string]session.Session),
 	}
@@ -63,12 +66,20 @@ func (m *Memory) GetWork(id string) (core.WorkItem, error) {
 }
 
 func (m *Memory) CreateTask(task core.TaskContract) error {
+	digest, err := task.Digest()
+	if err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.tasks[task.ID]; ok {
 		return ErrExists
 	}
+	if _, ok := m.tasksByDigest[digest]; ok {
+		return ErrExists
+	}
 	m.tasks[task.ID] = task
+	m.tasksByDigest[digest] = task
 	return nil
 }
 
@@ -76,6 +87,16 @@ func (m *Memory) GetTask(id string) (core.TaskContract, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	task, ok := m.tasks[id]
+	if !ok {
+		return core.TaskContract{}, ErrNotFound
+	}
+	return task, nil
+}
+
+func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	task, ok := m.tasksByDigest[digest]
 	if !ok {
 		return core.TaskContract{}, ErrNotFound
 	}
