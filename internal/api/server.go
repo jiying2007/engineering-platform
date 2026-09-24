@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
@@ -17,20 +19,36 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
+type ActionGateway interface {
+	Execute(context.Context, action.Request) (action.Receipt, error)
+	Get(string) (action.Operation, error)
+	Reconcile(context.Context, string) (action.Receipt, error)
+}
+
 type Server struct {
-	store store.Store
-	mux   *http.ServeMux
-	now   func() time.Time
+	store   store.Store
+	actions ActionGateway
+	mux     *http.ServeMux
+	now     func() time.Time
 }
 
 func NewServer(s store.Store) *Server {
+	return newServer(s, nil)
+}
+
+func NewServerWithActionGateway(s store.Store, actions ActionGateway) *Server {
+	return newServer(s, actions)
+}
+
+func newServer(s store.Store, actions ActionGateway) *Server {
 	if s == nil {
 		s = store.NewMemory()
 	}
 	server := &Server{
-		store: s,
-		mux:   http.NewServeMux(),
-		now:   func() time.Time { return time.Now().UTC() },
+		store:   s,
+		actions: actions,
+		mux:     http.NewServeMux(),
+		now:     func() time.Time { return time.Now().UTC() },
 	}
 	server.routes()
 	return server
@@ -59,6 +77,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/complete", s.handleCompleteRun)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/checkpoints", s.handleCreateCheckpoint)
 	s.mux.HandleFunc("GET /api/v1/checkpoints/{id}", s.handleGetCheckpoint)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/actions", s.handleCreateAction)
+	s.mux.HandleFunc("GET /api/v1/actions/{id}", s.handleGetAction)
+	s.mux.HandleFunc("POST /api/v1/actions/{id}/reconcile", s.handleReconcileAction)
 	s.mux.HandleFunc("POST /api/v1/deliveries", s.handleCreateDelivery)
 	s.mux.HandleFunc("GET /api/v1/deliveries/{id}", s.handleGetDelivery)
 	s.mux.HandleFunc("POST /api/v1/evidence", s.handleCreateEvidence)
@@ -590,6 +611,102 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.writeExecution(w, runID)
+}
+
+
+type createActionRequest struct {
+	ID               string           `json:"action_request_id"`
+	ExecutionEpoch   uint64           `json:"execution_epoch"`
+	RecoveryEpoch    *uint64          `json:"recovery_epoch"`
+	Action           string           `json:"action"`
+	RiskClass        action.RiskClass `json:"risk_class"`
+	Capability       string           `json:"capability"`
+	ParametersDigest string           `json:"parameters_digest"`
+	IdempotencyKey   string           `json:"idempotency_key"`
+	RequestedBy      string           `json:"requested_by"`
+}
+
+func (s *Server) handleCreateAction(w http.ResponseWriter, r *http.Request) {
+	if s.actions == nil {
+		writeError(w, http.StatusServiceUnavailable, "action gateway provider is not configured")
+		return
+	}
+	var req createActionRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ID == "" ||
+		req.ExecutionEpoch == 0 ||
+		req.RecoveryEpoch == nil ||
+		req.Action == "" ||
+		req.RiskClass == "" ||
+		req.Capability == "" ||
+		req.ParametersDigest == "" ||
+		req.IdempotencyKey == "" ||
+		req.RequestedBy == "" {
+		writeError(w, http.StatusBadRequest, "action_request_id, execution_epoch, recovery_epoch, action, risk_class, capability, parameters_digest, idempotency_key and requested_by are required")
+		return
+	}
+
+	receipt, err := s.actions.Execute(r.Context(), action.Request{
+		ID:               req.ID,
+		RunID:            r.PathValue("id"),
+		ExecutionEpoch:   req.ExecutionEpoch,
+		RecoveryEpoch:    *req.RecoveryEpoch,
+		Action:           req.Action,
+		RiskClass:        req.RiskClass,
+		Capability:       req.Capability,
+		ParametersDigest: req.ParametersDigest,
+		IdempotencyKey:   req.IdempotencyKey,
+		RequestedBy:      req.RequestedBy,
+		RequestedAt:      s.now(),
+	})
+	if err != nil {
+		writeActionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, receipt)
+}
+
+func (s *Server) handleGetAction(w http.ResponseWriter, r *http.Request) {
+	if s.actions == nil {
+		writeError(w, http.StatusServiceUnavailable, "action gateway provider is not configured")
+		return
+	}
+	item, err := s.actions.Get(r.PathValue("id"))
+	if err != nil {
+		writeActionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+func (s *Server) handleReconcileAction(w http.ResponseWriter, r *http.Request) {
+	if s.actions == nil {
+		writeError(w, http.StatusServiceUnavailable, "action gateway provider is not configured")
+		return
+	}
+	receipt, err := s.actions.Reconcile(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeActionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, receipt)
+}
+
+func writeActionError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, action.ErrDenied):
+		writeError(w, http.StatusForbidden, err.Error())
+	case errors.Is(err, action.ErrIdempotencyConflict):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, action.ErrOperationAbsent), errors.Is(err, store.ErrNotFound):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, run.ErrStaleEpoch), errors.Is(err, recovery.ErrStaleEpoch), errors.Is(err, recovery.ErrRecoveryMode):
+		writeError(w, http.StatusConflict, err.Error())
+	default:
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+	}
 }
 
 type createDeliveryRequest struct {
