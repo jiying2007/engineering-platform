@@ -7,6 +7,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
+	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
 var (
@@ -25,26 +26,34 @@ type Store interface {
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
+	CreateEvidence(core.EvidenceRef) error
+	GetEvidence(string) (core.EvidenceRef, error)
+	CreateVerification(verification.Report) error
+	GetVerification(string) (verification.Report, error)
 }
 
 type Memory struct {
-	mu            sync.RWMutex
-	works         map[string]core.WorkItem
-	tasks         map[string]map[uint64]core.TaskContract
-	latestTaskRev map[string]uint64
-	tasksByDigest map[string]core.TaskContract
-	runs          map[string]run.Run
-	sessions      map[string]session.Session
+	mu                  sync.RWMutex
+	works               map[string]core.WorkItem
+	tasks               map[string]map[uint64]core.TaskContract
+	latestTaskRev       map[string]uint64
+	tasksByDigest       map[string]core.TaskContract
+	runs                map[string]run.Run
+	sessions            map[string]session.Session
+	evidence            map[string]core.EvidenceRef
+	verificationReports map[string]verification.Report
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		works:         make(map[string]core.WorkItem),
-		tasks:         make(map[string]map[uint64]core.TaskContract),
-		latestTaskRev: make(map[string]uint64),
-		tasksByDigest: make(map[string]core.TaskContract),
-		runs:          make(map[string]run.Run),
-		sessions:      make(map[string]session.Session),
+		works:               make(map[string]core.WorkItem),
+		tasks:               make(map[string]map[uint64]core.TaskContract),
+		latestTaskRev:       make(map[string]uint64),
+		tasksByDigest:       make(map[string]core.TaskContract),
+		runs:                make(map[string]run.Run),
+		sessions:            make(map[string]session.Session),
+		evidence:            make(map[string]core.EvidenceRef),
+		verificationReports: make(map[string]verification.Report),
 	}
 }
 
@@ -107,7 +116,6 @@ func (m *Memory) CreateTask(task core.TaskContract) error {
 	return nil
 }
 
-// GetTask returns the latest revision for human/API lookup.
 func (m *Memory) GetTask(id string) (core.TaskContract, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -190,4 +198,44 @@ func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Ru
 	m.runs[id] = value
 	m.sessions[id] = sess
 	return nil
+}
+
+func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.evidence[item.ID]; ok {
+		return ErrExists
+	}
+	m.evidence[item.ID] = item
+	return nil
+}
+
+func (m *Memory) GetEvidence(id string) (core.EvidenceRef, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	item, ok := m.evidence[id]
+	if !ok {
+		return core.EvidenceRef{}, ErrNotFound
+	}
+	return item, nil
+}
+
+func (m *Memory) CreateVerification(report verification.Report) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.verificationReports[report.ID]; ok {
+		return ErrExists
+	}
+	m.verificationReports[report.ID] = report
+	return nil
+}
+
+func (m *Memory) GetVerification(id string) (verification.Report, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	report, ok := m.verificationReports[id]
+	if !ok {
+		return verification.Report{}, ErrNotFound
+	}
+	return report, nil
 }
