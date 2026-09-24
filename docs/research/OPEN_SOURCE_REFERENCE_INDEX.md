@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V36.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V39.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V36.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V39.md
 
 ## 1. Research rounds
 
@@ -49,6 +49,9 @@ Execution:
 | 34 | Long-term compatibility / support | Kubernetes version skew, Android VINTF, K8s conformance | CompatibilityEnvelope; VersionSkewPolicy; ProductSupportPolicy; upgrade order |
 | 35 | Threat modeling / security-by-design | OWASP Threat Dragon, pytm, ATT&CK, ASVS | ThreatModelArtifact; ThreatScenario; mitigation trace; threat-model freshness |
 | 36 | Tamper-evident audit / disaster recovery | Rekor, Trillian/Tessera, pgBackRest, restic | AuditCheckpoint; RecoveryPoint/Plan; recovery epoch; external reconciliation |
+| 37 | Laboratory sample / cross-enterprise traceability | SENAITE, Tractus-X Trace-X/IRS | SampleInstance/custody; lab import receipts; SupplyChainTraceEvent; PartGenealogyProjection |
+| 38 | Digital Product Passport | EU DPP Registry/standards, Tractus-X | DigitalProductPassportArtifact; DPPProfile; projection/registration receipts |
+| 39 | Digital calibration / metrology | PTB DCC | quantity/unit/uncertainty-aware MeasurementResult; DCC Artifact; measurement traceability |
 
 ---
 
@@ -132,6 +135,10 @@ Prefer:
 - Kubernetes/Android-inspired compatibility envelopes and upgrade-order policy for multi-generation products
 - OWASP-style threat models traced to normal Requirements/Evidence and freshness-reviewed
 - tamper-evident checkpoints plus tested recovery/reconciliation instead of assuming backups roll back the external world
+- laboratory sample identity/preparation/custody separated from product/device identity
+- cross-enterprise trace data treated as provenance-rich observations and genealogy projections
+- Digital Product Passport generated as an immutable external projection over lifecycle facts
+- PTB DCC-inspired measurement semantics for units, uncertainty, instrument/calibration and influence conditions
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -185,6 +192,11 @@ Do not let any standard become the mutable engineering business authority.
 44. threat models are revision/freshness bound and feed standard Requirements/Verification.
 45. audit append-only semantics are strengthened by signed/checkpointed integrity verification where risk requires it.
 46. recovery restores records first and reconciles Git/CI/devices/releases/manufacturing before irreversible work resumes.
+47. physical samples have independent identity, preparation and chain-of-custody.
+48. cross-enterprise supplier/part traces are observations and genealogy inputs, not internal BOM authority.
+49. Digital Product Passport is a versioned projection/export, never the mutable source of product facts.
+50. formal measurements preserve quantity, unit, uncertainty, instrument, calibration and influence conditions.
+51. raw measurement data remains immutable beneath derived/calculated/evaluated results.
 
 ---
 
