@@ -8,7 +8,7 @@ import (
 
 var (
 	ErrStaleEpoch = errors.New("stale execution epoch")
-	ErrTerminal    = errors.New("run is terminal")
+	ErrTerminal   = errors.New("run is terminal")
 )
 
 type State string
@@ -30,16 +30,21 @@ type Attempt struct {
 }
 
 type Run struct {
-	ID               string `json:"run_id"`
+	ID                 string `json:"run_id"`
 	TaskContractDigest string `json:"task_contract_digest"`
-	State            State  `json:"state"`
-	CurrentEpoch     uint64 `json:"current_epoch"`
-	CurrentAttemptID string `json:"current_attempt_id,omitempty"`
-	ControlOwner     string `json:"control_owner"`
+	State              State  `json:"state"`
+	CurrentEpoch       uint64 `json:"current_epoch"`
+	CurrentAttemptID   string `json:"current_attempt_id,omitempty"`
+	ControlOwner       string `json:"control_owner"`
 }
 
 func New(id, taskDigest string) *Run {
-	return &Run{ID: id, TaskContractDigest: taskDigest, State: Created, ControlOwner: "RUNTIME"}
+	return &Run{
+		ID:                 id,
+		TaskContractDigest: taskDigest,
+		State:              Created,
+		ControlOwner:       "RUNTIME",
+	}
 }
 
 func (r *Run) StartAttempt(id string, now time.Time) (Attempt, error) {
