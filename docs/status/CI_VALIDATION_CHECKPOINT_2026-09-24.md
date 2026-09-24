@@ -7,3 +7,5 @@ Rerun marker: runner-exact gofmt cleanup applied on current main.
 Rerun marker 2: checkpoint test import fixed on current main.
 
 Rerun marker: checkpoint gofmt cleanup applied on current main.
+
+Rerun marker: exact runner gofmt applied to checkpoint changes.
