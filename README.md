@@ -21,7 +21,9 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v36 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V36.md)
+- [Reference-Aligned Implementation Profile v39 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V39.md)
+- [Reference-Aligned Implementation Profile v38 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V38.md)
+- [Reference-Aligned Implementation Profile v36 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V36.md)
 - [Reference-Aligned Implementation Profile v35 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V35.md)
 - [Reference-Aligned Implementation Profile v29 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md)
 - [Reference-Aligned Implementation Profile v25 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V25.md)
@@ -81,6 +83,9 @@ See:
 - [Public / Open Source Reference Review Round 34 — long-term compatibility](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND34_LONG_TERM_COMPATIBILITY_2026-09-24.md)
 - [Open Source Reference Review Round 35 — threat modeling](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND35_THREAT_MODELING_2026-09-24.md)
 - [Open Source Reference Review Round 36 — audit integrity and disaster recovery](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND36_AUDIT_DISASTER_RECOVERY_2026-09-24.md)
+- [Open Source Reference Review Round 37 — laboratory samples and supply-chain traceability](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND37_LAB_SAMPLE_SUPPLY_CHAIN_TRACE_2026-09-24.md)
+- [Public / Regulatory Reference Review Round 38 — Digital Product Passport](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND38_DIGITAL_PRODUCT_PASSPORT_2026-09-24.md)
+- [Public Standard Reference Review Round 39 — digital calibration and metrology](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND39_DIGITAL_CALIBRATION_METROLOGY_2026-09-24.md)
 - [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
@@ -136,7 +141,9 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v36 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V36.md)
+- [M0 Reference Adoption Plan v39 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V39.md)
+- [M0 Reference Adoption Plan v38 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V38.md)
+- [M0 Reference Adoption Plan v36 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V36.md)
 - [M0 Reference Adoption Plan v35 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V35.md)
 - [M0 Reference Adoption Plan v29 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md)
 - [M0 Reference Adoption Plan v25 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V25.md)
