@@ -219,8 +219,18 @@ CREATE TABLE IF NOT EXISTS closure_receipts (
     created_at              timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS audit_journal_state (
+    singleton_id        boolean PRIMARY KEY DEFAULT true CHECK (singleton_id),
+    last_sequence       bigint NOT NULL DEFAULT 0 CHECK (last_sequence >= 0),
+    last_digest         text NOT NULL DEFAULT ''
+);
+
+INSERT INTO audit_journal_state (singleton_id)
+VALUES (true)
+ON CONFLICT (singleton_id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS audit_events (
-    sequence            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    sequence            bigint PRIMARY KEY CHECK (sequence > 0),
     event_type          text NOT NULL,
     aggregate_type      text,
     aggregate_id        text,
