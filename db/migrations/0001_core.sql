@@ -49,9 +49,22 @@ CREATE TABLE IF NOT EXISTS task_contracts (
     UNIQUE (content_digest)
 );
 
+CREATE TABLE IF NOT EXISTS run_input_manifests (
+    run_input_manifest_digest text PRIMARY KEY,
+    run_id                    text NOT NULL UNIQUE,
+    task_contract_digest      text NOT NULL REFERENCES task_contracts(content_digest),
+    runtime_profile           text NOT NULL,
+    tool_profile              text NOT NULL,
+    worker_profile            text NOT NULL,
+    policy_profile            text NOT NULL,
+    manifest_json             jsonb NOT NULL,
+    created_at                timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS runs (
     run_id                  text PRIMARY KEY,
     task_contract_digest    text NOT NULL REFERENCES task_contracts(content_digest),
+    run_input_manifest_digest text NOT NULL REFERENCES run_input_manifests(run_input_manifest_digest),
     state                   text NOT NULL,
     version                 bigint NOT NULL DEFAULT 1 CHECK (version > 0),
     current_epoch           bigint NOT NULL DEFAULT 0 CHECK (current_epoch >= 0),
