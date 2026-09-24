@@ -31,7 +31,8 @@ type Attempt struct {
 
 type Run struct {
 	ID                 string `json:"run_id"`
-	TaskContractDigest string `json:"task_contract_digest"`
+	TaskContractDigest     string `json:"task_contract_digest"`
+	RunInputManifestDigest string `json:"run_input_manifest_digest"`
 	State              State  `json:"state"`
 	Version            uint64 `json:"version"`
 	CurrentEpoch       uint64 `json:"current_epoch"`
@@ -39,10 +40,11 @@ type Run struct {
 	ControlOwner       string `json:"control_owner"`
 }
 
-func New(id, taskDigest string) *Run {
+func New(id, taskDigest, inputDigest string) *Run {
 	return &Run{
-		ID:                 id,
-		TaskContractDigest: taskDigest,
+		ID:                     id,
+		TaskContractDigest:     taskDigest,
+		RunInputManifestDigest: inputDigest,
 		State:              Created,
 		Version:            1,
 		ControlOwner:       "RUNTIME",
