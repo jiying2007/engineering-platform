@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS external_operations (
         )
     ),
     external_ref        text,
+    observed_state      text,
     receipt_json        jsonb,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now()
@@ -130,8 +131,25 @@ CREATE TABLE IF NOT EXISTS artifacts (
     UNIQUE (content_digest, artifact_id)
 );
 
+CREATE TABLE IF NOT EXISTS delivery_receipts (
+    delivery_receipt_id     text PRIMARY KEY,
+    work_item_id            text NOT NULL REFERENCES work_items(work_item_id),
+    task_contract_digest    text NOT NULL REFERENCES task_contracts(content_digest),
+    run_id                  text NOT NULL REFERENCES runs(run_id),
+    target_id               text,
+    base_commit             text NOT NULL,
+    result_commit           text,
+    subject_digest          text NOT NULL UNIQUE,
+    receipt_json            jsonb NOT NULL,
+    created_at              timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS delivery_run_idx
+    ON delivery_receipts(run_id);
+
 CREATE TABLE IF NOT EXISTS evidence (
     evidence_id         text PRIMARY KEY,
+    delivery_receipt_id text NOT NULL REFERENCES delivery_receipts(delivery_receipt_id),
     subject_digest      text NOT NULL,
     issuer              text NOT NULL,
     procedure_ref       text NOT NULL,
@@ -146,6 +164,7 @@ CREATE INDEX IF NOT EXISTS evidence_subject_idx
 
 CREATE TABLE IF NOT EXISTS verification_reports (
     verification_report_id text PRIMARY KEY,
+    delivery_receipt_id    text NOT NULL REFERENCES delivery_receipts(delivery_receipt_id),
     verification_plan_id   text NOT NULL,
     subject_digest         text NOT NULL,
     result                 text NOT NULL,
@@ -156,6 +175,20 @@ CREATE TABLE IF NOT EXISTS verification_reports (
 
 CREATE INDEX IF NOT EXISTS verification_subject_idx
     ON verification_reports(subject_digest);
+
+CREATE TABLE IF NOT EXISTS closure_receipts (
+    closure_receipt_id      text PRIMARY KEY,
+    work_item_id            text NOT NULL REFERENCES work_items(work_item_id),
+    task_contract_digest    text NOT NULL REFERENCES task_contracts(content_digest),
+    run_id                  text NOT NULL REFERENCES runs(run_id),
+    delivery_receipt_id     text NOT NULL REFERENCES delivery_receipts(delivery_receipt_id),
+    verification_report_id  text NOT NULL REFERENCES verification_reports(verification_report_id),
+    review_report_id        text,
+    subject_digest          text NOT NULL,
+    result                  text NOT NULL,
+    receipt_json            jsonb NOT NULL,
+    created_at              timestamptz NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS audit_events (
     sequence            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
