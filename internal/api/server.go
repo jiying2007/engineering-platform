@@ -53,6 +53,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/takeover", s.handleTakeover)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/complete", s.handleCompleteRun)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/checkpoints", s.handleCreateCheckpoint)
+	s.mux.HandleFunc("GET /api/v1/checkpoints/{id}", s.handleGetCheckpoint)
 	s.mux.HandleFunc("POST /api/v1/deliveries", s.handleCreateDelivery)
 	s.mux.HandleFunc("GET /api/v1/deliveries/{id}", s.handleGetDelivery)
 	s.mux.HandleFunc("POST /api/v1/evidence", s.handleCreateEvidence)
@@ -409,6 +411,86 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"control_owner":   "HUMAN",
 		"execution_epoch": newEpoch,
+	})
+}
+
+
+type createCheckpointRequest struct {
+	ID                      string   `json:"checkpoint_id"`
+	ExecutionEpoch          uint64   `json:"execution_epoch"`
+	SourceTreeDigest        string   `json:"source_tree_digest"`
+	DiffDigest              string   `json:"diff_digest,omitempty"`
+	Objective               string   `json:"objective,omitempty"`
+	Completed               []string `json:"completed,omitempty"`
+	Pending                 []string `json:"pending,omitempty"`
+	Questions               []string `json:"questions,omitempty"`
+	LastEventSequence       uint64   `json:"last_event_sequence"`
+	ExternalOperationCursor string   `json:"external_operation_cursor,omitempty"`
+}
+
+func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) {
+	var req createCheckpointRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ID == "" || req.ExecutionEpoch == 0 || req.SourceTreeDigest == "" {
+		writeError(w, http.StatusBadRequest, "checkpoint_id, execution_epoch and source_tree_digest are required")
+		return
+	}
+	runID := r.PathValue("id")
+	value, sess, err := s.store.GetExecution(runID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	if sess.ExecutionEpoch != req.ExecutionEpoch {
+		writeError(w, http.StatusConflict, "session execution epoch does not match run")
+		return
+	}
+	item := session.Checkpoint{
+		ID:                      req.ID,
+		RunID:                   runID,
+		TaskContractDigest:      value.TaskContractDigest,
+		RunInputManifestDigest:  value.RunInputManifestDigest,
+		ExecutionEpoch:          req.ExecutionEpoch,
+		SourceTreeDigest:        req.SourceTreeDigest,
+		DiffDigest:              req.DiffDigest,
+		Objective:               req.Objective,
+		Completed:               append([]string(nil), req.Completed...),
+		Pending:                 append([]string(nil), req.Pending...),
+		Questions:               append([]string(nil), req.Questions...),
+		LastEventSequence:       req.LastEventSequence,
+		ExternalOperationCursor: req.ExternalOperationCursor,
+		CreatedAt:               s.now(),
+	}
+	digest, err := s.store.CreateCheckpoint(item)
+	if err != nil {
+		if errors.Is(err, store.ErrExists) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"checkpoint": item,
+		"digest":     digest,
+	})
+}
+
+func (s *Server) handleGetCheckpoint(w http.ResponseWriter, r *http.Request) {
+	item, digest, err := s.store.GetCheckpoint(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"checkpoint": item,
+		"digest":     digest,
 	})
 }
 
