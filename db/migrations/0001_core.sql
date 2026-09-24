@@ -244,6 +244,7 @@ CREATE TABLE IF NOT EXISTS audit_events (
 
 CREATE TABLE IF NOT EXISTS outbox_events (
     outbox_id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    outbox_key          text NOT NULL UNIQUE,
     topic               text NOT NULL,
     aggregate_type      text,
     aggregate_id        text,
