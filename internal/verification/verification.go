@@ -25,14 +25,15 @@ type CriterionResult struct {
 }
 
 type Report struct {
-	ID            string            `json:"verification_report_id"`
-	PlanID        string            `json:"verification_plan_id"`
-	SubjectDigest string            `json:"subject_digest"`
-	Result        string            `json:"result"`
-	Verifier      string            `json:"verifier,omitempty"`
-	Criteria      []CriterionResult `json:"criteria"`
-	EvidenceIDs   []string          `json:"evidence_ids"`
-	CreatedAt     time.Time         `json:"created_at"`
+	ID                string            `json:"verification_report_id"`
+	DeliveryReceiptID string            `json:"delivery_receipt_id"`
+	PlanID            string            `json:"verification_plan_id"`
+	SubjectDigest     string            `json:"subject_digest"`
+	Result            string            `json:"result"`
+	Verifier          string            `json:"verifier,omitempty"`
+	Criteria          []CriterionResult `json:"criteria"`
+	EvidenceIDs       []string          `json:"evidence_ids"`
+	CreatedAt         time.Time         `json:"created_at"`
 }
 
 func Evaluate(plan Plan, evidence []core.EvidenceRef) Report {
