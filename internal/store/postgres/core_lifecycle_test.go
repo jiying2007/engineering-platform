@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -115,7 +116,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	input := core.RunInputManifest{
 		RunID:              runID,
 		TaskContractDigest: taskDigest,
-		ContextRefs:        []string{"doc:datasheet@sha256:test"},
+		ContextRefs:        []core.ContextRef{{Source: "doc:datasheet", Type: "DOCUMENT", Version: "r1", Digest: canonical.BytesDigest([]byte("datasheet")), Trust: core.ContextApproved}},
 		RuntimeProfile:     "codex/default",
 		ToolProfile:        "tools/m1",
 		WorkerProfile:      "worker/ubuntu",
@@ -161,6 +162,10 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	}
 	if persistedInput.RuntimeProfile != input.RuntimeProfile {
 		t.Fatalf("unexpected run input: %#v", persistedInput)
+	}
+	persistedInputDigest, err := persistedInput.Digest()
+	if err != nil || persistedInputDigest != inputDigest || len(persistedInput.ContextRefs) != 1 || persistedInput.ContextRefs[0] != input.ContextRefs[0] {
+		t.Fatalf("structured context identity changed in PostgreSQL: %#v digest=%s err=%v", persistedInput, persistedInputDigest, err)
 	}
 
 	currentRun, currentSession, err := s.GetExecution(runID)

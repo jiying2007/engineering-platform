@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
@@ -429,7 +430,7 @@ func TestCheckpointBindsFrozenRunInputAndRejectsStaleEpoch(t *testing.T) {
 			"tool_profile":    "tools/m1",
 			"worker_profile":  "worker/ubuntu",
 			"policy_profile":  "policy/m1",
-			"context_refs":    []string{"doc:datasheet@sha256:1"},
+			"context_refs":    []core.ContextRef{{Source: "doc:datasheet", Type: "DOCUMENT", Version: "r1", Digest: canonical.BytesDigest([]byte("datasheet")), Trust: core.ContextApproved}},
 		},
 	}, http.StatusCreated)
 	var runResponse struct {
