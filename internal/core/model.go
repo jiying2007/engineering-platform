@@ -78,26 +78,59 @@ type EvidenceRef struct {
 }
 
 type DeliveryReceipt struct {
-	ID            string        `json:"delivery_receipt_id"`
-	WorkItemID    string        `json:"work_item_id"`
-	RunID         string        `json:"run_id"`
-	BaseCommit    string        `json:"base_commit"`
-	ResultCommit  string        `json:"result_commit,omitempty"`
-	SubjectDigest string        `json:"subject_digest"`
-	Artifacts     []ArtifactRef `json:"artifacts,omitempty"`
-	KnownLimits   []string      `json:"known_limits,omitempty"`
-	CreatedAt     time.Time     `json:"created_at"`
+	ID                 string        `json:"delivery_receipt_id"`
+	WorkItemID         string        `json:"work_item_id"`
+	TaskContractDigest string        `json:"task_contract_digest"`
+	RunID              string        `json:"run_id"`
+	TargetID           string        `json:"target_id,omitempty"`
+	BaseCommit         string        `json:"base_commit"`
+	ResultCommit       string        `json:"result_commit,omitempty"`
+	SubjectDigest      string        `json:"subject_digest"`
+	Artifacts          []ArtifactRef `json:"artifacts,omitempty"`
+	KnownLimits        []string      `json:"known_limits,omitempty"`
+	CreatedAt          time.Time     `json:"created_at"`
+}
+
+type deliverySubjectArtifact struct {
+	ID     string `json:"artifact_id"`
+	Digest string `json:"digest"`
+}
+
+type deliverySubject struct {
+	TaskContractDigest string                    `json:"task_contract_digest"`
+	RunID              string                    `json:"run_id"`
+	TargetID           string                    `json:"target_id,omitempty"`
+	BaseCommit         string                    `json:"base_commit"`
+	ResultCommit       string                    `json:"result_commit,omitempty"`
+	Artifacts          []deliverySubjectArtifact `json:"artifacts,omitempty"`
+}
+
+func (d DeliveryReceipt) CalculateSubjectDigest() (string, error) {
+	subject := deliverySubject{
+		TaskContractDigest: d.TaskContractDigest,
+		RunID:              d.RunID,
+		TargetID:           d.TargetID,
+		BaseCommit:         d.BaseCommit,
+		ResultCommit:       d.ResultCommit,
+	}
+	for _, artifact := range d.Artifacts {
+		subject.Artifacts = append(subject.Artifacts, deliverySubjectArtifact{
+			ID:     artifact.ID,
+			Digest: artifact.Digest,
+		})
+	}
+	return canonical.Digest(subject)
 }
 
 type ClosureReceipt struct {
-	ID                     string    `json:"closure_receipt_id"`
-	WorkItemID             string    `json:"work_item_id"`
-	TaskContractDigest     string    `json:"task_contract_digest"`
-	RunID                  string    `json:"run_id"`
-	DeliveryReceiptID      string    `json:"delivery_receipt_id"`
-	VerificationReportID   string    `json:"verification_report_id"`
-	ReviewReportID         string    `json:"review_report_id,omitempty"`
-	SubjectDigest          string    `json:"subject_digest"`
-	Result                 string    `json:"result"`
-	CreatedAt              time.Time `json:"created_at"`
+	ID                   string    `json:"closure_receipt_id"`
+	WorkItemID           string    `json:"work_item_id"`
+	TaskContractDigest   string    `json:"task_contract_digest"`
+	RunID                string    `json:"run_id"`
+	DeliveryReceiptID    string    `json:"delivery_receipt_id"`
+	VerificationReportID string    `json:"verification_report_id"`
+	ReviewReportID       string    `json:"review_report_id,omitempty"`
+	SubjectDigest        string    `json:"subject_digest"`
+	Result               string    `json:"result"`
+	CreatedAt            time.Time `json:"created_at"`
 }
