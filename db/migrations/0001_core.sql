@@ -25,6 +25,13 @@ CREATE TABLE IF NOT EXISTS work_items (
     updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS verification_plans (
+    verification_plan_id  text NOT NULL,
+    plan_digest           text PRIMARY KEY,
+    plan_json             jsonb NOT NULL,
+    created_at            timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS task_contracts (
     task_contract_id    text NOT NULL,
     revision            bigint NOT NULL CHECK (revision > 0),
@@ -34,6 +41,8 @@ CREATE TABLE IF NOT EXISTS task_contracts (
     repository          text NOT NULL,
     base_commit         text NOT NULL,
     target_id           text,
+    verification_plan_id text NOT NULL,
+    verification_plan_digest text NOT NULL REFERENCES verification_plans(plan_digest),
     contract_json       jsonb NOT NULL,
     created_at          timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (task_contract_id, revision),
@@ -166,6 +175,7 @@ CREATE TABLE IF NOT EXISTS verification_reports (
     verification_report_id text PRIMARY KEY,
     delivery_receipt_id    text NOT NULL REFERENCES delivery_receipts(delivery_receipt_id),
     verification_plan_id   text NOT NULL,
+    verification_plan_digest text NOT NULL REFERENCES verification_plans(plan_digest),
     subject_digest         text NOT NULL,
     result                 text NOT NULL,
     verifier               text,
