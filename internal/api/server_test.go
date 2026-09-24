@@ -94,6 +94,26 @@ func TestPauseSteerAndTakeover(t *testing.T) {
 		"content_digest":      "sha256:steer",
 	}, http.StatusAccepted)
 
+	steerBody := mustRequest(t, h, http.MethodGet, "/api/v1/steering/steer-1", nil, http.StatusOK)
+	var storedSteer struct {
+		ID             string `json:"steering_command_id"`
+		RunID          string `json:"run_id"`
+		ExecutionEpoch uint64 `json:"execution_epoch"`
+		Sequence       uint64 `json:"sequence"`
+	}
+	mustJSON(t, steerBody, &storedSteer)
+	if storedSteer.ID != "steer-1" || storedSteer.RunID != "run-s" || storedSteer.ExecutionEpoch != 1 || storedSteer.Sequence != 1 {
+		t.Fatalf("unexpected persisted steering command: %#v", storedSteer)
+	}
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/steer", map[string]any{
+		"steering_command_id": "steer-duplicate-sequence",
+		"execution_epoch":     1,
+		"sequence":            1,
+		"actor":               "engineer",
+		"content_digest":      "sha256:duplicate",
+	}, http.StatusConflict)
+
 	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/pause", map[string]any{
 		"execution_epoch": 1,
 	}, http.StatusOK)
@@ -592,4 +612,48 @@ func TestRecoveryReadFailureReturnsServiceUnavailable(t *testing.T) {
 	expected := errors.New("database unavailable")
 	s := NewServer(failingRecoveryStore{Memory: store.NewMemory(), err: expected})
 	mustRequest(t, s.Handler(), http.MethodGet, "/api/v1/recovery", nil, http.StatusServiceUnavailable)
+}
+
+func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	taskDigest := createWorkAndTask(t, h, "work-steer-id", "task-steer-id", "FEATURE", "driver")
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs", map[string]any{
+		"run_id":               "run-steer-id",
+		"task_contract_digest": taskDigest,
+		"attempt_id":           "attempt-steer-id",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
+	}, http.StatusCreated)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-steer-id/steer", map[string]any{
+		"steering_command_id": "steer-fixed",
+		"execution_epoch":     1,
+		"sequence":            1,
+		"actor":               "engineer",
+		"content_digest":      "sha256:first",
+	}, http.StatusAccepted)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-steer-id/steer", map[string]any{
+		"steering_command_id": "steer-fixed",
+		"execution_epoch":     1,
+		"sequence":            2,
+		"actor":               "engineer",
+		"content_digest":      "sha256:second",
+	}, http.StatusConflict)
+
+	body := mustRequest(t, h, http.MethodGet, "/api/v1/steering/steer-fixed", nil, http.StatusOK)
+	var stored struct {
+		Sequence      uint64 `json:"sequence"`
+		ContentDigest string `json:"content_digest"`
+	}
+	mustJSON(t, body, &stored)
+	if stored.Sequence != 1 || stored.ContentDigest != "sha256:first" {
+		t.Fatalf("historical steering command was overwritten: %#v", stored)
+	}
 }
