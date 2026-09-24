@@ -14,7 +14,7 @@ var ErrRunSessionEpochMismatch = errors.New("run/session execution epoch mismatc
 
 type Source interface {
 	GetExecution(string) (run.Run, session.Session, error)
-	GetRecovery() recovery.Manager
+	GetRecovery() (recovery.Manager, error)
 }
 
 type Guard struct {
@@ -40,7 +40,10 @@ func (g *Guard) CheckRunEpoch(_ context.Context, runID string, epoch uint64) err
 }
 
 func (g *Guard) CheckRecoveryEpoch(_ context.Context, epoch uint64, risk action.RiskClass) error {
-	state := g.source.GetRecovery()
+	state, err := g.source.GetRecovery()
+	if err != nil {
+		return err
+	}
 	if err := state.CheckEpoch(epoch); err != nil {
 		return err
 	}
