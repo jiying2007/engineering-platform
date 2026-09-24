@@ -54,7 +54,7 @@ type Memory struct {
 	verificationPlans   map[string]verification.Plan
 	runs                map[string]run.Run
 	sessions            map[string]session.Session
-	runInputs            map[string]core.RunInputManifest
+	runInputs           map[string]core.RunInputManifest
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
@@ -70,7 +70,7 @@ func NewMemory() *Memory {
 		verificationPlans:   make(map[string]verification.Plan),
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
-		runInputs:            make(map[string]core.RunInputManifest),
+		runInputs:           make(map[string]core.RunInputManifest),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
