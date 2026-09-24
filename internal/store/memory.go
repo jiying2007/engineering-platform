@@ -12,6 +12,7 @@ import (
 var (
 	ErrExists   = errors.New("record already exists")
 	ErrNotFound = errors.New("record not found")
+	ErrConflict = errors.New("optimistic concurrency conflict")
 )
 
 type Store interface {
@@ -21,7 +22,7 @@ type Store interface {
 	GetTask(string) (core.TaskContract, error)
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
-	MutateExecution(string, func(*run.Run, *session.Session) error) error
+	UpdateExecution(string, uint64, run.Run, session.Session) error
 }
 
 type Memory struct {
@@ -90,6 +91,9 @@ func (m *Memory) CreateExecution(value run.Run, sess session.Session) error {
 	if _, ok := m.sessions[value.ID]; ok {
 		return ErrExists
 	}
+	if value.Version == 0 {
+		value.Version = 1
+	}
 	m.runs[value.ID] = value
 	m.sessions[value.ID] = sess
 	return nil
@@ -109,20 +113,20 @@ func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
 	return value, sess, nil
 }
 
-func (m *Memory) MutateExecution(id string, fn func(*run.Run, *session.Session) error) error {
+func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	value, ok := m.runs[id]
+	current, ok := m.runs[id]
 	if !ok {
 		return ErrNotFound
 	}
-	sess, ok := m.sessions[id]
-	if !ok {
+	if _, ok := m.sessions[id]; !ok {
 		return ErrNotFound
 	}
-	if err := fn(&value, &sess); err != nil {
-		return err
+	if current.Version != expectedVersion {
+		return ErrConflict
 	}
+	value.Version = expectedVersion + 1
 	m.runs[id] = value
 	m.sessions[id] = sess
 	return nil
