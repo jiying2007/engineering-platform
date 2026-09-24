@@ -261,24 +261,22 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := s.store.CreateTask(req.Contract, req.VerificationPlan); err != nil {
+	expectedWorkVersion := work.Version
+	work.ActiveTaskContractDigest = digest
+	work.ActiveRunID = ""
+	if work.State == core.WorkDraft {
+		if err := work.Transition(core.WorkReady); err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+	}
+	if err := s.store.CreateTaskAndUpdateWork(req.Contract, req.VerificationPlan, expectedWorkVersion, work); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	if work.State == core.WorkDraft {
-		expectedVersion := work.Version
-		if err := work.Transition(core.WorkReady); err != nil {
-			writeError(w, http.StatusConflict, err.Error())
-			return
-		}
-		if err := s.store.UpdateWork(work.ID, expectedVersion, work); err != nil {
-			writeMutationError(w, err)
-			return
-		}
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"contract":  req.Contract,
@@ -342,6 +340,10 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "work must be READY before starting a run")
 		return
 	}
+	if work.ActiveTaskContractDigest != req.TaskContractDigest {
+		writeError(w, http.StatusConflict, "run must use the current active task contract revision")
+		return
+	}
 	value := run.New(req.RunID, req.TaskContractDigest, inputDigest)
 	attempt, err := value.StartAttempt(req.AttemptID, s.now())
 	if err != nil {
@@ -349,21 +351,18 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sess := session.New(req.RunID, attempt.Epoch)
-	if err := s.store.CreateExecution(*value, *sess, req.RunInput); err != nil {
-		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	expectedWorkVersion := work.Version
+	work.ActiveRunID = req.RunID
 	if err := work.Transition(core.WorkExecuting); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.store.UpdateWork(work.ID, expectedWorkVersion, work); err != nil {
-		writeMutationError(w, err)
+	if err := s.store.CreateExecutionAndUpdateWork(*value, attempt, *sess, req.RunInput, expectedWorkVersion, work); err != nil {
+		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -579,16 +578,14 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runID := r.PathValue("id")
-	err := s.mutateExecution(runID, func(value *run.Run, _ *session.Session) error {
-		return value.Complete(req.ExecutionEpoch)
-	})
-	if err != nil {
-		writeMutationError(w, err)
-		return
-	}
-	value, _, err := s.store.GetExecution(runID)
+	value, sess, err := s.store.GetExecution(runID)
 	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	expectedRunVersion := value.Version
+	if err := value.Complete(req.ExecutionEpoch); err != nil {
+		writeMutationError(w, err)
 		return
 	}
 	task, err := s.store.GetTaskByDigest(value.TaskContractDigest)
@@ -601,12 +598,25 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	expectedVersion := work.Version
+	if work.State != core.WorkExecuting ||
+		work.ActiveTaskContractDigest != value.TaskContractDigest ||
+		work.ActiveRunID != runID {
+		writeError(w, http.StatusConflict, "work is not executing this run/task subject")
+		return
+	}
+	expectedWorkVersion := work.Version
 	if err := work.Transition(core.WorkVerifying); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.store.UpdateWork(work.ID, expectedVersion, work); err != nil {
+	if err := s.store.UpdateExecutionAndWork(
+		runID,
+		expectedRunVersion,
+		value,
+		sess,
+		expectedWorkVersion,
+		work,
+	); err != nil {
 		writeMutationError(w, err)
 		return
 	}
