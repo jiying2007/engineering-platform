@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -160,5 +161,38 @@ func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 	}
 	if err := s.UpdateExecution(stale.ID, stale.Version, stale, staleSession); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected optimistic concurrency conflict, got %v", err)
+	}
+}
+
+func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
+	s := NewMemory()
+	initial := s.GetRecovery()
+	if initial.Epoch != 0 || initial.Mode != recovery.Normal {
+		t.Fatalf("unexpected initial recovery state: %#v", initial)
+	}
+
+	active, err := s.BeginRecovery(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if active.Epoch != 1 || active.Mode != recovery.RecoveryReconciliation {
+		t.Fatalf("unexpected active recovery state: %#v", active)
+	}
+
+	if _, err := s.BeginRecovery(0); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected stale begin conflict, got %v", err)
+	}
+	if _, err := s.BeginRecovery(1); !errors.Is(err, recovery.ErrAlreadyRecovering) {
+		t.Fatalf("expected duplicate recovery begin rejection, got %v", err)
+	}
+	if _, err := s.CompleteRecovery(1, false); !errors.Is(err, recovery.ErrReconciliationRequired) {
+		t.Fatalf("expected reconciliation requirement, got %v", err)
+	}
+	completed, err := s.CompleteRecovery(1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Mode != recovery.Normal || completed.Epoch != 1 {
+		t.Fatalf("unexpected completed recovery state: %#v", completed)
 	}
 }
