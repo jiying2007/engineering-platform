@@ -105,7 +105,12 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleGetRecovery(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, s.store.GetRecovery())
+	state, err := s.store.GetRecovery()
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, state)
 }
 
 type beginRecoveryRequest struct {
