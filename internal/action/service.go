@@ -48,8 +48,9 @@ type Authorizer interface {
 	Authorize(context.Context, Request) error
 }
 
-type EpochGuard interface {
+type AuthorityGuard interface {
 	CheckRunEpoch(context.Context, string, uint64) error
+	CheckRecoveryEpoch(context.Context, uint64, RiskClass) error
 }
 
 type Provider interface {
@@ -66,13 +67,13 @@ type Repository interface {
 
 type Service struct {
 	authorizer Authorizer
-	guard      EpochGuard
+	guard      AuthorityGuard
 	provider   Provider
 	repository Repository
 	now        func() time.Time
 }
 
-func NewService(authorizer Authorizer, guard EpochGuard, provider Provider, repository Repository) *Service {
+func NewService(authorizer Authorizer, guard AuthorityGuard, provider Provider, repository Repository) *Service {
 	return &Service{
 		authorizer: authorizer,
 		guard:      guard,
@@ -86,6 +87,7 @@ type requestIdentity struct {
 	ID               string    `json:"action_request_id"`
 	RunID            string    `json:"run_id"`
 	ExecutionEpoch   uint64    `json:"execution_epoch"`
+	RecoveryEpoch    uint64    `json:"recovery_epoch"`
 	Action           string    `json:"action"`
 	RiskClass        RiskClass `json:"risk_class"`
 	Capability       string    `json:"capability"`
@@ -98,6 +100,7 @@ func requestDigest(req Request) (string, error) {
 		ID:               req.ID,
 		RunID:            req.RunID,
 		ExecutionEpoch:   req.ExecutionEpoch,
+		RecoveryEpoch:    req.RecoveryEpoch,
 		Action:           req.Action,
 		RiskClass:        req.RiskClass,
 		Capability:       req.Capability,
@@ -132,9 +135,12 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if err := s.guard.CheckRunEpoch(ctx, req.RunID, req.ExecutionEpoch); err != nil {
 		return Receipt{}, err
 	}
+	if err := s.guard.CheckRecoveryEpoch(ctx, req.RecoveryEpoch, req.RiskClass); err != nil {
+		return Receipt{}, err
+	}
 
 	now := s.now()
-	op := NewWithRequestDigest(req.ID, req.RunID, req.Action, req.IdempotencyKey, digest, now)
+	op := NewWithRequestDigest(req, digest, now)
 	if err := s.repository.Create(*op); err != nil {
 		if errors.Is(err, ErrOperationExists) {
 			existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey)
