@@ -6,9 +6,9 @@ import (
 )
 
 type Route struct {
-	TaskType       string   `json:"task_type"`
-	CapabilityIDs  []string `json:"capability_ids"`
-	SkillIDs       []string `json:"skill_ids"`
+	TaskType      string   `json:"task_type"`
+	CapabilityIDs []string `json:"capability_ids"`
+	SkillIDs      []string `json:"skill_ids"`
 }
 
 func Resolve(taskType, subsystem string) (Route, error) {
