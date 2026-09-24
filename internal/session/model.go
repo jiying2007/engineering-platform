@@ -3,6 +3,8 @@ package session
 import (
 	"errors"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 )
 
 var (
@@ -29,10 +31,12 @@ type SteeringCommand struct {
 }
 
 type Checkpoint struct {
-	ID                      string    `json:"checkpoint_id"`
-	RunID                   string    `json:"run_id"`
-	ExecutionEpoch          uint64    `json:"execution_epoch"`
-	SourceTreeDigest        string    `json:"source_tree_digest"`
+	ID                     string    `json:"checkpoint_id"`
+	RunID                  string    `json:"run_id"`
+	TaskContractDigest     string    `json:"task_contract_digest"`
+	RunInputManifestDigest string    `json:"run_input_manifest_digest"`
+	ExecutionEpoch         uint64    `json:"execution_epoch"`
+	SourceTreeDigest       string    `json:"source_tree_digest"`
 	DiffDigest              string    `json:"diff_digest,omitempty"`
 	Objective               string    `json:"objective,omitempty"`
 	Completed               []string  `json:"completed,omitempty"`
@@ -41,6 +45,38 @@ type Checkpoint struct {
 	LastEventSequence       uint64    `json:"last_event_sequence"`
 	ExternalOperationCursor string    `json:"external_operation_cursor,omitempty"`
 	CreatedAt               time.Time `json:"created_at"`
+}
+
+type checkpointContent struct {
+	RunID                   string   `json:"run_id"`
+	TaskContractDigest      string   `json:"task_contract_digest"`
+	RunInputManifestDigest  string   `json:"run_input_manifest_digest"`
+	ExecutionEpoch          uint64   `json:"execution_epoch"`
+	SourceTreeDigest        string   `json:"source_tree_digest"`
+	DiffDigest              string   `json:"diff_digest,omitempty"`
+	Objective               string   `json:"objective,omitempty"`
+	Completed               []string `json:"completed,omitempty"`
+	Pending                 []string `json:"pending,omitempty"`
+	Questions               []string `json:"questions,omitempty"`
+	LastEventSequence       uint64   `json:"last_event_sequence"`
+	ExternalOperationCursor string   `json:"external_operation_cursor,omitempty"`
+}
+
+func (c Checkpoint) Digest() (string, error) {
+	return canonical.Digest(checkpointContent{
+		RunID:                   c.RunID,
+		TaskContractDigest:      c.TaskContractDigest,
+		RunInputManifestDigest:  c.RunInputManifestDigest,
+		ExecutionEpoch:          c.ExecutionEpoch,
+		SourceTreeDigest:        c.SourceTreeDigest,
+		DiffDigest:              c.DiffDigest,
+		Objective:               c.Objective,
+		Completed:               c.Completed,
+		Pending:                 c.Pending,
+		Questions:               c.Questions,
+		LastEventSequence:       c.LastEventSequence,
+		ExternalOperationCursor: c.ExternalOperationCursor,
+	})
 }
 
 type Session struct {
