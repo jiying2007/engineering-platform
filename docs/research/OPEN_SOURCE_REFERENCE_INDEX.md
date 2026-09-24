@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V41.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V42.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V41.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V42.md
 
 ## 1. Research rounds
 
@@ -54,6 +54,7 @@ Execution:
 | 39 | Digital calibration / metrology | PTB DCC | quantity/unit/uncertainty-aware MeasurementResult; DCC Artifact; measurement traceability |
 | 40 | System safety / STPA | XSTAMPP, OSATE/AADL, Resolute | SafetyLoss/Hazard/UCA/LossScenario; SafetyConstraint; SafeStateDefinition |
 | 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
+| 42 | Device diagnostics / service interface | OpenSOVD, ISO 17978-3:2026, UDS/iso14229 | DiagnosticServiceProfile; snapshot-before-mutation; diagnostic query/operation receipts |
 
 ---
 
@@ -143,6 +144,7 @@ Prefer:
 - PTB DCC-inspired measurement semantics for units, uncertainty, instrument/calibration and influence conditions
 - STPA/AADL-inspired system safety chain for losses, hazards, unsafe control actions and safety constraints
 - ASAM-inspired optional HIL/test interoperability while retaining internal Procedure/Measurement/Evidence authority
+- SOVD/UDS-inspired governed diagnostics with snapshot-before-mutation and Action-Gateway receipts
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -205,6 +207,9 @@ Do not let any standard become the mutable engineering business authority.
 53. safety constraints trace into ordinary Requirement/Evidence authority and safe state is explicit.
 54. standardized test/measurement formats never replace internal Verification authority.
 55. multi-source HIL timing Evidence declares timebase/synchronization assumptions.
+56. diagnostics is a governed service surface, not arbitrary debug access.
+57. destructive/state-changing diagnostics can require immutable pre-operation snapshots.
+58. privileged diagnostic mutation always produces an auditable receipt and reconciled observed state.
 
 ---
 
