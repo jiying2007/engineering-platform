@@ -8,11 +8,16 @@ import (
 )
 
 type fixedGuard struct {
-	err error
+	runErr      error
+	recoveryErr error
 }
 
 func (g fixedGuard) CheckRunEpoch(context.Context, string, uint64) error {
-	return g.err
+	return g.runErr
+}
+
+func (g fixedGuard) CheckRecoveryEpoch(context.Context, uint64, RiskClass) error {
+	return g.recoveryErr
 }
 
 type fakeProvider struct {
@@ -100,7 +105,7 @@ func TestDispatchErrorBecomesUnknownAndMustReconcile(t *testing.T) {
 func TestStaleEpochBlocksDispatchBeforeProvider(t *testing.T) {
 	svc := NewService(
 		AllowCapabilities{"device.flash": true},
-		fixedGuard{err: errors.New("stale execution epoch")},
+		fixedGuard{runErr: errors.New("stale execution epoch")},
 		fakeProvider{dispatch: DispatchResult{Outcome: DispatchConfirmed}},
 		NewMemoryRepository(),
 	)
@@ -110,6 +115,30 @@ func TestStaleEpochBlocksDispatchBeforeProvider(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected epoch guard failure")
+	}
+}
+
+func TestRecoveryGuardBlocksDispatchBeforeProvider(t *testing.T) {
+	calls := 0
+	svc := NewService(
+		AllowCapabilities{"device.flash": true},
+		fixedGuard{recoveryErr: errors.New("recovery reconciliation active")},
+		fakeProvider{
+			dispatch:      DispatchResult{Outcome: DispatchConfirmed},
+			dispatchCalls: &calls,
+		},
+		NewMemoryRepository(),
+	)
+	_, err := svc.Execute(context.Background(), Request{
+		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1, RecoveryEpoch: 2,
+		Action: "device.flash", RiskClass: HighRisk,
+		Capability: "device.flash", IdempotencyKey: "idem",
+	})
+	if err == nil {
+		t.Fatal("expected recovery guard failure")
+	}
+	if calls != 0 {
+		t.Fatalf("provider must not be called while recovery guard blocks action, got %d calls", calls)
 	}
 }
 
@@ -126,7 +155,7 @@ func TestIdempotentRetryDoesNotDispatchTwice(t *testing.T) {
 		repo,
 	)
 	req := Request{
-		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1,
+		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1, RecoveryEpoch: 0,
 		Action: "ci.dispatch", RiskClass: ControlledMutation,
 		Capability: "ci.dispatch", ParametersDigest: "sha256:params",
 		IdempotencyKey: "idem-1", RequestedBy: "runtime",
@@ -144,6 +173,29 @@ func TestIdempotentRetryDoesNotDispatchTwice(t *testing.T) {
 	}
 	if first.OperationID != second.OperationID || second.Result != string(Confirmed) {
 		t.Fatalf("unexpected duplicate result: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestIdempotencyKeyCannotCrossRecoveryEpoch(t *testing.T) {
+	repo := NewMemoryRepository()
+	svc := NewService(
+		AllowCapabilities{"ci.dispatch": true},
+		fixedGuard{},
+		fakeProvider{dispatch: DispatchResult{Outcome: DispatchConfirmed}},
+		repo,
+	)
+	first := Request{
+		ID: "op-1", RunID: "run-1", ExecutionEpoch: 1, RecoveryEpoch: 0,
+		Action: "ci.dispatch", Capability: "ci.dispatch",
+		ParametersDigest: "sha256:a", IdempotencyKey: "same-key", RequestedBy: "runtime",
+	}
+	if _, err := svc.Execute(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.RecoveryEpoch = 1
+	if _, err := svc.Execute(context.Background(), second); !errors.Is(err, ErrIdempotencyConflict) {
+		t.Fatalf("expected recovery-epoch idempotency conflict, got %v", err)
 	}
 }
 
