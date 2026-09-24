@@ -11,26 +11,27 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
+	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/store"
 )
 
 type Server struct {
-	store *store.Memory
+	store store.Store
 	mux   *http.ServeMux
 	now   func() time.Time
 }
 
-func NewServer(memory *store.Memory) *Server {
-	if memory == nil {
-		memory = store.NewMemory()
+func NewServer(s store.Store) *Server {
+	if s == nil {
+		s = store.NewMemory()
 	}
-	s := &Server{
-		store: memory,
+	server := &Server{
+		store: s,
 		mux:   http.NewServeMux(),
 		now:   func() time.Time { return time.Now().UTC() },
 	}
-	s.routes()
-	return s
+	server.routes()
+	return server
 }
 
 func (s *Server) Handler() http.Handler {
@@ -46,6 +47,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/task-contracts/{id}", s.handleGetTask)
 	s.mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/steer", s.handleSteer)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/takeover", s.handleTakeover)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -204,7 +209,8 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.store.CreateRun(*value); err != nil {
+	sess := session.New(req.RunID, attempt.Epoch)
+	if err := s.store.CreateExecution(*value, *sess); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -215,16 +221,132 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"run":     value,
 		"attempt": attempt,
+		"session": sess,
 	})
 }
 
 func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
-	value, err := s.store.GetRun(r.PathValue("id"))
+	value, sess, err := s.store.GetExecution(r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, value)
+	writeJSON(w, http.StatusOK, map[string]any{"run": value, "session": sess})
+}
+
+type epochRequest struct {
+	ExecutionEpoch uint64 `json:"execution_epoch"`
+}
+
+func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
+	var req epochRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+		if err := value.Pause(req.ExecutionEpoch); err != nil {
+			return err
+		}
+		return sess.Pause(req.ExecutionEpoch)
+	})
+	if err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	s.writeExecution(w, r.PathValue("id"))
+}
+
+func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
+	var req epochRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+		if err := value.Resume(req.ExecutionEpoch); err != nil {
+			return err
+		}
+		return sess.Resume(req.ExecutionEpoch)
+	})
+	if err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	s.writeExecution(w, r.PathValue("id"))
+}
+
+type steerRequest struct {
+	ID             string `json:"steering_command_id"`
+	ExecutionEpoch uint64 `json:"execution_epoch"`
+	Sequence       uint64 `json:"sequence"`
+	Actor          string `json:"actor"`
+	ContentDigest  string `json:"content_digest"`
+}
+
+func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
+	var req steerRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	cmd := session.SteeringCommand{
+		ID:             req.ID,
+		RunID:          r.PathValue("id"),
+		ExecutionEpoch: req.ExecutionEpoch,
+		Sequence:       req.Sequence,
+		Actor:          req.Actor,
+		ContentDigest:  req.ContentDigest,
+		CreatedAt:      s.now(),
+	}
+	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+		if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
+			return err
+		}
+		return sess.ApplySteering(cmd)
+	})
+	if err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, cmd)
+}
+
+func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
+	var req epochRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	var newEpoch uint64
+	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+		epoch, err := value.Takeover(req.ExecutionEpoch)
+		if err != nil {
+			return err
+		}
+		sessionEpoch, err := sess.Takeover(req.ExecutionEpoch)
+		if err != nil {
+			return err
+		}
+		if epoch != sessionEpoch {
+			return errors.New("run/session epoch divergence")
+		}
+		newEpoch = epoch
+		return nil
+	})
+	if err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"control_owner":   "HUMAN",
+		"execution_epoch": newEpoch,
+	})
+}
+
+func (s *Server) writeExecution(w http.ResponseWriter, id string) {
+	value, sess, err := s.store.GetExecution(id)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"run": value, "session": sess})
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
@@ -235,6 +357,18 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 		return false
 	}
 	return true
+}
+
+func writeMutationError(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	writeError(w, http.StatusUnprocessableEntity, err.Error())
 }
 
 func writeStoreError(w http.ResponseWriter, err error) {
