@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -27,8 +28,8 @@ type Message struct {
 type EventKind string
 
 const (
-	Response     EventKind = "RESPONSE"
-	Notification EventKind = "NOTIFICATION"
+	Response      EventKind = "RESPONSE"
+	Notification  EventKind = "NOTIFICATION"
 	ServerRequest EventKind = "SERVER_REQUEST"
 )
 
@@ -74,7 +75,7 @@ func (c *Client) ReadError() error {
 }
 
 func (c *Client) Request(ctx context.Context, method string, params any) (uint64, error) {
-	if stringsTrimSpace(method) == "" {
+	if strings.TrimSpace(method) == "" {
 		return 0, fmt.Errorf("method is required")
 	}
 	id := c.nextID.Add(1)
@@ -86,7 +87,7 @@ func (c *Client) Request(ctx context.Context, method string, params any) (uint64
 }
 
 func (c *Client) Notify(ctx context.Context, method string, params any) error {
-	if stringsTrimSpace(method) == "" {
+	if strings.TrimSpace(method) == "" {
 		return fmt.Errorf("method is required")
 	}
 	return c.write(ctx, map[string]any{
@@ -116,12 +117,12 @@ func (c *Client) write(ctx context.Context, value any) error {
 		return ErrClientClosed
 	default:
 	}
+
 	payload, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("marshal app-server message: %w", err)
 	}
-	payload = append(payload, '
-')
+	payload = append(payload, '\n')
 
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
@@ -136,6 +137,7 @@ func (c *Client) readLoop(reader io.Reader) {
 		close(c.done)
 		close(c.events)
 	})
+
 	scanner := bufio.NewScanner(reader)
 	buffer := make([]byte, 0, 64*1024)
 	scanner.Buffer(buffer, 8*1024*1024)
@@ -146,8 +148,7 @@ func (c *Client) readLoop(reader io.Reader) {
 			c.setReadError(fmt.Errorf("decode app-server message: %w", err))
 			return
 		}
-		kind := classify(message)
-		c.events <- Event{Kind: kind, Message: message}
+		c.events <- Event{Kind: classify(message), Message: message}
 	}
 	if err := scanner.Err(); err != nil {
 		c.setReadError(fmt.Errorf("read app-server stream: %w", err))
@@ -168,18 +169,4 @@ func classify(message Message) EventKind {
 		return Notification
 	}
 	return Response
-}
-
-func stringsTrimSpace(value string) string {
-	start := 0
-	for start < len(value) && (value[start] == ' ' || value[start] == '	' || value[start] == '
-' || value[start] == '') {
-		start++
-	}
-	end := len(value)
-	for end > start && (value[end-1] == ' ' || value[end-1] == '	' || value[end-1] == '
-' || value[end-1] == '') {
-		end--
-	}
-	return value[start:end]
 }
