@@ -421,18 +421,18 @@ func TestCheckpointBindsFrozenRunInputAndRejectsStaleEpoch(t *testing.T) {
 	}
 
 	cpBody := mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-cp/checkpoints", map[string]any{
-		"checkpoint_id":            "cp-1",
-		"execution_epoch":          1,
-		"source_tree_digest":       "sha256:tree",
-		"diff_digest":              "sha256:diff",
-		"objective":                "finish driver fix",
-		"completed":                []string{"analysis"},
-		"pending":                  []string{"test"},
-		"last_event_sequence":      5,
-		"external_operation_cursor":"op-2",
+		"checkpoint_id":             "cp-1",
+		"execution_epoch":           1,
+		"source_tree_digest":        "sha256:tree",
+		"diff_digest":               "sha256:diff",
+		"objective":                 "finish driver fix",
+		"completed":                 []string{"analysis"},
+		"pending":                   []string{"test"},
+		"last_event_sequence":       5,
+		"external_operation_cursor": "op-2",
 	}, http.StatusCreated)
 	var cpResponse struct {
-		Digest string `json:"digest"`
+		Digest     string `json:"digest"`
 		Checkpoint struct {
 			TaskContractDigest     string `json:"task_contract_digest"`
 			RunInputManifestDigest string `json:"run_input_manifest_digest"`
