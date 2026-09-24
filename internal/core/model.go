@@ -1,6 +1,7 @@
 package core
 
 import (
+	"sort"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
@@ -68,8 +69,9 @@ type ArtifactRef struct {
 }
 
 type EvidenceRef struct {
-	ID            string   `json:"evidence_id"`
-	SubjectDigest string   `json:"subject_digest"`
+	ID                string   `json:"evidence_id"`
+	DeliveryReceiptID string   `json:"delivery_receipt_id"`
+	SubjectDigest     string   `json:"subject_digest"`
 	Issuer        string   `json:"issuer"`
 	Procedure     string   `json:"procedure"`
 	Result        string   `json:"result"`
@@ -119,6 +121,12 @@ func (d DeliveryReceipt) CalculateSubjectDigest() (string, error) {
 			Digest: artifact.Digest,
 		})
 	}
+	sort.Slice(subject.Artifacts, func(i, j int) bool {
+		if subject.Artifacts[i].ID == subject.Artifacts[j].ID {
+			return subject.Artifacts[i].Digest < subject.Artifacts[j].Digest
+		}
+		return subject.Artifacts[i].ID < subject.Artifacts[j].ID
+	})
 	return canonical.Digest(subject)
 }
 
