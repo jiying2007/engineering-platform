@@ -116,10 +116,10 @@ func (s *Server) handleGetWork(w http.ResponseWriter, r *http.Request) {
 }
 
 type createTaskRequest struct {
-	Contract         core.TaskContract  `json:"contract"`
-	Material         material.Manifest  `json:"material"`
-	Subsystem        string             `json:"subsystem,omitempty"`
-	VerificationPlan verification.Plan  `json:"verification_plan"`
+	Contract         core.TaskContract `json:"contract"`
+	Material         material.Manifest `json:"material"`
+	Subsystem        string            `json:"subsystem,omitempty"`
+	VerificationPlan verification.Plan `json:"verification_plan"`
 }
 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
