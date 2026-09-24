@@ -19,11 +19,11 @@ const inboxColumns = `inbox_id,run_id,state,lease_generation,COALESCE(lease_owne
  COALESCE(lease_recovery_epoch,0),intent_digest,intent_json,worker_profile,receipt_json`
 
 type inboxRecord struct {
-	id                                  int64
+	id                                   int64
 	runID, state, owner, digest, profile string
-	generation, epoch                   uint64
-	intent                              workerqueue.Intent
-	receipt                             *workerqueue.Receipt
+	generation, epoch                    uint64
+	intent                               workerqueue.Intent
+	receipt                              *workerqueue.Receipt
 }
 
 func scanInbox(row pgx.Row) (inboxRecord, error) {

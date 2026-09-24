@@ -11,10 +11,10 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
-	"POST /api/v1/worker/claim":      access.WorkerPoll,
-	"POST /api/v1/worker/renew":      access.WorkerPoll,
-	"POST /api/v1/worker/report":     access.WorkerReport,
-	"GET /api/v1/runs/{id}/inbox":    access.Read,
+	"POST /api/v1/worker/claim":   access.WorkerPoll,
+	"POST /api/v1/worker/renew":   access.WorkerPoll,
+	"POST /api/v1/worker/report":  access.WorkerReport,
+	"GET /api/v1/runs/{id}/inbox": access.Read,
 }
 
 // Registered only by the authenticated constructor. Bare development/test APIs

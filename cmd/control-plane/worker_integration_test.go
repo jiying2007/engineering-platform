@@ -117,8 +117,8 @@ func TestWorkerCommandMTLSRelayAdmissionAndShutdown(t *testing.T) {
 	}
 	post("/api/v1/work-items", map[string]any{"work_item_id": "cmd-work", "title": "command fixture", "human_owner": engineer})
 	task := post("/api/v1/task-contracts", map[string]any{
-		"contract": map[string]any{"task_contract_id": "cmd-task", "work_item_id": "cmd-work", "task_type": "FEATURE"},
-		"material": map[string]any{"repository": "repo", "base_commit": strings.Repeat("a", 40), "target_id": "target", "acceptance_criteria": []string{"tests pass"}},
+		"contract":  map[string]any{"task_contract_id": "cmd-task", "work_item_id": "cmd-work", "task_type": "FEATURE"},
+		"material":  map[string]any{"repository": "repo", "base_commit": strings.Repeat("a", 40), "target_id": "target", "acceptance_criteria": []string{"tests pass"}},
 		"subsystem": "driver",
 		"verification_plan": map[string]any{"verification_plan_id": "cmd-plan", "criteria": []any{
 			map[string]any{"criterion_id": "ac", "statement": "tests pass", "evidence_requirements": []any{map[string]any{"requirement_id": "req", "procedure": "ci.test"}}},
