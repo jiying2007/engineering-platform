@@ -39,7 +39,7 @@ type Store interface {
 	CreateVerification(verification.Report) error
 	GetVerification(string) (verification.Report, error)
 
-	CreateClosure(core.ClosureReceipt) error
+	CreateClosureAndUpdateWork(core.ClosureReceipt, uint64, core.WorkItem) error
 	GetClosure(string) (core.ClosureReceipt, error)
 }
 
@@ -293,13 +293,22 @@ func (m *Memory) GetVerification(id string) (verification.Report, error) {
 	return report, nil
 }
 
-func (m *Memory) CreateClosure(item core.ClosureReceipt) error {
+func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.closures[item.ID]; ok {
 		return ErrExists
 	}
+	current, ok := m.works[work.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if current.Version != expectedVersion {
+		return ErrConflict
+	}
+	work.Version = expectedVersion + 1
 	m.closures[item.ID] = item
+	m.works[work.ID] = work
 	return nil
 }
 
