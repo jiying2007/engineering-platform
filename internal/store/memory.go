@@ -38,6 +38,8 @@ type Store interface {
 	GetAttempt(string, string) (run.Attempt, error)
 	GetRunInputByDigest(string) (core.RunInputManifest, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
+	RecordSteering(string, uint64, run.Run, session.Session, session.SteeringCommand) error
+	GetSteering(string) (session.SteeringCommand, error)
 	UpdateExecutionAndWork(string, uint64, run.Run, session.Session, uint64, core.WorkItem) error
 	CreateCheckpoint(session.Checkpoint) (string, error)
 	GetCheckpoint(string) (session.Checkpoint, string, error)
@@ -67,6 +69,7 @@ type Memory struct {
 	attempts            map[string]map[string]run.Attempt
 	sessions            map[string]session.Session
 	runInputs           map[string]core.RunInputManifest
+	steeringCommands    map[string]session.SteeringCommand
 	checkpoints         map[string]session.Checkpoint
 	checkpointDigests   map[string]string
 	operations          map[string]action.Operation
@@ -89,6 +92,7 @@ func NewMemory() *Memory {
 		attempts:            make(map[string]map[string]run.Attempt),
 		sessions:            make(map[string]session.Session),
 		runInputs:           make(map[string]core.RunInputManifest),
+		steeringCommands:    make(map[string]session.SteeringCommand),
 		checkpoints:         make(map[string]session.Checkpoint),
 		checkpointDigests:   make(map[string]string),
 		operations:          make(map[string]action.Operation),
@@ -515,6 +519,51 @@ func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Ru
 	m.runs[id] = value
 	m.sessions[id] = sess
 	return nil
+}
+
+func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run, sess session.Session, cmd session.SteeringCommand) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	current, ok := m.runs[id]
+	if !ok {
+		return ErrNotFound
+	}
+	currentSession, ok := m.sessions[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if current.Version != expectedVersion {
+		return ErrConflict
+	}
+	if current.TaskContractDigest != value.TaskContractDigest ||
+		current.RunInputManifestDigest != value.RunInputManifestDigest ||
+		cmd.RunID != id ||
+		cmd.ExecutionEpoch != current.CurrentEpoch ||
+		sess.ExecutionEpoch != current.CurrentEpoch ||
+		sess.LastSequence != cmd.Sequence ||
+		cmd.Sequence <= currentSession.LastSequence {
+		return ErrConflict
+	}
+	if _, exists := m.steeringCommands[cmd.ID]; exists {
+		return ErrExists
+	}
+
+	value.Version = expectedVersion + 1
+	m.runs[id] = value
+	m.sessions[id] = sess
+	m.steeringCommands[cmd.ID] = cmd
+	return nil
+}
+
+func (m *Memory) GetSteering(id string) (session.SteeringCommand, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	cmd, ok := m.steeringCommands[id]
+	if !ok {
+		return session.SteeringCommand{}, ErrNotFound
+	}
+	return cmd, nil
 }
 
 func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
