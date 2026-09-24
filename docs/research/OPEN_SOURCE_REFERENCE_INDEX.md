@@ -1,13 +1,21 @@
 # Open Source Reference Research Index
 
 Date: 2026-09-24
-Status: **Current research index**
-Architecture:
+Status: **Archived research / extension reference index**
+
+Current Core:
+- docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md
+- docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md
+
+Current execution plan:
+- docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md
+
+Extension activation:
+- docs/extensions/EXTENSION_CATALOG_V1.md
+
+Historical foundation:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
-Implementation:
 - docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V43.md
-Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V43.md
 
 ## 1. Research rounds
 
@@ -228,4 +236,6 @@ Further research should only alter the canonical implementation profile when it:
 
 A popular tool alone is not a reason to add a new dependency or plugin interface.
 
-Current baseline is sufficiently mature to proceed with M0 implementation while targeted research continues in parallel with real spikes.
+The research corpus is sufficiently mature. It is no longer the active M0 checklist.
+
+New research changes Core only when a real implementation/pilot gap proves a missing invariant. Otherwise the result remains an Extension/Reference item.
