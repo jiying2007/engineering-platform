@@ -613,7 +613,6 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 	s.writeExecution(w, runID)
 }
 
-
 type createActionRequest struct {
 	ID               string           `json:"action_request_id"`
 	ExecutionEpoch   uint64           `json:"execution_epoch"`
