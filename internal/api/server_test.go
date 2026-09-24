@@ -169,8 +169,8 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 			"verification_plan_id": "vp-f",
 			"criteria": []any{
 				map[string]any{
-					"criterion_id":           "ac-1",
-					"statement":              "tests pass",
+					"criterion_id":          "ac-1",
+					"statement":             "tests pass",
 					"required_evidence_ids": []string{"ev-f"},
 				},
 			},
@@ -190,8 +190,8 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 	}
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
-		"closure_receipt_id":    "closure-f",
-		"delivery_receipt_id":   "delivery-f",
+		"closure_receipt_id":     "closure-f",
+		"delivery_receipt_id":    "delivery-f",
 		"verification_report_id": "vr-f",
 	}, http.StatusCreated)
 
@@ -229,7 +229,7 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 			"verification_plan_id": "vp-cross",
 			"criteria": []any{
 				map[string]any{
-					"criterion_id":           "ac-1",
+					"criterion_id":          "ac-1",
 					"required_evidence_ids": []string{"ev-a"},
 				},
 			},
@@ -262,7 +262,7 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 			"verification_plan_id": "vp-fail",
 			"criteria": []any{
 				map[string]any{
-					"criterion_id":           "ac-1",
+					"criterion_id":          "ac-1",
 					"required_evidence_ids": []string{"ev-fail"},
 				},
 			},
@@ -271,8 +271,8 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 	}, http.StatusUnprocessableEntity)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
-		"closure_receipt_id":    "closure-fail",
-		"delivery_receipt_id":   delivery.ID,
+		"closure_receipt_id":     "closure-fail",
+		"delivery_receipt_id":    delivery.ID,
 		"verification_report_id": "vr-fail",
 	}, http.StatusUnprocessableEntity)
 }
@@ -290,7 +290,7 @@ func TestVerificationRejectsUnregisteredEvidenceReference(t *testing.T) {
 			"verification_plan_id": "vp-1",
 			"criteria": []any{
 				map[string]any{
-					"criterion_id":           "ac-1",
+					"criterion_id":          "ac-1",
 					"required_evidence_ids": []string{"ev-missing"},
 				},
 			},
