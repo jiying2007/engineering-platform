@@ -155,7 +155,7 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 		"evidence": map[string]any{
 			"evidence_id": "ev-f",
 			"issuer":      "ci",
-			"procedure":   "go-test",
+			"procedure":   "ci.test",
 			"result":      "PASS",
 			"applicable":  true,
 		},
@@ -165,16 +165,6 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 		"verification_report_id": "vr-f",
 		"delivery_receipt_id":    "delivery-f",
 		"verifier":               "verification-service",
-		"plan": map[string]any{
-			"verification_plan_id": "vp-f",
-			"criteria": []any{
-				map[string]any{
-					"criterion_id":          "ac-1",
-					"statement":             "tests pass",
-					"required_evidence_ids": []string{"ev-f"},
-				},
-			},
-		},
 		"evidence_ids": []string{"ev-f"},
 	}, http.StatusCreated)
 	var verificationReport struct {
@@ -215,7 +205,7 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 		"evidence": map[string]any{
 			"evidence_id": "ev-a",
 			"issuer":      "ci",
-			"procedure":   "test",
+			"procedure":   "ci.test",
 			"result":      "PASS",
 			"applicable":  true,
 		},
@@ -225,15 +215,6 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 		"verification_report_id": "vr-cross",
 		"delivery_receipt_id":    deliveryB.ID,
 		"verifier":               "verification-service",
-		"plan": map[string]any{
-			"verification_plan_id": "vp-cross",
-			"criteria": []any{
-				map[string]any{
-					"criterion_id":          "ac-1",
-					"required_evidence_ids": []string{"ev-a"},
-				},
-			},
-		},
 		"evidence_ids": []string{"ev-a"},
 	}, http.StatusUnprocessableEntity)
 }
@@ -248,7 +229,7 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 		"evidence": map[string]any{
 			"evidence_id": "ev-fail",
 			"issuer":      "ci",
-			"procedure":   "test",
+			"procedure":   "ci.test",
 			"result":      "FAIL",
 			"applicable":  true,
 		},
@@ -258,15 +239,6 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 		"verification_report_id": "vr-fail",
 		"delivery_receipt_id":    delivery.ID,
 		"verifier":               "verification-service",
-		"plan": map[string]any{
-			"verification_plan_id": "vp-fail",
-			"criteria": []any{
-				map[string]any{
-					"criterion_id":          "ac-1",
-					"required_evidence_ids": []string{"ev-fail"},
-				},
-			},
-		},
 		"evidence_ids": []string{"ev-fail"},
 	}, http.StatusUnprocessableEntity)
 
@@ -286,15 +258,6 @@ func TestVerificationRejectsUnregisteredEvidenceReference(t *testing.T) {
 		"verification_report_id": "vr-missing",
 		"delivery_receipt_id":    delivery.ID,
 		"verifier":               "verification-service",
-		"plan": map[string]any{
-			"verification_plan_id": "vp-1",
-			"criteria": []any{
-				map[string]any{
-					"criterion_id":          "ac-1",
-					"required_evidence_ids": []string{"ev-missing"},
-				},
-			},
-		},
 		"evidence_ids": []string{"ev-missing"},
 	}, http.StatusNotFound)
 }
@@ -319,6 +282,21 @@ func createWorkAndTask(t *testing.T, h http.Handler, workID, taskID, taskType, s
 			"acceptance_criteria": []string{"tests pass"},
 		},
 		"subsystem": subsystem,
+		"verification_plan": map[string]any{
+			"verification_plan_id": "vp-" + taskID,
+			"criteria": []any{
+				map[string]any{
+					"criterion_id": "ac-1",
+					"statement":    "tests pass",
+					"evidence_requirements": []any{
+						map[string]any{
+							"requirement_id": "req-1",
+							"procedure":      "ci.test",
+						},
+					},
+				},
+			},
+		},
 	}, http.StatusCreated)
 	var response struct {
 		Digest string `json:"digest"`
