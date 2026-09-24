@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/audit"
 )
 
@@ -16,6 +17,7 @@ type OutboxMessage struct {
 	Topic         string
 	AggregateType string
 	AggregateID   string
+	RiskClass     action.RiskClass
 	Payload       any
 }
 
@@ -127,7 +129,11 @@ func insertOutbox(ctx context.Context, tx pgx.Tx, message OutboxMessage) (int64,
 		return 0, fmt.Errorf("marshal outbox payload: %w", err)
 	}
 
-	const insertMessage = "INSERT INTO outbox_events (outbox_key,topic,aggregate_type,aggregate_id,payload_json) VALUES ($1,$2,$3,$4,$5::jsonb) RETURNING outbox_id"
+	riskClass := message.RiskClass
+	if riskClass == "" {
+		riskClass = action.Observe
+	}
+	const insertMessage = "INSERT INTO outbox_events (outbox_key,topic,aggregate_type,aggregate_id,risk_class,payload_json) VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING outbox_id"
 	var id int64
 	if err := tx.QueryRow(
 		ctx,
@@ -136,6 +142,7 @@ func insertOutbox(ctx context.Context, tx pgx.Tx, message OutboxMessage) (int64,
 		message.Topic,
 		nullIfEmpty(message.AggregateType),
 		nullIfEmpty(message.AggregateID),
+		string(riskClass),
 		string(payload),
 	).Scan(&id); err != nil {
 		return 0, fmt.Errorf("insert outbox message %q: %w", message.Key, err)
