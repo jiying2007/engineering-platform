@@ -3,6 +3,7 @@ package session
 import (
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestSteeringIsOrderedAndEpochBound(t *testing.T) {
