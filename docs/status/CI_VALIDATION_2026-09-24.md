@@ -16,3 +16,5 @@ The validation target is:
 This file carries no runtime or architecture semantics.
 
 Rerun marker: validate against updated CI workflow and current main.
+
+Rerun marker 2: validate gofmt-fixed current main.
