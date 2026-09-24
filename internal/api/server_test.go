@@ -20,6 +20,12 @@ func TestWorkTaskRunVerticalSlice(t *testing.T) {
 		"run_id":               "run-1",
 		"task_contract_digest": taskDigest,
 		"attempt_id":           "attempt-1",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
 	}, http.StatusCreated)
 
 	body := mustRequest(t, h, http.MethodGet, "/api/v1/runs/run-1", nil, http.StatusOK)
@@ -70,6 +76,12 @@ func TestPauseSteerAndTakeover(t *testing.T) {
 		"run_id":               "run-s",
 		"task_contract_digest": taskDigest,
 		"attempt_id":           "attempt-s",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
 	}, http.StatusCreated)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/steer", map[string]any{
@@ -108,6 +120,12 @@ func TestDeliveryRequiresCompletedRun(t *testing.T) {
 		"run_id":               "run-d",
 		"task_contract_digest": taskDigest,
 		"attempt_id":           "attempt-d",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
 	}, http.StatusCreated)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/deliveries", map[string]any{
@@ -126,6 +144,12 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 		"run_id":               "run-f",
 		"task_contract_digest": taskDigest,
 		"attempt_id":           "attempt-f",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
 	}, http.StatusCreated)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-f/complete", map[string]any{
@@ -320,6 +344,12 @@ func createCompletedDelivery(t *testing.T, h http.Handler, suffix string) core.D
 		"run_id":               runID,
 		"task_contract_digest": taskDigest,
 		"attempt_id":           "attempt-" + suffix,
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+		},
 	}, http.StatusCreated)
 	mustRequest(t, h, http.MethodPost, "/api/v1/runs/"+runID+"/complete", map[string]any{
 		"execution_epoch": 1,
