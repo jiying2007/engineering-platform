@@ -26,6 +26,7 @@ type WorkItem struct {
 	TargetID       string    `json:"target_id,omitempty"`
 	AssuranceClass string    `json:"assurance_class,omitempty"`
 	State          WorkState `json:"state"`
+	Version        uint64    `json:"version"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -77,12 +78,26 @@ type EvidenceRef struct {
 }
 
 type DeliveryReceipt struct {
-	ID           string        `json:"delivery_receipt_id"`
-	WorkItemID   string        `json:"work_item_id"`
-	RunID        string        `json:"run_id"`
-	BaseCommit   string        `json:"base_commit"`
-	ResultCommit string        `json:"result_commit,omitempty"`
-	Artifacts    []ArtifactRef `json:"artifacts,omitempty"`
-	KnownLimits  []string      `json:"known_limits,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
+	ID            string        `json:"delivery_receipt_id"`
+	WorkItemID    string        `json:"work_item_id"`
+	RunID         string        `json:"run_id"`
+	BaseCommit    string        `json:"base_commit"`
+	ResultCommit  string        `json:"result_commit,omitempty"`
+	SubjectDigest string        `json:"subject_digest"`
+	Artifacts     []ArtifactRef `json:"artifacts,omitempty"`
+	KnownLimits   []string      `json:"known_limits,omitempty"`
+	CreatedAt     time.Time     `json:"created_at"`
+}
+
+type ClosureReceipt struct {
+	ID                     string    `json:"closure_receipt_id"`
+	WorkItemID             string    `json:"work_item_id"`
+	TaskContractDigest     string    `json:"task_contract_digest"`
+	RunID                  string    `json:"run_id"`
+	DeliveryReceiptID      string    `json:"delivery_receipt_id"`
+	VerificationReportID   string    `json:"verification_report_id"`
+	ReviewReportID         string    `json:"review_report_id,omitempty"`
+	SubjectDigest          string    `json:"subject_digest"`
+	Result                 string    `json:"result"`
+	CreatedAt              time.Time `json:"created_at"`
 }
