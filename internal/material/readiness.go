@@ -14,17 +14,18 @@ const (
 )
 
 type Manifest struct {
-	TaskType            string   `json:"task_type"`
-	Repository          string   `json:"repository"`
-	BaseCommit          string   `json:"base_commit"`
-	TargetID            string   `json:"target_id,omitempty"`
-	AcceptanceCriteria  []string `json:"acceptance_criteria"`
-	HasAuthoritativeLog bool     `json:"has_authoritative_log,omitempty"`
-	HasReproduction     bool     `json:"has_reproduction,omitempty"`
-	RequiresDevice      bool     `json:"requires_device,omitempty"`
-	DeviceID            string   `json:"device_id,omitempty"`
-	FirmwareIdentity    string   `json:"firmware_identity,omitempty"`
-	DegradationApproved bool     `json:"degradation_approved,omitempty"`
+	TaskType              string   `json:"task_type"`
+	Repository            string   `json:"repository"`
+	BaseCommit            string   `json:"base_commit"`
+	TargetID              string   `json:"target_id,omitempty"`
+	AcceptanceCriteria    []string `json:"acceptance_criteria"`
+	HasAuthoritativeLog   bool     `json:"has_authoritative_log,omitempty"`
+	HasReproduction       bool     `json:"has_reproduction,omitempty"`
+	RequiresDevice        bool     `json:"requires_device,omitempty"`
+	DeviceID              string   `json:"device_id,omitempty"`
+	FirmwareIdentity      string   `json:"firmware_identity,omitempty"`
+	DegradationApprovedBy string   `json:"degradation_approved_by,omitempty"`
+	DegradationReason     string   `json:"degradation_reason,omitempty"`
 }
 
 type Result struct {
@@ -69,10 +70,10 @@ func Evaluate(m Manifest) Result {
 	if len(degradable) == 0 {
 		return Result{Status: Ready}
 	}
-	if m.DegradationApproved {
+	if m.DegradationApprovedBy != "" && m.DegradationReason != "" {
 		return Result{Status: Degraded, Reasons: degradable}
 	}
-	return Result{Status: Blocked, Reasons: degradable}
+	return Result{Status: Blocked, Reasons: append(degradable, "degradation requires approver and reason")}
 }
 
 func isFullCommit(v string) bool {
