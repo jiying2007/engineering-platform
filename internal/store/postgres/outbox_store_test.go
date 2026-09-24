@@ -374,9 +374,7 @@ func TestPostgresOutboxMigrationPreservesEvidenceAndQuarantinesLegacyLeases(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.pool.Exec(ctx, "DROP SCHEMA public CASCADE; CREATE SCHEMA public;", pgx.QueryExecModeSimpleProtocol); err != nil {
-		t.Fatal(err)
-	}
+	resetIsolatedSchema(t, s)
 	if _, err := s.pool.Exec(ctx, string(legacy), pgx.QueryExecModeSimpleProtocol); err != nil {
 		t.Fatal(err)
 	}

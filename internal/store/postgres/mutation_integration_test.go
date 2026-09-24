@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -16,25 +15,9 @@ import (
 
 func integrationStore(t *testing.T) *Store {
 	t.Helper()
-	url := os.Getenv("POSTGRES_TEST_URL")
-	if url == "" {
-		t.Skip("POSTGRES_TEST_URL is not configured")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	t.Cleanup(cancel)
-	s, err := Open(ctx, url)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(s.Close)
-	if _, err := s.pool.Exec(ctx, "DROP SCHEMA public CASCADE; CREATE SCHEMA public", pgx.QueryExecModeSimpleProtocol); err != nil {
-		t.Fatalf("reset PostgreSQL schema: %v", err)
-	}
-	if err := s.ApplyCoreMigration(ctx); err != nil {
-		t.Fatal(err)
-	}
-	return s
+	return newIsolatedIntegrationStore(t)
 }
+
 func insertWorkMutation(id string, messages []OutboxMessage) Mutation {
 	return Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
