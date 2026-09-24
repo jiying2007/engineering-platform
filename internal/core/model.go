@@ -32,20 +32,20 @@ type WorkItem struct {
 }
 
 type TaskContract struct {
-	ID                 string   `json:"task_contract_id"`
-	WorkItemID         string   `json:"work_item_id"`
-	TaskType           string   `json:"task_type"`
-	CapabilityIDs      []string `json:"capability_ids"`
-	SkillIDs           []string `json:"skill_ids"`
-	Repository         string   `json:"repository"`
-	BaseCommit         string   `json:"base_commit"`
-	TargetID           string   `json:"target_id,omitempty"`
-	AcceptanceCriteria []string `json:"acceptance_criteria"`
-	AllowedActions     []string `json:"allowed_actions,omitempty"`
-	ExpectedOutputs         []string `json:"expected_outputs,omitempty"`
-	VerificationPlanID      string   `json:"verification_plan_id"`
-	VerificationPlanDigest  string   `json:"verification_plan_digest"`
-	Revision                uint64   `json:"revision"`
+	ID                     string   `json:"task_contract_id"`
+	WorkItemID             string   `json:"work_item_id"`
+	TaskType               string   `json:"task_type"`
+	CapabilityIDs          []string `json:"capability_ids"`
+	SkillIDs               []string `json:"skill_ids"`
+	Repository             string   `json:"repository"`
+	BaseCommit             string   `json:"base_commit"`
+	TargetID               string   `json:"target_id,omitempty"`
+	AcceptanceCriteria     []string `json:"acceptance_criteria"`
+	AllowedActions         []string `json:"allowed_actions,omitempty"`
+	ExpectedOutputs        []string `json:"expected_outputs,omitempty"`
+	VerificationPlanID     string   `json:"verification_plan_id"`
+	VerificationPlanDigest string   `json:"verification_plan_digest"`
+	Revision               uint64   `json:"revision"`
 }
 
 func (t TaskContract) Digest() (string, error) {
