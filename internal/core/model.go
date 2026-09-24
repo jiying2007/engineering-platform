@@ -72,11 +72,11 @@ type EvidenceRef struct {
 	ID                string   `json:"evidence_id"`
 	DeliveryReceiptID string   `json:"delivery_receipt_id"`
 	SubjectDigest     string   `json:"subject_digest"`
-	Issuer        string   `json:"issuer"`
-	Procedure     string   `json:"procedure"`
-	Result        string   `json:"result"`
-	ArtifactRefs  []string `json:"artifact_refs,omitempty"`
-	Applicable    bool     `json:"applicable"`
+	Issuer            string   `json:"issuer"`
+	Procedure         string   `json:"procedure"`
+	Result            string   `json:"result"`
+	ArtifactRefs      []string `json:"artifact_refs,omitempty"`
+	Applicable        bool     `json:"applicable"`
 }
 
 type DeliveryReceipt struct {
