@@ -110,13 +110,26 @@ func TestTaskRejectsPlanDigestMismatch(t *testing.T) {
 
 func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 	s := NewMemory()
-	r := run.New("run-1", "sha256:task")
+	r := run.New("run-1", "sha256:task", "sha256:input")
 	attempt, err := r.StartAttempt("attempt-1", time.Unix(1, 0))
 	if err != nil {
 		t.Fatal(err)
 	}
 	sess := session.New(r.ID, attempt.Epoch)
-	if err := s.CreateExecution(*r, *sess); err != nil {
+	input := core.RunInputManifest{
+		RunID:              r.ID,
+		TaskContractDigest: r.TaskContractDigest,
+		RuntimeProfile:     "codex/default",
+		ToolProfile:        "tools/m1",
+		WorkerProfile:      "worker/ubuntu",
+		PolicyProfile:      "policy/m1",
+	}
+	inputDigest, err := input.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.RunInputManifestDigest = inputDigest
+	if err := s.CreateExecution(*r, *sess, input); err != nil {
 		t.Fatal(err)
 	}
 
