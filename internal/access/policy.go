@@ -37,6 +37,7 @@ const (
 )
 
 var capabilities = map[string]bool{
+	WorkerPoll: true, WorkerReport: true,
 	Read: true, WorkCreate: true, TaskCreate: true, RunStart: true, RunControl: true,
 	RunComplete: true, CheckpointCreate: true, ActionExecute: true, ActionReconcile: true,
 	DeliveryCreate: true, EvidenceRegister: true, VerificationCreate: true,
@@ -52,6 +53,7 @@ type ActionGrant struct {
 }
 
 type PrincipalSpec struct {
+	WorkerProfiles     []string      `json:"worker_profiles,omitempty"`
 	Subject            string        `json:"subject"`
 	Scope              string        `json:"scope"`
 	Capabilities       []string      `json:"capabilities"`
@@ -68,11 +70,12 @@ type Document struct {
 // Identity's grants are copied into private maps and cannot be changed by a
 // request, the caller's source slices, or a returned slice.
 type Identity struct {
-	subject      string
-	capabilities map[string]bool
-	actions      map[string]ActionGrant
-	issuer       string
-	procedures   map[string]bool
+	workerProfiles map[string]bool
+	subject        string
+	capabilities   map[string]bool
+	actions        map[string]ActionGrant
+	issuer         string
+	procedures     map[string]bool
 }
 
 func (p Identity) Subject() string               { return p.subject }
@@ -141,6 +144,9 @@ func New(doc Document) (*Policy, error) {
 			}
 		} else if id.issuer != "" || len(id.procedures) > 0 {
 			return nil, fmt.Errorf("evidence binding without evidence grant")
+		}
+		if err := configureWorkerProfiles(spec, &id); err != nil {
+			return nil, err
 		}
 		policy.principals[id.subject] = id
 	}
