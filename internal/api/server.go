@@ -220,9 +220,10 @@ func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 }
 
 type createRunRequest struct {
-	RunID              string `json:"run_id"`
-	TaskContractDigest string `json:"task_contract_digest"`
-	AttemptID          string `json:"attempt_id"`
+	RunID              string                `json:"run_id"`
+	TaskContractDigest string                `json:"task_contract_digest"`
+	AttemptID          string                `json:"attempt_id"`
+	RunInput           core.RunInputManifest `json:"run_input"`
 }
 
 func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +233,17 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.RunID == "" || req.TaskContractDigest == "" || req.AttemptID == "" {
 		writeError(w, http.StatusBadRequest, "run_id, task_contract_digest and attempt_id are required")
+		return
+	}
+	if req.RunInput.RuntimeProfile == "" || req.RunInput.ToolProfile == "" || req.RunInput.WorkerProfile == "" || req.RunInput.PolicyProfile == "" {
+		writeError(w, http.StatusBadRequest, "runtime_profile, tool_profile, worker_profile and policy_profile are required")
+		return
+	}
+	req.RunInput.RunID = req.RunID
+	req.RunInput.TaskContractDigest = req.TaskContractDigest
+	inputDigest, err := req.RunInput.Digest()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	task, err := s.store.GetTaskByDigest(req.TaskContractDigest)
@@ -248,14 +260,14 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "work must be READY before starting a run")
 		return
 	}
-	value := run.New(req.RunID, req.TaskContractDigest)
+	value := run.New(req.RunID, req.TaskContractDigest, inputDigest)
 	attempt, err := value.StartAttempt(req.AttemptID, s.now())
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
 	sess := session.New(req.RunID, attempt.Epoch)
-	if err := s.store.CreateExecution(*value, *sess); err != nil {
+	if err := s.store.CreateExecution(*value, *sess, req.RunInput); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -275,7 +287,8 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"run":     value,
 		"attempt": attempt,
-		"session": sess,
+		"session":   sess,
+		"run_input": req.RunInput,
 	})
 }
 
@@ -285,7 +298,12 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"run": value, "session": sess})
+	input, err := s.store.GetRunInputByDigest(value.RunInputManifestDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"run": value, "session": sess, "run_input": input})
 }
 
 type epochRequest struct {
