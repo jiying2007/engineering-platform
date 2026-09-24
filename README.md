@@ -21,7 +21,9 @@ The platform is intentionally **not** a WorkBuddy-to-Codex proxy, prompt platfor
 See:
 
 - [AI Native Engineering Platform v1.2 — FINAL / canonical](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md)
-- [Reference-Aligned Implementation Profile v29 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md)
+- [Reference-Aligned Implementation Profile v36 — current canonical implementation companion](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V36.md)
+- [Reference-Aligned Implementation Profile v35 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V35.md)
+- [Reference-Aligned Implementation Profile v29 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md)
 - [Reference-Aligned Implementation Profile v25 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V25.md)
 - [Reference-Aligned Implementation Profile v21 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md)
 - [Reference-Aligned Implementation Profile v20 — historical](docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V20.md)
@@ -73,6 +75,12 @@ See:
 - [Open Source Reference Review Round 28 — digital twin and observed device state](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND28_DIGITAL_TWIN_DEVICE_STATE_2026-09-24.md)
 - [Open Source Reference Review Round 29 — FOSS / license compliance](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND29_FOSS_LICENSE_COMPLIANCE_2026-09-24.md)
 - [Open Source Reference Review Round 30 — reliability/FMEA/FRACAS negative result](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND30_RELIABILITY_NEGATIVE_RESULT_2026-09-24.md)
+- [Open Source / Regulatory Reference Review Round 31 — certification and battery safety](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND31_CERTIFICATION_BATTERY_SAFETY_2026-09-24.md)
+- [Open Source / Public Practice Review Round 32 — privacy and data lifecycle](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND32_PRIVACY_DATA_LIFECYCLE_2026-09-24.md)
+- [Open Source Reference Review Round 33 — field anomaly and prognostics](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND33_FIELD_PROGNOSTICS_2026-09-24.md)
+- [Public / Open Source Reference Review Round 34 — long-term compatibility](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND34_LONG_TERM_COMPATIBILITY_2026-09-24.md)
+- [Open Source Reference Review Round 35 — threat modeling](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND35_THREAT_MODELING_2026-09-24.md)
+- [Open Source Reference Review Round 36 — audit integrity and disaster recovery](docs/research/OPEN_SOURCE_REFERENCE_REVIEW_ROUND36_AUDIT_DISASTER_RECOVERY_2026-09-24.md)
 - [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md)
 - [Open Source Reference Synthesis — optimization decisions](docs/research/OPEN_SOURCE_REFERENCE_SYNTHESIS_OPTIMIZATION_2026-09-23.md)
 - [AI Native Engineering Platform v1.1 — historical baseline](docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_1.md)
@@ -128,7 +136,9 @@ External component state never becomes hidden engineering authority.
 
 ## Current M0 execution plan
 
-- [M0 Reference Adoption Plan v29 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md)
+- [M0 Reference Adoption Plan v36 — current](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V36.md)
+- [M0 Reference Adoption Plan v35 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V35.md)
+- [M0 Reference Adoption Plan v29 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md)
 - [M0 Reference Adoption Plan v25 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V25.md)
 - [M0 Reference Adoption Plan v21 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md)
 - [M0 Reference Adoption Plan v20 — historical](docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V20.md)
