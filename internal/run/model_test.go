@@ -44,3 +44,17 @@ func TestTakeoverRevokesRuntimeEpoch(t *testing.T) {
 		t.Fatal("takeover epoch mismatch")
 	}
 }
+
+func TestCompleteMakesRunTerminal(t *testing.T) {
+	r := New("run-1", "sha256:task")
+	a, _ := r.StartAttempt("a1", time.Unix(1, 0))
+	if err := r.Complete(a.Epoch); err != nil {
+		t.Fatal(err)
+	}
+	if r.State != Completed {
+		t.Fatalf("expected COMPLETED, got %s", r.State)
+	}
+	if _, err := r.StartAttempt("a2", time.Unix(2, 0)); !errors.Is(err, ErrTerminal) {
+		t.Fatalf("expected terminal run to reject new attempt, got %v", err)
+	}
+}
