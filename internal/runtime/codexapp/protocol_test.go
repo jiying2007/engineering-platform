@@ -4,18 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 )
 
 func TestClientWritesJSONLRequestsAndClassifiesMessages(t *testing.T) {
-	input := strings.NewReader(
-		"{\"id\":1,\"result\":{\"ok\":true}}\n" +
-			"{\"method\":\"thread/event\",\"params\":{\"kind\":\"progress\"}}\n" +
-			"{\"id\":7,\"method\":\"approval/request\",\"params\":{\"action\":\"shell\"}}\n",
-	)
+	reader, inbound := io.Pipe()
+	defer reader.Close()
+
 	var output bytes.Buffer
-	client := NewClient(input, &output)
+	client := NewClient(reader, &output)
 
 	id, err := client.Request(context.Background(), "thread/start", map[string]any{"cwd": "/workspace"})
 	if err != nil {
@@ -27,6 +26,15 @@ func TestClientWritesJSONLRequestsAndClassifiesMessages(t *testing.T) {
 	if err := client.Notify(context.Background(), "client/ready", map[string]any{"ready": true}); err != nil {
 		t.Fatal(err)
 	}
+
+	go func() {
+		_, _ = io.WriteString(inbound,
+			"{\"id\":1,\"result\":{\"ok\":true}}\n"+
+				"{\"method\":\"thread/event\",\"params\":{\"kind\":\"progress\"}}\n"+
+				"{\"id\":7,\"method\":\"approval/request\",\"params\":{\"action\":\"shell\"}}\n",
+		)
+		_ = inbound.Close()
+	}()
 
 	var events []Event
 	for event := range client.Events() {
@@ -61,8 +69,19 @@ func TestClientRespondsToServerRequest(t *testing.T) {
 	client := NewClient(input, &output)
 	<-client.Done()
 
-	// Closed clients fail closed instead of silently dropping approval responses.
 	if err := client.Respond(context.Background(), json.RawMessage("7"), map[string]any{"approved": false}, nil); err != ErrClientClosed {
 		t.Fatalf("expected ErrClientClosed, got %v", err)
+	}
+}
+
+func TestClientRejectsBlankMethod(t *testing.T) {
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	defer writer.Close()
+
+	var output bytes.Buffer
+	client := NewClient(reader, &output)
+	if _, err := client.Request(context.Background(), "   ", nil); err == nil {
+		t.Fatal("expected blank method to fail")
 	}
 }
