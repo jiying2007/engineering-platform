@@ -33,6 +33,7 @@ type Run struct {
 	ID                 string `json:"run_id"`
 	TaskContractDigest string `json:"task_contract_digest"`
 	State              State  `json:"state"`
+	Version            uint64 `json:"version"`
 	CurrentEpoch       uint64 `json:"current_epoch"`
 	CurrentAttemptID   string `json:"current_attempt_id,omitempty"`
 	ControlOwner       string `json:"control_owner"`
@@ -43,6 +44,7 @@ func New(id, taskDigest string) *Run {
 		ID:                 id,
 		TaskContractDigest: taskDigest,
 		State:              Created,
+		Version:            1,
 		ControlOwner:       "RUNTIME",
 	}
 }
