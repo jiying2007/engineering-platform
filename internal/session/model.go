@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	ErrStaleEpoch       = errors.New("stale session epoch")
-	ErrSequence         = errors.New("steering sequence must increase")
-	ErrRuntimeNotOwner  = errors.New("runtime no longer owns session writes")
+	ErrStaleEpoch      = errors.New("stale session epoch")
+	ErrSequence        = errors.New("steering sequence must increase")
+	ErrRuntimeNotOwner = errors.New("runtime no longer owns session writes")
 )
 
 type ControlOwner string
@@ -19,21 +19,21 @@ const (
 )
 
 type SteeringCommand struct {
-	ID            string    `json:"steering_command_id"`
-	RunID         string    `json:"run_id"`
+	ID             string    `json:"steering_command_id"`
+	RunID          string    `json:"run_id"`
 	ExecutionEpoch uint64    `json:"execution_epoch"`
-	Sequence      uint64    `json:"sequence"`
-	Actor         string    `json:"actor"`
-	ContentDigest string    `json:"content_digest"`
-	CreatedAt     time.Time `json:"created_at"`
+	Sequence       uint64    `json:"sequence"`
+	Actor          string    `json:"actor"`
+	ContentDigest  string    `json:"content_digest"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Checkpoint struct {
-	ID                     string    `json:"checkpoint_id"`
-	RunID                  string    `json:"run_id"`
-	ExecutionEpoch         uint64    `json:"execution_epoch"`
-	SourceTreeDigest       string    `json:"source_tree_digest"`
-	DiffDigest             string    `json:"diff_digest,omitempty"`
+	ID                      string    `json:"checkpoint_id"`
+	RunID                   string    `json:"run_id"`
+	ExecutionEpoch          uint64    `json:"execution_epoch"`
+	SourceTreeDigest        string    `json:"source_tree_digest"`
+	DiffDigest              string    `json:"diff_digest,omitempty"`
 	Objective               string    `json:"objective,omitempty"`
 	Completed               []string  `json:"completed,omitempty"`
 	Pending                 []string  `json:"pending,omitempty"`
