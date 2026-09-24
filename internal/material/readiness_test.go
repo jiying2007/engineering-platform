@@ -36,3 +36,17 @@ func TestDeviceTestRequiresExactDeviceAndFirmware(t *testing.T) {
 		t.Fatalf("expected READY, got %s", got)
 	}
 }
+
+func TestDegradationCannotBypassExactSourceIdentity(t *testing.T) {
+	m := Manifest{
+		TaskType:            "FEATURE",
+		Repository:          "repo",
+		BaseCommit:          "main",
+		AcceptanceCriteria:  []string{"build passes"},
+		DegradationApproved: true,
+	}
+	got := Evaluate(m)
+	if got.Status != Blocked {
+		t.Fatalf("expected hard BLOCKED despite degradation approval, got %s", got.Status)
+	}
+}
