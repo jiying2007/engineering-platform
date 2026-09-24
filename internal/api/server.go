@@ -116,9 +116,10 @@ func (s *Server) handleGetWork(w http.ResponseWriter, r *http.Request) {
 }
 
 type createTaskRequest struct {
-	Contract  core.TaskContract `json:"contract"`
-	Material  material.Manifest `json:"material"`
-	Subsystem string            `json:"subsystem,omitempty"`
+	Contract         core.TaskContract  `json:"contract"`
+	Material         material.Manifest  `json:"material"`
+	Subsystem        string             `json:"subsystem,omitempty"`
+	VerificationPlan verification.Plan  `json:"verification_plan"`
 }
 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
@@ -159,6 +160,17 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	req.Contract.BaseCommit = req.Material.BaseCommit
 	req.Contract.TargetID = req.Material.TargetID
 	req.Contract.AcceptanceCriteria = append([]string(nil), req.Material.AcceptanceCriteria...)
+	if !verification.ValidatePlan(req.VerificationPlan, req.Contract.AcceptanceCriteria) {
+		writeError(w, http.StatusUnprocessableEntity, "verification plan must cover every acceptance criterion with at least one evidence requirement")
+		return
+	}
+	planDigest, err := req.VerificationPlan.Digest()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	req.Contract.VerificationPlanID = req.VerificationPlan.ID
+	req.Contract.VerificationPlanDigest = planDigest
 	if req.Contract.Revision == 0 {
 		req.Contract.Revision = 1
 	}
@@ -167,7 +179,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := s.store.CreateTask(req.Contract); err != nil {
+	if err := s.store.CreateTask(req.Contract, req.VerificationPlan); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -543,11 +555,10 @@ func (s *Server) handleGetEvidence(w http.ResponseWriter, r *http.Request) {
 }
 
 type createVerificationRequest struct {
-	ReportID          string            `json:"verification_report_id"`
-	DeliveryReceiptID string            `json:"delivery_receipt_id"`
-	Verifier          string            `json:"verifier"`
-	Plan              verification.Plan `json:"plan"`
-	EvidenceIDs       []string          `json:"evidence_ids"`
+	ReportID          string   `json:"verification_report_id"`
+	DeliveryReceiptID string   `json:"delivery_receipt_id"`
+	Verifier          string   `json:"verifier"`
+	EvidenceIDs       []string `json:"evidence_ids"`
 }
 
 func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request) {
@@ -555,8 +566,8 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.ReportID == "" || req.DeliveryReceiptID == "" || req.Verifier == "" || req.Plan.ID == "" {
-		writeError(w, http.StatusBadRequest, "verification_report_id, delivery_receipt_id, verifier and plan id are required")
+	if req.ReportID == "" || req.DeliveryReceiptID == "" || req.Verifier == "" {
+		writeError(w, http.StatusBadRequest, "verification_report_id, delivery_receipt_id and verifier are required")
 		return
 	}
 	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
@@ -564,7 +575,16 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 		writeStoreError(w, err)
 		return
 	}
-	req.Plan.SubjectDigest = delivery.SubjectDigest
+	task, err := s.store.GetTaskByDigest(delivery.TaskContractDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	plan, err := s.store.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
 	evidence := make([]core.EvidenceRef, 0, len(req.EvidenceIDs))
 	for _, id := range req.EvidenceIDs {
 		item, err := s.store.GetEvidence(id)
@@ -574,8 +594,9 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 		}
 		evidence = append(evidence, item)
 	}
-	report := verification.Evaluate(req.Plan, evidence)
+	report := verification.Evaluate(plan, delivery.SubjectDigest, evidence)
 	report.ID = req.ReportID
+	report.VerificationPlanDigest = task.VerificationPlanDigest
 	report.DeliveryReceiptID = delivery.ID
 	report.Verifier = req.Verifier
 	report.CreatedAt = s.now()
