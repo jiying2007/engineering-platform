@@ -11,16 +11,16 @@ const (
 )
 
 type Request struct {
-	ID               string         `json:"action_request_id"`
-	RunID            string         `json:"run_id"`
-	ExecutionEpoch   uint64         `json:"execution_epoch"`
-	Action           string         `json:"action"`
-	RiskClass        RiskClass      `json:"risk_class"`
-	Capability       string         `json:"capability"`
-	ParametersDigest string         `json:"parameters_digest"`
-	IdempotencyKey   string         `json:"idempotency_key"`
-	RequestedBy      string         `json:"requested_by"`
-	RequestedAt      time.Time      `json:"requested_at"`
+	ID               string    `json:"action_request_id"`
+	RunID            string    `json:"run_id"`
+	ExecutionEpoch   uint64    `json:"execution_epoch"`
+	Action           string    `json:"action"`
+	RiskClass        RiskClass `json:"risk_class"`
+	Capability       string    `json:"capability"`
+	ParametersDigest string    `json:"parameters_digest"`
+	IdempotencyKey   string    `json:"idempotency_key"`
+	RequestedBy      string    `json:"requested_by"`
+	RequestedAt      time.Time `json:"requested_at"`
 }
 
 type Receipt struct {
