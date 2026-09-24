@@ -1,3 +1,5 @@
+> **Historical architecture foundation.** The current clean-slate implementation authority is [Embedded AI Engineering Platform — Core Architecture v1](EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md). v1.2 remains design evidence and is no longer the M0 implementation baseline.
+
 # AI Native Engineering Platform v1.2 — Final Architecture Baseline
 
 Status: **FINAL ARCHITECTURE BASELINE / M0 INPUT**
