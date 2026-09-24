@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -20,6 +21,10 @@ type Store interface {
 	CreateWork(core.WorkItem) error
 	GetWork(string) (core.WorkItem, error)
 	UpdateWork(string, uint64, core.WorkItem) error
+
+	GetRecovery() recovery.Manager
+	BeginRecovery(uint64) (recovery.Manager, error)
+	CompleteRecovery(uint64, bool) (recovery.Manager, error)
 
 	CreateTask(core.TaskContract, verification.Plan) error
 	GetTask(string) (core.TaskContract, error)
@@ -49,6 +54,7 @@ type Store interface {
 
 type Memory struct {
 	mu                  sync.RWMutex
+	recoveryState       recovery.Manager
 	works               map[string]core.WorkItem
 	tasks               map[string]map[uint64]core.TaskContract
 	latestTaskRev       map[string]uint64
@@ -67,6 +73,7 @@ type Memory struct {
 
 func NewMemory() *Memory {
 	return &Memory{
+		recoveryState:       *recovery.New(),
 		works:               make(map[string]core.WorkItem),
 		tasks:               make(map[string]map[uint64]core.TaskContract),
 		latestTaskRev:       make(map[string]uint64),
@@ -82,6 +89,37 @@ func NewMemory() *Memory {
 		verificationReports: make(map[string]verification.Report),
 		closures:            make(map[string]core.ClosureReceipt),
 	}
+}
+
+func (m *Memory) GetRecovery() recovery.Manager {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.recoveryState
+}
+
+func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.recoveryState.Epoch != expectedEpoch {
+		return recovery.Manager{}, ErrConflict
+	}
+	if m.recoveryState.Mode != recovery.Normal {
+		return recovery.Manager{}, recovery.ErrRecoveryMode
+	}
+	m.recoveryState.Begin()
+	return m.recoveryState, nil
+}
+
+func (m *Memory) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.recoveryState.Epoch != epoch {
+		return recovery.Manager{}, ErrConflict
+	}
+	if err := m.recoveryState.Complete(epoch, reconciled); err != nil {
+		return recovery.Manager{}, err
+	}
+	return m.recoveryState, nil
 }
 
 func (m *Memory) CreateWork(item core.WorkItem) error {
