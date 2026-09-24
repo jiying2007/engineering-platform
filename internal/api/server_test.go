@@ -167,3 +167,81 @@ func mustRequest(t *testing.T, h http.Handler, method, path string, body any, wa
 	}
 	return rec.Body.Bytes()
 }
+
+
+func TestVerificationUsesOnlyRegisteredExactSubjectEvidence(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"evidence_id":    "ev-pass",
+		"subject_digest": "sha256:subject",
+		"issuer":         "ci",
+		"procedure":      "go-test",
+		"result":         "PASS",
+		"applicable":     true,
+	}, http.StatusCreated)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/verifications", map[string]any{
+		"verification_report_id": "vr-pass",
+		"verifier":               "verification-service",
+		"plan": map[string]any{
+			"verification_plan_id": "vp-1",
+			"subject_digest":       "sha256:subject",
+			"criteria": []any{
+				map[string]any{
+					"criterion_id":         "ac-1",
+					"statement":            "tests pass",
+					"required_evidence_ids": []string{"ev-pass"},
+				},
+			},
+		},
+		"evidence_ids": []string{"ev-pass"},
+	}, http.StatusCreated)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"evidence_id":    "ev-stale",
+		"subject_digest": "sha256:old",
+		"issuer":         "ci",
+		"procedure":      "go-test",
+		"result":         "PASS",
+		"applicable":     true,
+	}, http.StatusCreated)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/verifications", map[string]any{
+		"verification_report_id": "vr-fail",
+		"verifier":               "verification-service",
+		"plan": map[string]any{
+			"verification_plan_id": "vp-2",
+			"subject_digest":       "sha256:new",
+			"criteria": []any{
+				map[string]any{
+					"criterion_id":          "ac-1",
+					"required_evidence_ids": []string{"ev-stale"},
+				},
+			},
+		},
+		"evidence_ids": []string{"ev-stale"},
+	}, http.StatusUnprocessableEntity)
+}
+
+func TestVerificationRejectsUnregisteredEvidenceReference(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/verifications", map[string]any{
+		"verification_report_id": "vr-missing",
+		"verifier":               "verification-service",
+		"plan": map[string]any{
+			"verification_plan_id": "vp-1",
+			"subject_digest":       "sha256:subject",
+			"criteria": []any{
+				map[string]any{
+					"criterion_id":          "ac-1",
+					"required_evidence_ids": []string{"ev-missing"},
+				},
+			},
+		},
+		"evidence_ids": []string{"ev-missing"},
+	}, http.StatusNotFound)
+}
