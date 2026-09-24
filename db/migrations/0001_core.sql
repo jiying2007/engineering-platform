@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS steering_commands (
 CREATE TABLE IF NOT EXISTS checkpoints (
     checkpoint_id           text PRIMARY KEY,
     run_id                  text NOT NULL REFERENCES runs(run_id),
+    task_contract_digest    text NOT NULL REFERENCES task_contracts(content_digest),
+    run_input_manifest_digest text NOT NULL REFERENCES run_input_manifests(run_input_manifest_digest),
     execution_epoch         bigint NOT NULL CHECK (execution_epoch > 0),
     source_tree_digest      text NOT NULL,
     diff_digest             text,
