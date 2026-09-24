@@ -19,17 +19,28 @@ var (
 type Store interface {
 	CreateWork(core.WorkItem) error
 	GetWork(string) (core.WorkItem, error)
+	UpdateWork(string, uint64, core.WorkItem) error
+
 	CreateTask(core.TaskContract) error
 	GetTask(string) (core.TaskContract, error)
 	GetTaskRevision(string, uint64) (core.TaskContract, error)
 	GetTaskByDigest(string) (core.TaskContract, error)
+
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
+
+	CreateDelivery(core.DeliveryReceipt) error
+	GetDelivery(string) (core.DeliveryReceipt, error)
+
 	CreateEvidence(core.EvidenceRef) error
 	GetEvidence(string) (core.EvidenceRef, error)
+
 	CreateVerification(verification.Report) error
 	GetVerification(string) (verification.Report, error)
+
+	CreateClosure(core.ClosureReceipt) error
+	GetClosure(string) (core.ClosureReceipt, error)
 }
 
 type Memory struct {
@@ -40,8 +51,10 @@ type Memory struct {
 	tasksByDigest       map[string]core.TaskContract
 	runs                map[string]run.Run
 	sessions            map[string]session.Session
+	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
+	closures            map[string]core.ClosureReceipt
 }
 
 func NewMemory() *Memory {
@@ -52,8 +65,10 @@ func NewMemory() *Memory {
 		tasksByDigest:       make(map[string]core.TaskContract),
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
+		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
+		closures:            make(map[string]core.ClosureReceipt),
 	}
 }
 
@@ -62,6 +77,9 @@ func (m *Memory) CreateWork(item core.WorkItem) error {
 	defer m.mu.Unlock()
 	if _, ok := m.works[item.ID]; ok {
 		return ErrExists
+	}
+	if item.Version == 0 {
+		item.Version = 1
 	}
 	m.works[item.ID] = item
 	return nil
@@ -75,6 +93,21 @@ func (m *Memory) GetWork(id string) (core.WorkItem, error) {
 		return core.WorkItem{}, ErrNotFound
 	}
 	return item, nil
+}
+
+func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current, ok := m.works[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if current.Version != expectedVersion {
+		return ErrConflict
+	}
+	item.Version = expectedVersion + 1
+	m.works[id] = item
+	return nil
 }
 
 func (m *Memory) CreateTask(task core.TaskContract) error {
@@ -200,6 +233,26 @@ func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Ru
 	return nil
 }
 
+func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.deliveries[item.ID]; ok {
+		return ErrExists
+	}
+	m.deliveries[item.ID] = item
+	return nil
+}
+
+func (m *Memory) GetDelivery(id string) (core.DeliveryReceipt, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	item, ok := m.deliveries[id]
+	if !ok {
+		return core.DeliveryReceipt{}, ErrNotFound
+	}
+	return item, nil
+}
+
 func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -238,4 +291,24 @@ func (m *Memory) GetVerification(id string) (verification.Report, error) {
 		return verification.Report{}, ErrNotFound
 	}
 	return report, nil
+}
+
+func (m *Memory) CreateClosure(item core.ClosureReceipt) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.closures[item.ID]; ok {
+		return ErrExists
+	}
+	m.closures[item.ID] = item
+	return nil
+}
+
+func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	item, ok := m.closures[id]
+	if !ok {
+		return core.ClosureReceipt{}, ErrNotFound
+	}
+	return item, nil
 }
