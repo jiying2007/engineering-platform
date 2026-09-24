@@ -243,7 +243,7 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		if err := value.Pause(req.ExecutionEpoch); err != nil {
 			return err
 		}
@@ -261,7 +261,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		if err := value.Resume(req.ExecutionEpoch); err != nil {
 			return err
 		}
@@ -296,7 +296,7 @@ func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
 		ContentDigest:  req.ContentDigest,
 		CreatedAt:      s.now(),
 	}
-	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var newEpoch uint64
-	err := s.store.MutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		epoch, err := value.Takeover(req.ExecutionEpoch)
 		if err != nil {
 			return err
@@ -338,6 +338,18 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 		"control_owner":   "HUMAN",
 		"execution_epoch": newEpoch,
 	})
+}
+
+func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) error) error {
+	value, sess, err := s.store.GetExecution(id)
+	if err != nil {
+		return err
+	}
+	expectedVersion := value.Version
+	if err := fn(&value, &sess); err != nil {
+		return err
+	}
+	return s.store.UpdateExecution(id, expectedVersion, value, sess)
 }
 
 func (s *Server) writeExecution(w http.ResponseWriter, id string) {
@@ -364,7 +376,7 @@ func writeMutationError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
+	if errors.Is(err, store.ErrConflict) || errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
