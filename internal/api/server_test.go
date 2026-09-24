@@ -512,7 +512,6 @@ func TestRecoveryLifecycleIsEpochBound(t *testing.T) {
 	}, http.StatusBadRequest)
 }
 
-
 func TestSupersededTaskRevisionCannotStartRun(t *testing.T) {
 	s := NewServer(store.NewMemory())
 	h := s.Handler()
