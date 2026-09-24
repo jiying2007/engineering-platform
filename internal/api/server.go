@@ -9,6 +9,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -42,6 +43,9 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("GET /api/v1/capabilities", s.handleCapabilities)
+	s.mux.HandleFunc("GET /api/v1/recovery", s.handleGetRecovery)
+	s.mux.HandleFunc("POST /api/v1/recovery/begin", s.handleBeginRecovery)
+	s.mux.HandleFunc("POST /api/v1/recovery/complete", s.handleCompleteRecovery)
 	s.mux.HandleFunc("POST /api/v1/work-items", s.handleCreateWork)
 	s.mux.HandleFunc("GET /api/v1/work-items/{id}", s.handleGetWork)
 	s.mux.HandleFunc("POST /api/v1/task-contracts", s.handleCreateTask)
@@ -77,6 +81,61 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, _ *http.Request) {
 		"capabilities": embedded.Capabilities(),
 		"skills":       embedded.Skills(),
 	})
+}
+
+func (s *Server) handleGetRecovery(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.store.GetRecovery())
+}
+
+type beginRecoveryRequest struct {
+	ExpectedRecoveryEpoch uint64 `json:"expected_recovery_epoch"`
+}
+
+func (s *Server) handleBeginRecovery(w http.ResponseWriter, r *http.Request) {
+	var req beginRecoveryRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	state, err := s.store.BeginRecovery(req.ExpectedRecoveryEpoch)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrAlreadyRecovering):
+			writeError(w, http.StatusConflict, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, state)
+}
+
+type completeRecoveryRequest struct {
+	RecoveryEpoch uint64 `json:"recovery_epoch"`
+	Reconciled    bool   `json:"reconciled"`
+}
+
+func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) {
+	var req completeRecoveryRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.RecoveryEpoch == 0 {
+		writeError(w, http.StatusBadRequest, "recovery_epoch is required")
+		return
+	}
+	state, err := s.store.CompleteRecovery(req.RecoveryEpoch, req.Reconciled)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch):
+			writeError(w, http.StatusConflict, err.Error())
+		case errors.Is(err, recovery.ErrReconciliationRequired):
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, state)
 }
 
 func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
