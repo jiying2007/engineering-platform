@@ -1,3 +1,5 @@
+> **Historical cumulative plan.** Do not inherit this plan into current M0. The active plan is [Core M0 / M1 Vertical Slice Plan v1](CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md).
+
 # M0 Reference Adoption Plan v43
 
 Date: 2026-09-24
