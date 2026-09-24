@@ -27,16 +27,18 @@ type Store interface {
 	BeginRecovery(uint64) (recovery.Manager, error)
 	CompleteRecovery(uint64, bool) (recovery.Manager, error)
 
-	CreateTask(core.TaskContract, verification.Plan) error
+	CreateTaskAndUpdateWork(core.TaskContract, verification.Plan, uint64, core.WorkItem) error
 	GetTask(string) (core.TaskContract, error)
 	GetTaskRevision(string, uint64) (core.TaskContract, error)
 	GetTaskByDigest(string) (core.TaskContract, error)
 	GetVerificationPlanByDigest(string) (verification.Plan, error)
 
-	CreateExecution(run.Run, session.Session, core.RunInputManifest) error
+	CreateExecutionAndUpdateWork(run.Run, run.Attempt, session.Session, core.RunInputManifest, uint64, core.WorkItem) error
 	GetExecution(string) (run.Run, session.Session, error)
+	GetAttempt(string, string) (run.Attempt, error)
 	GetRunInputByDigest(string) (core.RunInputManifest, error)
 	UpdateExecution(string, uint64, run.Run, session.Session) error
+	UpdateExecutionAndWork(string, uint64, run.Run, session.Session, uint64, core.WorkItem) error
 	CreateCheckpoint(session.Checkpoint) (string, error)
 	GetCheckpoint(string) (session.Checkpoint, string, error)
 
@@ -62,6 +64,7 @@ type Memory struct {
 	tasksByDigest       map[string]core.TaskContract
 	verificationPlans   map[string]verification.Plan
 	runs                map[string]run.Run
+	attempts            map[string]map[string]run.Attempt
 	sessions            map[string]session.Session
 	runInputs           map[string]core.RunInputManifest
 	checkpoints         map[string]session.Checkpoint
@@ -83,6 +86,7 @@ func NewMemory() *Memory {
 		tasksByDigest:       make(map[string]core.TaskContract),
 		verificationPlans:   make(map[string]verification.Plan),
 		runs:                make(map[string]run.Run),
+		attempts:            make(map[string]map[string]run.Attempt),
 		sessions:            make(map[string]session.Session),
 		runInputs:           make(map[string]core.RunInputManifest),
 		checkpoints:         make(map[string]session.Checkpoint),
@@ -218,6 +222,77 @@ func (m *Memory) CreateTask(task core.TaskContract, plan verification.Plan) erro
 	return nil
 }
 
+func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
+	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" {
+		return ErrConflict
+	}
+	taskDigest, err := task.Digest()
+	if err != nil {
+		return err
+	}
+	planDigest, err := plan.Digest()
+	if err != nil {
+		return err
+	}
+	if plan.ID != task.VerificationPlanID || planDigest != task.VerificationPlanDigest {
+		return ErrConflict
+	}
+	if task.WorkItemID != work.ID || work.ActiveTaskContractDigest != taskDigest || work.State != core.WorkReady {
+		return ErrConflict
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	currentWork, ok := m.works[work.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if currentWork.Version != expectedWorkVersion {
+		return ErrConflict
+	}
+	if currentWork.State != core.WorkDraft && currentWork.State != core.WorkReady {
+		return ErrConflict
+	}
+	if currentWork.ActiveRunID != "" {
+		return ErrConflict
+	}
+	if _, ok := m.tasksByDigest[taskDigest]; ok {
+		return ErrExists
+	}
+	if existing, ok := m.verificationPlans[planDigest]; ok {
+		existingDigest, digestErr := existing.Digest()
+		if digestErr != nil || existingDigest != planDigest {
+			return ErrConflict
+		}
+	}
+
+	versions := m.tasks[task.ID]
+	latest := m.latestTaskRev[task.ID]
+	if versions == nil {
+		if task.Revision != 1 {
+			return ErrConflict
+		}
+		versions = make(map[uint64]core.TaskContract)
+	} else {
+		if _, exists := versions[task.Revision]; exists {
+			return ErrExists
+		}
+		if task.Revision != latest+1 {
+			return ErrConflict
+		}
+	}
+
+	work.Version = expectedWorkVersion + 1
+	m.tasks[task.ID] = versions
+	versions[task.Revision] = task
+	m.latestTaskRev[task.ID] = task.Revision
+	m.tasksByDigest[taskDigest] = task
+	m.verificationPlans[planDigest] = plan
+	m.works[work.ID] = work
+	return nil
+}
+
 func (m *Memory) GetTask(id string) (core.TaskContract, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -291,6 +366,78 @@ func (m *Memory) CreateExecution(value run.Run, sess session.Session, input core
 	return nil
 }
 
+func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
+	inputDigest, err := input.Digest()
+	if err != nil {
+		return err
+	}
+	if inputDigest != value.RunInputManifestDigest ||
+		input.RunID != value.ID ||
+		input.TaskContractDigest != value.TaskContractDigest ||
+		attempt.ID != value.CurrentAttemptID ||
+		attempt.Epoch != value.CurrentEpoch ||
+		sess.RunID != value.ID ||
+		sess.ExecutionEpoch != value.CurrentEpoch {
+		return ErrConflict
+	}
+	if work.State != core.WorkExecuting ||
+		work.ActiveTaskContractDigest != value.TaskContractDigest ||
+		work.ActiveRunID != value.ID {
+		return ErrConflict
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	currentWork, ok := m.works[work.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if currentWork.Version != expectedWorkVersion ||
+		currentWork.State != core.WorkReady ||
+		currentWork.ActiveTaskContractDigest != value.TaskContractDigest ||
+		currentWork.ActiveRunID != "" {
+		return ErrConflict
+	}
+	if _, ok := m.tasksByDigest[value.TaskContractDigest]; !ok {
+		return ErrNotFound
+	}
+	if _, ok := m.runs[value.ID]; ok {
+		return ErrExists
+	}
+	if _, ok := m.sessions[value.ID]; ok {
+		return ErrExists
+	}
+	if _, ok := m.runInputs[inputDigest]; ok {
+		return ErrExists
+	}
+
+	if value.Version == 0 {
+		value.Version = 1
+	}
+	work.Version = expectedWorkVersion + 1
+	m.runs[value.ID] = value
+	m.sessions[value.ID] = sess
+	m.runInputs[inputDigest] = input
+	m.attempts[value.ID] = map[string]run.Attempt{attempt.ID: attempt}
+	m.works[work.ID] = work
+	return nil
+}
+
+func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items, ok := m.attempts[runID]
+	if !ok {
+		return run.Attempt{}, ErrNotFound
+	}
+	attempt, ok := items[attemptID]
+	if !ok {
+		return run.Attempt{}, ErrNotFound
+	}
+	return attempt, nil
+}
+
 func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -360,9 +507,50 @@ func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Ru
 	if current.Version != expectedVersion {
 		return ErrConflict
 	}
+	if current.TaskContractDigest != value.TaskContractDigest ||
+		current.RunInputManifestDigest != value.RunInputManifestDigest {
+		return ErrConflict
+	}
 	value.Version = expectedVersion + 1
 	m.runs[id] = value
 	m.sessions[id] = sess
+	return nil
+}
+
+func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	currentRun, ok := m.runs[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if _, ok := m.sessions[id]; !ok {
+		return ErrNotFound
+	}
+	currentWork, ok := m.works[work.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if currentRun.Version != expectedRunVersion || currentWork.Version != expectedWorkVersion {
+		return ErrConflict
+	}
+	if currentRun.TaskContractDigest != value.TaskContractDigest ||
+		currentRun.RunInputManifestDigest != value.RunInputManifestDigest {
+		return ErrConflict
+	}
+	if currentWork.ActiveTaskContractDigest != value.TaskContractDigest ||
+		currentWork.ActiveRunID != value.ID ||
+		work.ActiveTaskContractDigest != value.TaskContractDigest ||
+		work.ActiveRunID != value.ID {
+		return ErrConflict
+	}
+
+	value.Version = expectedRunVersion + 1
+	work.Version = expectedWorkVersion + 1
+	m.runs[id] = value
+	m.sessions[id] = sess
+	m.works[work.ID] = work
 	return nil
 }
 
