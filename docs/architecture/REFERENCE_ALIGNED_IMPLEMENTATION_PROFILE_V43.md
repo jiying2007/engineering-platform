@@ -1,3 +1,5 @@
+> **Historical/reference profile.** This accumulated research profile is no longer the current implementation checklist. Active Core scope is defined by [Embedded AI Engineering Platform — Core Architecture v1](EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md) and the [Extension Catalog](../extensions/EXTENSION_CATALOG_V1.md).
+
 # Reference-Aligned Implementation Profile v43
 
 Date: 2026-09-24
