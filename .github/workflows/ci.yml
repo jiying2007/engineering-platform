@@ -37,8 +37,14 @@ jobs:
         shell: bash
         run: |
           go mod tidy
-          if ! git diff --exit-code -- go.mod go.sum; then
+          if ! git diff --exit-code -- go.mod go.sum || [ -n "$(git status --porcelain -- go.mod go.sum)" ]; then
             echo "go.mod/go.sum are not tidy; commit the generated module metadata."
+            git status --short -- go.mod go.sum
+            if [ -f go.sum ]; then
+              echo "----- BEGIN GENERATED go.sum -----"
+              cat go.sum
+              echo "----- END GENERATED go.sum -----"
+            fi
             exit 1
           fi
       - name: Format check
