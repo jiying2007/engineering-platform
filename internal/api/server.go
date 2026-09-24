@@ -13,6 +13,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/store"
+	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
 type Server struct {
@@ -51,6 +52,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/takeover", s.handleTakeover)
+	s.mux.HandleFunc("POST /api/v1/evidence", s.handleCreateEvidence)
+	s.mux.HandleFunc("GET /api/v1/evidence/{id}", s.handleGetEvidence)
+	s.mux.HandleFunc("POST /api/v1/verifications", s.handleCreateVerification)
+	s.mux.HandleFunc("GET /api/v1/verifications/{id}", s.handleGetVerification)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -150,7 +155,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.store.CreateTask(req.Contract); err != nil {
-		if errors.Is(err, store.ErrExists) {
+		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
@@ -332,6 +337,88 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 		"control_owner":   "HUMAN",
 		"execution_epoch": newEpoch,
 	})
+}
+
+func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
+	var item core.EvidenceRef
+	if !decodeJSON(w, r, &item) {
+		return
+	}
+	if item.ID == "" || item.SubjectDigest == "" || item.Issuer == "" || item.Procedure == "" || item.Result == "" {
+		writeError(w, http.StatusBadRequest, "evidence_id, subject_digest, issuer, procedure and result are required")
+		return
+	}
+	if err := s.store.CreateEvidence(item); err != nil {
+		if errors.Is(err, store.ErrExists) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, item)
+}
+
+func (s *Server) handleGetEvidence(w http.ResponseWriter, r *http.Request) {
+	item, err := s.store.GetEvidence(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
+
+type createVerificationRequest struct {
+	ReportID    string            `json:"verification_report_id"`
+	Verifier    string            `json:"verifier"`
+	Plan        verification.Plan `json:"plan"`
+	EvidenceIDs []string          `json:"evidence_ids"`
+}
+
+func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request) {
+	var req createVerificationRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ReportID == "" || req.Verifier == "" || req.Plan.ID == "" || req.Plan.SubjectDigest == "" {
+		writeError(w, http.StatusBadRequest, "verification_report_id, verifier, plan id and subject_digest are required")
+		return
+	}
+	evidence := make([]core.EvidenceRef, 0, len(req.EvidenceIDs))
+	for _, id := range req.EvidenceIDs {
+		item, err := s.store.GetEvidence(id)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		evidence = append(evidence, item)
+	}
+	report := verification.Evaluate(req.Plan, evidence)
+	report.ID = req.ReportID
+	report.Verifier = req.Verifier
+	report.CreatedAt = s.now()
+	if err := s.store.CreateVerification(report); err != nil {
+		if errors.Is(err, store.ErrExists) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	status := http.StatusCreated
+	if report.Result != "PASS" {
+		status = http.StatusUnprocessableEntity
+	}
+	writeJSON(w, status, report)
+}
+
+func (s *Server) handleGetVerification(w http.ResponseWriter, r *http.Request) {
+	report, err := s.store.GetVerification(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, report)
 }
 
 func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) error) error {
