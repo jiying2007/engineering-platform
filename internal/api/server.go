@@ -414,7 +414,6 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 type createCheckpointRequest struct {
 	ID                      string   `json:"checkpoint_id"`
 	ExecutionEpoch          uint64   `json:"execution_epoch"`
