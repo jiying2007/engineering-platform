@@ -457,3 +457,57 @@ func TestCheckpointBindsFrozenRunInputAndRejectsStaleEpoch(t *testing.T) {
 		"source_tree_digest": "sha256:tree2",
 	}, http.StatusConflict)
 }
+
+func TestRecoveryLifecycleIsEpochBound(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	initialBody := mustRequest(t, h, http.MethodGet, "/api/v1/recovery", nil, http.StatusOK)
+	var initial struct {
+		Epoch uint64 `json:"recovery_epoch"`
+		Mode  string `json:"mode"`
+	}
+	mustJSON(t, initialBody, &initial)
+	if initial.Epoch != 0 || initial.Mode != "NORMAL" {
+		t.Fatalf("unexpected initial recovery state: %#v", initial)
+	}
+
+	beginBody := mustRequest(t, h, http.MethodPost, "/api/v1/recovery/begin", map[string]any{
+		"expected_recovery_epoch": 0,
+	}, http.StatusOK)
+	var active struct {
+		Epoch uint64 `json:"recovery_epoch"`
+		Mode  string `json:"mode"`
+	}
+	mustJSON(t, beginBody, &active)
+	if active.Epoch != 1 || active.Mode != "RECOVERY_RECONCILIATION" {
+		t.Fatalf("unexpected active recovery state: %#v", active)
+	}
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/recovery/begin", map[string]any{
+		"expected_recovery_epoch": 0,
+	}, http.StatusConflict)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
+		"recovery_epoch": 1,
+		"reconciled":     false,
+	}, http.StatusUnprocessableEntity)
+
+	completeBody := mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
+		"recovery_epoch": 1,
+		"reconciled":     true,
+	}, http.StatusOK)
+	var normal struct {
+		Epoch uint64 `json:"recovery_epoch"`
+		Mode  string `json:"mode"`
+	}
+	mustJSON(t, completeBody, &normal)
+	if normal.Epoch != 1 || normal.Mode != "NORMAL" {
+		t.Fatalf("unexpected completed recovery state: %#v", normal)
+	}
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
+		"recovery_epoch": 0,
+		"reconciled":     true,
+	}, http.StatusBadRequest)
+}
