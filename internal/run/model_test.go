@@ -7,7 +7,7 @@ import (
 )
 
 func TestStaleEpochRejectedAfterRestart(t *testing.T) {
-	r := New("run-1", "sha256:task")
+	r := New("run-1", "sha256:task", "sha256:input")
 	a1, err := r.StartAttempt("a1", time.Unix(1, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -28,7 +28,7 @@ func TestStaleEpochRejectedAfterRestart(t *testing.T) {
 }
 
 func TestTakeoverRevokesRuntimeEpoch(t *testing.T) {
-	r := New("run-1", "sha256:task")
+	r := New("run-1", "sha256:task", "sha256:input")
 	a, _ := r.StartAttempt("a1", time.Unix(1, 0))
 	newEpoch, err := r.Takeover(a.Epoch)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestTakeoverRevokesRuntimeEpoch(t *testing.T) {
 }
 
 func TestCompleteMakesRunTerminal(t *testing.T) {
-	r := New("run-1", "sha256:task")
+	r := New("run-1", "sha256:task", "sha256:input")
 	a, _ := r.StartAttempt("a1", time.Unix(1, 0))
 	if err := r.Complete(a.Epoch); err != nil {
 		t.Fatal(err)
