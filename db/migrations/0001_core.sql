@@ -124,9 +124,13 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 CREATE TABLE IF NOT EXISTS external_operations (
     operation_id        text PRIMARY KEY,
     run_id              text NOT NULL REFERENCES runs(run_id),
+    execution_epoch     bigint NOT NULL CHECK (execution_epoch > 0),
+    recovery_epoch      bigint NOT NULL CHECK (recovery_epoch >= 0),
     action              text NOT NULL,
+    risk_class          text NOT NULL CHECK (risk_class IN ('OBSERVE', 'CONTROLLED_MUTATION', 'HIGH_RISK')),
+    capability          text NOT NULL,
     idempotency_key     text NOT NULL UNIQUE,
-    request_digest      text,
+    request_digest      text NOT NULL,
     state               text NOT NULL CHECK (
         state IN (
             'PLANNED',
