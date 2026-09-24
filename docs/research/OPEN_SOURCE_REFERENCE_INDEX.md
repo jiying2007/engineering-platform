@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V36.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V36.md
 
 ## 1. Research rounds
 
@@ -43,6 +43,12 @@ Execution:
 | 28 | Digital Twin / observed device state | Eclipse Ditto, Kanto, ThingsBoard | ObservedDeviceState; freshness-bound DeviceTwinProjection |
 | 29 | FOSS/license compliance | FOSSology, ORT, ScanCode, SPDX, OpenChain | LicenseFinding/Policy/Assessment; notices/source offer; distribution profile |
 | 30 | Reliability/FMEA/FRACAS landscape | targeted OSS search | negative result: no new core subsystem; reuse existing Verification/Incident/CAPA semantics |
+| 31 | Product certification / battery safety | EU CE guidance, UNECE 38.3, PyBaMM | ConformityAssessmentCase; certification delta; exact battery qualification scope |
+| 32 | Privacy / engineering data lifecycle | NIST Privacy Framework, OpenDP, Presidio/DataHub concepts | DataAssetProfile; ProcessingPurpose; retention/disposition/privacy transforms |
+| 33 | Field anomaly / prognostics | NASA ProgPy, NAB, Digital Twin practices | TelemetryWindow; HealthStateEstimate; PrognosticEstimate; maintenance decision loop |
+| 34 | Long-term compatibility / support | Kubernetes version skew, Android VINTF, K8s conformance | CompatibilityEnvelope; VersionSkewPolicy; ProductSupportPolicy; upgrade order |
+| 35 | Threat modeling / security-by-design | OWASP Threat Dragon, pytm, ATT&CK, ASVS | ThreatModelArtifact; ThreatScenario; mitigation trace; threat-model freshness |
+| 36 | Tamper-evident audit / disaster recovery | Rekor, Trillian/Tessera, pgBackRest, restic | AuditCheckpoint; RecoveryPoint/Plan; recovery epoch; external reconciliation |
 
 ---
 
@@ -120,6 +126,12 @@ Prefer:
 - OSCAL-compatible compliance export where control/assessment automation is useful
 - SPDX/CycloneDX plus ORT/FOSSology/ScanCode for distribution-aware FOSS compliance
 - Digital Twin systems treated as freshness-bound observed-state projections, not engineering authority
+- product certification modeled as exact-scope conformity evidence rather than uploaded-document checklists
+- privacy handled as a purpose/retention/transformation lifecycle over engineering data
+- prognostics represented as uncertainty-bearing Evidence/Recommendation, not autonomous authority
+- Kubernetes/Android-inspired compatibility envelopes and upgrade-order policy for multi-generation products
+- OWASP-style threat models traced to normal Requirements/Evidence and freshness-reviewed
+- tamper-evident checkpoints plus tested recovery/reconciliation instead of assuming backups roll back the external world
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -166,6 +178,13 @@ Do not let any standard become the mutable engineering business authority.
 37. Digital Twin is an observed-state projection with freshness/trust metadata.
 38. FOSS license obligations are release/distribution-context specific and scanner facts do not self-authorize.
 39. reliability/FMEA research does not justify a new platform subsystem until real program needs prove it.
+40. certification claims bind exact product configuration, sample and standards edition and are re-assessed after material change.
+41. sensitive engineering data use is purpose-scoped and retention/disposition actions are auditable.
+42. predictive-maintenance outputs carry model/input identity and uncertainty and require normal Decisions.
+43. long-term support is defined by compatibility envelope, directional skew and verified upgrade paths.
+44. threat models are revision/freshness bound and feed standard Requirements/Verification.
+45. audit append-only semantics are strengthened by signed/checkpointed integrity verification where risk requires it.
+46. recovery restores records first and reconciles Git/CI/devices/releases/manufacturing before irreversible work resumes.
 
 ---
 
