@@ -576,3 +576,18 @@ func TestSupersededTaskRevisionCannotStartRun(t *testing.T) {
 		"run_input":            runInput,
 	}, http.StatusCreated)
 }
+
+type failingRecoveryStore struct {
+	*store.Memory
+	err error
+}
+
+func (s failingRecoveryStore) GetRecovery() (recovery.Manager, error) {
+	return recovery.Manager{}, s.err
+}
+
+func TestRecoveryReadFailureReturnsServiceUnavailable(t *testing.T) {
+	expected := errors.New("database unavailable")
+	s := NewServer(failingRecoveryStore{Memory: store.NewMemory(), err: expected})
+	mustRequest(t, s.Handler(), http.MethodGet, "/api/v1/recovery", nil, http.StatusServiceUnavailable)
+}
