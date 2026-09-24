@@ -11,7 +11,7 @@ func TestRecoveryBlocksIrreversibleActionsUntilReconciled(t *testing.T) {
 	if err := m.AuthorizeIrreversible(epoch); !errors.Is(err, ErrRecoveryMode) {
 		t.Fatalf("expected recovery guard, got %v", err)
 	}
-	if err := m.Complete(epoch, false); !errors.Is(err, ErrRecoveryMode) {
+	if err := m.Complete(epoch, false); !errors.Is(err, ErrReconciliationRequired) {
 		t.Fatalf("expected reconciliation requirement, got %v", err)
 	}
 	if err := m.Complete(epoch, true); err != nil {
