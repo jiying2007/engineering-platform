@@ -21,10 +21,11 @@ type Store interface {
 	GetWork(string) (core.WorkItem, error)
 	UpdateWork(string, uint64, core.WorkItem) error
 
-	CreateTask(core.TaskContract) error
+	CreateTask(core.TaskContract, verification.Plan) error
 	GetTask(string) (core.TaskContract, error)
 	GetTaskRevision(string, uint64) (core.TaskContract, error)
 	GetTaskByDigest(string) (core.TaskContract, error)
+	GetVerificationPlanByDigest(string) (verification.Plan, error)
 
 	CreateExecution(run.Run, session.Session) error
 	GetExecution(string) (run.Run, session.Session, error)
@@ -44,17 +45,18 @@ type Store interface {
 }
 
 type Memory struct {
-	mu                  sync.RWMutex
-	works               map[string]core.WorkItem
-	tasks               map[string]map[uint64]core.TaskContract
-	latestTaskRev       map[string]uint64
-	tasksByDigest       map[string]core.TaskContract
-	runs                map[string]run.Run
-	sessions            map[string]session.Session
-	deliveries          map[string]core.DeliveryReceipt
-	evidence            map[string]core.EvidenceRef
-	verificationReports map[string]verification.Report
-	closures            map[string]core.ClosureReceipt
+	mu                    sync.RWMutex
+	works                 map[string]core.WorkItem
+	tasks                 map[string]map[uint64]core.TaskContract
+	latestTaskRev         map[string]uint64
+	tasksByDigest         map[string]core.TaskContract
+	verificationPlans     map[string]verification.Plan
+	runs                  map[string]run.Run
+	sessions              map[string]session.Session
+	deliveries            map[string]core.DeliveryReceipt
+	evidence              map[string]core.EvidenceRef
+	verificationReports   map[string]verification.Report
+	closures              map[string]core.ClosureReceipt
 }
 
 func NewMemory() *Memory {
@@ -63,6 +65,7 @@ func NewMemory() *Memory {
 		tasks:               make(map[string]map[uint64]core.TaskContract),
 		latestTaskRev:       make(map[string]uint64),
 		tasksByDigest:       make(map[string]core.TaskContract),
+		verificationPlans:   make(map[string]verification.Plan),
 		runs:                make(map[string]run.Run),
 		sessions:            make(map[string]session.Session),
 		deliveries:          make(map[string]core.DeliveryReceipt),
@@ -110,20 +113,33 @@ func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkIte
 	return nil
 }
 
-func (m *Memory) CreateTask(task core.TaskContract) error {
-	if task.Revision == 0 {
+func (m *Memory) CreateTask(task core.TaskContract, plan verification.Plan) error {
+	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" {
 		return ErrConflict
 	}
-	digest, err := task.Digest()
+	taskDigest, err := task.Digest()
 	if err != nil {
 		return err
+	}
+	planDigest, err := plan.Digest()
+	if err != nil {
+		return err
+	}
+	if plan.ID != task.VerificationPlanID || planDigest != task.VerificationPlanDigest {
+		return ErrConflict
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if _, ok := m.tasksByDigest[digest]; ok {
+	if _, ok := m.tasksByDigest[taskDigest]; ok {
 		return ErrExists
+	}
+	if existing, ok := m.verificationPlans[planDigest]; ok {
+		existingDigest, digestErr := existing.Digest()
+		if digestErr != nil || existingDigest != planDigest {
+			return ErrConflict
+		}
 	}
 
 	versions := m.tasks[task.ID]
@@ -145,7 +161,8 @@ func (m *Memory) CreateTask(task core.TaskContract) error {
 
 	versions[task.Revision] = task
 	m.latestTaskRev[task.ID] = task.Revision
-	m.tasksByDigest[digest] = task
+	m.tasksByDigest[taskDigest] = task
+	m.verificationPlans[planDigest] = plan
 	return nil
 }
 
@@ -181,6 +198,16 @@ func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
 		return core.TaskContract{}, ErrNotFound
 	}
 	return task, nil
+}
+
+func (m *Memory) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	plan, ok := m.verificationPlans[digest]
+	if !ok {
+		return verification.Plan{}, ErrNotFound
+	}
+	return plan, nil
 }
 
 func (m *Memory) CreateExecution(value run.Run, sess session.Session) error {
