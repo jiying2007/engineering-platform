@@ -392,3 +392,68 @@ func mustJSON(t *testing.T, body []byte, dst any) {
 		t.Fatalf("decode response: %v; body=%s", err, body)
 	}
 }
+
+func TestCheckpointBindsFrozenRunInputAndRejectsStaleEpoch(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+
+	taskDigest := createWorkAndTask(t, h, "work-cp", "task-cp", "FEATURE", "driver")
+	runBody := mustRequest(t, h, http.MethodPost, "/api/v1/runs", map[string]any{
+		"run_id":               "run-cp",
+		"task_contract_digest": taskDigest,
+		"attempt_id":           "attempt-cp",
+		"run_input": map[string]any{
+			"runtime_profile": "codex/default",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
+			"context_refs":    []string{"doc:datasheet@sha256:1"},
+		},
+	}, http.StatusCreated)
+	var runResponse struct {
+		Run struct {
+			RunInputManifestDigest string `json:"run_input_manifest_digest"`
+		} `json:"run"`
+	}
+	mustJSON(t, runBody, &runResponse)
+	if runResponse.Run.RunInputManifestDigest == "" {
+		t.Fatal("expected frozen run input manifest digest")
+	}
+
+	cpBody := mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-cp/checkpoints", map[string]any{
+		"checkpoint_id":            "cp-1",
+		"execution_epoch":          1,
+		"source_tree_digest":       "sha256:tree",
+		"diff_digest":              "sha256:diff",
+		"objective":                "finish driver fix",
+		"completed":                []string{"analysis"},
+		"pending":                  []string{"test"},
+		"last_event_sequence":      5,
+		"external_operation_cursor":"op-2",
+	}, http.StatusCreated)
+	var cpResponse struct {
+		Digest string `json:"digest"`
+		Checkpoint struct {
+			TaskContractDigest     string `json:"task_contract_digest"`
+			RunInputManifestDigest string `json:"run_input_manifest_digest"`
+			ExecutionEpoch         uint64 `json:"execution_epoch"`
+		} `json:"checkpoint"`
+	}
+	mustJSON(t, cpBody, &cpResponse)
+	if cpResponse.Digest == "" ||
+		cpResponse.Checkpoint.TaskContractDigest != taskDigest ||
+		cpResponse.Checkpoint.RunInputManifestDigest != runResponse.Run.RunInputManifestDigest ||
+		cpResponse.Checkpoint.ExecutionEpoch != 1 {
+		t.Fatalf("unexpected checkpoint binding: %#v", cpResponse)
+	}
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-cp/takeover", map[string]any{
+		"execution_epoch": 1,
+	}, http.StatusOK)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-cp/checkpoints", map[string]any{
+		"checkpoint_id":      "cp-stale",
+		"execution_epoch":    1,
+		"source_tree_digest": "sha256:tree2",
+	}, http.StatusConflict)
+}
