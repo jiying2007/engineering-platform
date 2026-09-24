@@ -10,17 +10,72 @@ import (
 type Event struct {
 	Sequence       uint64    `json:"sequence"`
 	Type           string    `json:"type"`
+	AggregateType  string    `json:"aggregate_type,omitempty"`
+	AggregateID    string    `json:"aggregate_id,omitempty"`
 	PayloadDigest  string    `json:"payload_digest"`
+	CorrelationID  string    `json:"correlation_id,omitempty"`
+	CausationID    string    `json:"causation_id,omitempty"`
 	PreviousDigest string    `json:"previous_digest,omitempty"`
 	Digest         string    `json:"digest"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-type unsignedEvent struct {
+type eventContent struct {
 	Sequence       uint64 `json:"sequence"`
 	Type           string `json:"type"`
+	AggregateType  string `json:"aggregate_type,omitempty"`
+	AggregateID    string `json:"aggregate_id,omitempty"`
 	PayloadDigest  string `json:"payload_digest"`
+	CorrelationID  string `json:"correlation_id,omitempty"`
+	CausationID    string `json:"causation_id,omitempty"`
 	PreviousDigest string `json:"previous_digest,omitempty"`
+}
+
+type Input struct {
+	Type          string
+	AggregateType string
+	AggregateID   string
+	PayloadDigest string
+	CorrelationID string
+	CausationID   string
+}
+
+func Build(sequence uint64, previousDigest string, input Input, now time.Time) (Event, error) {
+	if sequence == 0 {
+		return Event{}, fmt.Errorf("audit sequence must be greater than zero")
+	}
+	if input.Type == "" {
+		return Event{}, fmt.Errorf("audit event type is required")
+	}
+	if input.PayloadDigest == "" {
+		return Event{}, fmt.Errorf("audit payload digest is required")
+	}
+	content := eventContent{
+		Sequence:       sequence,
+		Type:           input.Type,
+		AggregateType:  input.AggregateType,
+		AggregateID:    input.AggregateID,
+		PayloadDigest:  input.PayloadDigest,
+		CorrelationID:  input.CorrelationID,
+		CausationID:    input.CausationID,
+		PreviousDigest: previousDigest,
+	}
+	digest, err := canonical.Digest(content)
+	if err != nil {
+		return Event{}, err
+	}
+	return Event{
+		Sequence:       content.Sequence,
+		Type:           content.Type,
+		AggregateType:  content.AggregateType,
+		AggregateID:    content.AggregateID,
+		PayloadDigest:  content.PayloadDigest,
+		CorrelationID:  content.CorrelationID,
+		CausationID:    content.CausationID,
+		PreviousDigest: content.PreviousDigest,
+		Digest:         digest,
+		CreatedAt:      now,
+	}, nil
 }
 
 type Journal struct {
@@ -28,27 +83,20 @@ type Journal struct {
 }
 
 func (j *Journal) Append(eventType, payloadDigest string, now time.Time) (Event, error) {
+	return j.AppendInput(Input{
+		Type:          eventType,
+		PayloadDigest: payloadDigest,
+	}, now)
+}
+
+func (j *Journal) AppendInput(input Input, now time.Time) (Event, error) {
 	var prev string
 	if len(j.events) > 0 {
 		prev = j.events[len(j.events)-1].Digest
 	}
-	u := unsignedEvent{
-		Sequence:       uint64(len(j.events) + 1),
-		Type:           eventType,
-		PayloadDigest:  payloadDigest,
-		PreviousDigest: prev,
-	}
-	digest, err := canonical.Digest(u)
+	event, err := Build(uint64(len(j.events)+1), prev, input, now)
 	if err != nil {
 		return Event{}, err
-	}
-	event := Event{
-		Sequence:       u.Sequence,
-		Type:           u.Type,
-		PayloadDigest:  u.PayloadDigest,
-		PreviousDigest: u.PreviousDigest,
-		Digest:         digest,
-		CreatedAt:      now,
 	}
 	j.events = append(j.events, event)
 	return event, nil
@@ -70,17 +118,18 @@ func Verify(events []Event) error {
 		if event.PreviousDigest != prev {
 			return fmt.Errorf("audit previous digest mismatch at sequence %d", event.Sequence)
 		}
-		u := unsignedEvent{
-			Sequence:       event.Sequence,
-			Type:           event.Type,
-			PayloadDigest:  event.PayloadDigest,
-			PreviousDigest: event.PreviousDigest,
-		}
-		digest, err := canonical.Digest(u)
+		rebuilt, err := Build(event.Sequence, event.PreviousDigest, Input{
+			Type:          event.Type,
+			AggregateType: event.AggregateType,
+			AggregateID:   event.AggregateID,
+			PayloadDigest: event.PayloadDigest,
+			CorrelationID: event.CorrelationID,
+			CausationID:   event.CausationID,
+		}, event.CreatedAt)
 		if err != nil {
 			return err
 		}
-		if digest != event.Digest {
+		if rebuilt.Digest != event.Digest {
 			return fmt.Errorf("audit digest mismatch at sequence %d", event.Sequence)
 		}
 		prev = event.Digest
