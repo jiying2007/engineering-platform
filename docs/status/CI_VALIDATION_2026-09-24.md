@@ -14,3 +14,5 @@ The validation target is:
 - build cmd/worker
 
 This file carries no runtime or architecture semantics.
+
+Rerun marker: validate against updated CI workflow and current main.
