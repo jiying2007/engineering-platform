@@ -11,6 +11,7 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     services:
       postgres:
         image: postgres:17-alpine
@@ -61,6 +62,10 @@ jobs:
           fi
       - name: Test
         run: go test -race -timeout 5m ./...
+      - name: Outbox authority repeated regression
+        run: |
+          go test -race -count=20 -timeout 1m ./internal/outbox
+          go test -race -count=3 -timeout 2m ./internal/store/postgres -run 'TestPostgres(Outbox|EverySettlement|RecoveryAfterClaim|DispatchHolds|ConcurrentDispatch|MismatchedRisk|ExpiredAndCancelled|UnknownOutcome|RiskRejection)'
       - name: Vet
         run: go vet ./...
       - name: Build binaries
