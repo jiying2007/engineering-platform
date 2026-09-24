@@ -31,12 +31,12 @@ type SteeringCommand struct {
 }
 
 type Checkpoint struct {
-	ID                     string    `json:"checkpoint_id"`
-	RunID                  string    `json:"run_id"`
-	TaskContractDigest     string    `json:"task_contract_digest"`
-	RunInputManifestDigest string    `json:"run_input_manifest_digest"`
-	ExecutionEpoch         uint64    `json:"execution_epoch"`
-	SourceTreeDigest       string    `json:"source_tree_digest"`
+	ID                      string    `json:"checkpoint_id"`
+	RunID                   string    `json:"run_id"`
+	TaskContractDigest      string    `json:"task_contract_digest"`
+	RunInputManifestDigest  string    `json:"run_input_manifest_digest"`
+	ExecutionEpoch          uint64    `json:"execution_epoch"`
+	SourceTreeDigest        string    `json:"source_tree_digest"`
 	DiffDigest              string    `json:"diff_digest,omitempty"`
 	Objective               string    `json:"objective,omitempty"`
 	Completed               []string  `json:"completed,omitempty"`
