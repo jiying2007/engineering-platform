@@ -5,9 +5,9 @@ Status: **Current research index**
 Architecture:
 - docs/architecture/AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md
 Implementation:
-- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V21.md
+- docs/architecture/REFERENCE_ALIGNED_IMPLEMENTATION_PROFILE_V29.md
 Execution:
-- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V21.md
+- docs/roadmap/M0_REFERENCE_ADOPTION_PLAN_V29.md
 
 ## 1. Research rounds
 
@@ -34,6 +34,15 @@ Execution:
 | 19 | Knowledge freshness / revalidation | DataHub, OpenMetadata, Backstage concepts | KnowledgeItem lifecycle; freshness policy; validation receipts; scoped trusted retrieval |
 | 20 | AI code review quality / independence | PR-Agent, reviewdog, Code Review Bench, AACR-Bench, Google review guidance | ReviewExecution/Finding/Resolution; reviewer qualification; independence and replay corpus |
 | 21 | Empirical AI coding governance | DORA, METR, OpenSSF public guidance | AIUsagePolicy; RuntimeInstructionProfile; paired metrics; versioned measurement studies |
+| 22 | PLM / hardware design / engineering change | Odoo PLM, InvenTree, Part-DB, KiCad, KiBot, LibrePCB | HardwareDesignArtifact; ProductStructureSnapshot; EngineeringChangePackage; EffectivityRule |
+| 23 | PSIRT / vulnerability / CRA readiness | CVE, CSAF, OpenVEX, CRA guidance | ProductSecurityCase; applicability/VEX; advisory; support policy; RegulatoryNotificationCase |
+| 24 | RMA / repair / failure analysis | ERPNext Warranty, Odoo Repairs | AS_RETURNED snapshots; FailureAnalysis; RepairActionReceipt; repair requalification |
+| 25 | Product family / SKU / variants | FeatureIDE, Kconfig/Kconfiglib, ERPNext/Odoo variants | FeatureModelArtifact; ProductVariantDefinition; variant resolution/coverage/equivalence |
+| 26 | Supplier lifecycle / CAPA / material compliance | InvenTree, ERPNext/Odoo Quality, CycloneDX HBOM | SupplierChangeNotice; alternate qualification; QualityCase/CAPA; material compliance |
+| 27 | Machine-readable compliance | OSCAL, OpenControl | ComplianceProfile; control implementation; assessment results/package |
+| 28 | Digital Twin / observed device state | Eclipse Ditto, Kanto, ThingsBoard | ObservedDeviceState; freshness-bound DeviceTwinProjection |
+| 29 | FOSS/license compliance | FOSSology, ORT, ScanCode, SPDX, OpenChain | LicenseFinding/Policy/Assessment; notices/source offer; distribution profile |
+| 30 | Reliability/FMEA/FRACAS landscape | targeted OSS search | negative result: no new core subsystem; reuse existing Verification/Incident/CAPA semantics |
 
 ---
 
@@ -106,6 +115,11 @@ Prefer:
 - staged OTA/fleet systems modeled through per-device attempts and explicit cohort semantics
 - knowledge/context catalogs treated as governed projections around KnowledgeItem lifecycle
 - AI code review tools qualified through benchmark + project failure replay, not trusted by brand
+- KiCad/KiBot-style deterministic hardware design export for reproducible manufacturing artifacts
+- CSAF/VEX/CVE for security advisory/applicability interchange, with regulation-specific reporting kept separate
+- OSCAL-compatible compliance export where control/assessment automation is useful
+- SPDX/CycloneDX plus ORT/FOSSology/ScanCode for distribution-aware FOSS compliance
+- Digital Twin systems treated as freshness-bound observed-state projections, not engineering authority
 
 Do not let any standard become the mutable engineering business authority.
 
@@ -143,6 +157,15 @@ Do not let any standard become the mutable engineering business authority.
 28. AI review produces Findings under explicit reviewer identity/qualification; it does not self-approve.
 29. AI usage policy and instructions are versioned, but instructions never replace capability enforcement.
 30. AI productivity claims are local/time/profile scoped and paired with quality/assurance outcomes.
+31. hardware design/BOM revision and production effectivity are explicit and immutable.
+32. PSIRT applicability, VEX/advisory, remediation and regulatory reporting are separate lifecycle concepts.
+33. RMA preserves AS_RETURNED state before repair and appends technical service receipts.
+34. SKU/feature intent, resolved variant, TargetRevision and DeviceInstance are distinct identities.
+35. supplier PCN/EOL and alternate-part qualification flow through explicit impact/effectivity.
+36. compliance assessment is regenerated from engineering Evidence rather than maintained as a parallel truth set.
+37. Digital Twin is an observed-state projection with freshness/trust metadata.
+38. FOSS license obligations are release/distribution-context specific and scanner facts do not self-authorize.
+39. reliability/FMEA research does not justify a new platform subsystem until real program needs prove it.
 
 ---
 
