@@ -42,10 +42,10 @@ type TaskContract struct {
 	TargetID           string   `json:"target_id,omitempty"`
 	AcceptanceCriteria []string `json:"acceptance_criteria"`
 	AllowedActions     []string `json:"allowed_actions,omitempty"`
-	ExpectedOutputs    []string `json:"expected_outputs,omitempty"`
-	VerificationPlanID     string   `json:"verification_plan_id"`
-	VerificationPlanDigest string   `json:"verification_plan_digest"`
-	Revision           uint64   `json:"revision"`
+	ExpectedOutputs         []string `json:"expected_outputs,omitempty"`
+	VerificationPlanID      string   `json:"verification_plan_id"`
+	VerificationPlanDigest  string   `json:"verification_plan_digest"`
+	Revision                uint64   `json:"revision"`
 }
 
 func (t TaskContract) Digest() (string, error) {
