@@ -165,7 +165,7 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 		"verification_report_id": "vr-f",
 		"delivery_receipt_id":    "delivery-f",
 		"verifier":               "verification-service",
-		"evidence_ids": []string{"ev-f"},
+		"evidence_ids":           []string{"ev-f"},
 	}, http.StatusCreated)
 	var verificationReport struct {
 		Result            string `json:"result"`
@@ -215,7 +215,7 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 		"verification_report_id": "vr-cross",
 		"delivery_receipt_id":    deliveryB.ID,
 		"verifier":               "verification-service",
-		"evidence_ids": []string{"ev-a"},
+		"evidence_ids":           []string{"ev-a"},
 	}, http.StatusUnprocessableEntity)
 }
 
@@ -239,7 +239,7 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 		"verification_report_id": "vr-fail",
 		"delivery_receipt_id":    delivery.ID,
 		"verifier":               "verification-service",
-		"evidence_ids": []string{"ev-fail"},
+		"evidence_ids":           []string{"ev-fail"},
 	}, http.StatusUnprocessableEntity)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
@@ -258,7 +258,7 @@ func TestVerificationRejectsUnregisteredEvidenceReference(t *testing.T) {
 		"verification_report_id": "vr-missing",
 		"delivery_receipt_id":    delivery.ID,
 		"verifier":               "verification-service",
-		"evidence_ids": []string{"ev-missing"},
+		"evidence_ids":           []string{"ev-missing"},
 	}, http.StatusNotFound)
 }
 
