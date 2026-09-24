@@ -71,6 +71,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/steer", s.handleSteer)
+	s.mux.HandleFunc("GET /api/v1/steering/{id}", s.handleGetSteering)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/takeover", s.handleTakeover)
@@ -445,26 +446,49 @@ func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	if req.ID == "" || req.ExecutionEpoch == 0 || req.Sequence == 0 || req.Actor == "" || req.ContentDigest == "" {
+		writeError(w, http.StatusBadRequest, "steering_command_id, execution_epoch, sequence, actor and content_digest are required")
+		return
+	}
+
+	runID := r.PathValue("id")
+	value, sess, err := s.store.GetExecution(runID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	expectedVersion := value.Version
 	cmd := session.SteeringCommand{
 		ID:             req.ID,
-		RunID:          r.PathValue("id"),
+		RunID:          runID,
 		ExecutionEpoch: req.ExecutionEpoch,
 		Sequence:       req.Sequence,
 		Actor:          req.Actor,
 		ContentDigest:  req.ContentDigest,
 		CreatedAt:      s.now(),
 	}
-	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
-		if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
-			return err
-		}
-		return sess.ApplySteering(cmd)
-	})
-	if err != nil {
+	if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	if err := sess.ApplySteering(cmd); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	if err := s.store.RecordSteering(runID, expectedVersion, value, sess, cmd); err != nil {
 		writeMutationError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, cmd)
+}
+
+func (s *Server) handleGetSteering(w http.ResponseWriter, r *http.Request) {
+	cmd, err := s.store.GetSteering(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cmd)
 }
 
 func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
