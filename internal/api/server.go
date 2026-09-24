@@ -1050,7 +1050,7 @@ func writeMutationError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if errors.Is(err, store.ErrConflict) || errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
+	if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) || errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
