@@ -23,7 +23,7 @@ type Store interface {
 	GetWork(string) (core.WorkItem, error)
 	UpdateWork(string, uint64, core.WorkItem) error
 
-	GetRecovery() recovery.Manager
+	GetRecovery() (recovery.Manager, error)
 	BeginRecovery(uint64) (recovery.Manager, error)
 	CompleteRecovery(uint64, bool) (recovery.Manager, error)
 
@@ -100,10 +100,10 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) GetRecovery() recovery.Manager {
+func (m *Memory) GetRecovery() (recovery.Manager, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.recoveryState
+	return m.recoveryState, nil
 }
 
 func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
