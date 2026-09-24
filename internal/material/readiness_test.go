@@ -20,6 +20,26 @@ func TestDebugRequiresEvidence(t *testing.T) {
 	}
 }
 
+func TestDebugDegradationRequiresApproverAndReason(t *testing.T) {
+	m := Manifest{
+		TaskType:           "DEBUG",
+		Repository:         "repo",
+		BaseCommit:         "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"collect enough evidence to decide next step"},
+	}
+	if got := Evaluate(m).Status; got != Blocked {
+		t.Fatalf("expected BLOCKED without degradation approval, got %s", got)
+	}
+	m.DegradationApprovedBy = "tech-lead"
+	if got := Evaluate(m).Status; got != Blocked {
+		t.Fatalf("expected BLOCKED without degradation reason, got %s", got)
+	}
+	m.DegradationReason = "original device is unavailable; diagnostic run is explicitly exploratory"
+	if got := Evaluate(m).Status; got != Degraded {
+		t.Fatalf("expected DEGRADED with auditable approval, got %s", got)
+	}
+}
+
 func TestDeviceTestRequiresExactDeviceAndFirmware(t *testing.T) {
 	m := Manifest{
 		TaskType:           "DEVICE_TEST",
@@ -39,11 +59,12 @@ func TestDeviceTestRequiresExactDeviceAndFirmware(t *testing.T) {
 
 func TestDegradationCannotBypassExactSourceIdentity(t *testing.T) {
 	m := Manifest{
-		TaskType:            "FEATURE",
-		Repository:          "repo",
-		BaseCommit:          "main",
-		AcceptanceCriteria:  []string{"build passes"},
-		DegradationApproved: true,
+		TaskType:              "FEATURE",
+		Repository:            "repo",
+		BaseCommit:            "main",
+		AcceptanceCriteria:    []string{"build passes"},
+		DegradationApprovedBy: "tech-lead",
+		DegradationReason:     "exploratory",
 	}
 	got := Evaluate(m)
 	if got.Status != Blocked {
