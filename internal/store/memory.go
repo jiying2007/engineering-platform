@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/run"
@@ -65,6 +66,8 @@ type Memory struct {
 	runInputs           map[string]core.RunInputManifest
 	checkpoints         map[string]session.Checkpoint
 	checkpointDigests   map[string]string
+	operations          map[string]action.Operation
+	actionIdempotency   map[string]string
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
@@ -84,6 +87,8 @@ func NewMemory() *Memory {
 		runInputs:           make(map[string]core.RunInputManifest),
 		checkpoints:         make(map[string]session.Checkpoint),
 		checkpointDigests:   make(map[string]string),
+		operations:          make(map[string]action.Operation),
+		actionIdempotency:   make(map[string]string),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
@@ -358,6 +363,54 @@ func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Ru
 	value.Version = expectedVersion + 1
 	m.runs[id] = value
 	m.sessions[id] = sess
+	return nil
+}
+
+func (m *Memory) Create(op action.Operation) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.operations[op.ID]; ok {
+		return action.ErrOperationExists
+	}
+	if _, ok := m.actionIdempotency[op.IdempotencyKey]; ok {
+		return action.ErrOperationExists
+	}
+	m.operations[op.ID] = op
+	m.actionIdempotency[op.IdempotencyKey] = op.ID
+	return nil
+}
+
+func (m *Memory) Get(id string) (action.Operation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	op, ok := m.operations[id]
+	if !ok {
+		return action.Operation{}, action.ErrOperationAbsent
+	}
+	return op, nil
+}
+
+func (m *Memory) GetByIdempotencyKey(key string) (action.Operation, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	id, ok := m.actionIdempotency[key]
+	if !ok {
+		return action.Operation{}, action.ErrOperationAbsent
+	}
+	op, ok := m.operations[id]
+	if !ok {
+		return action.Operation{}, action.ErrOperationAbsent
+	}
+	return op, nil
+}
+
+func (m *Memory) Update(op action.Operation) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.operations[op.ID]; !ok {
+		return action.ErrOperationAbsent
+	}
+	m.operations[op.ID] = op
 	return nil
 }
 
