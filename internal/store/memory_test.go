@@ -8,7 +8,32 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
+	"github.com/jiying2007/engineering-platform/internal/verification"
 )
+
+func planFor(statement, procedure string) verification.Plan {
+	return verification.Plan{
+		ID: "vp-1",
+		Criteria: []verification.Criterion{{
+			ID:        "ac-1",
+			Statement: statement,
+			Requirements: []verification.EvidenceRequirement{{
+				ID:        "req-1",
+				Procedure: procedure,
+			}},
+		}},
+	}
+}
+
+func bindPlan(t *testing.T, task *core.TaskContract, plan verification.Plan) {
+	t.Helper()
+	digest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	task.VerificationPlanID = plan.ID
+	task.VerificationPlanDigest = digest
+}
 
 func TestTaskRevisionsAreImmutableAndMonotonic(t *testing.T) {
 	s := NewMemory()
@@ -21,7 +46,9 @@ func TestTaskRevisionsAreImmutableAndMonotonic(t *testing.T) {
 		AcceptanceCriteria: []string{"A"},
 		Revision:           1,
 	}
-	if err := s.CreateTask(r1); err != nil {
+	p1 := planFor("A", "ci.test")
+	bindPlan(t, &r1, p1)
+	if err := s.CreateTask(r1, p1); err != nil {
 		t.Fatal(err)
 	}
 	d1, _ := r1.Digest()
@@ -29,7 +56,15 @@ func TestTaskRevisionsAreImmutableAndMonotonic(t *testing.T) {
 	r2 := r1
 	r2.Revision = 2
 	r2.AcceptanceCriteria = []string{"A", "B"}
-	if err := s.CreateTask(r2); err != nil {
+	p2 := verification.Plan{
+		ID: "vp-2",
+		Criteria: []verification.Criterion{
+			{ID: "ac-1", Statement: "A", Requirements: []verification.EvidenceRequirement{{ID: "req-1", Procedure: "ci.test"}}},
+			{ID: "ac-2", Statement: "B", Requirements: []verification.EvidenceRequirement{{ID: "req-2", Procedure: "review.test"}}},
+		},
+	}
+	bindPlan(t, &r2, p2)
+	if err := s.CreateTask(r2, p2); err != nil {
 		t.Fatal(err)
 	}
 	d2, _ := r2.Digest()
@@ -54,8 +89,22 @@ func TestTaskRevisionsAreImmutableAndMonotonic(t *testing.T) {
 
 	r4 := r2
 	r4.Revision = 4
-	if err := s.CreateTask(r4); !errors.Is(err, ErrConflict) {
+	if err := s.CreateTask(r4, p2); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected revision gap conflict, got %v", err)
+	}
+}
+
+func TestTaskRejectsPlanDigestMismatch(t *testing.T) {
+	s := NewMemory()
+	task := core.TaskContract{
+		ID: "task-1", WorkItemID: "work-1", TaskType: "FEATURE",
+		Repository: "repo", BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"A"}, Revision: 1,
+		VerificationPlanID: "vp-1", VerificationPlanDigest: "sha256:wrong",
+	}
+	plan := planFor("A", "ci.test")
+	if err := s.CreateTask(task, plan); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected plan digest mismatch conflict, got %v", err)
 	}
 }
 
