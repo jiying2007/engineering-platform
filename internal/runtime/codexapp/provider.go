@@ -99,6 +99,13 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if err != nil || len(entries) != 0 {
 		return nil, fmt.Errorf("fresh empty isolated HOME required")
 	}
+	// Real Codex requires an explicitly selected CODEX_HOME to exist. Create only
+	// the platform-owned empty derived directories after proving HOME was empty.
+	for _, dir := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			return nil, fmt.Errorf("initialize isolated runtime home: %w", err)
+		}
+	}
 	env := []string{"PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "TZ=UTC", "HOME=" + home, "CODEX_HOME=" + filepath.Join(home, ".codex"), "XDG_CONFIG_HOME=" + filepath.Join(home, ".config"), "XDG_CACHE_HOME=" + filepath.Join(home, ".cache")}
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
