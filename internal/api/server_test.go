@@ -701,4 +701,17 @@ func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
 			"applicable":  true,
 		},
 	}, http.StatusBadRequest)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id":    "ev-foreign-artifact",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"artifact_refs":  []string{"not-in-delivery"},
+			"applicable":     true,
+		},
+	}, http.StatusUnprocessableEntity)
 }
