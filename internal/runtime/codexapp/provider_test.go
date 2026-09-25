@@ -96,7 +96,6 @@ func TestProviderRejectsUnsafeLaunchInputs(t *testing.T) {
 	}
 }
 
-
 func workloadIdentityEnv(t *testing.T, spec runtimeprovider.LaunchSpec) []string {
 	t.Helper()
 	home := strings.TrimPrefix(spec.Env[0], "HOME=")
@@ -194,7 +193,6 @@ func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
 		})
 	}
 }
-
 
 func TestRejectedCredentialConfigurationLeavesRuntimeHomeFresh(t *testing.T) {
 	p, spec := launchFixture(t)
