@@ -64,8 +64,8 @@ func New(socket, guard string) (*Engine, error) {
 	}
 	t := &http.Transport{Proxy: nil, DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "unix", socket)
-	}, MaxResponseHeaderBytes: 32 << 10, DisableCompression: true, ResponseHeaderTimeout: 5 * time.Second}
-	return &Engine{guard: guard, guardDigest: Hash(data), transport: t, client: &http.Client{Transport: t, Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return ErrPolicy }}}, nil
+	}, MaxResponseHeaderBytes: 32 << 10, DisableCompression: true, ResponseHeaderTimeout: 10 * time.Second}
+	return &Engine{guard: guard, guardDigest: Hash(data), transport: t, client: &http.Client{Transport: t, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return ErrPolicy }}}, nil
 }
 func (e *Engine) Close() { e.transport.CloseIdleConnections() }
 
@@ -141,7 +141,7 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 		return result, ErrPolicy
 	}
 	p.Argv = append([]string(nil), p.Argv...)
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.Seconds+10)*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.Seconds+20)*time.Second)
 	defer cancel()
 	nonce := make([]byte, 16)
 	if _, err = rand.Read(nonce); err != nil {
@@ -156,7 +156,7 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 	name := "ep-offline-" + owner
 	created := false
 	defer func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 10*time.Second)
+		cleanup, stop := context.WithTimeout(context.Background(), 15*time.Second)
 		defer stop()
 		target := name
 		if created {
