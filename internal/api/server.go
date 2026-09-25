@@ -866,9 +866,17 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 	item := req.Evidence
 	item.DeliveryReceiptID = delivery.ID
 	item.SubjectDigest = delivery.SubjectDigest
+	if !verification.EvidenceArtifactsBelongToDelivery(delivery, item) {
+		writeError(w, http.StatusUnprocessableEntity, "evidence artifact_refs must be unique artifacts from the exact delivery")
+		return
+	}
 	if err := s.store.CreateEvidence(item); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if errors.Is(err, store.ErrConflict) {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
