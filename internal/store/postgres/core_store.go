@@ -13,6 +13,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/audit"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
@@ -958,6 +959,119 @@ func (s *Store) GetVerification(id string) (verification.Report, error) {
 	return report, nil
 }
 
+func (s *Store) CreateReviewAndUpdateWork(
+	report review.Report,
+	expectedVersion uint64,
+	work core.WorkItem,
+) error {
+	if err := report.Validate(); err != nil {
+		return err
+	}
+	raw, err := encodeJSON(report)
+	if err != nil {
+		return err
+	}
+	payload := struct {
+		Review review.Report `json:"review"`
+		Work   core.WorkItem `json:"work"`
+	}{Review: report, Work: work}
+	input, err := auditInput("review.created", "ReviewReport", report.ID, payload)
+	if err != nil {
+		return err
+	}
+	_, err = s.Mutate(bg(), Mutation{
+		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			const subjectQuery = `
+SELECT vr.verifier,vr.result,vr.delivery_receipt_id,vr.subject_digest,
+       dr.task_contract_digest,dr.work_item_id,dr.run_id,dr.subject_digest
+FROM verification_reports vr
+JOIN delivery_receipts dr ON dr.delivery_receipt_id=vr.delivery_receipt_id
+WHERE vr.verification_report_id=$1 AND dr.delivery_receipt_id=$2
+FOR UPDATE OF vr,dr`
+			var verifier, verificationResult, verificationDelivery, verificationSubject string
+			var taskDigest, workID, runID, deliverySubject string
+			if err := tx.QueryRow(ctx, subjectQuery, report.VerificationReportID, report.DeliveryReceiptID).Scan(
+				&verifier, &verificationResult, &verificationDelivery, &verificationSubject,
+				&taskDigest, &workID, &runID, &deliverySubject,
+			); err != nil {
+				return mapReadError(err)
+			}
+			if verificationResult != "PASS" ||
+				verificationDelivery != report.DeliveryReceiptID ||
+				verificationSubject != report.SubjectDigest ||
+				deliverySubject != report.SubjectDigest ||
+				taskDigest != report.TaskContractDigest ||
+				workID != work.ID ||
+				report.Reviewer == verifier {
+				return corestore.ErrConflict
+			}
+
+			const workQuery = `
+SELECT human_owner,state,version,COALESCE(active_task_contract_digest,''),COALESCE(active_run_id,'')
+FROM work_items WHERE work_item_id=$1 FOR UPDATE`
+			var humanOwner, state, activeTask, activeRun string
+			var version uint64
+			if err := tx.QueryRow(ctx, workQuery, work.ID).Scan(&humanOwner, &state, &version, &activeTask, &activeRun); err != nil {
+				return mapReadError(err)
+			}
+			if version != expectedVersion ||
+				state != string(core.WorkVerifying) ||
+				(report.Result == review.ResultPass && work.State != core.WorkReviewing) ||
+				(report.Result == review.ResultFail && work.State != core.WorkVerifying) ||
+				humanOwner == report.Reviewer ||
+				activeTask != report.TaskContractDigest ||
+				activeRun != runID ||
+				work.ActiveTaskContractDigest != activeTask ||
+				work.ActiveRunID != activeRun {
+				return corestore.ErrConflict
+			}
+
+			const insertReview = `
+INSERT INTO review_reports (
+ review_report_id,delivery_receipt_id,verification_report_id,task_contract_digest,
+ subject_digest,reviewer,result,report_json,created_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)`
+			if _, err := tx.Exec(ctx, insertReview,
+				report.ID, report.DeliveryReceiptID, report.VerificationReportID,
+				report.TaskContractDigest, report.SubjectDigest, report.Reviewer,
+				report.Result, string(raw), report.CreatedAt,
+			); err != nil {
+				return mapWriteError(err)
+			}
+			const updateWork = `
+UPDATE work_items
+SET state=$1,version=version+1,updated_at=now()
+WHERE work_item_id=$2 AND version=$3 AND state=$4
+  AND active_task_contract_digest=$5 AND active_run_id=$6`
+			tag, err := tx.Exec(ctx, updateWork,
+				string(work.State), work.ID, expectedVersion, string(core.WorkVerifying),
+				report.TaskContractDigest, runID,
+			)
+			if err != nil {
+				return mapWriteError(err)
+			}
+			if tag.RowsAffected() != 1 {
+				return corestore.ErrConflict
+			}
+			return nil
+		},
+		Audit: input,
+	})
+	return err
+}
+
+func (s *Store) GetReview(id string) (review.Report, error) {
+	var raw []byte
+	if err := s.pool.QueryRow(bg(), "SELECT report_json FROM review_reports WHERE review_report_id=$1", id).Scan(&raw); err != nil {
+		return review.Report{}, mapReadError(err)
+	}
+	var report review.Report
+	if err := json.Unmarshal(raw, &report); err != nil {
+		return review.Report{}, fmt.Errorf("decode review report: %w", err)
+	}
+	return report, nil
+}
+
 func (s *Store) CreateClosureAndUpdateWork(
 	item core.ClosureReceipt,
 	expectedVersion uint64,
@@ -977,6 +1091,23 @@ func (s *Store) CreateClosureAndUpdateWork(
 	}
 	_, err = s.Mutate(bg(), Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			const reviewQuery = `
+SELECT result,delivery_receipt_id,verification_report_id,task_contract_digest,subject_digest
+FROM review_reports WHERE review_report_id=$1 FOR UPDATE`
+			var reviewResult, reviewDelivery, reviewVerification, reviewTask, reviewSubject string
+			if err := tx.QueryRow(ctx, reviewQuery, item.ReviewReportID).Scan(
+				&reviewResult, &reviewDelivery, &reviewVerification, &reviewTask, &reviewSubject,
+			); err != nil {
+				return mapReadError(err)
+			}
+			if reviewResult != review.ResultPass ||
+				reviewDelivery != item.DeliveryReceiptID ||
+				reviewVerification != item.VerificationReportID ||
+				reviewTask != item.TaskContractDigest ||
+				reviewSubject != item.SubjectDigest ||
+				work.State != core.WorkClosed {
+				return corestore.ErrConflict
+			}
 			const insertClosure = `
 INSERT INTO closure_receipts (
     closure_receipt_id,work_item_id,task_contract_digest,run_id,delivery_receipt_id,
@@ -986,7 +1117,7 @@ INSERT INTO closure_receipts (
 				ctx, insertClosure,
 				item.ID, item.WorkItemID, item.TaskContractDigest, item.RunID,
 				item.DeliveryReceiptID, item.VerificationReportID,
-				nullIfEmpty(item.ReviewReportID), item.SubjectDigest, item.Result,
+				item.ReviewReportID, item.SubjectDigest, item.Result,
 				string(raw), item.CreatedAt,
 			); err != nil {
 				return mapWriteError(err)
@@ -995,11 +1126,13 @@ INSERT INTO closure_receipts (
 			const updateWork = `
 UPDATE work_items
 SET active_task_contract_digest=$1,active_run_id=$2,state=$3,version=version+1,updated_at=now()
-WHERE work_item_id=$4 AND version=$5`
+WHERE work_item_id=$4 AND version=$5 AND state=$6
+  AND active_task_contract_digest=$7 AND active_run_id=$8`
 			tag, err := tx.Exec(
 				ctx, updateWork,
 				nullIfEmpty(work.ActiveTaskContractDigest), nullIfEmpty(work.ActiveRunID),
-				string(work.State), work.ID, expectedVersion,
+				string(work.State), work.ID, expectedVersion, string(core.WorkReviewing),
+				item.TaskContractDigest, item.RunID,
 			)
 			if err != nil {
 				return mapWriteError(err)

@@ -35,6 +35,7 @@ import (
 const engineerSubject = "urn:engineering-platform:engineer:alice"
 const ciSubject = "urn:engineering-platform:service:ci"
 const verifierSubject = "urn:engineering-platform:service:verifier"
+const reviewerSubject = "urn:engineering-platform:service:reviewer"
 const recoverySubject = "urn:engineering-platform:operator:recovery"
 
 func testAccessPolicy(t *testing.T) *access.Policy {
@@ -43,6 +44,7 @@ func testAccessPolicy(t *testing.T) *access.Policy {
 		{Subject: engineerSubject, Scope: "platform", Capabilities: []string{access.Read, access.WorkCreate, access.TaskCreate, access.RunStart, access.RunControl, access.RunComplete, access.DeliveryCreate, access.ClosureCreate, access.ActionExecute}, Actions: []access.ActionGrant{{Action: "ci.dispatch", RiskClass: "CONTROLLED_MUTATION", Capability: "ci"}}},
 		{Subject: ciSubject, Scope: "platform", Capabilities: []string{access.EvidenceRegister}, EvidenceIssuer: "test-ci", EvidenceProcedures: []string{"ci.test"}},
 		{Subject: verifierSubject, Scope: "platform", Capabilities: []string{access.VerificationCreate}},
+		{Subject: reviewerSubject, Scope: "platform", Capabilities: []string{access.ReviewCreate}},
 		{Subject: recoverySubject, Scope: "platform", Capabilities: []string{access.RecoveryBegin, access.RecoveryComplete}},
 	}})
 	if err != nil {
@@ -144,7 +146,7 @@ func TestAuthenticatedPostgresCoreLifecycle(t *testing.T) {
 func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	t.Helper()
 	server, pki := securedTestServer(t, backend, nil, AuthenticatedOptions{})
-	engineer, ci, verifier := pki.Client(t, engineerSubject), pki.Client(t, ciSubject), pki.Client(t, verifierSubject)
+	engineer, ci, verifier, reviewer := pki.Client(t, engineerSubject), pki.Client(t, ciSubject), pki.Client(t, verifierSubject), pki.Client(t, reviewerSubject)
 	base := server.URL + "/api/v1"
 	secureCall(t, engineer, base+"/work-items", map[string]any{"work_item_id": "work-auth", "title": "authenticated API fixture", "human_owner": engineerSubject}, http.StatusCreated)
 	taskBody := secureCall(t, engineer, base+"/task-contracts", map[string]any{
@@ -180,7 +182,30 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	secureCall(t, verifier, base+"/verifications", verification, http.StatusForbidden)
 	verification["verifier"] = verifierSubject
 	secureCall(t, verifier, base+"/verifications", verification, http.StatusCreated)
-	secureCall(t, engineer, base+"/closures", map[string]any{"closure_receipt_id": "closure-auth", "delivery_receipt_id": "delivery-auth", "verification_report_id": "verification-auth"}, http.StatusCreated)
+
+	review := map[string]any{
+		"review_report_id":       "review-auth",
+		"delivery_receipt_id":    "delivery-auth",
+		"verification_report_id": "verification-auth",
+		"reviewer":               engineerSubject,
+		"result":                 "PASS",
+	}
+	secureCall(t, reviewer, base+"/reviews", review, http.StatusForbidden)
+	review["reviewer"] = reviewerSubject
+	secureCall(t, engineer, base+"/reviews", review, http.StatusForbidden)
+	secureCall(t, verifier, base+"/reviews", review, http.StatusForbidden)
+	secureCall(t, reviewer, base+"/reviews", review, http.StatusCreated)
+	persistedReview, err := backend.GetReview("review-auth")
+	if err != nil || persistedReview.Reviewer != reviewerSubject || persistedReview.Result != "PASS" {
+		t.Fatalf("authenticated review not persisted exactly: %#v %v", persistedReview, err)
+	}
+
+	secureCall(t, engineer, base+"/closures", map[string]any{
+		"closure_receipt_id":     "closure-auth",
+		"delivery_receipt_id":    "delivery-auth",
+		"verification_report_id": "verification-auth",
+		"review_report_id":       "review-auth",
+	}, http.StatusCreated)
 	final, err := backend.GetWork("work-auth")
 	if err != nil || final.State != core.WorkClosed {
 		t.Fatalf("authenticated lifecycle did not close: %v %v", final, err)

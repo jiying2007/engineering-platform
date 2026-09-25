@@ -7,7 +7,7 @@ import (
 
 func TestWorkStateMachine(t *testing.T) {
 	w := WorkItem{ID: "work-1", State: WorkDraft}
-	for _, state := range []WorkState{WorkReady, WorkExecuting, WorkVerifying, WorkClosed} {
+	for _, state := range []WorkState{WorkReady, WorkExecuting, WorkVerifying, WorkReviewing, WorkClosed} {
 		if err := w.Transition(state); err != nil {
 			t.Fatalf("transition to %s failed: %v", state, err)
 		}
