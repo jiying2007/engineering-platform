@@ -1,8 +1,8 @@
 # Implementation Status
 
-Reviewed base: `810d01c7e1c89efe22aa7c3c99bcbd2398b35380` (#36).
+Reviewed base: `c817876c8c10fddebe21fc38d394fee944f66c47` (#37).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
-real Codex 0.155 qualification + retained Git/CI/artifact provenance; no authenticated model pilot**.
+real Codex 0.155 qualification + retained Git/CI/artifact provenance + WIF-ready live-turn lane; no retained authenticated model-turn proof**.
 
 ## Canonical scope
 
@@ -33,8 +33,9 @@ Evidence/Verification/Delivery/Closure automatically.
 | Worker admission/preparation | Real relay, mTLS identities/profiles and leases; approved source/context preparation | Approval snapshots require restart; no online enrollment/tenant ACL |
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots and byte checks | Trusted source metadata/host parents; quota/retention |
 | Offline execution | Exact one-shot authorization; live Run/recovery/lease checks; pinned image+guard; real constrained container; bounded output and retained result | Offline/read-only only; trusted Worker/daemon/kernel; no VM/rootless qualification |
-| Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Real model turn and interactive approval lane not yet assembled |
-| Codex qualification (this change) | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Provider credentials/network policy and real model-output qualification |
+| Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Interactive Action-Gateway approval lane not yet assembled |
+| Codex qualification | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Production/runtime pin lifecycle remains operator-owned |
+| Codex WIF live lane (this change) | Fail-closed WIF env/token-file boundary; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
 | Action/recovery | Durable action ledger, authenticated grants, independent recovery-completion gate | Real privileged provider/effect boundary and completion verifier |
 | Engineering delivery | Frozen verification plus Delivery/Evidence/Closure contracts; exact Git/CI/artifact provenance envelope with GitHub and raw-binary digests | Import provenance into Run-bound Core Evidence, independent Review and Feature/Debug pilots |
 
@@ -48,7 +49,8 @@ Evidence/Verification/Delivery/Closure automatically.
   PR `36084019664` and fresh main `36084270695` passed both normal Go/PG
   regression and mandatory real-container jobs.
 - #36 real Codex qualification: main `810d01c7e1c89efe22aa7c3c99bcbd2398b35380`; PR run `36088616108` and fresh-main run `36093348940` passed `go`, real container and real Codex qualification jobs. PR qualification artifact `10844861935` retained exact native/schema digests.
-- This CI provenance change additionally requires a successful `trusted-ci-artifact-evidence` job on the exact PR head and fresh main. Earlier logs or manually copied job IDs do not substitute.
+- #37 trusted CI provenance: main `c817876c8c10fddebe21fc38d394fee944f66c47`; PR run `36095060443` and fresh-main run `36095388934` passed `go`, real container, real Codex and `trusted-ci-artifact-evidence`. Main retained binary artifact `10847815571`, Codex qualification `10847795311`, trusted evidence `10847531493`; main receipt digest `sha256:9db9637b40c0ce09c71348a9d17d7681fba1c8cdcb48e95b26b2b101cb6c6c01`.
+- This WIF change is accepted by ordinary CI only as implementation readiness. A real authenticated-model claim additionally requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
 
 The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
 platform executable, verifies the reported version, hashes the executable,
@@ -70,17 +72,20 @@ qualified native binary and bind the exact raw-byte digest before launch.
 
 Next implementation sequence:
 
-1. consume the qualified binary identity in the existing Worker/Core execution
-   reservation and perform a real authenticated Codex turn under explicit egress;
-2. route every interactive command/file/network approval through current
-   Action Gateway authority, never through provider self-approval;
-3. import the now-retained Git/CI/artifact provenance into exact Run/VerificationPlan-bound Core Evidence, plus model/protocol/output and changed-tree facts, then independent Review;
-4. close UNKNOWN/reconciliation and restore drills;
-5. retain one real Feature pilot and one real Debug pilot before assessing M1.
+1. administrator enables/configures Codex WIF and repository non-secret variables,
+   then retain one successful manual WIF read-only model-turn receipt;
+2. consume that qualified WIF/binary boundary inside the existing Worker/Core
+   execution reservation instead of workflow-only qualification;
+3. route every command/file/network approval through Action Gateway authority;
+4. import retained CI/model/changed-tree provenance into exact
+   Run/VerificationPlan-bound Core Evidence, then independent Review;
+5. close UNKNOWN reconciliation and restore drills;
+6. retain one real Feature pilot and one real Debug pilot before assessing M1.
 
 No new extension domains. **M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/CODEX_WIF_LIVE_V1.md`
 - `docs/implementation/TRUSTED_CI_EVIDENCE_V1.md`
 - `docs/implementation/CODEX_QUALIFICATION_V1.md`
 - `docs/implementation/OFFLINE_EXECUTION_V1.md`

@@ -1,0 +1,136 @@
+name: Codex WIF live qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Exact Codex model available to the mapped managed-workspace principal
+        required: true
+        default: gpt-5.6-sol
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  live:
+    name: one-read-only-model-turn
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require protected main workflow invocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+          test -n "${{ vars.OPENAI_WIF_AUDIENCE }}"
+          test -n "${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}"
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact qualified Codex native binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/codex-0.155.0"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
+          mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
+          test "${#candidates[@]}" -eq 1
+          codex="$(readlink -f "${candidates[0]}")"
+          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
+          printf 'CODEX_DIGEST=sha256:%s\n' "$(sha256sum "$codex" | awk '{print $1}')" >> "$GITHUB_ENV"
+      - name: Require Codex Linux sandbox prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          export NEEDRESTART_MODE=l
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils
+          if [ -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict ]; then
+            sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
+      - name: Mint and verify one GitHub OIDC assertion
+        shell: bash
+        env:
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          secret_dir="$RUNNER_TEMP/openai-wif"
+          install -d -m 0700 "$secret_dir"
+          encoded="$(jq -rn --arg audience "$OPENAI_WIF_AUDIENCE" '$audience|@uri')"
+          token="$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${encoded}" | jq -er .value)"
+          printf '%s' "$token" > "$secret_dir/identity-token"
+          unset token
+          chmod 0600 "$secret_dir/identity-token"
+          python3 - "$secret_dir/identity-token" "$OPENAI_WIF_AUDIENCE" "$GITHUB_REPOSITORY" "$GITHUB_REF" <<'PY'
+          import base64, json, pathlib, sys, time
+          token = pathlib.Path(sys.argv[1]).read_text()
+          parts = token.split(".")
+          if len(parts) != 3:
+              raise SystemExit("OIDC token is not a compact JWT")
+          payload = parts[1] + "=" * (-len(parts[1]) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+          audience, repository, ref = sys.argv[2:]
+          if claims.get("iss") != "https://token.actions.githubusercontent.com":
+              raise SystemExit("unexpected OIDC issuer")
+          aud = claims.get("aud")
+          if not (aud == audience or isinstance(aud, list) and audience in aud):
+              raise SystemExit("unexpected OIDC audience")
+          if claims.get("repository") != repository or claims.get("ref") != ref:
+              raise SystemExit("unexpected repository/ref claims")
+          subject = claims.get("sub", "")
+          if not subject.startswith("repo:" + repository + ":"):
+              raise SystemExit("unexpected OIDC subject")
+          workflow_ref = claims.get("workflow_ref", "")
+          expected = repository + "/.github/workflows/codex-wif-live.yml@refs/heads/main"
+          if workflow_ref != expected:
+              raise SystemExit("unexpected workflow_ref")
+          if int(claims.get("exp", 0)) <= int(time.time()):
+              raise SystemExit("expired OIDC assertion")
+          PY
+          printf 'OPENAI_IDENTITY_TOKEN_FILE=%s\n' "$secret_dir/identity-token" >> "$GITHUB_ENV"
+      - name: Perform exactly one WIF read-only model turn
+        shell: bash
+        env:
+          OPENAI_FEDERATION_RULE_ID: ${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}
+          LIVE_MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/codex-live-work"
+          home="$RUNNER_TEMP/codex-live-home"
+          install -d -m 0700 "$work" "$home"
+          context="$(jq -cn --arg run_id "$GITHUB_RUN_ID" --arg repository "$GITHUB_REPOSITORY" --arg source_sha "$GITHUB_SHA" '{github_run_id:$run_id,repository:$repository,source_sha:$source_sha}')"
+          go run ./cmd/codex-wif-live \
+            --codex "$CODEX_NATIVE" \
+            --digest "$CODEX_DIGEST" \
+            --work "$work" \
+            --home "$home" \
+            --federation-rule "$OPENAI_FEDERATION_RULE_ID" \
+            --identity-token-file "$OPENAI_IDENTITY_TOKEN_FILE" \
+            --audit-context "$context" \
+            --model "$LIVE_MODEL" \
+            > "$RUNNER_TEMP/codex-wif-live-receipt.json"
+          cat "$RUNNER_TEMP/codex-wif-live-receipt.json"
+      - name: Retain real live-turn receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-wif-live-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/codex-wif-live-receipt.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Destroy identity assertion
+        if: always()
+        shell: bash
+        run: rm -rf "$RUNNER_TEMP/openai-wif"

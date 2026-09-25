@@ -14,12 +14,16 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 type Provider struct {
-	executable string
-	digest     string
+	executable     string
+	digest         string
+	credentialSafe bool
 }
+
+const credentialSafeConfig = "[features]\nshell_tool = false\nview_image = false\n"
 
 func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
 
@@ -30,6 +34,18 @@ func NewPinnedProvider(executable, digest string) (*Provider, error) {
 		return nil, fmt.Errorf("valid executable digest required")
 	}
 	return &Provider{executable: executable, digest: digest}, nil
+}
+
+// NewPinnedWIFProvider enables the platform-owned credential-safe startup profile.
+// The profile is fixed in code; callers cannot inject Codex TOML or per-thread
+// config overrides.
+func NewPinnedWIFProvider(executable, digest string) (*Provider, error) {
+	p, err := NewPinnedProvider(executable, digest)
+	if err != nil {
+		return nil, err
+	}
+	p.credentialSafe = true
+	return p, nil
 }
 func (p *Provider) Name() string { return "codex-app-server" }
 
@@ -74,7 +90,7 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			return nil, fmt.Errorf("duplicate runtime environment key")
 		}
 		switch key {
-		case "HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL":
+		case "HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_FEDERATION_RULE_ID", "OPENAI_IDENTITY_TOKEN_FILE", "OPENAI_WORKLOAD_IDENTITY_CONTEXT":
 		default:
 			return nil, fmt.Errorf("runtime environment key is not allowlisted")
 		}
@@ -94,13 +110,58 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if err != nil || info.Mode().Perm()&0o077 != 0 {
 		return nil, fmt.Errorf("isolated HOME must be owner-only")
 	}
-	// A freshly allocated HOME cannot import stale provider/XDG configuration.
+	wifRule, hasRule := values["OPENAI_FEDERATION_RULE_ID"]
+	wifToken, hasToken := values["OPENAI_IDENTITY_TOKEN_FILE"]
+	wifContext, hasContext := values["OPENAI_WORKLOAD_IDENTITY_CONTEXT"]
+	baseURL, hasBaseURL := values["OPENAI_BASE_URL"]
+	if hasRule != hasToken {
+		return nil, fmt.Errorf("workload identity requires both federation rule and identity token file")
+	}
+	if hasRule && !p.credentialSafe {
+		return nil, fmt.Errorf("workload identity requires the credential-safe provider")
+	}
+	if p.credentialSafe && !hasRule {
+		return nil, fmt.Errorf("credential-safe Codex profile requires workload identity")
+	}
+	if hasContext && !hasRule {
+		return nil, fmt.Errorf("workload identity context requires workload identity")
+	}
+	if hasBaseURL {
+		u, e := url.Parse(baseURL)
+		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return nil, fmt.Errorf("explicit provider endpoint must be HTTPS without credentials or query")
+		}
+	}
+	if hasRule {
+		if _, hasAPIKey := values["OPENAI_API_KEY"]; hasAPIKey {
+			return nil, fmt.Errorf("workload identity cannot carry a long-lived API key")
+		}
+		if hasBaseURL {
+			return nil, fmt.Errorf("workload identity cannot override the OpenAI endpoint")
+		}
+		if !validFederationRuleID(wifRule) {
+			return nil, fmt.Errorf("invalid workload identity federation rule")
+		}
+		tokenPath, err := privateIdentityToken(wifToken)
+		if err != nil {
+			return nil, err
+		}
+		if inside(work, tokenPath) || inside(home, tokenPath) {
+			return nil, fmt.Errorf("identity token must be outside runtime workspace and HOME")
+		}
+		values["OPENAI_IDENTITY_TOKEN_FILE"] = tokenPath
+		if hasContext {
+			if len(wifContext) > 4096 || strictjson.ValidateObject([]byte(wifContext)) != nil {
+				return nil, fmt.Errorf("invalid workload identity audit context")
+			}
+		}
+	}
+	// No filesystem mutation occurs until every credential and endpoint input has
+	// passed validation. A rejected launch must leave a fresh HOME reusable.
 	entries, err := os.ReadDir(home)
 	if err != nil || len(entries) != 0 {
 		return nil, fmt.Errorf("fresh empty isolated HOME required")
 	}
-	// Real Codex requires an explicitly selected CODEX_HOME to exist. Create only
-	// the platform-owned empty derived directories after proving HOME was empty.
 	for _, dir := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
 		if err := os.Mkdir(dir, 0o700); err != nil {
 			return nil, fmt.Errorf("initialize isolated runtime home: %w", err)
@@ -110,12 +171,24 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
 	}
-	if base, ok := values["OPENAI_BASE_URL"]; ok {
-		u, e := url.Parse(base)
-		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-			return nil, fmt.Errorf("explicit provider endpoint must be HTTPS without credentials or query")
+	if p.credentialSafe {
+		configPath := filepath.Join(home, ".codex", "config.toml")
+		if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
+			return nil, fmt.Errorf("write credential-safe Codex config: %w", err)
 		}
-		env = append(env, "OPENAI_BASE_URL="+base)
+	}
+
+	if hasRule {
+		env = append(env,
+			"OPENAI_FEDERATION_RULE_ID="+wifRule,
+			"OPENAI_IDENTITY_TOKEN_FILE="+values["OPENAI_IDENTITY_TOKEN_FILE"],
+		)
+		if hasContext {
+			env = append(env, "OPENAI_WORKLOAD_IDENTITY_CONTEXT="+wifContext)
+		}
+	}
+	if hasBaseURL {
+		env = append(env, "OPENAI_BASE_URL="+baseURL)
 	}
 	// Current Codex documents --stdio as the explicit equivalent of
 	// --listen stdio://. A new process is launched for every qualified session;
@@ -124,6 +197,35 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	cmd.Dir = work
 	cmd.Env = env
 	return cmd, nil
+}
+
+func validFederationRuleID(value string) bool {
+	if value == "" || len(value) > 256 || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, ch := range value {
+		if ch < 0x20 || ch == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+func privateIdentityToken(path string) (string, error) {
+	resolved, err := canonicalPath(path, false)
+	if err != nil {
+		return "", fmt.Errorf("identity token path: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < 16 || info.Size() > 1<<20 {
+		return "", fmt.Errorf("identity token must be a bounded owner-private regular file")
+	}
+	parent := filepath.Dir(resolved)
+	parentInfo, err := os.Stat(parent)
+	if err != nil || !parentInfo.IsDir() || parentInfo.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("identity token parent must be owner-private")
+	}
+	return resolved, nil
 }
 
 func executableDigest(path string) (string, error) {
