@@ -2,7 +2,6 @@ package cievidence
 
 import (
 	"archive/zip"
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -262,4 +261,3 @@ func TestBinaryManifestMustMatchEnvelopeFacts(t *testing.T) {
 	}
 }
 
-var _ = bytes.Equal
