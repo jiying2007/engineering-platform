@@ -366,7 +366,6 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 	}
 }
 
-
 func TestMemoryEvidenceRequiresExactFrozenRequirement(t *testing.T) {
 	store := NewMemory()
 	plan := planFor("tests pass", "ci.test")
