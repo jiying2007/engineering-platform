@@ -692,7 +692,7 @@ func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
 	if !ok {
 		return ErrNotFound
 	}
-	if !verification.EvidenceMatchesPlan(plan, item) {
+	if !verification.EvidenceMatchesPlan(plan, item) || !verification.EvidenceArtifactsBelongToDelivery(delivery, item) {
 		return ErrConflict
 	}
 	m.evidence[item.ID] = item
