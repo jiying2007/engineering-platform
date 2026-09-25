@@ -96,6 +96,20 @@ func TestProviderRejectsUnsafeLaunchInputs(t *testing.T) {
 	}
 }
 
+func launchWIFFixture(t *testing.T) (*Provider, runtimeprovider.LaunchSpec) {
+	t.Helper()
+	base, spec := launchFixture(t)
+	digest, err := executableDigest(base.executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := NewPinnedWIFProvider(base.executable, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return provider, spec
+}
+
 func workloadIdentityEnv(t *testing.T, spec runtimeprovider.LaunchSpec) []string {
 	t.Helper()
 	home := strings.TrimPrefix(spec.Env[0], "HOME=")
@@ -115,7 +129,7 @@ func workloadIdentityEnv(t *testing.T, spec runtimeprovider.LaunchSpec) []string
 }
 
 func TestProviderAcceptsPrivateWorkloadIdentityWithoutReadingSecret(t *testing.T) {
-	p, spec := launchFixture(t)
+	p, spec := launchWIFFixture(t)
 	spec.Env = append(spec.Env, workloadIdentityEnv(t, spec)...)
 	cmd, err := p.Command(context.Background(), spec)
 	if err != nil {
@@ -142,7 +156,7 @@ func TestProviderAcceptsPrivateWorkloadIdentityWithoutReadingSecret(t *testing.T
 func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
 	for _, kind := range []string{"rule-only", "token-only", "context-only", "api-key", "base-url", "bad-rule", "public-file", "public-parent", "relative-token", "worktree-token", "bad-context"} {
 		t.Run(kind, func(t *testing.T) {
-			p, spec := launchFixture(t)
+			p, spec := launchWIFFixture(t)
 			wif := workloadIdentityEnv(t, spec)
 			switch kind {
 			case "rule-only":
@@ -195,9 +209,9 @@ func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
 }
 
 func TestRejectedCredentialConfigurationLeavesRuntimeHomeFresh(t *testing.T) {
-	p, spec := launchFixture(t)
+	p, spec := launchWIFFixture(t)
 	home := strings.TrimPrefix(spec.Env[0], "HOME=")
-	spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID=idpm_incomplete")
+	spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID=rule-incomplete")
 	if _, err := p.Command(context.Background(), spec); err == nil {
 		t.Fatal("incomplete workload identity accepted")
 	}
@@ -207,5 +221,41 @@ func TestRejectedCredentialConfigurationLeavesRuntimeHomeFresh(t *testing.T) {
 	}
 	if len(entries) != 0 {
 		t.Fatalf("rejected launch polluted runtime HOME: %#v", entries)
+	}
+}
+
+
+func TestNormalProviderRejectsWorkloadIdentity(t *testing.T) {
+	p, spec := launchFixture(t)
+	spec.Env = append(spec.Env, workloadIdentityEnv(t, spec)...)
+	if _, err := p.Command(context.Background(), spec); err == nil || !strings.Contains(err.Error(), "credential-safe") {
+		t.Fatalf("normal provider accepted workload identity: %v", err)
+	}
+}
+
+func TestWIFProviderWritesOnlyFixedCredentialSafeConfig(t *testing.T) {
+	p, spec := launchWIFFixture(t)
+	spec.Env = append(spec.Env, workloadIdentityEnv(t, spec)...)
+	if _, err := p.Command(context.Background(), spec); err != nil {
+		t.Fatal(err)
+	}
+	home := strings.TrimPrefix(spec.Env[0], "HOME=")
+	path := filepath.Join(home, ".codex", "config.toml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != credentialSafeConfig {
+		t.Fatalf("unexpected credential-safe config: %q", data)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("credential-safe config mode=%#o", info.Mode().Perm())
+	}
+	if strings.Contains(string(data), "OPENAI_") || strings.Contains(string(data), "identity") {
+		t.Fatal("credential data leaked into Codex config")
 	}
 }
