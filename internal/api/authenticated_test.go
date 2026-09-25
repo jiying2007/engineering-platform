@@ -364,7 +364,6 @@ func TestAllCoreRoutesHaveExplicitAccessPolicy(t *testing.T) {
 	}
 }
 
-
 func TestPostgresRecoveryProofRequiresSeparateIdentities(t *testing.T) {
 	databaseURL := os.Getenv("POSTGRES_TEST_URL")
 	if databaseURL == "" {
