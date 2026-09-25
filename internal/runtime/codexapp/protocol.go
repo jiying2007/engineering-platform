@@ -25,11 +25,12 @@ const MaxFrameBytes = 1 << 20
 const maxPending = 128
 
 type Message struct {
-	ID     json.RawMessage `json:"id,omitempty"`
-	Method string          `json:"method,omitempty"`
-	Params json.RawMessage `json:"params,omitempty"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  json.RawMessage `json:"error,omitempty"`
+	ID          json.RawMessage `json:"id,omitempty"`
+	Method      string          `json:"method,omitempty"`
+	Params      json.RawMessage `json:"params,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	Error       json.RawMessage `json:"error,omitempty"`
+	EmittedAtMs *int64          `json:"emittedAtMs,omitempty"`
 }
 type EventKind string
 
@@ -352,7 +353,7 @@ func decodeMessage(data []byte) (Message, error) {
 			return Message{}, ErrProtocol
 		}
 		switch key {
-		case "id", "method", "params", "result", "error", "jsonrpc":
+		case "id", "method", "params", "result", "error", "jsonrpc", "emittedAtMs":
 		default:
 			return Message{}, fmt.Errorf("%w: unknown top-level field %q", ErrProtocol, key)
 		}
@@ -378,6 +379,11 @@ func decodeMessage(data []byte) (Message, error) {
 	}
 	if len(m.ID) > 0 && !validID(m.ID) {
 		return m, fmt.Errorf("%w: invalid message id", ErrProtocol)
+	}
+	// Since Codex 0.155, server notifications may carry an optional emission
+	// timestamp. It is transport metadata only and must never affect correlation.
+	if m.EmittedAtMs != nil && (m.Method == "" || len(m.ID) != 0 || *m.EmittedAtMs < 0) {
+		return m, fmt.Errorf("%w: emittedAtMs is only valid on notifications", ErrProtocol)
 	}
 	if m.Method != "" {
 		if strings.TrimSpace(m.Method) == "" || len(m.Result) > 0 || len(m.Error) > 0 {
