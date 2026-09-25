@@ -84,6 +84,20 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 	return true
 }
 
+func FindRequirement(plan Plan, id string) (EvidenceRequirement, bool) {
+	if id == "" {
+		return EvidenceRequirement{}, false
+	}
+	for _, criterion := range plan.Criteria {
+		for _, requirement := range criterion.Requirements {
+			if requirement.ID == id {
+				return requirement, true
+			}
+		}
+	}
+	return EvidenceRequirement{}, false
+}
+
 func Evaluate(plan Plan, subjectDigest string, evidence []core.EvidenceRef) Report {
 	evidenceIDs := make([]string, 0, len(evidence))
 	for _, item := range evidence {
