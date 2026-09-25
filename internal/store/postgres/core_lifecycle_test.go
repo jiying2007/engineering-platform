@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -330,7 +331,39 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	closedWork := verifyingWork
+	reviewReport := review.Report{
+		ID:                   "review-" + suffix,
+		DeliveryReceiptID:    delivery.ID,
+		VerificationReportID: report.ID,
+		TaskContractDigest:   taskDigest,
+		SubjectDigest:        delivery.SubjectDigest,
+		Reviewer:             "integration-reviewer",
+		Result:               review.ResultPass,
+		KnownLimits:          []string{"integration host remains trusted"},
+		CreatedAt:            time.Now().UTC(),
+	}
+	reviewingWork := verifyingWork
+	if err := reviewingWork.Transition(core.WorkReviewing); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateReviewAndUpdateWork(reviewReport, verifyingWork.Version, reviewingWork); err != nil {
+		t.Fatal(err)
+	}
+	storedReview, err := s.GetReview(reviewReport.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedReview.Result != review.ResultPass ||
+		storedReview.SubjectDigest != delivery.SubjectDigest ||
+		storedReview.VerificationReportID != report.ID {
+		t.Fatalf("unexpected review report: %#v", storedReview)
+	}
+
+	reviewingWork, err = s.GetWork(workID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closedWork := reviewingWork
 	if err := closedWork.Transition(core.WorkClosed); err != nil {
 		t.Fatal(err)
 	}
@@ -341,13 +374,14 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		RunID:                runID,
 		DeliveryReceiptID:    delivery.ID,
 		VerificationReportID: report.ID,
+		ReviewReportID:       reviewReport.ID,
 		SubjectDigest:        delivery.SubjectDigest,
 		Result:               "CLOSED",
 		CreatedAt:            time.Now().UTC(),
 	}
 	if err := s.CreateClosureAndUpdateWork(
 		closure,
-		verifyingWork.Version,
+		reviewingWork.Version,
 		closedWork,
 	); err != nil {
 		t.Fatal(err)
@@ -370,12 +404,12 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	var auditCount int
 	if err := s.pool.QueryRow(
 		ctx,
-		"SELECT COUNT(*) FROM audit_events WHERE aggregate_id IN ($1,$2,$3,$4,$5,$6)",
-		workID, taskID, runID, checkpoint.ID, delivery.ID, report.ID,
+		"SELECT COUNT(*) FROM audit_events WHERE aggregate_id IN ($1,$2,$3,$4,$5,$6,$7)",
+		workID, taskID, runID, checkpoint.ID, delivery.ID, report.ID, reviewReport.ID,
 	).Scan(&auditCount); err != nil {
 		t.Fatal(err)
 	}
-	if auditCount < 8 {
+	if auditCount < 9 {
 		t.Fatalf("expected lifecycle audit trail, got %d matching audit events", auditCount)
 	}
 
