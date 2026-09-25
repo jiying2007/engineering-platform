@@ -62,53 +62,53 @@ type Store interface {
 }
 
 type Memory struct {
-	mu                  sync.RWMutex
-	recoveryState       recovery.Manager
-	works               map[string]core.WorkItem
-	tasks               map[string]map[uint64]core.TaskContract
-	latestTaskRev       map[string]uint64
-	tasksByDigest       map[string]core.TaskContract
-	verificationPlans   map[string]verification.Plan
-	runs                map[string]run.Run
-	attempts            map[string]map[string]run.Attempt
-	sessions            map[string]session.Session
-	runInputs           map[string]core.RunInputManifest
-	steeringCommands    map[string]session.SteeringCommand
-	checkpoints         map[string]session.Checkpoint
-	checkpointDigests   map[string]string
-	operations          map[string]action.Operation
-	actionIdempotency   map[string]string
-	deliveries          map[string]core.DeliveryReceipt
-	evidence            map[string]core.EvidenceRef
-	verificationReports map[string]verification.Report
-	reviewReports       map[string]review.Report
+	mu                   sync.RWMutex
+	recoveryState        recovery.Manager
+	works                map[string]core.WorkItem
+	tasks                map[string]map[uint64]core.TaskContract
+	latestTaskRev        map[string]uint64
+	tasksByDigest        map[string]core.TaskContract
+	verificationPlans    map[string]verification.Plan
+	runs                 map[string]run.Run
+	attempts             map[string]map[string]run.Attempt
+	sessions             map[string]session.Session
+	runInputs            map[string]core.RunInputManifest
+	steeringCommands     map[string]session.SteeringCommand
+	checkpoints          map[string]session.Checkpoint
+	checkpointDigests    map[string]string
+	operations           map[string]action.Operation
+	actionIdempotency    map[string]string
+	deliveries           map[string]core.DeliveryReceipt
+	evidence             map[string]core.EvidenceRef
+	verificationReports  map[string]verification.Report
+	reviewReports        map[string]review.Report
 	reviewByVerification map[string]string
-	closures            map[string]core.ClosureReceipt
+	closures             map[string]core.ClosureReceipt
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		recoveryState:       *recovery.New(),
-		works:               make(map[string]core.WorkItem),
-		tasks:               make(map[string]map[uint64]core.TaskContract),
-		latestTaskRev:       make(map[string]uint64),
-		tasksByDigest:       make(map[string]core.TaskContract),
-		verificationPlans:   make(map[string]verification.Plan),
-		runs:                make(map[string]run.Run),
-		attempts:            make(map[string]map[string]run.Attempt),
-		sessions:            make(map[string]session.Session),
-		runInputs:           make(map[string]core.RunInputManifest),
-		steeringCommands:    make(map[string]session.SteeringCommand),
-		checkpoints:         make(map[string]session.Checkpoint),
-		checkpointDigests:   make(map[string]string),
-		operations:          make(map[string]action.Operation),
-		actionIdempotency:   make(map[string]string),
-		deliveries:          make(map[string]core.DeliveryReceipt),
-		evidence:            make(map[string]core.EvidenceRef),
+		recoveryState:        *recovery.New(),
+		works:                make(map[string]core.WorkItem),
+		tasks:                make(map[string]map[uint64]core.TaskContract),
+		latestTaskRev:        make(map[string]uint64),
+		tasksByDigest:        make(map[string]core.TaskContract),
+		verificationPlans:    make(map[string]verification.Plan),
+		runs:                 make(map[string]run.Run),
+		attempts:             make(map[string]map[string]run.Attempt),
+		sessions:             make(map[string]session.Session),
+		runInputs:            make(map[string]core.RunInputManifest),
+		steeringCommands:     make(map[string]session.SteeringCommand),
+		checkpoints:          make(map[string]session.Checkpoint),
+		checkpointDigests:    make(map[string]string),
+		operations:           make(map[string]action.Operation),
+		actionIdempotency:    make(map[string]string),
+		deliveries:           make(map[string]core.DeliveryReceipt),
+		evidence:             make(map[string]core.EvidenceRef),
 		verificationReports:  make(map[string]verification.Report),
 		reviewReports:        make(map[string]review.Report),
 		reviewByVerification: make(map[string]string),
-		closures:            make(map[string]core.ClosureReceipt),
+		closures:             make(map[string]core.ClosureReceipt),
 	}
 }
 
