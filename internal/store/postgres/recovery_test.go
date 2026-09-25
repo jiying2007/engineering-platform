@@ -62,6 +62,22 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 		t.Fatalf("failed completion must keep recovery active: %#v", stillActive)
 	}
 
+	if _, err := s.CompleteRecovery(1, true); !errors.Is(err, recovery.ErrReconciliationRequired) {
+		t.Fatalf("completion without durable proof accepted: %v", err)
+	}
+	proof, err := s.CreateRecoveryProof(ctx, 1, "urn:engineering-platform:operator:reconciler")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proof.RecoveryEpoch != 1 || !proof.Facts.Clear() {
+		t.Fatalf("unexpected recovery proof: %#v", proof)
+	}
+	if err := s.AuthorizeCompletion(ctx, proof.Reconciler, 1); err == nil {
+		t.Fatal("same reconciler identity authorized completion")
+	}
+	if err := s.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:completer", 1); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.CompleteRecovery(0, true); !errors.Is(err, corestore.ErrConflict) {
 		t.Fatalf("expected stale recovery epoch conflict, got %v", err)
 	}
