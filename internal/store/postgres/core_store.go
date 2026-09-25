@@ -868,7 +868,7 @@ func (s *Store) CreateEvidence(item core.EvidenceRef) error {
 	if err != nil {
 		return err
 	}
-	if !verification.EvidenceMatchesPlan(plan, item) {
+	if !verification.EvidenceMatchesPlan(plan, item) || !verification.EvidenceArtifactsBelongToDelivery(delivery, item) {
 		return corestore.ErrConflict
 	}
 	raw, err := encodeJSON(item)
