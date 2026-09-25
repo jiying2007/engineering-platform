@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 )
 
 func liveAdapter(t *testing.T) (*Adapter, io.ReadWriter) {
