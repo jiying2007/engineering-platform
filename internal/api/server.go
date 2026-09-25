@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -87,6 +88,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/evidence/{id}", s.handleGetEvidence)
 	s.mux.HandleFunc("POST /api/v1/verifications", s.handleCreateVerification)
 	s.mux.HandleFunc("GET /api/v1/verifications/{id}", s.handleGetVerification)
+	s.mux.HandleFunc("POST /api/v1/reviews", s.handleCreateReview)
+	s.mux.HandleFunc("GET /api/v1/reviews/{id}", s.handleGetReview)
 	s.mux.HandleFunc("POST /api/v1/closures", s.handleCreateClosure)
 	s.mux.HandleFunc("GET /api/v1/closures/{id}", s.handleGetClosure)
 }
@@ -964,6 +967,80 @@ func (s *Server) handleGetVerification(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, report)
 }
 
+type createReviewRequest struct {
+	ReportID             string   `json:"review_report_id"`
+	DeliveryReceiptID    string   `json:"delivery_receipt_id"`
+	VerificationReportID string   `json:"verification_report_id"`
+	Reviewer             string   `json:"reviewer"`
+	Result               string   `json:"result"`
+	Findings             []string `json:"findings,omitempty"`
+}
+
+func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
+	var req createReviewRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ReportID == "" || req.DeliveryReceiptID == "" || req.VerificationReportID == "" || req.Reviewer == "" || req.Result == "" {
+		writeError(w, http.StatusBadRequest, "review_report_id, delivery_receipt_id, verification_report_id, reviewer and result are required")
+		return
+	}
+	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	verificationReport, err := s.store.GetVerification(req.VerificationReportID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if verificationReport.Result != "PASS" || verificationReport.DeliveryReceiptID != delivery.ID || verificationReport.SubjectDigest != delivery.SubjectDigest {
+		writeError(w, http.StatusUnprocessableEntity, "review requires PASS verification for the exact delivery subject")
+		return
+	}
+	work, err := s.store.GetWork(delivery.WorkItemID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if req.Reviewer == verificationReport.Verifier || req.Reviewer == work.HumanOwner {
+		writeError(w, http.StatusUnprocessableEntity, "reviewer must be independent from verifier and work owner")
+		return
+	}
+	item := review.Report{
+		ID: req.ReportID, DeliveryReceiptID: delivery.ID, VerificationReportID: verificationReport.ID,
+		SubjectDigest: delivery.SubjectDigest, Reviewer: req.Reviewer, Result: req.Result,
+		Findings: append([]string(nil), req.Findings...), CreatedAt: s.now(),
+	}
+	if err := review.Validate(item); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	expectedVersion := work.Version
+	if err := work.Transition(core.WorkReviewing); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := s.store.CreateReviewAndUpdateWork(item, expectedVersion, work); err != nil {
+		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, item)
+}
+
+func (s *Server) handleGetReview(w http.ResponseWriter, r *http.Request) {
+	item, err := s.store.GetReview(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, item)
+}
 type createClosureRequest struct {
 	ID                   string `json:"closure_receipt_id"`
 	DeliveryReceiptID    string `json:"delivery_receipt_id"`
