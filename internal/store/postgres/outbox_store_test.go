@@ -155,8 +155,8 @@ func TestPostgresRecoveryAfterClaimAndOldEpochAfterCompletion(t *testing.T) {
 			if _, err := s.CompleteRecovery(recovery.Epoch, true); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := s.Dispatch(ctx, old.Lease(), risk, deliver); !errors.Is(err, outbox.ErrLeaseLost) {
-				t.Fatalf("expired pre-recovery lease resurrected: %v", err)
+			if _, err := s.Dispatch(ctx, old.Lease(), risk, deliver); !errors.Is(err, outbox.ErrRecoveryBlocked) {
+				t.Fatalf("old recovery epoch lease resurrected: %v", err)
 			}
 			if calls != 0 {
 				t.Fatal("blocked mutation handler ran")
