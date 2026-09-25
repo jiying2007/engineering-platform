@@ -81,7 +81,7 @@ func TestPinnedProviderRejectsExecutableByteDrift(t *testing.T) {
 
 func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 	data, err := MarshalQualification(QualificationReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:               1,
 		CLI:                         "codex-cli",
 		Version:                     QualifiedCodexVersion,
 		ReleaseTag:                  QualifiedCodexReleaseTag,
