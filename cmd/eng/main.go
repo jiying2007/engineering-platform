@@ -26,6 +26,26 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "offline-receipt-digest":
+		if err := offlineReceiptDigest(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "import-offline-evidence":
+		if err := importOfflineEvidence(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "git-change-manifest":
+		if err := gitChangeManifest(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "import-git-change-evidence":
+		if err := importGitChangeEvidence(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "capabilities":
 		printJSON(map[string]any{
 			"capabilities": embedded.Capabilities(),
@@ -79,6 +99,10 @@ func usage() {
 	fmt.Println("eng <command>")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
+	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
+	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
+	fmt.Println("  git-change-manifest <flags>              capture exact base/result Git tree provenance")
+	fmt.Println("  import-git-change-evidence <flags>       re-capture Git trees and register requirement-bound Evidence")
 	fmt.Println("  capabilities                         list embedded capabilities and skills")
 	fmt.Println("  route <task-type> <subsystem>       resolve explicit M1 capability/skill route")
 	fmt.Println("  material-check <manifest.json>      evaluate material readiness")

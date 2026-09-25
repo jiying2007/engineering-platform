@@ -239,3 +239,40 @@ func TestReviewerWorkerProfileSeparationIsCheckedAfterProfileParsing(t *testing.
 		t.Fatal("reviewer accepted worker profile authority")
 	}
 }
+
+func TestEngineeringEvidenceAuthoritiesAreDedicatedAndSeparated(t *testing.T) {
+	for _, tc := range []struct {
+		subject   string
+		issuer    string
+		procedure string
+	}{
+		{WorkerEvidenceImporterSubject, WorkerEvidenceIssuer, WorkerEvidenceProcedure},
+		{GitEvidenceImporterSubject, GitEvidenceIssuer, GitEvidenceProcedure},
+	} {
+		valid := PrincipalSpec{
+			Subject:            tc.subject,
+			Scope:              "platform",
+			Capabilities:       []string{Read, EvidenceRegister},
+			EvidenceIssuer:     tc.issuer,
+			EvidenceProcedures: []string{tc.procedure},
+		}
+		if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
+			t.Fatalf("dedicated evidence importer rejected: %v", err)
+		}
+		for _, mutate := range []func(*PrincipalSpec){
+			func(s *PrincipalSpec) { s.Subject = testSubject },
+			func(s *PrincipalSpec) { s.EvidenceIssuer = "other" },
+			func(s *PrincipalSpec) { s.EvidenceProcedures = []string{tc.procedure, "other"} },
+			func(s *PrincipalSpec) { s.Capabilities = append(s.Capabilities, RunControl) },
+			func(s *PrincipalSpec) { s.WorkerProfiles = []string{"worker/test"} },
+		} {
+			spec := valid
+			spec.Capabilities = append([]string(nil), valid.Capabilities...)
+			spec.EvidenceProcedures = append([]string(nil), valid.EvidenceProcedures...)
+			mutate(&spec)
+			if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{spec}}); err == nil {
+				t.Fatalf("reserved evidence authority escaped dedicated importer: %#v", spec)
+			}
+		}
+	}
+}
