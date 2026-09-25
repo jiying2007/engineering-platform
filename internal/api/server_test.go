@@ -255,8 +255,8 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 			"requirement_id": "req-1",
 			"issuer":         "ci",
 			"procedure":      "ci.test",
-			"result":      "PASS",
-			"applicable":  true,
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
