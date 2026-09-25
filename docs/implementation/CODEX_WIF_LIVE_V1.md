@@ -26,6 +26,15 @@ artifact. Its path must resolve without symlinks to an owner-private regular fil
 inside an owner-private directory. The token path must be outside the worktree and
 Runtime HOME. Errors never include token contents.
 
+Before any thread or model turn is created, the adapter calls the exact stable
+`account/rateLimits/read` RPC. Codex 0.155.0 resolves `AuthManager::auth().await`
+on that path, so a successful response proves that the host-owned WIF assertion
+has been exchanged without starting model/tool execution. The host then unlinks
+the assertion and requires the path to be absent before `thread/start`. The live
+receipt records `assertion_removed_before_turn=true`; missing that fence is
+invalid. A later refresh that requires the upstream assertion therefore fails
+closed instead of making the assertion readable to a model-reachable local tool.
+
 This follows Codex credential precedence rather than relying on fallback: the
 presence of either required WIF variable selects WIF, and incomplete WIF must be
 an error rather than silently trying another credential.
@@ -83,6 +92,11 @@ The prompt is fixed:
 
 `Reply with only: engineering-platform live qualification`
 
+The fixed credential-safe Codex HOME also disables the stable `shell_tool` and
+`view_image` features. This is defense in depth: assertion removal before the
+turn is the credential boundary; feature flags are not treated as a filesystem
+sandbox.
+
 The observer accepts a terminal result only when:
 
 - the matching turn reaches `completed`;
@@ -96,8 +110,8 @@ eventually deny them.
 
 The retained receipt includes the exact qualified binary digest, model input,
 federation rule ID, prompt digest, thread/turn IDs, terminal status and bounded
-model output + digest. It contains neither the identity token nor its filesystem
-path.
+model output + digest plus the assertion-removal fence. It contains neither the
+identity token nor its filesystem path.
 
 ## External prerequisite
 
