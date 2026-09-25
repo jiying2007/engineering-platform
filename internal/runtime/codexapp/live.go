@@ -36,6 +36,7 @@ type LiveReceipt struct {
 	OutputDigest               string `json:"output_digest"`
 	ApprovalRequests           int    `json:"approval_requests"`
 	UnexpectedToolUse          bool   `json:"unexpected_tool_use"`
+	AssertionRemovedBeforeTurn bool   `json:"assertion_removed_before_turn"`
 }
 
 type TurnObservation struct {
@@ -120,7 +121,8 @@ func ObserveTurn(ctx context.Context, adapter *Adapter, threadID, turnID string)
 
 // LiveWIFProbe performs exactly one read-only model turn using Codex workload
 // identity. It never accepts tool approvals and retains no token bytes or path.
-// The caller owns token freshness and removes the token after this call returns.
+// The host prewarms the WIF exchange and removes the upstream assertion before
+// any thread/model turn starts. The caller still owns directory cleanup.
 func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, ruleID, tokenFile, auditContext, model string) (LiveReceipt, error) {
 	var receipt LiveReceipt
 	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
@@ -130,6 +132,11 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err != nil {
 		return receipt, err
 	}
+	tokenPath, err := privateIdentityToken(tokenFile)
+	if err != nil {
+		return receipt, err
+	}
+	defer func() { _ = os.Remove(tokenPath) }()
 	versionHome, err := os.MkdirTemp("", "engineering-platform-codex-live-version-")
 	if err != nil {
 		return receipt, err
@@ -144,7 +151,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	env := []string{
 		"HOME=" + home,
 		"OPENAI_FEDERATION_RULE_ID=" + ruleID,
-		"OPENAI_IDENTITY_TOKEN_FILE=" + tokenFile,
+		"OPENAI_IDENTITY_TOKEN_FILE=" + tokenPath,
 	}
 	if auditContext != "" {
 		env = append(env, "OPENAI_WORKLOAD_IDENTITY_CONTEXT="+auditContext)
@@ -189,6 +196,16 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err := adapter.Initialize(probeCtx, "engineering-platform-codex-live-wif-v1"); err != nil {
 		return receipt, fmt.Errorf("initialize: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
 	}
+	if err := adapter.WarmWorkloadIdentity(probeCtx); err != nil {
+		return receipt, fmt.Errorf("workload identity prewarm: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	if err := os.Remove(tokenPath); err != nil {
+		return receipt, fmt.Errorf("remove workload identity assertion before model turn: %w", err)
+	}
+	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
+		return receipt, fmt.Errorf("workload identity assertion remained reachable before model turn")
+	}
+	assertionRemoved := true
 	threadID, err := adapter.StartThread(probeCtx, model)
 	if err != nil {
 		return receipt, fmt.Errorf("thread/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
@@ -229,12 +246,13 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		OutputDigest:               canonical.BytesDigest([]byte(observation.Output)),
 		ApprovalRequests:           observation.ApprovalRequests,
 		UnexpectedToolUse:          observation.UnexpectedToolUse,
+		AssertionRemovedBeforeTurn: assertionRemoved,
 	}
 	return receipt, receipt.Validate()
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse || !r.AssertionRemovedBeforeTurn {
 		return fmt.Errorf("invalid live qualification receipt")
 	}
 	return nil

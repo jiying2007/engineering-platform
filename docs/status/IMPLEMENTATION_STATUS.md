@@ -1,6 +1,6 @@
 # Implementation Status
 
-Reviewed base: `c817876c8c10fddebe21fc38d394fee944f66c47` (#37).
+Reviewed base: `d3bb6d591ee4b8b70e137d62d85fa3384109325e` (#40).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
 real Codex 0.155 qualification + retained Git/CI/artifact provenance + WIF-ready live-turn lane; no retained authenticated model-turn proof**.
 
@@ -35,7 +35,7 @@ Evidence/Verification/Delivery/Closure automatically.
 | Offline execution | Exact one-shot authorization; live Run/recovery/lease checks; pinned image+guard; real constrained container; bounded output and retained result | Offline/read-only only; trusted Worker/daemon/kernel; no VM/rootless qualification |
 | Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Interactive Action-Gateway approval lane not yet assembled |
 | Codex qualification | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Production/runtime pin lifecycle remains operator-owned |
-| Codex WIF live lane (this change) | Fail-closed WIF env/token-file boundary; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
+| Codex WIF live lane | Fail-closed WIF env/token-file boundary; authenticated prewarm exchange; upstream assertion must be deleted before thread/start; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
 | Action/recovery | Durable action ledger, authenticated grants, independent recovery-completion gate | Real privileged provider/effect boundary and completion verifier |
 | Engineering delivery | Frozen verification plus Delivery/Evidence/Closure contracts; exact Git/CI/artifact provenance envelope with GitHub and raw-binary digests | Import provenance into Run-bound Core Evidence, independent Review and Feature/Debug pilots |
 
@@ -50,7 +50,9 @@ Evidence/Verification/Delivery/Closure automatically.
   regression and mandatory real-container jobs.
 - #36 real Codex qualification: main `810d01c7e1c89efe22aa7c3c99bcbd2398b35380`; PR run `36088616108` and fresh-main run `36093348940` passed `go`, real container and real Codex qualification jobs. PR qualification artifact `10844861935` retained exact native/schema digests.
 - #37 trusted CI provenance: main `c817876c8c10fddebe21fc38d394fee944f66c47`; PR run `36095060443` and fresh-main run `36095388934` passed `go`, real container, real Codex and `trusted-ci-artifact-evidence`. Main retained binary artifact `10847815571`, Codex qualification `10847795311`, trusted evidence `10847531493`; main receipt digest `sha256:9db9637b40c0ce09c71348a9d17d7681fba1c8cdcb48e95b26b2b101cb6c6c01`.
-- This WIF change is accepted by ordinary CI only as implementation readiness. A real authenticated-model claim additionally requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
+- #38 WIF-ready lane merged as main `0d786e73f952412dda5853dc8be675451db6d549`; its first fresh-main run `36099892960` exposed a Docker cold-start timeout while Go and real Codex qualification passed.
+- #40 bounded Docker cold-start hotfix merged as main `d3bb6d591ee4b8b70e137d62d85fa3384109325e`; exact-head run `36101425449` and fresh-main run `36101773459` passed Go/PostgreSQL, 3x real-container, real Codex and trusted CI evidence.
+- This WIF assertion-removal follow-up is implementation hardening only. A real authenticated-model claim still requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
 
 The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
 platform executable, verifies the reported version, hashes the executable,
