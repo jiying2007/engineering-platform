@@ -7,6 +7,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -53,6 +54,9 @@ type Store interface {
 	CreateVerification(verification.Report) error
 	GetVerification(string) (verification.Report, error)
 
+	CreateReviewAndUpdateWork(review.Report, uint64, core.WorkItem) error
+	GetReview(string) (review.Report, error)
+
 	CreateClosureAndUpdateWork(core.ClosureReceipt, uint64, core.WorkItem) error
 	GetClosure(string) (core.ClosureReceipt, error)
 }
@@ -77,6 +81,7 @@ type Memory struct {
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
+	reviews             map[string]review.Report
 	closures            map[string]core.ClosureReceipt
 }
 
@@ -100,6 +105,7 @@ func NewMemory() *Memory {
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
 		verificationReports: make(map[string]verification.Report),
+		reviews:             make(map[string]review.Report),
 		closures:            make(map[string]core.ClosureReceipt),
 	}
 }
@@ -727,6 +733,59 @@ func (m *Memory) GetVerification(id string) (verification.Report, error) {
 		return verification.Report{}, ErrNotFound
 	}
 	return report, nil
+}
+
+func (m *Memory) CreateReviewAndUpdateWork(item review.Report, expectedWorkVersion uint64, work core.WorkItem) error {
+	if err := review.Validate(item); err != nil {
+		return ErrConflict
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.reviews[item.ID]; exists {
+		return ErrExists
+	}
+	delivery, ok := m.deliveries[item.DeliveryReceiptID]
+	if !ok {
+		return ErrNotFound
+	}
+	verificationReport, ok := m.verificationReports[item.VerificationReportID]
+	if !ok {
+		return ErrNotFound
+	}
+	currentWork, ok := m.works[delivery.WorkItemID]
+	if !ok {
+		return ErrNotFound
+	}
+	if currentWork.Version != expectedWorkVersion || currentWork.ID != work.ID ||
+		(currentWork.State != core.WorkVerifying && currentWork.State != core.WorkReviewing) {
+		return ErrConflict
+	}
+	if item.SubjectDigest != delivery.SubjectDigest ||
+		verificationReport.Result != "PASS" ||
+		verificationReport.DeliveryReceiptID != delivery.ID ||
+		verificationReport.SubjectDigest != delivery.SubjectDigest ||
+		item.Reviewer == verificationReport.Verifier ||
+		item.Reviewer == currentWork.HumanOwner ||
+		work.State != core.WorkReviewing {
+		return ErrConflict
+	}
+	work.Version = expectedWorkVersion + 1
+	m.reviews[item.ID] = item
+	m.works[work.ID] = work
+	return nil
+}
+
+func (m *Memory) GetReview(id string) (review.Report, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	item, ok := m.reviews[id]
+	if !ok {
+		return review.Report{}, ErrNotFound
+	}
+	item.Findings = append([]string(nil), item.Findings...)
+	return item, nil
 }
 
 func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
