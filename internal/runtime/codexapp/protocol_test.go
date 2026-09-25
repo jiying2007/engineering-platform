@@ -139,6 +139,32 @@ func TestMalformedFramesFailClosed(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationEmissionMetadataIsAcceptedButNeverCorrelates(t *testing.T) {
+	c, p := pair(t)
+	go func() {
+		_, _ = io.WriteString(p, "{"method":"thread/started","params":{},"emittedAtMs":1234}\n")
+	}()
+	select {
+	case event := <-c.Events():
+		if event.Kind != Notification || event.Message.EmittedAtMs == nil || *event.Message.EmittedAtMs != 1234 {
+			t.Fatalf("unexpected notification metadata: %#v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("notification metadata blocked")
+	}
+
+	for _, frame := range []string{
+		"{"id":1,"result":{},"emittedAtMs":1234}",
+		"{"id":1,"method":"approval/request","params":{},"emittedAtMs":1234}",
+		"{"method":"thread/started","params":{},"emittedAtMs":-1}",
+	} {
+		if _, err := decodeMessage([]byte(frame)); !errors.Is(err, ErrProtocol) {
+			t.Fatalf("invalid emittedAtMs envelope accepted: %s err=%v", frame, err)
+		}
+	}
+}
+
 func TestOversizedFrameFailsClosed(t *testing.T) {
 	c, p := pair(t)
 	go func() { _, _ = io.WriteString(p, strings.Repeat("x", MaxFrameBytes+1)+"\n") }()
