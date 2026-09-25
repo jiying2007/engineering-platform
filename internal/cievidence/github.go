@@ -27,8 +27,7 @@ type GitHubClient struct {
 
 func NewGitHubClient(token string) (*GitHubClient, error) {
 	token = strings.TrimSpace(token)
-	if strings.ContainsAny(token, "
-") || len(token) > 4096 {
+	if strings.ContainsAny(token, "\r\n") || len(token) > 4096 {
 		return nil, fmt.Errorf("invalid GitHub token")
 	}
 	base, _ := url.Parse("https://api.github.com")
@@ -145,8 +144,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 }
 
 func (c *GitHubClient) getJSON(ctx context.Context, requestPath string, dst any) error {
-	if c == nil || c.http == nil || !strings.HasPrefix(requestPath, "/repos/"+TrustedRepository+"/actions/") || strings.ContainsAny(requestPath, "
-#") {
+	if c == nil || c.http == nil || !strings.HasPrefix(requestPath, "/repos/"+TrustedRepository+"/actions/") || strings.ContainsAny(requestPath, "\r\n#") {
 		return fmt.Errorf("invalid GitHub API path")
 	}
 	u := *c.base
