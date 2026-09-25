@@ -74,6 +74,37 @@ func (a *Adapter) Initialize(ctx context.Context, version string) error {
 	a.mu.Unlock()
 	return nil
 }
+func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
+	if err := a.enter(ctx); err != nil {
+		return err
+	}
+	defer a.leave()
+	a.mu.Lock()
+	ready, thread, turn := a.initialized, a.thread, a.turn
+	a.mu.Unlock()
+	if !ready || thread != "" || turn != "" {
+		return ErrLifecycle
+	}
+	// account/rateLimits/read resolves AuthManager::auth().await in Codex 0.155.0.
+	// For workload identity this performs the assertion exchange without starting
+	// a thread, model turn, tool, or approval flow. Success is the deletion fence:
+	// the host may remove the upstream assertion before any model-reachable work.
+	var result struct {
+		RateLimits json.RawMessage `json:"rateLimits"`
+	}
+	if err := a.client.Call(ctx, "account/rateLimits/read", map[string]any{
+		"supportsLunaReserve":       false,
+		"excludeResetCreditDetails": true,
+	}, &result); err != nil {
+		return err
+	}
+	if len(result.RateLimits) == 0 || string(result.RateLimits) == "null" {
+		a.client.stop(ErrProtocol)
+		return ErrProtocol
+	}
+	return nil
+}
+
 func (a *Adapter) StartThread(ctx context.Context, model string) (string, error) {
 	if err := a.enter(ctx); err != nil {
 		return "", err
