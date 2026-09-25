@@ -24,6 +24,7 @@ type LiveReceipt struct {
 	CLI               string `json:"cli"`
 	Version           string `json:"version"`
 	BinaryDigest      string `json:"binary_digest"`
+	CredentialSafeConfigDigest string `json:"credential_safe_config_digest"`
 	CredentialMode    string `json:"credential_mode"`
 	FederationRuleID  string `json:"federation_rule_id"`
 	Model             string `json:"model"`
@@ -216,6 +217,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		CLI:               "codex-cli",
 		Version:           QualifiedCodexVersion,
 		BinaryDigest:      binaryDigest,
+		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:    "workload_identity",
 		FederationRuleID:  ruleID,
 		Model:             model,
@@ -232,7 +234,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
 		return fmt.Errorf("invalid live qualification receipt")
 	}
 	return nil
