@@ -194,3 +194,20 @@ func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
 		})
 	}
 }
+
+
+func TestRejectedCredentialConfigurationLeavesRuntimeHomeFresh(t *testing.T) {
+	p, spec := launchFixture(t)
+	home := strings.TrimPrefix(spec.Env[0], "HOME=")
+	spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID=idpm_incomplete")
+	if _, err := p.Command(context.Background(), spec); err == nil {
+		t.Fatal("incomplete workload identity accepted")
+	}
+	entries, err := os.ReadDir(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("rejected launch polluted runtime HOME: %#v", entries)
+	}
+}
