@@ -158,9 +158,15 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends bubblewrap
+          sudo apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils
           command -v bwrap
           bwrap --version
+          if [ -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict ]; then
+            sudo install -m 0644 \
+              /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+              /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
           bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
       - name: Qualify real stable app-server and generated protocol
         shell: bash
