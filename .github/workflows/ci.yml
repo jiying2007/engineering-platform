@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   go:
@@ -82,12 +83,34 @@ jobs:
         run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestOfflineStore
       - name: Vet
         run: go vet ./...
-      - name: Build binaries
+      - name: Build candidate binaries with raw-byte manifest
+        shell: bash
         run: |
-          go build ./cmd/control-plane
-          go build ./cmd/eng
-          go build ./cmd/worker
-          CGO_ENABLED=0 go build ./cmd/sandbox-guard
+          set -euo pipefail
+          dist="$RUNNER_TEMP/engineering-dist"
+          mkdir -p "$dist"
+          go build -trimpath -o "$dist/control-plane" ./cmd/control-plane
+          go build -trimpath -o "$dist/eng" ./cmd/eng
+          go build -trimpath -o "$dist/worker" ./cmd/worker
+          CGO_ENABLED=0 go build -trimpath -o "$dist/sandbox-guard" ./cmd/sandbox-guard
+          go build -trimpath -o "$dist/codex-qualifier" ./cmd/codex-qualifier
+          (
+            cd "$dist"
+            sha256sum codex-qualifier control-plane eng sandbox-guard worker > SHA256SUMS
+            : > file-manifest.ndjson
+            while read -r digest path; do
+              jq -cn --arg path "$path" --arg digest "sha256:$digest" --argjson size "$(stat -c%s "$path")"                 '{path:$path,digest:$digest,size:$size}' >> file-manifest.ndjson
+            done < SHA256SUMS
+            jq -s 'sort_by(.path)' file-manifest.ndjson > file-manifest.json
+            rm file-manifest.ndjson
+          )
+      - name: Retain candidate binary bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-binaries-${{ github.sha }}
+          path: ${{ runner.temp }}/engineering-dist
+          if-no-files-found: error
+          retention-days: 30
 
   offline:
     name: offline-container-integration
@@ -189,3 +212,76 @@ jobs:
             ${{ runner.temp }}/codex-npm-integrity.txt
           if-no-files-found: error
           retention-days: 30
+
+
+  evidence:
+    name: trusted-ci-artifact-evidence
+    needs: [go, offline, codex]
+    if: ${{ always() && needs.go.result == 'success' && needs.offline.result == 'success' && needs.codex.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Collect exact Git, CI and artifact facts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
+          curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
+
+          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==3 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
+          binary_id="$(jq -er '.artifacts[] | select(.name|startswith("engineering-binaries-")) | .id' "$RUNNER_TEMP/artifacts.json")"
+          codex_id="$(jq -er '.artifacts[] | select(.name|startswith("codex-0.155.0-qualification-")) | .id' "$RUNNER_TEMP/artifacts.json")"
+          test -n "$binary_id" -a -n "$codex_id"
+
+          curl -fsSL -L "${auth[@]}" "$api/actions/artifacts/$binary_id/zip" -o "$RUNNER_TEMP/binaries.zip"
+          mkdir "$RUNNER_TEMP/binaries"
+          unzip -q "$RUNNER_TEMP/binaries.zip" -d "$RUNNER_TEMP/binaries"
+          manifest="$(find "$RUNNER_TEMP/binaries" -type f -name file-manifest.json -print -quit)"
+          test -n "$manifest"
+          jq -e 'length==5 and all(.[]; (.digest|test("^sha256:[0-9a-f]{64}$")) and .size>0)' "$manifest" >/dev/null
+
+          jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
+          artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-0.155.0-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
+          files="$(jq -c '.' "$manifest")"
+          tested_sha="$(git rev-parse HEAD)"
+          event="$GITHUB_EVENT_NAME"
+          jq -n \
+            --argjson schema_version 1 \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg event "$event" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg tested_sha "$tested_sha" \
+            --arg base_sha "$BASE_SHA" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --argjson jobs "$jobs" \
+            --argjson artifacts "$artifacts" \
+            --argjson files "$files" \
+            '{schema_version:$schema_version,repository:$repository,workflow:$workflow,event:$event,source_sha:$source_sha,tested_sha:$tested_sha,base_sha:$base_sha,run_id:$run_id,run_attempt:$run_attempt,jobs:$jobs,artifacts:$artifacts,files:$files}' \
+            > "$RUNNER_TEMP/ci-evidence-raw.json"
+          if [ "$event" = push ]; then
+            jq 'del(.base_sha)' "$RUNNER_TEMP/ci-evidence-raw.json" > "$RUNNER_TEMP/ci-evidence-receipt.json"
+          else
+            cp "$RUNNER_TEMP/ci-evidence-raw.json" "$RUNNER_TEMP/ci-evidence-receipt.json"
+          fi
+          go run ./cmd/ci-evidence --input "$RUNNER_TEMP/ci-evidence-receipt.json" > "$RUNNER_TEMP/ci-evidence-envelope.json"
+          cat "$RUNNER_TEMP/ci-evidence-envelope.json"
+      - name: Retain verified CI evidence envelope
+        uses: actions/upload-artifact@v4
+        with:
+          name: trusted-ci-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-evidence-envelope.json
+          if-no-files-found: error
+          retention-days: 90
