@@ -147,7 +147,7 @@ type ClosureReceipt struct {
 	RunID                string    `json:"run_id"`
 	DeliveryReceiptID    string    `json:"delivery_receipt_id"`
 	VerificationReportID string    `json:"verification_report_id"`
-	ReviewReportID       string    `json:"review_report_id,omitempty"`
+	ReviewReportID       string    `json:"review_report_id"`
 	SubjectDigest        string    `json:"subject_digest"`
 	Result               string    `json:"result"`
 	CreatedAt            time.Time `json:"created_at"`
