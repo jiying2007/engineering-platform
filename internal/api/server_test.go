@@ -226,10 +226,56 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 		t.Fatalf("unexpected verification report: %#v", verificationReport)
 	}
 
+	// Verification alone cannot close work anymore.
+	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
+		"closure_receipt_id":     "closure-without-review",
+		"delivery_receipt_id":    "delivery-f",
+		"verification_report_id": "vr-f",
+	}, http.StatusBadRequest)
+
+	for _, reviewer := range []string{"verification-service", "owner"} {
+		mustRequest(t, h, http.MethodPost, "/api/v1/reviews", map[string]any{
+			"review_report_id":       "review-denied-" + reviewer,
+			"delivery_receipt_id":    "delivery-f",
+			"verification_report_id": "vr-f",
+			"reviewer":               reviewer,
+			"result":                 "PASS",
+		}, http.StatusUnprocessableEntity)
+	}
+
+	reviewBody := mustRequest(t, h, http.MethodPost, "/api/v1/reviews", map[string]any{
+		"review_report_id":       "review-f",
+		"delivery_receipt_id":    "delivery-f",
+		"verification_report_id": "vr-f",
+		"reviewer":               "independent-reviewer",
+		"result":                 "PASS",
+		"known_limits":           []string{"host remains trusted"},
+	}, http.StatusCreated)
+	var reviewReport struct {
+		Result               string `json:"result"`
+		SubjectDigest        string `json:"subject_digest"`
+		DeliveryReceiptID    string `json:"delivery_receipt_id"`
+		VerificationReportID string `json:"verification_report_id"`
+	}
+	mustJSON(t, reviewBody, &reviewReport)
+	if reviewReport.Result != "PASS" ||
+		reviewReport.SubjectDigest != delivery.SubjectDigest ||
+		reviewReport.DeliveryReceiptID != delivery.ID ||
+		reviewReport.VerificationReportID != "vr-f" {
+		t.Fatalf("unexpected review report: %#v", reviewReport)
+	}
+	reviewingBody := mustRequest(t, h, http.MethodGet, "/api/v1/work-items/work-f", nil, http.StatusOK)
+	var reviewing core.WorkItem
+	mustJSON(t, reviewingBody, &reviewing)
+	if reviewing.State != core.WorkReviewing {
+		t.Fatalf("expected REVIEWING work, got %s", reviewing.State)
+	}
+
 	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
 		"closure_receipt_id":     "closure-f",
 		"delivery_receipt_id":    "delivery-f",
 		"verification_report_id": "vr-f",
+		"review_report_id":       "review-f",
 	}, http.StatusCreated)
 
 	workBody := mustRequest(t, h, http.MethodGet, "/api/v1/work-items/work-f", nil, http.StatusOK)
@@ -293,6 +339,7 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 		"closure_receipt_id":     "closure-fail",
 		"delivery_receipt_id":    delivery.ID,
 		"verification_report_id": "vr-fail",
+		"review_report_id":       "review-fail",
 	}, http.StatusUnprocessableEntity)
 }
 
