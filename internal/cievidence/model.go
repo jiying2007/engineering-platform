@@ -80,7 +80,7 @@ func (r Receipt) Validate() error {
 	requiredJobs := map[string]bool{
 		"go":                                     false,
 		"offline-container-integration":          false,
-		"postgres-authority-restore-drill":         false,
+		"postgres-authority-restore-drill":       false,
 		"codex-app-server-0.155.0-qualification": false,
 	}
 	last := ""
