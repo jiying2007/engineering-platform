@@ -196,11 +196,10 @@ func TestIndependentReviewerCapabilitySeparation(t *testing.T) {
 	}
 }
 
-
 func TestRecoveryReconcilerIsSeparatedFromCompletionAndExecution(t *testing.T) {
 	valid := PrincipalSpec{
-		Subject: "urn:engineering-platform:operator:reconciler",
-		Scope: "platform",
+		Subject:      "urn:engineering-platform:operator:reconciler",
+		Scope:        "platform",
 		Capabilities: []string{Read, RecoveryReconcile},
 	}
 	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
@@ -231,9 +230,9 @@ func TestRecoveryReconcilerIsSeparatedFromCompletionAndExecution(t *testing.T) {
 
 func TestReviewerWorkerProfileSeparationIsCheckedAfterProfileParsing(t *testing.T) {
 	spec := PrincipalSpec{
-		Subject: "urn:engineering-platform:reviewer:worker-leak",
-		Scope: "platform",
-		Capabilities: []string{Read, ReviewCreate},
+		Subject:        "urn:engineering-platform:reviewer:worker-leak",
+		Scope:          "platform",
+		Capabilities:   []string{Read, ReviewCreate},
 		WorkerProfiles: []string{"worker/test"},
 	}
 	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{spec}}); err == nil {
