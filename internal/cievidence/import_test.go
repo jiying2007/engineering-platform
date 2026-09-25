@@ -152,7 +152,7 @@ func TestVerifyTrustedImportProducesRequirementBoundEvidence(t *testing.T) {
 }
 
 func TestVerifyTrustedImportFailsClosedOnAuthorityDrift(t *testing.T) {
-	for _, kind := range []string{"commit", "job", "artifact", "delivery-artifact", "subject", "expired"} {
+	for _, kind := range []string{"commit", "job", "duplicate-job", "artifact", "delivery-artifact", "subject", "expired"} {
 		t.Run(kind, func(t *testing.T) {
 			req := fixtureImport(t)
 			switch kind {
@@ -160,6 +160,8 @@ func TestVerifyTrustedImportFailsClosedOnAuthorityDrift(t *testing.T) {
 				req.Live.Run.HeadSHA = strings.Repeat("c", 40)
 			case "job":
 				req.Live.Jobs[1].Conclusion = "failure"
+			case "duplicate-job":
+				req.Live.Jobs = append(req.Live.Jobs, req.Live.Jobs[1])
 			case "artifact":
 				req.Live.Artifacts[0].Digest = "sha256:" + strings.Repeat("f", 64)
 			case "delivery-artifact":
