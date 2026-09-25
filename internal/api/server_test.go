@@ -354,11 +354,12 @@ func TestFailedIndependentReviewStaysVerifyingAndCannotClose(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-review-fail",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "PASS",
-			"applicable":  true,
+			"evidence_id":    "ev-review-fail",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 	mustRequest(t, h, http.MethodPost, "/api/v1/verifications", map[string]any{
