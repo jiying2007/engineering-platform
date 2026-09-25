@@ -835,13 +835,32 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.DeliveryReceiptID == "" || req.Evidence.ID == "" || req.Evidence.Issuer == "" || req.Evidence.Procedure == "" || req.Evidence.Result == "" {
-		writeError(w, http.StatusBadRequest, "delivery_receipt_id, evidence_id, issuer, procedure and result are required")
+	if req.DeliveryReceiptID == "" || req.Evidence.ID == "" || req.Evidence.RequirementID == "" || req.Evidence.Issuer == "" || req.Evidence.Procedure == "" || req.Evidence.Result == "" {
+		writeError(w, http.StatusBadRequest, "delivery_receipt_id, evidence_id, requirement_id, issuer, procedure and result are required")
 		return
 	}
 	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
 	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	task, err := s.store.GetTaskByDigest(delivery.TaskContractDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	plan, err := s.store.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	requirement, ok := verification.FindRequirement(plan, req.Evidence.RequirementID)
+	if !ok {
+		writeError(w, http.StatusUnprocessableEntity, "evidence requirement_id is not present in the frozen verification plan")
+		return
+	}
+	if req.Evidence.Procedure != requirement.Procedure || (requirement.Issuer != "" && req.Evidence.Issuer != requirement.Issuer) {
+		writeError(w, http.StatusUnprocessableEntity, "evidence issuer/procedure does not match the frozen verification requirement")
 		return
 	}
 	item := req.Evidence
