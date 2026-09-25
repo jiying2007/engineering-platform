@@ -260,4 +260,3 @@ func TestBinaryManifestMustMatchEnvelopeFacts(t *testing.T) {
 		t.Fatal("mismatched binary manifest accepted")
 	}
 }
-
