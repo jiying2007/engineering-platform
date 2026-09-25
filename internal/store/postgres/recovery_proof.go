@@ -31,6 +31,17 @@ func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 			return recovery.Facts{}, err
 		}
 	}
+	var codexReady bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM core_schema_migrations WHERE version=8)`).Scan(&codexReady); err != nil {
+		return recovery.Facts{}, err
+	}
+	if codexReady {
+		var codexUnresolved uint64
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM worker_codex_executions WHERE state IN ('AUTHORIZED','UNKNOWN')`).Scan(&codexUnresolved); err != nil {
+			return recovery.Facts{}, err
+		}
+		facts.OfflineUnresolved += codexUnresolved
+	}
 	return facts, nil
 }
 
