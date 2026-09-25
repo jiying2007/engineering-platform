@@ -98,12 +98,16 @@ func FindRequirement(plan Plan, id string) (EvidenceRequirement, bool) {
 	return EvidenceRequirement{}, false
 }
 
-func EvidenceMatchesRequirement(plan Plan, item core.EvidenceRef) bool {
-	requirement, ok := FindRequirement(plan, item.RequirementID)
-	if !ok || item.Procedure != requirement.Procedure {
+func EvidenceMatchesRequirement(requirement EvidenceRequirement, item core.EvidenceRef) bool {
+	if requirement.ID == "" || item.RequirementID != requirement.ID || item.Procedure != requirement.Procedure {
 		return false
 	}
 	return requirement.Issuer == "" || item.Issuer == requirement.Issuer
+}
+
+func EvidenceMatchesPlan(plan Plan, item core.EvidenceRef) bool {
+	requirement, ok := FindRequirement(plan, item.RequirementID)
+	return ok && EvidenceMatchesRequirement(requirement, item)
 }
 
 func Evaluate(plan Plan, subjectDigest string, evidence []core.EvidenceRef) Report {
@@ -153,7 +157,7 @@ func requirementSatisfied(requirement EvidenceRequirement, subjectDigest string,
 		if !item.Applicable || item.SubjectDigest != subjectDigest || item.Result != "PASS" {
 			continue
 		}
-		if !EvidenceMatchesRequirement(Plan{Criteria: []Criterion{{Requirements: []EvidenceRequirement{requirement}}}}, item) {
+		if !EvidenceMatchesRequirement(requirement, item) {
 			continue
 		}
 		return true
