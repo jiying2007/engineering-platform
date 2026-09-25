@@ -7,6 +7,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -53,6 +54,9 @@ type Store interface {
 	CreateVerification(verification.Report) error
 	GetVerification(string) (verification.Report, error)
 
+	CreateReviewAndUpdateWork(review.Report, uint64, core.WorkItem) error
+	GetReview(string) (review.Report, error)
+
 	CreateClosureAndUpdateWork(core.ClosureReceipt, uint64, core.WorkItem) error
 	GetClosure(string) (core.ClosureReceipt, error)
 }
@@ -77,6 +81,8 @@ type Memory struct {
 	deliveries          map[string]core.DeliveryReceipt
 	evidence            map[string]core.EvidenceRef
 	verificationReports map[string]verification.Report
+	reviewReports       map[string]review.Report
+	reviewByVerification map[string]string
 	closures            map[string]core.ClosureReceipt
 }
 
@@ -99,7 +105,9 @@ func NewMemory() *Memory {
 		actionIdempotency:   make(map[string]string),
 		deliveries:          make(map[string]core.DeliveryReceipt),
 		evidence:            make(map[string]core.EvidenceRef),
-		verificationReports: make(map[string]verification.Report),
+		verificationReports:  make(map[string]verification.Report),
+		reviewReports:        make(map[string]review.Report),
+		reviewByVerification: make(map[string]string),
 		closures:            make(map[string]core.ClosureReceipt),
 	}
 }
@@ -711,6 +719,64 @@ func (m *Memory) GetVerification(id string) (verification.Report, error) {
 	return report, nil
 }
 
+func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion uint64, work core.WorkItem) error {
+	if err := report.Validate(); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.reviewReports[report.ID]; ok {
+		return ErrExists
+	}
+	if _, ok := m.reviewByVerification[report.VerificationReportID]; ok {
+		return ErrExists
+	}
+	verificationReport, ok := m.verificationReports[report.VerificationReportID]
+	if !ok {
+		return ErrNotFound
+	}
+	delivery, ok := m.deliveries[report.DeliveryReceiptID]
+	if !ok {
+		return ErrNotFound
+	}
+	current, ok := m.works[work.ID]
+	if !ok {
+		return ErrNotFound
+	}
+	if current.Version != expectedVersion ||
+		current.State != core.WorkVerifying ||
+		work.State != core.WorkReviewing ||
+		current.ID != delivery.WorkItemID ||
+		current.ActiveRunID != delivery.RunID ||
+		current.ActiveTaskContractDigest != delivery.TaskContractDigest ||
+		work.ActiveRunID != current.ActiveRunID ||
+		work.ActiveTaskContractDigest != current.ActiveTaskContractDigest ||
+		report.TaskContractDigest != delivery.TaskContractDigest ||
+		report.SubjectDigest != delivery.SubjectDigest ||
+		verificationReport.Result != "PASS" ||
+		verificationReport.DeliveryReceiptID != delivery.ID ||
+		verificationReport.SubjectDigest != delivery.SubjectDigest ||
+		report.Reviewer == verificationReport.Verifier ||
+		report.Reviewer == current.HumanOwner {
+		return ErrConflict
+	}
+	work.Version = expectedVersion + 1
+	m.reviewReports[report.ID] = report
+	m.reviewByVerification[report.VerificationReportID] = report.ID
+	m.works[work.ID] = work
+	return nil
+}
+
+func (m *Memory) GetReview(id string) (review.Report, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	report, ok := m.reviewReports[id]
+	if !ok {
+		return review.Report{}, ErrNotFound
+	}
+	return report, nil
+}
+
 func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -721,7 +787,22 @@ func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVe
 	if !ok {
 		return ErrNotFound
 	}
-	if current.Version != expectedVersion {
+	report, ok := m.reviewReports[item.ReviewReportID]
+	if !ok {
+		return ErrNotFound
+	}
+	if current.Version != expectedVersion ||
+		current.State != core.WorkReviewing ||
+		work.State != core.WorkClosed ||
+		report.Result != review.ResultPass ||
+		report.DeliveryReceiptID != item.DeliveryReceiptID ||
+		report.VerificationReportID != item.VerificationReportID ||
+		report.TaskContractDigest != item.TaskContractDigest ||
+		report.SubjectDigest != item.SubjectDigest ||
+		current.ActiveRunID != item.RunID ||
+		current.ActiveTaskContractDigest != item.TaskContractDigest ||
+		work.ActiveRunID != current.ActiveRunID ||
+		work.ActiveTaskContractDigest != current.ActiveTaskContractDigest {
 		return ErrConflict
 	}
 	work.Version = expectedVersion + 1
