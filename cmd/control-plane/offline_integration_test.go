@@ -31,8 +31,8 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
-// This is actual local Git + mTLS + PostgreSQL + compiled Worker/eng + a real
-// constrained container. Its computation is a fixture, not Codex/model evidence.
+// Actual local Git, mTLS, PostgreSQL, compiled Worker/eng and real container.
+// The computation is a fixture, not Codex/model evidence.
 func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	image := testutil.Build(t)
 	url := os.Getenv("POSTGRES_TEST_URL")
@@ -153,7 +153,7 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	task := post("/api/v1/task-contracts", map[string]any{
 		"contract":  map[string]any{"task_contract_id": "offline-task", "work_item_id": "offline-work", "task_type": "FEATURE", "allowed_actions": []string{offline.Action}},
 		"material":  map[string]any{"repository": "fixture", "base_commit": commit, "target_id": "target", "acceptance_criteria": []string{"offline check"}},
-		"subsystem": "driver", "verification_plan": map[string]any{"verification_plan_id": "offline-plan", "criteria": []any{map[string]any{"criterion_id": "ac", "statement": "check", "evidence_requirements": []any{map[string]any{"requirement_id": "req", "procedure": "ci.test"}}}}},
+		"subsystem": "driver", "verification_plan": map[string]any{"verification_plan_id": "offline-plan", "criteria": []any{map[string]any{"criterion_id": "ac", "statement": "offline check", "evidence_requirements": []any{map[string]any{"requirement_id": "req", "procedure": "ci.test"}}}}},
 	})
 	var td string
 	commandOK(t, json.Unmarshal(task["digest"], &td))
@@ -213,7 +213,6 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 		cmd.Env = execEnv
 		return cmd.CombinedOutput()
 	}
-	// Same image, different command is denied by the exact server grant before reservation.
 	denied := profile
 	denied.Argv = []string{"/probe", "sleep"}
 	config["profile"] = denied

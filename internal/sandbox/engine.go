@@ -1,7 +1,6 @@
 package sandbox
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -69,37 +68,7 @@ func New(socket, guard string) (*Engine, error) {
 	return &Engine{guard: guard, guardDigest: Hash(data), transport: t, client: &http.Client{Transport: t, Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return ErrPolicy }}}, nil
 }
 func (e *Engine) Close() { e.transport.CloseIdleConnections() }
-func (e *Engine) call(ctx context.Context, method, p string, body any, max int) ([]byte, int, error) {
-	var input []byte
-	var err error
-	if body != nil {
-		input, err = json.Marshal(body)
-		if err != nil {
-			return nil, 0, err
-		}
-	}
-	req, err := http.NewRequestWithContext(ctx, method, "http://docker"+apiVersion+p, bytes.NewReader(input))
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := e.client.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer res.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(res.Body, int64(max)+1))
-	if err != nil {
-		return nil, res.StatusCode, err
-	}
-	if len(data) > max {
-		return nil, res.StatusCode, ErrPolicy
-	}
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, res.StatusCode, fmt.Errorf("engine %s returned HTTP %d", method, res.StatusCode)
-	}
-	return data, res.StatusCode, nil
-}
+
 func canonicalDir(p string) error {
 	if !filepath.IsAbs(p) || filepath.Clean(p) != p || strings.ContainsAny(p, "\x00\n\r") {
 		return ErrPolicy
@@ -153,7 +122,6 @@ func (e *Engine) Ready(ctx context.Context, p Profile) error {
 	if json.Unmarshal(data, &image) != nil || image.ID != p.Image || len(image.Config.Volumes) > 0 {
 		return ErrPolicy
 	}
-	// Image ENV is merged by Docker: reject anything not overridden below.
 	for _, env := range image.Config.Env {
 		k, _, ok := strings.Cut(env, "=")
 		if !ok || (k != "PATH" && k != "HOME" && k != "LANG" && k != "TMPDIR") {
@@ -164,8 +132,7 @@ func (e *Engine) Ready(ctx context.Context, p Profile) error {
 }
 
 // Run never mounts a writable host directory. Engine/kernel/image/guard and host
-// parents are trusted. Cancellation kills/removes the exact created container;
-// if that cannot be confirmed no successful Result is returned.
+// parents are trusted. Unknown cleanup cannot produce a successful Result.
 func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (result Result, err error) {
 	if err = e.Ready(ctx, p); err != nil {
 		return result, err
@@ -186,7 +153,6 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 	}
 	user := strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	config := map[string]any{"Image": p.Image, "Entrypoint": []string{"/ep-guard"}, "Cmd": append([]string{strconv.Itoa(p.Seconds)}, p.Argv...), "User": user, "WorkingDir": "/workspace", "Env": []string{"PATH=/usr/bin:/bin", "HOME=/tmp", "LANG=C", "TMPDIR=/tmp"}, "NetworkDisabled": true, "Tty": false, "OpenStdin": false, "Labels": map[string]string{"engineering-platform.offline": owner}, "Healthcheck": map[string]any{"Test": []string{"NONE"}}, "HostConfig": map[string]any{"NetworkMode": "none", "ReadonlyRootfs": true, "CapDrop": []string{"ALL"}, "SecurityOpt": []string{"no-new-privileges:true"}, "Memory": 256 << 20, "MemorySwap": 256 << 20, "NanoCpus": 1_000_000_000, "PidsLimit": 64, "IpcMode": "private", "ShmSize": 8 << 20, "RestartPolicy": map[string]any{"Name": "no"}, "LogConfig": map[string]any{"Type": "local", "Config": map[string]string{"max-size": "1m", "max-file": "1"}}, "Tmpfs": map[string]string{"/tmp": "rw,nosuid,nodev,noexec,size=67108864,mode=1777"}, "Mounts": []any{mount(source, "/workspace"), mount(bundle, "/context"), mount(e.guard, "/ep-guard")}}}
-	// Unique name lets cleanup address a create whose HTTP response was lost.
 	name := "ep-offline-" + owner
 	created := false
 	defer func() {
