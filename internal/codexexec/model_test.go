@@ -1,6 +1,7 @@
 package codexexec
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -28,21 +29,13 @@ func contractFixture(t *testing.T) (Profile, Permit) {
 	a := workerqueue.Assignment{Token:wt,LeaseUntil:time.Unix(100,0),Intent:intent,IntentDigest:intentDigest,Input:input,Task:task}
 	validation, err := workerqueue.Validate(a); if err != nil { t.Fatal(err) }
 	manifest := contextbundle.Manifest{SchemaVersion:1,RunInputDigest:id}
-	rawDigest := canonical.BytesDigest([]byte(`{"schema_version":1,"run_input_manifest_digest":"`+id+`","entries":null}`))
-	// Marshal rather than rely on hand formatting if the manifest representation changes.
-	if got, err := canonical.Digest(manifest); err == nil && got == "" { t.Fatal("unreachable", got) }
-	_ = rawDigest
-	manifestRaw, err := canonicalJSON(manifest); if err != nil { t.Fatal(err) }
+	manifestRaw, err := json.Marshal(manifest); if err != nil { t.Fatal(err) }
 	bundleDigest := canonical.BytesDigest(manifestRaw)
 	facts := preparation.Facts{Version:1,IntentDigest:intentDigest,InputDigest:id,TaskDigest:td,ApprovalDigest:"sha256:"+strings.Repeat("3",64),BaseCommit:task.BaseCommit,TreeCommit:strings.Repeat("4",40),WorkspaceRecipe:workspace.Recipe,SourceDigest:"sha256:"+strings.Repeat("5",64),ConfigDigest:"sha256:"+strings.Repeat("6",64),BundleDigest:bundleDigest,Context:manifest}
 	fd, err := canonical.Digest(facts); if err != nil { t.Fatal(err) }
 	worker := "urn:engineering-platform:worker:codex"
 	prep := preparation.Receipt{Kind:preparation.Kind,Admission:workerqueue.Receipt{Token:wt,Worker:worker,Kind:workerqueue.Validated,Validation:validation,ReceivedAt:time.Unix(10,0)},Facts:facts,FactsDigest:fd,ReceivedAt:time.Unix(11,0)}
 	return p, Permit{Token:Token{ID:strings.Repeat("d",64),RunID:"run",WorkerProfile:"worker/codex",ProfileDigest:pd},Assignment:a,Preparation:prep,Profile:p,LeaseUntil:time.Unix(200,0)}
-}
-
-func canonicalJSON(v any) ([]byte,error) {
-	return json.Marshal(v)
 }
 
 func TestProfileAndAssignmentAreExact(t *testing.T) {
