@@ -677,6 +677,24 @@ func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
 	if _, ok := m.evidence[item.ID]; ok {
 		return ErrExists
 	}
+	delivery, ok := m.deliveries[item.DeliveryReceiptID]
+	if !ok {
+		return ErrNotFound
+	}
+	if item.SubjectDigest != delivery.SubjectDigest {
+		return ErrConflict
+	}
+	task, ok := m.tasksByDigest[delivery.TaskContractDigest]
+	if !ok {
+		return ErrNotFound
+	}
+	plan, ok := m.verificationPlans[task.VerificationPlanDigest]
+	if !ok {
+		return ErrNotFound
+	}
+	if !verification.EvidenceMatchesPlan(plan, item) {
+		return ErrConflict
+	}
 	m.evidence[item.ID] = item
 	return nil
 }
