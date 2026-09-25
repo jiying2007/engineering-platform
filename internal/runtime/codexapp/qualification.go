@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
 const (
@@ -26,25 +26,25 @@ const (
 )
 
 type QualificationReceipt struct {
-	SchemaVersion               int    `json:"schema_version"`
-	CLI                         string `json:"cli"`
-	Version                     string `json:"version"`
-	ReleaseTag                  string `json:"release_tag"`
-	ReleaseCommit               string `json:"release_commit"`
-	BinaryDigest                string `json:"binary_digest"`
-	StableSchemaDigest          string `json:"stable_schema_digest"`
-	ExperimentalSchemaDigest    string `json:"experimental_schema_digest"`
-	Transport                   string `json:"transport"`
-	FreshProcess                bool   `json:"fresh_process"`
-	ManagedDaemon               bool   `json:"managed_daemon"`
-	PerThreadConfigOverride     bool   `json:"per_thread_config_override"`
-	InitializePassed            bool   `json:"initialize_passed"`
-	ThreadStartPassed           bool   `json:"thread_start_passed"`
-	ThreadStartModel            string `json:"thread_start_model"`
-	StableSchemaContractChecked bool   `json:"stable_schema_contract_checked"`
-	ExperimentalSurfaceChecked  bool   `json:"experimental_surface_checked"`
-	CredentialSafeConfigDigest  string `json:"credential_safe_config_digest"`
-	CredentialSafeProfileChecked bool `json:"credential_safe_profile_checked"`
+	SchemaVersion                int    `json:"schema_version"`
+	CLI                          string `json:"cli"`
+	Version                      string `json:"version"`
+	ReleaseTag                   string `json:"release_tag"`
+	ReleaseCommit                string `json:"release_commit"`
+	BinaryDigest                 string `json:"binary_digest"`
+	StableSchemaDigest           string `json:"stable_schema_digest"`
+	ExperimentalSchemaDigest     string `json:"experimental_schema_digest"`
+	Transport                    string `json:"transport"`
+	FreshProcess                 bool   `json:"fresh_process"`
+	ManagedDaemon                bool   `json:"managed_daemon"`
+	PerThreadConfigOverride      bool   `json:"per_thread_config_override"`
+	InitializePassed             bool   `json:"initialize_passed"`
+	ThreadStartPassed            bool   `json:"thread_start_passed"`
+	ThreadStartModel             string `json:"thread_start_model"`
+	StableSchemaContractChecked  bool   `json:"stable_schema_contract_checked"`
+	ExperimentalSurfaceChecked   bool   `json:"experimental_surface_checked"`
+	CredentialSafeConfigDigest   string `json:"credential_safe_config_digest"`
+	CredentialSafeProfileChecked bool   `json:"credential_safe_profile_checked"`
 }
 
 // Qualify exercises a real Codex binary without making a model turn. It verifies
@@ -171,24 +171,24 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	_ = cmd.Wait()
 
 	receipt = QualificationReceipt{
-		SchemaVersion:               1,
-		CLI:                         "codex-cli",
-		Version:                     expectedVersion,
-		ReleaseTag:                  QualifiedCodexReleaseTag,
-		ReleaseCommit:               QualifiedCodexReleaseCommit,
-		BinaryDigest:                digest,
-		StableSchemaDigest:          stableDigest,
-		ExperimentalSchemaDigest:    experimentalDigest,
-		Transport:                   "stdio",
-		FreshProcess:                true,
-		ManagedDaemon:               false,
-		PerThreadConfigOverride:     false,
-		InitializePassed:            true,
-		ThreadStartPassed:           true,
-		ThreadStartModel:            model,
-		StableSchemaContractChecked: true,
-		ExperimentalSurfaceChecked:  true,
-		CredentialSafeConfigDigest:  canonical.BytesDigest([]byte(credentialSafeConfig)),
+		SchemaVersion:                1,
+		CLI:                          "codex-cli",
+		Version:                      expectedVersion,
+		ReleaseTag:                   QualifiedCodexReleaseTag,
+		ReleaseCommit:                QualifiedCodexReleaseCommit,
+		BinaryDigest:                 digest,
+		StableSchemaDigest:           stableDigest,
+		ExperimentalSchemaDigest:     experimentalDigest,
+		Transport:                    "stdio",
+		FreshProcess:                 true,
+		ManagedDaemon:                false,
+		PerThreadConfigOverride:      false,
+		InitializePassed:             true,
+		ThreadStartPassed:            true,
+		ThreadStartModel:             model,
+		StableSchemaContractChecked:  true,
+		ExperimentalSurfaceChecked:   true,
+		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialSafeProfileChecked: true,
 	}
 	return receipt, nil
