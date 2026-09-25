@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
@@ -74,7 +75,7 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			return nil, fmt.Errorf("duplicate runtime environment key")
 		}
 		switch key {
-		case "HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL":
+		case "HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_FEDERATION_RULE_ID", "OPENAI_IDENTITY_TOKEN_FILE", "OPENAI_WORKLOAD_IDENTITY_CONTEXT":
 		default:
 			return nil, fmt.Errorf("runtime environment key is not allowlisted")
 		}
@@ -106,9 +107,51 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			return nil, fmt.Errorf("initialize isolated runtime home: %w", err)
 		}
 	}
+	wifRule, hasRule := values["OPENAI_FEDERATION_RULE_ID"]
+	wifToken, hasToken := values["OPENAI_IDENTITY_TOKEN_FILE"]
+	wifContext, hasContext := values["OPENAI_WORKLOAD_IDENTITY_CONTEXT"]
+	if hasRule != hasToken {
+		return nil, fmt.Errorf("workload identity requires both federation rule and identity token file")
+	}
+	if hasContext && !hasRule {
+		return nil, fmt.Errorf("workload identity context requires workload identity")
+	}
+	if hasRule {
+		if _, hasAPIKey := values["OPENAI_API_KEY"]; hasAPIKey {
+			return nil, fmt.Errorf("workload identity cannot carry a long-lived API key")
+		}
+		if _, hasBase := values["OPENAI_BASE_URL"]; hasBase {
+			return nil, fmt.Errorf("workload identity cannot override the OpenAI endpoint")
+		}
+		if !validFederationRuleID(wifRule) {
+			return nil, fmt.Errorf("invalid workload identity federation rule")
+		}
+		tokenPath, err := privateIdentityToken(wifToken)
+		if err != nil {
+			return nil, err
+		}
+		if inside(work, tokenPath) || inside(home, tokenPath) {
+			return nil, fmt.Errorf("identity token must be outside runtime workspace and HOME")
+		}
+		values["OPENAI_IDENTITY_TOKEN_FILE"] = tokenPath
+		if hasContext {
+			if len(wifContext) > 4096 || strictjson.ValidateObject([]byte(wifContext)) != nil {
+				return nil, fmt.Errorf("invalid workload identity audit context")
+			}
+		}
+	}
 	env := []string{"PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "TZ=UTC", "HOME=" + home, "CODEX_HOME=" + filepath.Join(home, ".codex"), "XDG_CONFIG_HOME=" + filepath.Join(home, ".config"), "XDG_CACHE_HOME=" + filepath.Join(home, ".cache")}
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
+	}
+	if hasRule {
+		env = append(env,
+			"OPENAI_FEDERATION_RULE_ID="+wifRule,
+			"OPENAI_IDENTITY_TOKEN_FILE="+values["OPENAI_IDENTITY_TOKEN_FILE"],
+		)
+		if hasContext {
+			env = append(env, "OPENAI_WORKLOAD_IDENTITY_CONTEXT="+wifContext)
+		}
 	}
 	if base, ok := values["OPENAI_BASE_URL"]; ok {
 		u, e := url.Parse(base)
@@ -124,6 +167,36 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	cmd.Dir = work
 	cmd.Env = env
 	return cmd, nil
+}
+
+
+func validFederationRuleID(value string) bool {
+	if !strings.HasPrefix(value, "idpm_") || len(value) < 6 || len(value) > 256 {
+		return false
+	}
+	for _, ch := range value {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-') {
+			return false
+		}
+	}
+	return true
+}
+
+func privateIdentityToken(path string) (string, error) {
+	resolved, err := canonicalPath(path, false)
+	if err != nil {
+		return "", fmt.Errorf("identity token path: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < 16 || info.Size() > 1<<20 {
+		return "", fmt.Errorf("identity token must be a bounded owner-private regular file")
+	}
+	parent := filepath.Dir(resolved)
+	parentInfo, err := os.Stat(parent)
+	if err != nil || !parentInfo.IsDir() || parentInfo.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("identity token parent must be owner-private")
+	}
+	return resolved, nil
 }
 
 func executableDigest(path string) (string, error) {
