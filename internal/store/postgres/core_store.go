@@ -161,6 +161,9 @@ func (s *Store) CreateTaskAndUpdateWork(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	if !verification.ValidatePlan(plan, task.AcceptanceCriteria) {
+		return corestore.ErrConflict
+	}
 	taskDigest, err := task.Digest()
 	if err != nil {
 		return err
