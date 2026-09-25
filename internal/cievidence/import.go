@@ -184,15 +184,18 @@ func verifyLiveFacts(envelope Envelope, live LiveFacts, resultCommit string) err
 		return fmt.Errorf("live GitHub jobs missing")
 	}
 	for _, expected := range r.Jobs {
-		found := false
+		matches := 0
 		for _, actual := range jobs {
-			if actual.Name == expected.Name && actual.ID == expected.ID && actual.Conclusion == "success" {
-				found = true
-				break
+			if actual.Name != expected.Name {
+				continue
+			}
+			matches++
+			if actual.ID != expected.ID || actual.Conclusion != "success" {
+				return fmt.Errorf("required live GitHub job %q mismatch", expected.Name)
 			}
 		}
-		if !found {
-			return fmt.Errorf("required live GitHub job %q mismatch", expected.Name)
+		if matches != 1 {
+			return fmt.Errorf("required live GitHub job %q is missing or ambiguous", expected.Name)
 		}
 	}
 	for _, expected := range r.Artifacts {
