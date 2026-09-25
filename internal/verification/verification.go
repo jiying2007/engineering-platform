@@ -110,6 +110,27 @@ func EvidenceMatchesPlan(plan Plan, item core.EvidenceRef) bool {
 	return ok && EvidenceMatchesRequirement(requirement, item)
 }
 
+func EvidenceArtifactsBelongToDelivery(delivery core.DeliveryReceipt, item core.EvidenceRef) bool {
+	available := make(map[string]bool, len(delivery.Artifacts))
+	for _, artifact := range delivery.Artifacts {
+		if artifact.ID == "" || available[artifact.ID] {
+			return false
+		}
+		available[artifact.ID] = true
+	}
+	if len(item.ArtifactRefs) > len(available) {
+		return false
+	}
+	seen := make(map[string]bool, len(item.ArtifactRefs))
+	for _, id := range item.ArtifactRefs {
+		if id == "" || seen[id] || !available[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	return true
+}
+
 func Evaluate(plan Plan, subjectDigest string, evidence []core.EvidenceRef) Report {
 	evidenceIDs := make([]string, 0, len(evidence))
 	for _, item := range evidence {
