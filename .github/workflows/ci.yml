@@ -139,7 +139,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: false
       - name: Install exact stable Codex package and locate native binary
         shell: bash
         run: |
