@@ -43,9 +43,9 @@ func offlineReceiptDigest(args []string) error {
 		return err
 	}
 	printJSON(map[string]any{
-		"run_id":        *runID,
+		"run_id":          *runID,
 		"artifact_digest": digest,
-		"media_type":    engineeringevidence.OfflineArtifactType,
+		"media_type":      engineeringevidence.OfflineArtifactType,
 	})
 	return nil
 }
