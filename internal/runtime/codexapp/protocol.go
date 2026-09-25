@@ -25,11 +25,12 @@ const MaxFrameBytes = 1 << 20
 const maxPending = 128
 
 type Message struct {
-	ID     json.RawMessage `json:"id,omitempty"`
-	Method string          `json:"method,omitempty"`
-	Params json.RawMessage `json:"params,omitempty"`
-	Result json.RawMessage `json:"result,omitempty"`
-	Error  json.RawMessage `json:"error,omitempty"`
+	ID          json.RawMessage `json:"id,omitempty"`
+	Method      string          `json:"method,omitempty"`
+	Params      json.RawMessage `json:"params,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	Error       json.RawMessage `json:"error,omitempty"`
+	EmittedAtMs *int64          `json:"emittedAtMs,omitempty"`
 }
 type EventKind string
 
@@ -98,9 +99,13 @@ func (c *Client) stop(err error) {
 	c.once.Do(func() {
 		c.mu.Lock()
 		c.readErr = err
+		pendingErr := err
+		if pendingErr == nil {
+			pendingErr = ErrClientClosed
+		}
 		for id, ch := range c.pending {
 			if ch != nil {
-				ch <- response{err: ErrClientClosed}
+				ch <- response{err: pendingErr}
 			}
 			delete(c.pending, id)
 		}
@@ -348,9 +353,9 @@ func decodeMessage(data []byte) (Message, error) {
 			return Message{}, ErrProtocol
 		}
 		switch key {
-		case "id", "method", "params", "result", "error", "jsonrpc":
+		case "id", "method", "params", "result", "error", "jsonrpc", "emittedAtMs":
 		default:
-			return Message{}, ErrProtocol
+			return Message{}, fmt.Errorf("%w: unknown top-level field %q", ErrProtocol, key)
 		}
 		var raw json.RawMessage
 		if d.Decode(&raw) != nil {
@@ -366,18 +371,23 @@ func decodeMessage(data []byte) (Message, error) {
 		return Message{}, ErrProtocol
 	}
 	if v, ok := fields["jsonrpc"]; ok && string(v) != `"2.0"` {
-		return Message{}, ErrProtocol
+		return Message{}, fmt.Errorf("%w: unexpected jsonrpc version", ErrProtocol)
 	}
 	var m Message
 	if json.Unmarshal(data, &m) != nil {
 		return m, ErrProtocol
 	}
 	if len(m.ID) > 0 && !validID(m.ID) {
-		return m, ErrProtocol
+		return m, fmt.Errorf("%w: invalid message id", ErrProtocol)
+	}
+	// Since Codex 0.155, server notifications may carry an optional emission
+	// timestamp. It is transport metadata only and must never affect correlation.
+	if m.EmittedAtMs != nil && (m.Method == "" || len(m.ID) != 0 || *m.EmittedAtMs < 0) {
+		return m, fmt.Errorf("%w: emittedAtMs is only valid on notifications", ErrProtocol)
 	}
 	if m.Method != "" {
 		if strings.TrimSpace(m.Method) == "" || len(m.Result) > 0 || len(m.Error) > 0 {
-			return m, ErrProtocol
+			return m, fmt.Errorf("%w: request/notification routing fields conflict", ErrProtocol)
 		}
 	} else {
 		if len(m.ID) == 0 || (len(m.Result) > 0) == (len(m.Error) > 0) || len(m.Params) > 0 {

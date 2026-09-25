@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 func helperServer() error {
-	if len(os.Args) != 4 || os.Args[2] != "--listen" || os.Args[3] != "stdio" {
+	if len(os.Args) != 3 || os.Args[2] != "--stdio" {
 		return errors.New("bad launch")
 	}
 	if os.Getenv("EP_HOST_SECRET") != "" {
@@ -79,7 +79,7 @@ func helperServer() error {
 				Sandbox string `json:"sandbox"`
 				Policy  string `json:"approvalPolicy"`
 			}
-			if json.Unmarshal(m.Params, &p) != nil || p.Sandbox != "readOnly" || p.Policy != "unlessTrusted" {
+			if json.Unmarshal(m.Params, &p) != nil || p.Sandbox != "read-only" || p.Policy != "never" {
 				return ErrProtocol
 			}
 			if _, err := os.Stat(p.CWD); err != nil {

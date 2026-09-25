@@ -94,7 +94,7 @@ func (a *Adapter) StartThread(ctx context.Context, model string) (string, error)
 			ID string `json:"id"`
 		} `json:"thread"`
 	}
-	if err = a.client.Call(ctx, "thread/start", map[string]any{"cwd": work, "model": model, "approvalPolicy": "unlessTrusted", "sandbox": "readOnly"}, &result); err != nil {
+	if err = a.client.Call(ctx, "thread/start", map[string]any{"cwd": work, "model": model, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": true}, &result); err != nil {
 		return "", err
 	}
 	if !remoteID(result.Thread.ID) {

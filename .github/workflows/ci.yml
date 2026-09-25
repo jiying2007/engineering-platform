@@ -124,3 +124,68 @@ jobs:
           go mod download
       - name: Real offline boundary and command integration
         run: go test -race -v -count=2 -timeout 5m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
+
+
+  codex:
+    name: codex-app-server-0.155.0-qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact stable Codex package and locate native binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/codex-0.155.0"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
+          npm view @openai/codex@0.155.0 dist.integrity > "$RUNNER_TEMP/codex-npm-integrity.txt"
+          mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
+          printf 'native candidates: %s\n' "${candidates[*]-}"
+          test "${#candidates[@]}" -eq 1
+          codex="$(readlink -f "${candidates[0]}")"
+          test -x "$codex"
+          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
+      - name: Require Linux sandbox prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          export NEEDRESTART_MODE=l
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils
+          command -v bwrap
+          bwrap --version
+          if [ -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict ]; then
+            sudo install -m 0644 \
+              /usr/share/apparmor/extra-profiles/bwrap-userns-restrict \
+              /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
+      - name: Qualify real stable app-server and generated protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./cmd/codex-qualifier \
+            --codex "$CODEX_NATIVE" \
+            --version 0.155.0 \
+            --model gpt-5.6-sol \
+            > "$RUNNER_TEMP/codex-qualification.json"
+          cat "$RUNNER_TEMP/codex-qualification.json"
+      - name: Retain Codex qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-0.155.0-qualification-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-qualification.json
+            ${{ runner.temp }}/codex-npm-integrity.txt
+          if-no-files-found: error
+          retention-days: 30

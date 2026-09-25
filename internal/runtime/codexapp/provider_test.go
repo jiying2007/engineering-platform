@@ -39,7 +39,7 @@ func TestProviderDoesNotInheritHostEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(cmd.Args[1:], " ") != "app-server --listen stdio" || cmd.Dir != s.Dir {
+	if strings.Join(cmd.Args[1:], " ") != "app-server --stdio" || cmd.Dir != s.Dir {
 		t.Fatal(cmd.Args, cmd.Dir)
 	}
 	joined := strings.Join(cmd.Env, "\n")
