@@ -65,7 +65,7 @@ The mandatory `codex-app-server-0.155.0-qualification` job:
    qualifying the Node wrapper;
 3. requires exact `codex-cli 0.155.0` output and retains npm package integrity;
 4. hashes the native executable bytes;
-5. generates stable and experimental JSON-schema trees with fresh HOME/CODEX_HOME;
+5. generates stable and experimental JSON-schema trees with fresh HOME and pre-created owner-only CODEX/XDG directories;
 6. validates the stable/experimental split and records deterministic tree digests;
 7. starts the exact pinned native binary with a fresh empty HOME and no provider
    credential, daemon, inherited config or proxy;
