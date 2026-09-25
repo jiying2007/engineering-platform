@@ -21,6 +21,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "import-ci-evidence":
+		if err := importCIEvidence(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "capabilities":
 		printJSON(map[string]any{
 			"capabilities": embedded.Capabilities(),
@@ -73,6 +78,7 @@ func printJSON(value any) {
 func usage() {
 	fmt.Println("eng <command>")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
+	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
 	fmt.Println("  capabilities                         list embedded capabilities and skills")
 	fmt.Println("  route <task-type> <subsystem>       resolve explicit M1 capability/skill route")
 	fmt.Println("  material-check <manifest.json>      evaluate material readiness")

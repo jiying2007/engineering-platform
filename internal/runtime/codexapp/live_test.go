@@ -3,6 +3,7 @@ package codexapp
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -99,7 +100,7 @@ func TestLiveReceiptRejectsTamper(t *testing.T) {
 		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:             "workload_identity",
-		FederationRuleID:           "idpm_test",
+		FederationRuleID:           "rule-test",
 		Model:                      "gpt-5.6-sol",
 		PromptDigest:               "sha256:" + strings.Repeat("b", 64),
 		ThreadID:                   "thread",
@@ -109,6 +110,7 @@ func TestLiveReceiptRejectsTamper(t *testing.T) {
 		OutputDigest:               canonicalDigestText("engineering-platform live qualification"),
 		ApprovalRequests:           0,
 		UnexpectedToolUse:          false,
+		AssertionRemovedBeforeTurn: true,
 	}
 	// The fixed qualification prompt has a deterministic digest.
 	r.PromptDigest = canonicalDigestText(LiveProbePrompt)
@@ -118,6 +120,78 @@ func TestLiveReceiptRejectsTamper(t *testing.T) {
 	r.Output = "changed"
 	if err := r.Validate(); err == nil {
 		t.Fatal("changed output accepted")
+	}
+}
+
+func TestWarmWorkloadIdentityUsesAuthenticatedRateLimitReadBeforeThread(t *testing.T) {
+	client, peer := pair(t)
+	adapter, err := NewAdapter(client, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter.initialized = true
+	server := make(chan error, 1)
+	go func() {
+		var request Message
+		if err := json.NewDecoder(peer).Decode(&request); err != nil {
+			server <- err
+			return
+		}
+		if request.Method != "account/rateLimits/read" {
+			server <- fmt.Errorf("unexpected prewarm method %q", request.Method)
+			return
+		}
+		var params struct {
+			SupportsLunaReserve       bool `json:"supportsLunaReserve"`
+			ExcludeResetCreditDetails bool `json:"excludeResetCreditDetails"`
+		}
+		if err := json.Unmarshal(request.Params, &params); err != nil {
+			server <- err
+			return
+		}
+		if params.SupportsLunaReserve || !params.ExcludeResetCreditDetails {
+			server <- fmt.Errorf("unsafe rate-limit prewarm params: %#v", params)
+			return
+		}
+		_, err := io.WriteString(peer, `{"id":`+string(request.ID)+`,"result":{"rateLimits":{"primary":null}}}`+"\n")
+		server <- err
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := adapter.WarmWorkloadIdentity(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if adapter.thread != "" || adapter.turn != "" {
+		t.Fatal("prewarm started model lifecycle")
+	}
+	if err := <-server; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLiveReceiptRequiresAssertionRemovalFence(t *testing.T) {
+	r := LiveReceipt{
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    QualifiedCodexVersion,
+		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
+		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           "rule-test",
+		Model:                      "gpt-5.6-sol",
+		PromptDigest:               canonicalDigestText(LiveProbePrompt),
+		ThreadID:                   "thread",
+		TurnID:                     "turn",
+		TurnStatus:                 "completed",
+		Output:                     LiveProbeExpected,
+		OutputDigest:               canonicalDigestText(LiveProbeExpected),
+	}
+	if err := r.Validate(); err == nil {
+		t.Fatal("receipt without assertion-removal fence accepted")
+	}
+	r.AssertionRemovedBeforeTurn = true
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
 	}
 }
 

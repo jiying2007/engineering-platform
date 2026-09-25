@@ -166,7 +166,7 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	secureCall(t, engineer, base+"/runs/run-auth/steer", steer, http.StatusAccepted)
 	secureCall(t, engineer, base+"/runs/run-auth/complete", map[string]any{"execution_epoch": 1}, http.StatusOK)
 	secureCall(t, engineer, base+"/deliveries", map[string]any{"delivery_receipt_id": "delivery-auth", "run_id": "run-auth", "result_commit": strings.Repeat("b", 40)}, http.StatusCreated)
-	evidence := map[string]any{"evidence_id": "evidence-auth", "issuer": "test-ci", "procedure": "ci.test", "result": "PASS", "applicable": true}
+	evidence := map[string]any{"evidence_id": "evidence-auth", "requirement_id": "ci", "issuer": "test-ci", "procedure": "ci.test", "result": "PASS", "applicable": true}
 	payload := map[string]any{"delivery_receipt_id": "delivery-auth", "evidence": evidence}
 	secureCall(t, engineer, base+"/evidence", payload, http.StatusForbidden)
 	evidence["issuer"] = "forged-ci"

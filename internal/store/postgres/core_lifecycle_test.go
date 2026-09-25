@@ -289,6 +289,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	evidence := core.EvidenceRef{
 		ID:                "evidence-" + suffix,
 		DeliveryReceiptID: delivery.ID,
+		RequirementID:     "req-1",
 		SubjectDigest:     delivery.SubjectDigest,
 		Issuer:            "ci",
 		Procedure:         "ci.test",
@@ -298,6 +299,18 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	}
 	if err := s.CreateEvidence(evidence); err != nil {
 		t.Fatal(err)
+	}
+	wrongRequirement := evidence
+	wrongRequirement.ID += "-wrong-requirement"
+	wrongRequirement.RequirementID = "req-other"
+	if err := s.CreateEvidence(wrongRequirement); err == nil {
+		t.Fatal("PostgreSQL store accepted evidence for a different frozen requirement")
+	}
+	wrongSubject := evidence
+	wrongSubject.ID += "-wrong-subject"
+	wrongSubject.SubjectDigest = "sha256:other"
+	if err := s.CreateEvidence(wrongSubject); err == nil {
+		t.Fatal("PostgreSQL store accepted evidence for a different delivery subject")
 	}
 	storedEvidence, err := s.GetEvidence(evidence.ID)
 	if err != nil {

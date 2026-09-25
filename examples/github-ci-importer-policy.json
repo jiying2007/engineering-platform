@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "principals": [
+    {
+      "subject": "urn:engineering-platform:github-ci-importer",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "evidence:register"
+      ],
+      "evidence_issuer": "github-actions-importer",
+      "evidence_procedures": [
+        "github.actions.trusted-ci.v1"
+      ]
+    }
+  ]
+}

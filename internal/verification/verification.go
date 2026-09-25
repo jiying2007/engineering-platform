@@ -51,6 +51,8 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 	if plan.ID == "" || len(plan.Criteria) == 0 || len(plan.Criteria) != len(acceptanceCriteria) {
 		return false
 	}
+	criterionIDs := make(map[string]bool, len(plan.Criteria))
+	requirementIDs := map[string]bool{}
 	expected := make(map[string]int, len(acceptanceCriteria))
 	for _, ac := range acceptanceCriteria {
 		if ac == "" {
@@ -59,23 +61,72 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 		expected[ac]++
 	}
 	for _, criterion := range plan.Criteria {
-		if criterion.ID == "" || criterion.Statement == "" || len(criterion.Requirements) == 0 {
+		if criterion.ID == "" || criterionIDs[criterion.ID] || criterion.Statement == "" || len(criterion.Requirements) == 0 {
 			return false
 		}
+		criterionIDs[criterion.ID] = true
 		if expected[criterion.Statement] == 0 {
 			return false
 		}
 		expected[criterion.Statement]--
 		for _, req := range criterion.Requirements {
-			if req.ID == "" || req.Procedure == "" {
+			if req.ID == "" || requirementIDs[req.ID] || req.Procedure == "" {
 				return false
 			}
+			requirementIDs[req.ID] = true
 		}
 	}
 	for _, remaining := range expected {
 		if remaining != 0 {
 			return false
 		}
+	}
+	return true
+}
+
+func FindRequirement(plan Plan, id string) (EvidenceRequirement, bool) {
+	if id == "" {
+		return EvidenceRequirement{}, false
+	}
+	for _, criterion := range plan.Criteria {
+		for _, requirement := range criterion.Requirements {
+			if requirement.ID == id {
+				return requirement, true
+			}
+		}
+	}
+	return EvidenceRequirement{}, false
+}
+
+func EvidenceMatchesRequirement(requirement EvidenceRequirement, item core.EvidenceRef) bool {
+	if requirement.ID == "" || item.RequirementID != requirement.ID || item.Procedure != requirement.Procedure {
+		return false
+	}
+	return requirement.Issuer == "" || item.Issuer == requirement.Issuer
+}
+
+func EvidenceMatchesPlan(plan Plan, item core.EvidenceRef) bool {
+	requirement, ok := FindRequirement(plan, item.RequirementID)
+	return ok && EvidenceMatchesRequirement(requirement, item)
+}
+
+func EvidenceArtifactsBelongToDelivery(delivery core.DeliveryReceipt, item core.EvidenceRef) bool {
+	available := make(map[string]bool, len(delivery.Artifacts))
+	for _, artifact := range delivery.Artifacts {
+		if artifact.ID == "" || available[artifact.ID] {
+			return false
+		}
+		available[artifact.ID] = true
+	}
+	if len(item.ArtifactRefs) > len(available) {
+		return false
+	}
+	seen := make(map[string]bool, len(item.ArtifactRefs))
+	for _, id := range item.ArtifactRefs {
+		if id == "" || seen[id] || !available[id] {
+			return false
+		}
+		seen[id] = true
 	}
 	return true
 }
@@ -127,10 +178,7 @@ func requirementSatisfied(requirement EvidenceRequirement, subjectDigest string,
 		if !item.Applicable || item.SubjectDigest != subjectDigest || item.Result != "PASS" {
 			continue
 		}
-		if item.Procedure != requirement.Procedure {
-			continue
-		}
-		if requirement.Issuer != "" && item.Issuer != requirement.Issuer {
+		if !EvidenceMatchesRequirement(requirement, item) {
 			continue
 		}
 		return true
