@@ -1,0 +1,233 @@
+package codexapp
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os/exec"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/jiying2007/engineering-platform/internal/canonical"
+	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+)
+
+const LiveProbePrompt = "Reply with only: engineering-platform live qualification"
+
+type LiveReceipt struct {
+	SchemaVersion     int    `json:"schema_version"`
+	CLI               string `json:"cli"`
+	Version           string `json:"version"`
+	BinaryDigest      string `json:"binary_digest"`
+	CredentialMode    string `json:"credential_mode"`
+	FederationRuleID  string `json:"federation_rule_id"`
+	Model             string `json:"model"`
+	PromptDigest      string `json:"prompt_digest"`
+	ThreadID          string `json:"thread_id"`
+	TurnID            string `json:"turn_id"`
+	TurnStatus        string `json:"turn_status"`
+	Output            string `json:"output"`
+	OutputDigest      string `json:"output_digest"`
+	ApprovalRequests  int    `json:"approval_requests"`
+	UnexpectedToolUse bool   `json:"unexpected_tool_use"`
+}
+
+type TurnObservation struct {
+	Status            string
+	Output            string
+	ApprovalRequests  int
+	UnexpectedToolUse bool
+}
+
+func ObserveTurn(ctx context.Context, adapter *Adapter, threadID, turnID string) (TurnObservation, error) {
+	var out TurnObservation
+	if adapter == nil || !remoteID(threadID) || !remoteID(turnID) {
+		return out, ErrLifecycle
+	}
+	messages := []string{}
+	total := 0
+	for {
+		event, err := adapter.Next(ctx)
+		if err != nil {
+			return out, err
+		}
+		if event.Kind == ServerRequest {
+			out.ApprovalRequests++
+			return out, fmt.Errorf("live qualification attempted a tool approval")
+		}
+		if event.Kind != Notification {
+			continue
+		}
+		switch event.Message.Method {
+		case "item/completed":
+			var p struct {
+				ThreadID string `json:"threadId"`
+				TurnID   string `json:"turnId"`
+				Item     struct {
+					Type string `json:"type"`
+					ID   string `json:"id"`
+					Text string `json:"text,omitempty"`
+				} `json:"item"`
+			}
+			if json.Unmarshal(event.Message.Params, &p) != nil || p.ThreadID != threadID || p.TurnID != turnID || !remoteID(p.Item.ID) || p.Item.Type == "" {
+				return out, ErrProtocol
+			}
+			switch p.Item.Type {
+			case "agentMessage":
+				if !utf8.ValidString(p.Item.Text) || strings.TrimSpace(p.Item.Text) == "" {
+					return out, ErrProtocol
+				}
+				total += len(p.Item.Text)
+				if total > 64<<10 {
+					return out, fmt.Errorf("live qualification output exceeded limit")
+				}
+				messages = append(messages, p.Item.Text)
+			case "userMessage", "reasoning", "plan":
+				// These are non-effect timeline items. They carry no authority.
+			default:
+				out.UnexpectedToolUse = true
+				return out, fmt.Errorf("live qualification emitted unexpected item type %q", p.Item.Type)
+			}
+		case "turn/completed":
+			var p struct {
+				ThreadID string `json:"threadId"`
+				Turn     struct {
+					ID     string `json:"id"`
+					Status string `json:"status"`
+				} `json:"turn"`
+			}
+			if json.Unmarshal(event.Message.Params, &p) != nil || p.ThreadID != threadID || p.Turn.ID != turnID {
+				return out, ErrProtocol
+			}
+			out.Status = p.Turn.Status
+			if out.Status != "completed" {
+				return out, fmt.Errorf("live qualification turn ended %q", out.Status)
+			}
+			out.Output = strings.TrimSpace(strings.Join(messages, "\n"))
+			if out.Output == "" {
+				return out, fmt.Errorf("live qualification produced no completed agent message")
+			}
+			return out, nil
+		}
+	}
+}
+
+// LiveWIFProbe performs exactly one read-only model turn using Codex workload
+// identity. It never accepts tool approvals and retains no token bytes or path.
+// The caller owns token freshness and removes the token after this call returns.
+func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, ruleID, tokenFile, auditContext, model string) (LiveReceipt, error) {
+	var receipt LiveReceipt
+	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
+		return receipt, fmt.Errorf("qualified binary digest and bounded model required")
+	}
+	provider, err := NewPinnedProvider(executable, binaryDigest)
+	if err != nil {
+		return receipt, err
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	env := []string{
+		"HOME=" + home,
+		"OPENAI_FEDERATION_RULE_ID=" + ruleID,
+		"OPENAI_IDENTITY_TOKEN_FILE=" + tokenFile,
+	}
+	if auditContext != "" {
+		env = append(env, "OPENAI_WORKLOAD_IDENTITY_CONTEXT="+auditContext)
+	}
+	cmd, err := provider.Command(probeCtx, runtimeprovider.LaunchSpec{Dir: work, Env: env})
+	if err != nil {
+		return receipt, err
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return receipt, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return receipt, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
+	if err := cmd.Start(); err != nil {
+		return receipt, err
+	}
+	client := NewClient(stdout, stdin)
+	waited := false
+	defer func() {
+		_ = client.Close()
+		cancel()
+		if !waited {
+			_ = cmd.Wait()
+		}
+	}()
+	adapter, err := NewAdapter(client, work)
+	if err != nil {
+		return receipt, err
+	}
+	if err := adapter.Initialize(probeCtx, "engineering-platform-codex-live-wif-v1"); err != nil {
+		return receipt, fmt.Errorf("initialize: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	threadID, err := adapter.StartThread(probeCtx, model)
+	if err != nil {
+		return receipt, fmt.Errorf("thread/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	turnID, err := adapter.StartTurn(probeCtx, LiveProbePrompt)
+	if err != nil {
+		return receipt, fmt.Errorf("turn/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	observation, err := ObserveTurn(probeCtx, adapter, threadID, turnID)
+	if err != nil {
+		return receipt, err
+	}
+	_ = client.Close()
+	waitCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-waitCtx.Done():
+		cancel()
+		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
+	case <-done:
+		waited = true
+	}
+	receipt = LiveReceipt{
+		SchemaVersion:     1,
+		CLI:               "codex-cli",
+		Version:           QualifiedCodexVersion,
+		BinaryDigest:      binaryDigest,
+		CredentialMode:    "workload_identity",
+		FederationRuleID:  ruleID,
+		Model:             model,
+		PromptDigest:      canonical.BytesDigest([]byte(LiveProbePrompt)),
+		ThreadID:          threadID,
+		TurnID:            turnID,
+		TurnStatus:        observation.Status,
+		Output:            observation.Output,
+		OutputDigest:      canonical.BytesDigest([]byte(observation.Output)),
+		ApprovalRequests:  observation.ApprovalRequests,
+		UnexpectedToolUse: observation.UnexpectedToolUse,
+	}
+	return receipt, receipt.Validate()
+}
+
+func (r LiveReceipt) Validate() error {
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || !canonical.ValidDigest(r.PromptDigest) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
+		return fmt.Errorf("invalid live qualification receipt")
+	}
+	return nil
+}
+
+func MarshalLiveReceipt(r LiveReceipt) ([]byte, error) {
+	if err := r.Validate(); err != nil {
+		return nil, err
+	}
+	return json.MarshalIndent(r, "", "  ")
+}
+
+// Keep io referenced here because this file's process boundary intentionally
+// relies on closable pipes; compile-time assertion catches accidental wrappers.
+var _ io.ReadCloser
