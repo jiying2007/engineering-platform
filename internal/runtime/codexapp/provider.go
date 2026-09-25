@@ -18,9 +18,12 @@ import (
 )
 
 type Provider struct {
-	executable string
-	digest     string
+	executable     string
+	digest         string
+	credentialSafe bool
 }
+
+const credentialSafeConfig = "[features]\nshell_tool = false\nview_image = false\n"
 
 func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
 
@@ -31,6 +34,18 @@ func NewPinnedProvider(executable, digest string) (*Provider, error) {
 		return nil, fmt.Errorf("valid executable digest required")
 	}
 	return &Provider{executable: executable, digest: digest}, nil
+}
+
+// NewPinnedWIFProvider enables the platform-owned credential-safe startup profile.
+// The profile is fixed in code; callers cannot inject Codex TOML or per-thread
+// config overrides.
+func NewPinnedWIFProvider(executable, digest string) (*Provider, error) {
+	p, err := NewPinnedProvider(executable, digest)
+	if err != nil {
+		return nil, err
+	}
+	p.credentialSafe = true
+	return p, nil
 }
 func (p *Provider) Name() string { return "codex-app-server" }
 
@@ -150,6 +165,16 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
 	}
+	if p.credentialSafe {
+		if !hasRule {
+			return nil, fmt.Errorf("credential-safe Codex profile requires workload identity")
+		}
+		configPath := filepath.Join(home, ".codex", "config.toml")
+		if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
+			return nil, fmt.Errorf("write credential-safe Codex config: %w", err)
+		}
+	}
+
 	if hasRule {
 		env = append(env,
 			"OPENAI_FEDERATION_RULE_ID="+wifRule,
