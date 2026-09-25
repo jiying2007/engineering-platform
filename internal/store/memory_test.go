@@ -411,7 +411,6 @@ func TestMemoryEvidenceRequiresExactFrozenRequirement(t *testing.T) {
 	}
 }
 
-
 func TestMemoryReviewReportIsImmutableAcrossCallers(t *testing.T) {
 	store := NewMemory()
 	taskDigest := "sha256:" + strings.Repeat("a", 64)
@@ -433,11 +432,11 @@ func TestMemoryReviewReportIsImmutableAcrossCallers(t *testing.T) {
 	report := review.Report{
 		ID: "review-copy", DeliveryReceiptID: "delivery-review-copy",
 		VerificationReportID: "verification-review-copy",
-		TaskContractDigest: taskDigest, SubjectDigest: subjectDigest,
+		TaskContractDigest:   taskDigest, SubjectDigest: subjectDigest,
 		Reviewer: "reviewer", Result: review.ResultPass,
-		Findings: []review.Finding{{ID: "note", Severity: review.SeverityWarning, Summary: "bounded warning"}},
+		Findings:    []review.Finding{{ID: "note", Severity: review.SeverityWarning, Summary: "bounded warning"}},
 		KnownLimits: []string{"host trust"},
-		CreatedAt: time.Unix(10, 0).UTC(),
+		CreatedAt:   time.Unix(10, 0).UTC(),
 	}
 	reviewing := work
 	if err := reviewing.Transition(core.WorkReviewing); err != nil {
