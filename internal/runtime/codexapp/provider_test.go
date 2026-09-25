@@ -108,7 +108,7 @@ func workloadIdentityEnv(t *testing.T, spec runtimeprovider.LaunchSpec) []string
 		t.Fatal(err)
 	}
 	return []string{
-		"OPENAI_FEDERATION_RULE_ID=idpm_engineering_platform_test",
+		"OPENAI_FEDERATION_RULE_ID=rule-engineering-platform-test",
 		"OPENAI_IDENTITY_TOKEN_FILE=" + token,
 		`OPENAI_WORKLOAD_IDENTITY_CONTEXT={"run_id":"test-run","worker":"test-worker"}`,
 	}
@@ -123,7 +123,7 @@ func TestProviderAcceptsPrivateWorkloadIdentityWithoutReadingSecret(t *testing.T
 	}
 	joined := strings.Join(cmd.Env, "\n")
 	for _, required := range []string{
-		"OPENAI_FEDERATION_RULE_ID=idpm_engineering_platform_test",
+		"OPENAI_FEDERATION_RULE_ID=rule-engineering-platform-test",
 		"OPENAI_IDENTITY_TOKEN_FILE=",
 		"OPENAI_WORKLOAD_IDENTITY_CONTEXT=",
 	} {
@@ -158,7 +158,7 @@ func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
 				spec.Env = append(spec.Env, wif...)
 				spec.Env = append(spec.Env, "OPENAI_BASE_URL=https://provider.example/v1")
 			case "bad-rule":
-				spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID=not-a-rule", wif[1])
+				spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID= bad-rule", wif[1])
 			case "public-file":
 				token := strings.TrimPrefix(wif[1], "OPENAI_IDENTITY_TOKEN_FILE=")
 				if err := os.Chmod(token, 0o644); err != nil {
