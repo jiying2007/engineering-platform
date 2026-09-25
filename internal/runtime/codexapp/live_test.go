@@ -93,22 +93,22 @@ func TestObserveTurnRejectsApprovalAndToolItems(t *testing.T) {
 
 func TestLiveReceiptRejectsTamper(t *testing.T) {
 	r := LiveReceipt{
-		SchemaVersion:     1,
-		CLI:               "codex-cli",
-		Version:           QualifiedCodexVersion,
-		BinaryDigest:      "sha256:" + strings.Repeat("a", 64),
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    QualifiedCodexVersion,
+		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:    "workload_identity",
-		FederationRuleID:  "idpm_test",
-		Model:             "gpt-5.6-sol",
-		PromptDigest:      "sha256:" + strings.Repeat("b", 64),
-		ThreadID:          "thread",
-		TurnID:            "turn",
-		TurnStatus:        "completed",
-		Output:            "engineering-platform live qualification",
-		OutputDigest:      canonicalDigestText("engineering-platform live qualification"),
-		ApprovalRequests:  0,
-		UnexpectedToolUse: false,
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           "idpm_test",
+		Model:                      "gpt-5.6-sol",
+		PromptDigest:               "sha256:" + strings.Repeat("b", 64),
+		ThreadID:                   "thread",
+		TurnID:                     "turn",
+		TurnStatus:                 "completed",
+		Output:                     "engineering-platform live qualification",
+		OutputDigest:               canonicalDigestText("engineering-platform live qualification"),
+		ApprovalRequests:           0,
+		UnexpectedToolUse:          false,
 	}
 	// The fixed qualification prompt has a deterministic digest.
 	r.PromptDigest = canonicalDigestText(LiveProbePrompt)
