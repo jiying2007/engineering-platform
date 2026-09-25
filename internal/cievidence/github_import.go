@@ -19,11 +19,12 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
+	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
 const (
-	GitHubIssuer            = "github-actions"
-	GitHubProcedure         = "github.actions.ci.v1"
+	GitHubIssuer            = verification.GitHubActionsIssuer
+	GitHubProcedure         = verification.GitHubActionsProcedure
 	GitHubArtifactMediaType = "application/vnd.github.actions.artifact+zip"
 	maxGitHubJSON           = 4 << 20
 	maxEvidenceZIP          = 2 << 20
