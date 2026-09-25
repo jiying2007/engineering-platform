@@ -288,6 +288,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	evidence := core.EvidenceRef{
 		ID:                "evidence-" + suffix,
 		DeliveryReceiptID: delivery.ID,
+		RequirementID:     "req-1",
 		SubjectDigest:     delivery.SubjectDigest,
 		Issuer:            "ci",
 		Procedure:         "ci.test",
