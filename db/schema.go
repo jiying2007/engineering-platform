@@ -14,6 +14,9 @@ var workerInboxMigration string
 //go:embed migrations/0004_worker_preparation.sql
 var workerPreparationMigration string
 
+//go:embed migrations/0005_offline_execution.sql
+var offlineExecutionMigration string
+
 func CoreMigration() string {
-	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration
+	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration
 }
