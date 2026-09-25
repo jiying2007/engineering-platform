@@ -109,6 +109,33 @@ func TestTaskRejectsPlanDigestMismatch(t *testing.T) {
 	}
 }
 
+func TestDirectMemoryTaskWriteRejectsUnpinnedGitHubAuthority(t *testing.T) {
+	s := NewMemory()
+	task := core.TaskContract{
+		ID: "task-github-authority", WorkItemID: "work-github-authority", TaskType: "FEATURE",
+		Repository: "owner/repo", BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"CI provenance verified"}, Revision: 1,
+	}
+	plan := verification.Plan{
+		ID: "vp-github-authority",
+		Criteria: []verification.Criterion{{
+			ID: "ac-github", Statement: "CI provenance verified",
+			Requirements: []verification.EvidenceRequirement{{
+				ID: "req-github", Procedure: verification.GitHubActionsProcedure,
+			}},
+		}},
+	}
+	bindPlan(t, &task, plan)
+	if err := s.CreateTask(task, plan); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected direct store authority conflict, got %v", err)
+	}
+	plan.Criteria[0].Requirements[0].Issuer = verification.GitHubActionsIssuer
+	bindPlan(t, &task, plan)
+	if err := s.CreateTask(task, plan); err != nil {
+		t.Fatalf("exact GitHub authority rejected: %v", err)
+	}
+}
+
 func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 	s := NewMemory()
 	r := run.New("run-1", "sha256:task", "sha256:input")
