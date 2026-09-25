@@ -11,18 +11,27 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
-	"POST /api/v1/worker/prepare-claim": access.WorkerPrepare,
-	"POST /api/v1/worker/prepared":      access.WorkerPrepare,
-	"GET /api/v1/runs/{id}/preparation": access.Read,
-	"POST /api/v1/worker/claim":         access.WorkerPoll,
-	"POST /api/v1/worker/renew":         access.WorkerPoll,
-	"POST /api/v1/worker/report":        access.WorkerReport,
-	"GET /api/v1/runs/{id}/inbox":       access.Read,
+	"POST /api/v1/worker/offline/start":  access.ActionExecute,
+	"POST /api/v1/worker/offline/renew":  access.ActionExecute,
+	"POST /api/v1/worker/offline/report": access.ActionExecute,
+	"POST /api/v1/worker/offline/fail":   access.ActionExecute,
+	"GET /api/v1/runs/{id}/offline":      access.Read,
+	"POST /api/v1/worker/prepare-claim":  access.WorkerPrepare,
+	"POST /api/v1/worker/prepared":       access.WorkerPrepare,
+	"GET /api/v1/runs/{id}/preparation":  access.Read,
+	"POST /api/v1/worker/claim":          access.WorkerPoll,
+	"POST /api/v1/worker/renew":          access.WorkerPoll,
+	"POST /api/v1/worker/report":         access.WorkerReport,
+	"GET /api/v1/runs/{id}/inbox":        access.Read,
 }
 
-// Registered only by the authenticated constructor. Bare development/test APIs
-// cannot accidentally expose queue mutation to an anonymous local caller.
+// Only the authenticated constructor registers these routes.
 func (s *Server) workerRoutes() {
+	s.mux.HandleFunc("POST /api/v1/worker/offline/start", s.handleOfflineStart)
+	s.mux.HandleFunc("POST /api/v1/worker/offline/renew", s.handleOfflineRenew)
+	s.mux.HandleFunc("POST /api/v1/worker/offline/report", s.handleOfflineReport)
+	s.mux.HandleFunc("POST /api/v1/worker/offline/fail", s.handleOfflineFail)
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/offline", s.handleOfflineGet)
 	s.mux.HandleFunc("POST /api/v1/worker/prepare-claim", s.handlePrepareClaim)
 	s.mux.HandleFunc("POST /api/v1/worker/prepared", s.handleWorkerPrepared)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}/preparation", s.handleGetPreparation)
@@ -37,15 +46,15 @@ func (s *Server) workerRepository(w http.ResponseWriter, r *http.Request, capabi
 		writeError(w, http.StatusForbidden, "worker capability denied")
 		return nil, id, false
 	}
-	repository, ok := s.store.(workerqueue.Repository)
+	repo, ok := s.store.(workerqueue.Repository)
 	if !ok {
 		writeError(w, http.StatusServiceUnavailable, "durable worker inbox unavailable")
 		return nil, id, false
 	}
-	return repository, id, true
+	return repo, id, true
 }
 func (s *Server) handleWorkerClaim(w http.ResponseWriter, r *http.Request) {
-	repository, id, ok := s.workerRepository(w, r, access.WorkerPoll)
+	repo, id, ok := s.workerRepository(w, r, access.WorkerPoll)
 	if !ok {
 		return
 	}
@@ -59,17 +68,17 @@ func (s *Server) handleWorkerClaim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "worker profile denied")
 		return
 	}
-	assignment, err := repository.ClaimInput(r.Context(), id.Subject(), req.Profile)
+	a, err := repo.ClaimInput(r.Context(), id.Subject(), req.Profile)
 	if err != nil {
 		writeWorkerError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
 		Assignment *workerqueue.Assignment `json:"assignment"`
-	}{assignment})
+	}{a})
 }
 func (s *Server) handleWorkerRenew(w http.ResponseWriter, r *http.Request) {
-	repository, id, ok := s.workerRepository(w, r, access.WorkerPoll)
+	repo, id, ok := s.workerRepository(w, r, access.WorkerPoll)
 	if !ok {
 		return
 	}
@@ -81,7 +90,7 @@ func (s *Server) handleWorkerRenew(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "worker profile denied")
 		return
 	}
-	until, err := repository.RenewInput(r.Context(), id.Subject(), token)
+	until, err := repo.RenewInput(r.Context(), id.Subject(), token)
 	if err != nil {
 		writeWorkerError(w, err)
 		return
@@ -91,7 +100,7 @@ func (s *Server) handleWorkerRenew(w http.ResponseWriter, r *http.Request) {
 	}{until})
 }
 func (s *Server) handleWorkerReport(w http.ResponseWriter, r *http.Request) {
-	repository, id, ok := s.workerRepository(w, r, access.WorkerReport)
+	repo, id, ok := s.workerRepository(w, r, access.WorkerReport)
 	if !ok {
 		return
 	}
@@ -103,7 +112,7 @@ func (s *Server) handleWorkerReport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "worker profile denied")
 		return
 	}
-	receipt, err := repository.ReportInput(r.Context(), id.Subject(), report)
+	receipt, err := repo.ReportInput(r.Context(), id.Subject(), report)
 	if err != nil {
 		writeWorkerError(w, err)
 		return
@@ -111,11 +120,11 @@ func (s *Server) handleWorkerReport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, receipt)
 }
 func (s *Server) handleWorkerInbox(w http.ResponseWriter, r *http.Request) {
-	repository, _, ok := s.workerRepository(w, r, access.Read)
+	repo, _, ok := s.workerRepository(w, r, access.Read)
 	if !ok {
 		return
 	}
-	status, err := repository.GetInbox(r.Context(), r.PathValue("id"))
+	status, err := repo.GetInbox(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeWorkerError(w, err)
 		return
@@ -126,7 +135,7 @@ func writeWorkerError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "worker intent not found")
-	case errors.Is(err, workerqueue.ErrLease), errors.Is(err, workerqueue.ErrRecovery), errors.Is(err, workerqueue.ErrInactive), errors.Is(err, workerqueue.ErrPaused):
+	case errors.Is(err, store.ErrConflict), errors.Is(err, store.ErrExists), errors.Is(err, workerqueue.ErrLease), errors.Is(err, workerqueue.ErrRecovery), errors.Is(err, workerqueue.ErrInactive), errors.Is(err, workerqueue.ErrPaused):
 		writeError(w, http.StatusConflict, "worker authority unavailable or superseded")
 	case errors.Is(err, workerqueue.ErrIdentity):
 		writeError(w, http.StatusUnprocessableEntity, "worker input identity mismatch")

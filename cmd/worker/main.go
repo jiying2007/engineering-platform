@@ -26,44 +26,58 @@ func main() {
 func serveWorker() error {
 	profile := flag.String("profile", "", "exact operator-authorized WorkerProfile")
 	admission := flag.Bool("admission-only", false, "validate frozen input identities only")
-	prepare := flag.Bool("prepare-only", false, "prepare operator-approved bytes and independent Git workspace; never execute Runtime")
+	prepare := flag.Bool("prepare-only", false, "prepare approved bytes without executing Runtime")
+	execute := flag.Bool("execute-offline", false, "execute a pinned offline profile for one previously prepared Run")
+	runID := flag.String("run", "", "exact prepared Run for offline execution")
 	once := flag.Bool("once", false, "perform one cycle then exit")
 	flag.Parse()
-	if *admission == *prepare || *profile == "" || flag.NArg() != 0 {
-		return fmt.Errorf("usage: worker (--admission-only | --prepare-only) --profile <profile> [--once]")
+	modes := 0
+	for _, v := range []bool{*admission, *prepare, *execute} {
+		if v {
+			modes++
+		}
+	}
+	if modes != 1 || *profile == "" || flag.NArg() != 0 || (*execute && (!*once || *runID == "")) || (!*execute && *runID != "") {
+		return fmt.Errorf("worker requires exactly one mode and profile; execute-offline also requires --run <id> --once")
 	}
 	if os.Getenv("DATABASE_URL") != "" {
 		return fmt.Errorf("Worker must not carry DATABASE_URL; use the mTLS Control API")
 	}
 	config := os.Getenv("WORKER_PREPARATION_CONFIG")
-	if !*prepare && config != "" {
-		return fmt.Errorf("admission-only cannot ignore a supplied preparation configuration")
+	if *admission && config != "" {
+		return fmt.Errorf("admission-only cannot ignore preparation configuration")
 	}
-	var preparer *preparation.Preparer
+	if !*execute && os.Getenv("WORKER_OFFLINE_CONFIG") != "" {
+		return fmt.Errorf("non-execution mode cannot ignore offline configuration")
+	}
+	var p *preparation.Preparer
 	var err error
-	if *prepare {
+	if *prepare || *execute {
 		if config == "" {
-			return fmt.Errorf("prepare-only requires WORKER_PREPARATION_CONFIG")
+			return fmt.Errorf("WORKER_PREPARATION_CONFIG required")
 		}
-		preparer, err = preparation.Load(config)
+		p, err = preparation.Load(config)
 		if err != nil {
 			return err
 		}
-		defer preparer.Close()
+		defer p.Close()
 	}
 	client, err := controlclient.FromEnvironment(os.Getenv)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
-	if preparer != nil && preparer.Subject() != client.Subject() {
-		return fmt.Errorf("preparation policy does not belong to the authenticated Worker")
+	if p != nil && p.Subject() != client.Subject() {
+		return fmt.Errorf("preparation policy does not belong to authenticated Worker")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if *execute {
+		return executeOffline(ctx, client, p, *profile, *runID)
+	}
 	step := func(ctx context.Context) error {
-		if preparer != nil {
-			receipt, err := workeragent.PrepareOnce(ctx, client, *profile, preparer)
+		if p != nil {
+			receipt, err := workeragent.PrepareOnce(ctx, client, *profile, p)
 			if err != nil {
 				return err
 			}

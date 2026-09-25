@@ -78,6 +78,8 @@ jobs:
           go test -race -count=5 -timeout 2m ./internal/workspace ./internal/preparation
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestPreparationStore
           go test -race -count=3 -timeout 3m ./cmd/control-plane -run TestPreparationCommand
+      - name: Offline authority repeated database regression
+        run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestOfflineStore
       - name: Vet
         run: go vet ./...
       - name: Build binaries
@@ -85,3 +87,40 @@ jobs:
           go build ./cmd/control-plane
           go build ./cmd/eng
           go build ./cmd/worker
+          CGO_ENABLED=0 go build ./cmd/sandbox-guard
+
+  offline:
+    name: offline-container-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+      EP_SANDBOX_INTEGRATION: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Require real container environment
+        run: |
+          test "$(id -u)" -ne 0
+          test -S /var/run/docker.sock
+          docker version
+          go mod download
+      - name: Real offline boundary and command integration
+        run: go test -race -v -count=2 -timeout 5m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
