@@ -59,6 +59,8 @@ var routeCapabilities = map[string]string{
 	"GET /api/v1/evidence/{id}":           access.Read,
 	"POST /api/v1/verifications":          access.VerificationCreate,
 	"GET /api/v1/verifications/{id}":      access.Read,
+	"POST /api/v1/reviews":                access.ReviewCreate,
+	"GET /api/v1/reviews/{id}":            access.Read,
 	"POST /api/v1/closures":               access.ClosureCreate,
 	"GET /api/v1/closures/{id}":           access.Read,
 }
@@ -170,6 +172,14 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 			return http.StatusBadRequest
 		}
 		if body.Verifier != id.Subject() {
+			return http.StatusForbidden
+		}
+	case "POST /api/v1/reviews":
+		var body createReviewRequest
+		if strictjson.Decode(data, &body) != nil {
+			return http.StatusBadRequest
+		}
+		if body.Reviewer != id.Subject() {
 			return http.StatusForbidden
 		}
 	case "POST /api/v1/recovery/complete":
