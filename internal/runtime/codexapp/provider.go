@@ -172,11 +172,11 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 }
 
 func validFederationRuleID(value string) bool {
-	if !strings.HasPrefix(value, "idpm_") || len(value) < 6 || len(value) > 256 {
+	if value == "" || len(value) > 256 || strings.TrimSpace(value) != value {
 		return false
 	}
 	for _, ch := range value {
-		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-') {
+		if ch < 0x20 || ch == 0x7f {
 			return false
 		}
 	}
