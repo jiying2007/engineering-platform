@@ -240,7 +240,6 @@ func TestReviewerWorkerProfileSeparationIsCheckedAfterProfileParsing(t *testing.
 	}
 }
 
-
 func TestEngineeringEvidenceAuthoritiesAreDedicatedAndSeparated(t *testing.T) {
 	for _, tc := range []struct {
 		subject   string
