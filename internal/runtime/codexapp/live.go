@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -126,6 +127,15 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err != nil {
 		return receipt, err
 	}
+	versionHome, err := os.MkdirTemp("", "engineering-platform-codex-live-version-")
+	if err != nil {
+		return receipt, err
+	}
+	defer os.RemoveAll(versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
+		return receipt, fmt.Errorf("live qualification requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	}
 	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	env := []string{
@@ -153,13 +163,20 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err := cmd.Start(); err != nil {
 		return receipt, err
 	}
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
-	waited := false
+	processJoined := false
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !waited {
-			_ = cmd.Wait()
+		if !processJoined {
+			select {
+			case <-waitDone:
+			case <-time.After(5 * time.Second):
+				_ = cmd.Process.Kill()
+				<-waitDone
+			}
 		}
 	}()
 	adapter, err := NewAdapter(client, work)
@@ -182,16 +199,12 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		return receipt, err
 	}
 	_ = client.Close()
-	waitCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-	defer stop()
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
 	select {
-	case <-waitCtx.Done():
+	case <-time.After(5 * time.Second):
 		cancel()
 		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
-	case waitErr := <-done:
-		waited = true
+	case waitErr := <-waitDone:
+		processJoined = true
 		if waitErr != nil {
 			return receipt, fmt.Errorf("app-server exited after live qualification: %w", waitErr)
 		}
