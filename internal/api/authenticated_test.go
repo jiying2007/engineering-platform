@@ -281,7 +281,7 @@ func TestRecoveryRequiresIndependentEpochGate(t *testing.T) {
 	}
 	gate := &rejectingRecoveryGate{}
 	server, pki := securedTestServer(t, backend, nil, AuthenticatedOptions{RecoveryCompletion: gate})
-	secureCall(t, pki.Client(t, recoverySubject), server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1, "reconciled": true}, http.StatusForbidden)
+	secureCall(t, pki.Client(t, recoverySubject), server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusForbidden)
 	if gate.calls.Load() != 1 {
 		t.Fatal("gate did not receive authenticated subject/exact epoch")
 	}
