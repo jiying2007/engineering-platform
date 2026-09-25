@@ -25,7 +25,7 @@ const (
 )
 
 type QualificationReceipt struct {
-	SchemaVersion              int    `json:"schema_version"`
+	SchemaVersion               int    `json:"schema_version"`
 	CLI                         string `json:"cli"`
 	Version                     string `json:"version"`
 	ReleaseTag                  string `json:"release_tag"`
@@ -160,7 +160,7 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	_ = cmd.Wait()
 
 	receipt = QualificationReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:               1,
 		CLI:                         "codex-cli",
 		Version:                     expectedVersion,
 		ReleaseTag:                  QualifiedCodexReleaseTag,
@@ -197,6 +197,11 @@ func generateSchema(ctx context.Context, executable, home, out string, experimen
 }
 
 func codexCommand(ctx context.Context, executable, home string, args ...string) ([]byte, error) {
+	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, err
+		}
+	}
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Env = []string{
 		"PATH=/usr/local/bin:/usr/bin:/bin",
