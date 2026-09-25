@@ -112,13 +112,13 @@ type PromptIdentity struct {
 	BundleDigest       string   `json:"context_bundle_digest"`
 }
 
-func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath string) (string, string, error) {
+func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptIdentity, string, error) {
 	if _, err := workerqueue.Validate(a); err != nil {
-		return "", "", err
+		return PromptIdentity{}, "", err
 	}
 	if preparation.Verify(a, prep, prep.Facts, prep.Admission.Worker) != nil ||
-		!canonical.ValidDigest(prep.Facts.BundleDigest) || strings.TrimSpace(bundlePath) == "" {
-		return "", "", workerqueue.ErrIdentity
+		!canonical.ValidDigest(prep.Facts.BundleDigest) {
+		return PromptIdentity{}, "", workerqueue.ErrIdentity
 	}
 	identity := PromptIdentity{
 		Version: 1, RunID: a.Intent.RunID, TaskContractDigest: a.Intent.TaskDigest,
@@ -131,6 +131,19 @@ func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath strin
 		BundleDigest: prep.Facts.BundleDigest,
 	}
 	digest, err := canonical.Digest(identity)
+	return identity, digest, err
+}
+
+func PromptIdentityDigest(a workerqueue.Assignment, prep preparation.Receipt) (string, error) {
+	_, digest, err := promptIdentity(a, prep)
+	return digest, err
+}
+
+func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath string) (string, string, error) {
+	if strings.TrimSpace(bundlePath) == "" {
+		return "", "", workerqueue.ErrIdentity
+	}
+	identity, digest, err := promptIdentity(a, prep)
 	if err != nil {
 		return "", "", err
 	}
@@ -174,7 +187,9 @@ type Result struct {
 
 func (r Result) Validate(p Profile, permit Permit) error {
 	pd, err := p.Digest()
-	if err != nil || permit.Token.ProfileDigest != pd || !canonical.ValidDigest(r.PromptIdentityDigest) ||
+	expectedPrompt, promptErr := PromptIdentityDigest(permit.Assignment, permit.Preparation)
+	if err != nil || promptErr != nil || permit.Token.ProfileDigest != pd ||
+		r.PromptIdentityDigest != expectedPrompt ||
 		r.Codex.Validate() != nil || r.Codex.BinaryDigest != p.BinaryDigest ||
 		r.Codex.EngineeringConfigDigest != p.EngineeringConfigDigest || r.Codex.Model != p.Model ||
 		r.Change.Recipe != workspace.FinalizeRecipe ||
