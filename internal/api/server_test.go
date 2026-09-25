@@ -343,6 +343,53 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 	}, http.StatusUnprocessableEntity)
 }
 
+func TestFailedIndependentReviewStaysVerifyingAndCannotClose(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+	delivery := createCompletedDelivery(t, h, "review-fail")
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id": "ev-review-fail",
+			"issuer":      "ci",
+			"procedure":   "ci.test",
+			"result":      "PASS",
+			"applicable":  true,
+		},
+	}, http.StatusCreated)
+	mustRequest(t, h, http.MethodPost, "/api/v1/verifications", map[string]any{
+		"verification_report_id": "vr-review-fail",
+		"delivery_receipt_id":    delivery.ID,
+		"verifier":               "verification-service",
+		"evidence_ids":           []string{"ev-review-fail"},
+	}, http.StatusCreated)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/reviews", map[string]any{
+		"review_report_id":       "review-fail",
+		"delivery_receipt_id":    delivery.ID,
+		"verification_report_id": "vr-review-fail",
+		"reviewer":               "independent-reviewer",
+		"result":                 "FAIL",
+		"findings": []any{
+			map[string]any{"finding_id": "blocking-1", "severity": "BLOCKING", "summary": "change is not acceptable"},
+		},
+	}, http.StatusCreated)
+
+	workBody := mustRequest(t, h, http.MethodGet, "/api/v1/work-items/work-review-fail", nil, http.StatusOK)
+	var work core.WorkItem
+	mustJSON(t, workBody, &work)
+	if work.State != core.WorkVerifying {
+		t.Fatalf("failed review must remain repairable in VERIFYING, got %s", work.State)
+	}
+	mustRequest(t, h, http.MethodPost, "/api/v1/closures", map[string]any{
+		"closure_receipt_id":     "closure-review-fail",
+		"delivery_receipt_id":    delivery.ID,
+		"verification_report_id": "vr-review-fail",
+		"review_report_id":       "review-fail",
+	}, http.StatusUnprocessableEntity)
+}
+
 func TestVerificationRejectsUnregisteredEvidenceReference(t *testing.T) {
 	s := NewServer(store.NewMemory())
 	h := s.Handler()
