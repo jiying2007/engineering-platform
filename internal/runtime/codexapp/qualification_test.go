@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
 func writeSchemaFixture(t *testing.T, experimental bool) string {
@@ -82,22 +82,22 @@ func TestPinnedProviderRejectsExecutableByteDrift(t *testing.T) {
 
 func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 	data, err := MarshalQualification(QualificationReceipt{
-		SchemaVersion:               1,
-		CLI:                         "codex-cli",
-		Version:                     QualifiedCodexVersion,
-		ReleaseTag:                  QualifiedCodexReleaseTag,
-		ReleaseCommit:               QualifiedCodexReleaseCommit,
-		BinaryDigest:                "sha256:" + strings.Repeat("a", 64),
-		StableSchemaDigest:          "sha256:" + strings.Repeat("b", 64),
-		ExperimentalSchemaDigest:    "sha256:" + strings.Repeat("c", 64),
-		Transport:                   "stdio",
-		FreshProcess:                true,
-		InitializePassed:            true,
-		ThreadStartPassed:           true,
-		ThreadStartModel:            "gpt-5.6-sol",
-		StableSchemaContractChecked: true,
-		ExperimentalSurfaceChecked:  true,
-		CredentialSafeConfigDigest:  canonical.BytesDigest([]byte(credentialSafeConfig)),
+		SchemaVersion:                1,
+		CLI:                          "codex-cli",
+		Version:                      QualifiedCodexVersion,
+		ReleaseTag:                   QualifiedCodexReleaseTag,
+		ReleaseCommit:                QualifiedCodexReleaseCommit,
+		BinaryDigest:                 "sha256:" + strings.Repeat("a", 64),
+		StableSchemaDigest:           "sha256:" + strings.Repeat("b", 64),
+		ExperimentalSchemaDigest:     "sha256:" + strings.Repeat("c", 64),
+		Transport:                    "stdio",
+		FreshProcess:                 true,
+		InitializePassed:             true,
+		ThreadStartPassed:            true,
+		ThreadStartModel:             "gpt-5.6-sol",
+		StableSchemaContractChecked:  true,
+		ExperimentalSurfaceChecked:   true,
+		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialSafeProfileChecked: true,
 	})
 	if err != nil {
@@ -107,7 +107,6 @@ func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 		t.Fatal("qualification receipt contains machine locator")
 	}
 }
-
 
 func TestCredentialSafeProfileProbeRequiresDisabledStableFeatures(t *testing.T) {
 	root := t.TempDir()
