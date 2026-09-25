@@ -115,10 +115,12 @@ func newImportFixture(t *testing.T) importFixture {
 	for _, job := range receipt.Jobs {
 		f.jobs.Jobs = append(f.jobs.Jobs, struct {
 			ID         int64  `json:"id"`
+			RunID      int64  `json:"run_id"`
+			HeadSHA    string `json:"head_sha"`
 			Name       string `json:"name"`
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
-		}{ID: job.ID, Name: job.Name, Status: "completed", Conclusion: "success"})
+		}{ID: job.ID, RunID: f.runID, HeadSHA: f.sourceSHA, Name: job.Name, Status: "completed", Conclusion: "success"})
 	}
 	f.delivery = core.DeliveryReceipt{
 		ID:            "delivery-1",
@@ -147,25 +149,20 @@ func (f importFixture) handler(t *testing.T) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/repos/" + f.repository + "/actions/runs/42":
-			var run githubRun
-			run.ID = f.runID
-			run.Name = "CI"
-			run.Event = "pull_request"
-			run.Status = "completed"
-			run.Conclusion = "success"
-			run.HeadSHA = f.testedSHA
-			run.RunAttempt = 1
-			run.Pulls = make([]struct {
-				Head struct {
-					SHA string `json:"sha"`
-				} `json:"head"`
-				Base struct {
-					SHA string `json:"sha"`
-				} `json:"base"`
-			}, 1)
-			run.Pulls[0].Head.SHA = f.sourceSHA
-			run.Pulls[0].Base.SHA = f.baseSHA
-			_ = json.NewEncoder(w).Encode(run)
+			_ = json.NewEncoder(w).Encode(githubRun{
+				ID: f.runID, Name: "CI", Event: "pull_request", Status: "completed",
+				Conclusion: "success", HeadSHA: f.sourceSHA, RunAttempt: 1,
+			})
+		case "/repos/" + f.repository + "/git/commits/" + f.testedSHA:
+			commit := githubCommit{SHA: f.testedSHA}
+			commit.Parents = make([]struct {
+				SHA string `json:"sha"`
+			}, 2)
+			commit.Parents[0].SHA = f.baseSHA
+			commit.Parents[1].SHA = f.sourceSHA
+			commit.Verification.Verified = true
+			commit.Verification.Reason = "valid"
+			_ = json.NewEncoder(w).Encode(commit)
 		case "/repos/" + f.repository + "/actions/runs/42/jobs":
 			if r.URL.Query().Get("per_page") != "100" {
 				t.Errorf("jobs query not bounded")
@@ -212,7 +209,7 @@ func TestGitHubImportBindsLivePRFactsToExactDelivery(t *testing.T) {
 }
 
 func TestGitHubImportRejectsDeliveryAndLiveFactSubstitution(t *testing.T) {
-	for _, kind := range []string{"result-commit", "base-commit", "artifact", "job", "zip-digest", "expired"} {
+	for _, kind := range []string{"result-commit", "base-commit", "artifact", "job", "job-source", "zip-digest", "expired"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newImportFixture(t)
 			switch kind {
@@ -224,6 +221,8 @@ func TestGitHubImportRejectsDeliveryAndLiveFactSubstitution(t *testing.T) {
 				f.delivery.Artifacts[0].Digest = "sha256:" + strings.Repeat("f", 64)
 			case "job":
 				f.jobs.Jobs[1].Conclusion = "failure"
+			case "job-source":
+				f.jobs.Jobs[1].HeadSHA = strings.Repeat("d", 40)
 			case "zip-digest":
 				f.artifacts[2].Digest = "sha256:" + strings.Repeat("e", 64)
 			case "expired":
@@ -260,5 +259,44 @@ func TestReadEnvelopeZIPRejectsExtraOrWrongEntry(t *testing.T) {
 func TestGitHubArtifactIDIsStable(t *testing.T) {
 	if got := GitHubArtifactID(42, 103); got != "github-actions/run/42/artifact/103" {
 		t.Fatal(got)
+	}
+}
+
+
+func TestPullRequestFactsValidateTaskAndReturnArtifactCopy(t *testing.T) {
+	f := newImportFixture(t)
+	verifier := verifierForFixture(t, f)
+	facts, err := verifier.ResolvePullRequest(context.Background(), f.repository, f.runID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := facts.ValidateTask(core.TaskContract{Repository: f.repository, BaseCommit: f.baseSHA}); err != nil {
+		t.Fatal(err)
+	}
+	if err := facts.ValidateTask(core.TaskContract{Repository: f.repository, BaseCommit: strings.Repeat("d", 40)}); err == nil {
+		t.Fatal("wrong task base accepted")
+	}
+	refs := facts.Artifacts()
+	refs[0].Digest = "sha256:" + strings.Repeat("f", 64)
+	if facts.Artifacts()[0].Digest == refs[0].Digest {
+		t.Fatal("artifact facts alias caller mutation")
+	}
+}
+
+func TestValidTestedMergeRequiresVerifiedExactParents(t *testing.T) {
+	commit := githubCommit{SHA: strings.Repeat("a", 40)}
+	commit.Parents = make([]struct {
+		SHA string `json:"sha"`
+	}, 2)
+	commit.Parents[0].SHA = strings.Repeat("b", 40)
+	commit.Parents[1].SHA = strings.Repeat("c", 40)
+	commit.Verification.Verified = true
+	commit.Verification.Reason = "valid"
+	if !validTestedMerge(commit, commit.Parents[0].SHA, commit.Parents[1].SHA, commit.SHA) {
+		t.Fatal("exact verified merge rejected")
+	}
+	commit.Verification.Verified = false
+	if validTestedMerge(commit, commit.Parents[0].SHA, commit.Parents[1].SHA, commit.SHA) {
+		t.Fatal("unverified synthetic merge accepted")
 	}
 }
