@@ -123,13 +123,12 @@ func TestTLSConfigurationRejectsUnsafeAndMissingInputs(t *testing.T) {
 	}
 }
 
-
 func TestTrustedCIEvidenceAuthorityIsReserved(t *testing.T) {
 	valid := PrincipalSpec{
-		Subject: TrustedCIImporterSubject,
-		Scope: "platform",
-		Capabilities: []string{Read, EvidenceRegister},
-		EvidenceIssuer: TrustedCIIssuer,
+		Subject:            TrustedCIImporterSubject,
+		Scope:              "platform",
+		Capabilities:       []string{Read, EvidenceRegister},
+		EvidenceIssuer:     TrustedCIIssuer,
 		EvidenceProcedures: []string{TrustedCIProcedure},
 	}
 	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
@@ -137,24 +136,24 @@ func TestTrustedCIEvidenceAuthorityIsReserved(t *testing.T) {
 	}
 	for _, spec := range []PrincipalSpec{
 		{
-			Subject: testSubject,
-			Scope: "platform",
-			Capabilities: []string{Read, EvidenceRegister},
-			EvidenceIssuer: TrustedCIIssuer,
+			Subject:            testSubject,
+			Scope:              "platform",
+			Capabilities:       []string{Read, EvidenceRegister},
+			EvidenceIssuer:     TrustedCIIssuer,
 			EvidenceProcedures: []string{TrustedCIProcedure},
 		},
 		{
-			Subject: TrustedCIImporterSubject,
-			Scope: "platform",
-			Capabilities: []string{Read, EvidenceRegister},
-			EvidenceIssuer: "ci",
+			Subject:            TrustedCIImporterSubject,
+			Scope:              "platform",
+			Capabilities:       []string{Read, EvidenceRegister},
+			EvidenceIssuer:     "ci",
 			EvidenceProcedures: []string{TrustedCIProcedure},
 		},
 		{
-			Subject: TrustedCIImporterSubject,
-			Scope: "platform",
-			Capabilities: []string{Read, EvidenceRegister},
-			EvidenceIssuer: TrustedCIIssuer,
+			Subject:            TrustedCIImporterSubject,
+			Scope:              "platform",
+			Capabilities:       []string{Read, EvidenceRegister},
+			EvidenceIssuer:     TrustedCIIssuer,
 			EvidenceProcedures: []string{TrustedCIProcedure, "ci.other"},
 		},
 	} {
