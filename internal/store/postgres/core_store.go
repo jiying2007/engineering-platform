@@ -959,6 +959,94 @@ func (s *Store) GetVerification(id string) (verification.Report, error) {
 	return report, nil
 }
 
+func (s *Store) CreateReviewAndUpdateWork(
+	item review.Report,
+	expectedWorkVersion uint64,
+	work core.WorkItem,
+) error {
+	if err := review.Validate(item); err != nil {
+		return corestore.ErrConflict
+	}
+	delivery, err := s.GetDelivery(item.DeliveryReceiptID)
+	if err != nil {
+		return err
+	}
+	verificationReport, err := s.GetVerification(item.VerificationReportID)
+	if err != nil {
+		return err
+	}
+	currentWork, err := s.GetWork(delivery.WorkItemID)
+	if err != nil {
+		return err
+	}
+	if currentWork.Version != expectedWorkVersion || currentWork.ID != work.ID ||
+		(currentWork.State != core.WorkVerifying && currentWork.State != core.WorkReviewing) ||
+		item.SubjectDigest != delivery.SubjectDigest ||
+		verificationReport.Result != "PASS" ||
+		verificationReport.DeliveryReceiptID != delivery.ID ||
+		verificationReport.SubjectDigest != delivery.SubjectDigest ||
+		item.Reviewer == verificationReport.Verifier ||
+		item.Reviewer == currentWork.HumanOwner ||
+		work.State != core.WorkReviewing {
+		return corestore.ErrConflict
+	}
+
+	raw, err := encodeJSON(item)
+	if err != nil {
+		return err
+	}
+	payload := map[string]any{"review": item, "work": work}
+	input, err := auditInput("review.created", "ReviewReport", item.ID, payload)
+	if err != nil {
+		return err
+	}
+	_, err = s.Mutate(bg(), Mutation{
+		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			const insertReview = `
+INSERT INTO review_reports (
+    review_report_id,delivery_receipt_id,verification_report_id,subject_digest,
+    reviewer,result,report_json,created_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`
+			if _, err := tx.Exec(
+				ctx, insertReview,
+				item.ID, item.DeliveryReceiptID, item.VerificationReportID, item.SubjectDigest,
+				item.Reviewer, item.Result, string(raw), item.CreatedAt,
+			); err != nil {
+				return mapWriteError(err)
+			}
+			const updateWork = `
+UPDATE work_items
+SET state=$1,version=version+1,updated_at=now()
+WHERE work_item_id=$2 AND version=$3 AND state IN ('VERIFYING','REVIEWING')`
+			tag, err := tx.Exec(ctx, updateWork, string(work.State), work.ID, expectedWorkVersion)
+			if err != nil {
+				return mapWriteError(err)
+			}
+			if tag.RowsAffected() != 1 {
+				return corestore.ErrConflict
+			}
+			return nil
+		},
+		Audit: input,
+	})
+	return err
+}
+
+func (s *Store) GetReview(id string) (review.Report, error) {
+	var raw []byte
+	if err := s.pool.QueryRow(
+		bg(),
+		"SELECT report_json FROM review_reports WHERE review_report_id=$1",
+		id,
+	).Scan(&raw); err != nil {
+		return review.Report{}, mapReadError(err)
+	}
+	var item review.Report
+	if err := json.Unmarshal(raw, &item); err != nil {
+		return review.Report{}, fmt.Errorf("decode review report: %w", err)
+	}
+	return item, nil
+}
 func (s *Store) CreateClosureAndUpdateWork(
 	item core.ClosureReceipt,
 	expectedVersion uint64,
@@ -987,7 +1075,7 @@ INSERT INTO closure_receipts (
 				ctx, insertClosure,
 				item.ID, item.WorkItemID, item.TaskContractDigest, item.RunID,
 				item.DeliveryReceiptID, item.VerificationReportID,
-				nullIfEmpty(item.ReviewReportID), item.SubjectDigest, item.Result,
+				item.ReviewReportID, item.SubjectDigest, item.Result,
 				string(raw), item.CreatedAt,
 			); err != nil {
 				return mapWriteError(err)
