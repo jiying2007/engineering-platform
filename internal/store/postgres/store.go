@@ -2,13 +2,16 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbschema "github.com/jiying2007/engineering-platform/db"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 )
@@ -124,39 +127,57 @@ func (s *Store) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manage
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
-	expectedState := recovery.Manager{
-		Epoch: epoch,
-		Mode:  recovery.Normal,
-	}
-	input, err := auditInput("recovery.completed", "PlatformState", "singleton", expectedState)
+	ctx := context.Background()
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if err != nil {
 		return recovery.Manager{}, err
 	}
-	var result recovery.Manager
-	_, err = s.Mutate(context.Background(), Mutation{
-		Apply: func(ctx context.Context, tx pgx.Tx) error {
-			const query = `
-UPDATE platform_state
-SET recovery_mode = 'NORMAL',
-    updated_at = now()
-WHERE singleton_id = true
-  AND recovery_epoch = $1
-  AND recovery_mode = 'RECOVERY_RECONCILIATION'
-RETURNING recovery_epoch,recovery_mode`
-			var mode string
-			scanErr := tx.QueryRow(ctx, query, epoch).Scan(&result.Epoch, &mode)
-			if errors.Is(scanErr, pgx.ErrNoRows) {
-				return corestore.ErrConflict
-			}
-			if scanErr != nil {
-				return fmt.Errorf("complete recovery: %w", scanErr)
-			}
-			result.Mode = recovery.Mode(mode)
-			return nil
-		},
-		Audit: input,
-	})
+	defer func() { _ = tx.Rollback(ctx) }()
+	var currentEpoch uint64
+	var mode string
+	if err := tx.QueryRow(ctx, `SELECT recovery_epoch,recovery_mode FROM platform_state WHERE singleton_id=true FOR UPDATE`).Scan(&currentEpoch, &mode); err != nil {
+		return recovery.Manager{}, err
+	}
+	if currentEpoch != epoch || mode != string(recovery.RecoveryReconciliation) {
+		return recovery.Manager{}, corestore.ErrConflict
+	}
+	var proofRaw []byte
+	if err := tx.QueryRow(ctx, `SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=$1`, epoch).Scan(&proofRaw); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return recovery.Manager{}, recovery.ErrReconciliationRequired
+		}
+		return recovery.Manager{}, err
+	}
+	var proof recovery.Proof
+	if err := json.Unmarshal(proofRaw, &proof); err != nil || proof.Validate() != nil {
+		return recovery.Manager{}, recovery.ErrReconciliationRequired
+	}
+	facts, err := recoveryFacts(ctx, tx)
 	if err != nil {
+		return recovery.Manager{}, err
+	}
+	if !facts.Clear() {
+		return recovery.Manager{}, recovery.ErrReconciliationRequired
+	}
+	factsDigest, err := canonical.Digest(facts)
+	if err != nil || factsDigest != proof.FactsDigest {
+		return recovery.Manager{}, recovery.ErrReconciliationRequired
+	}
+	result := recovery.Manager{Epoch: epoch, Mode: recovery.Normal}
+	input, err := auditInput("recovery.completed", "PlatformState", "singleton", struct {
+		State recovery.Manager `json:"state"`
+		Proof recovery.Proof   `json:"proof"`
+	}{State: result, Proof: proof})
+	if err != nil {
+		return recovery.Manager{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE platform_state SET recovery_mode='NORMAL',updated_at=clock_timestamp() WHERE singleton_id=true AND recovery_epoch=$1 AND recovery_mode='RECOVERY_RECONCILIATION'`, epoch); err != nil {
+		return recovery.Manager{}, err
+	}
+	if _, err := appendAudit(ctx, tx, input, time.Now().UTC()); err != nil {
+		return recovery.Manager{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return recovery.Manager{}, err
 	}
 	return result, nil
