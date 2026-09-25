@@ -174,7 +174,8 @@ func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkIte
 }
 
 func (m *Memory) CreateTask(task core.TaskContract, plan verification.Plan) error {
-	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" {
+	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" ||
+		!verification.ValidatePlan(plan, task.AcceptanceCriteria) {
 		return ErrConflict
 	}
 	taskDigest, err := task.Digest()
@@ -227,7 +228,8 @@ func (m *Memory) CreateTask(task core.TaskContract, plan verification.Plan) erro
 }
 
 func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
-	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" {
+	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" ||
+		!verification.ValidatePlan(plan, task.AcceptanceCriteria) {
 		return ErrConflict
 	}
 	taskDigest, err := task.Digest()
