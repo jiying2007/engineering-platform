@@ -13,6 +13,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/audit"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
