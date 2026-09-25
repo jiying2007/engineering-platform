@@ -4,11 +4,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -28,6 +27,7 @@ const (
 	GitHubArtifactMediaType = "application/vnd.github.actions.artifact+zip"
 	maxGitHubJSON           = 4 << 20
 	maxEvidenceZIP          = 2 << 20
+	maxRetainedArtifact     = 1 << 30
 )
 
 type githubVerifier struct {
@@ -289,7 +289,7 @@ func uniqueTrustedArtifact(artifacts []githubArtifact, runID int64, testedSHA st
 	count := 0
 	for _, artifact := range artifacts {
 		if artifact.Name == want {
-			if !validLiveArtifact(artifact, runID, testedSHA) {
+			if !validTrustedArtifact(artifact, runID, testedSHA) {
 				return githubArtifact{}, fmt.Errorf("invalid trusted CI evidence artifact")
 			}
 			found = artifact
@@ -302,12 +302,16 @@ func uniqueTrustedArtifact(artifacts []githubArtifact, runID int64, testedSHA st
 	return found, nil
 }
 
-func validLiveArtifact(a githubArtifact, runID int64, headSHA string) bool {
-	return a.ID > 0 && a.Size > 0 && a.Size <= maxEvidenceZIP && canonical.ValidDigest(a.Digest) && !a.Expired && a.Workflow.ID == runID && a.Workflow.HeadSHA == headSHA
+func validArtifactIdentity(a githubArtifact, runID int64, headSHA string, maxSize int64) bool {
+	return a.ID > 0 && a.Size > 0 && a.Size <= maxSize && canonical.ValidDigest(a.Digest) && !a.Expired && a.Workflow.ID == runID && a.Workflow.HeadSHA == headSHA
+}
+
+func validTrustedArtifact(a githubArtifact, runID int64, headSHA string) bool {
+	return validArtifactIdentity(a, runID, headSHA, maxEvidenceZIP)
 }
 
 func sameArtifact(live githubArtifact, fact Artifact, runID int64, headSHA string) bool {
-	return validLiveArtifact(live, runID, headSHA) && live.Name == fact.Name && live.ID == fact.ID && live.Digest == fact.Digest && live.Size == fact.Size
+	return validArtifactIdentity(live, runID, headSHA, maxRetainedArtifact) && live.Name == fact.Name && live.ID == fact.ID && live.Digest == fact.Digest && live.Size == fact.Size
 }
 
 func livePullMatches(run githubRun, sourceSHA, baseSHA string) bool {
@@ -372,7 +376,3 @@ func readEnvelopeZIP(data []byte) ([]byte, error) {
 	return body, nil
 }
 
-func zipDigest(data []byte) string {
-	sum := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(sum[:])
-}
