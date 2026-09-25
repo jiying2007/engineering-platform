@@ -95,32 +95,27 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if err != nil || info.Mode().Perm()&0o077 != 0 {
 		return nil, fmt.Errorf("isolated HOME must be owner-only")
 	}
-	// A freshly allocated HOME cannot import stale provider/XDG configuration.
-	entries, err := os.ReadDir(home)
-	if err != nil || len(entries) != 0 {
-		return nil, fmt.Errorf("fresh empty isolated HOME required")
-	}
-	// Real Codex requires an explicitly selected CODEX_HOME to exist. Create only
-	// the platform-owned empty derived directories after proving HOME was empty.
-	for _, dir := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
-		if err := os.Mkdir(dir, 0o700); err != nil {
-			return nil, fmt.Errorf("initialize isolated runtime home: %w", err)
-		}
-	}
 	wifRule, hasRule := values["OPENAI_FEDERATION_RULE_ID"]
 	wifToken, hasToken := values["OPENAI_IDENTITY_TOKEN_FILE"]
 	wifContext, hasContext := values["OPENAI_WORKLOAD_IDENTITY_CONTEXT"]
+	baseURL, hasBaseURL := values["OPENAI_BASE_URL"]
 	if hasRule != hasToken {
 		return nil, fmt.Errorf("workload identity requires both federation rule and identity token file")
 	}
 	if hasContext && !hasRule {
 		return nil, fmt.Errorf("workload identity context requires workload identity")
 	}
+	if hasBaseURL {
+		u, e := url.Parse(baseURL)
+		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return nil, fmt.Errorf("explicit provider endpoint must be HTTPS without credentials or query")
+		}
+	}
 	if hasRule {
 		if _, hasAPIKey := values["OPENAI_API_KEY"]; hasAPIKey {
 			return nil, fmt.Errorf("workload identity cannot carry a long-lived API key")
 		}
-		if _, hasBase := values["OPENAI_BASE_URL"]; hasBase {
+		if hasBaseURL {
 			return nil, fmt.Errorf("workload identity cannot override the OpenAI endpoint")
 		}
 		if !validFederationRuleID(wifRule) {
@@ -140,6 +135,17 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			}
 		}
 	}
+	// No filesystem mutation occurs until every credential and endpoint input has
+	// passed validation. A rejected launch must leave a fresh HOME reusable.
+	entries, err := os.ReadDir(home)
+	if err != nil || len(entries) != 0 {
+		return nil, fmt.Errorf("fresh empty isolated HOME required")
+	}
+	for _, dir := range []string{filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			return nil, fmt.Errorf("initialize isolated runtime home: %w", err)
+		}
+	}
 	env := []string{"PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "TZ=UTC", "HOME=" + home, "CODEX_HOME=" + filepath.Join(home, ".codex"), "XDG_CONFIG_HOME=" + filepath.Join(home, ".config"), "XDG_CACHE_HOME=" + filepath.Join(home, ".cache")}
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
@@ -153,12 +159,8 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			env = append(env, "OPENAI_WORKLOAD_IDENTITY_CONTEXT="+wifContext)
 		}
 	}
-	if base, ok := values["OPENAI_BASE_URL"]; ok {
-		u, e := url.Parse(base)
-		if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
-			return nil, fmt.Errorf("explicit provider endpoint must be HTTPS without credentials or query")
-		}
-		env = append(env, "OPENAI_BASE_URL="+base)
+	if hasBaseURL {
+		env = append(env, "OPENAI_BASE_URL="+baseURL)
 	}
 	// Current Codex documents --stdio as the explicit equivalent of
 	// --listen stdio://. A new process is launched for every qualified session;
@@ -168,7 +170,6 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	cmd.Env = env
 	return cmd, nil
 }
-
 
 func validFederationRuleID(value string) bool {
 	if !strings.HasPrefix(value, "idpm_") || len(value) < 6 || len(value) > 256 {
