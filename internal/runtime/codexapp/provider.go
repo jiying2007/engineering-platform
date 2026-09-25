@@ -2,20 +2,36 @@ package codexapp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
-type Provider struct{ executable string }
+type Provider struct {
+	executable string
+	digest     string
+}
 
 func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
-func (p *Provider) Name() string              { return "codex-app-server" }
+
+// NewPinnedProvider binds every launch to the exact bytes qualified by the host.
+// This does not replace executable ownership or OS isolation checks.
+func NewPinnedProvider(executable, digest string) (*Provider, error) {
+	if !canonical.ValidDigest(digest) {
+		return nil, fmt.Errorf("valid executable digest required")
+	}
+	return &Provider{executable: executable, digest: digest}, nil
+}
+func (p *Provider) Name() string { return "codex-app-server" }
 
 // Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
 // paths, separate identities/read-only mounts and resource limits remain required.
@@ -34,6 +50,15 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	fi, err := os.Stat(executable)
 	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o022 != 0 || fi.Mode().Perm()&0o111 == 0 {
 		return nil, fmt.Errorf("trusted executable required")
+	}
+	if p.digest != "" {
+		actual, err := executableDigest(executable)
+		if err != nil {
+			return nil, err
+		}
+		if actual != p.digest {
+			return nil, fmt.Errorf("qualified executable bytes changed")
+		}
 	}
 	work, err := canonicalPath(spec.Dir, true)
 	if err != nil {
@@ -85,10 +110,26 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 		}
 		env = append(env, "OPENAI_BASE_URL="+base)
 	}
-	cmd := exec.CommandContext(ctx, executable, "app-server", "--listen", "stdio")
+	// Current Codex documents --stdio as the explicit equivalent of
+	// --listen stdio://. A new process is launched for every qualified session;
+	// the managed daemon/proxy path is intentionally not used.
+	cmd := exec.CommandContext(ctx, executable, "app-server", "--stdio")
 	cmd.Dir = work
 	cmd.Env = env
 	return cmd, nil
+}
+
+func executableDigest(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 func canonicalPath(path string, directory bool) (string, error) {
 	if !filepath.IsAbs(path) {
