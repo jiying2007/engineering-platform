@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
-	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 type Provider struct {
