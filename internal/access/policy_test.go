@@ -195,3 +195,48 @@ func TestIndependentReviewerCapabilitySeparation(t *testing.T) {
 		}
 	}
 }
+
+
+func TestRecoveryReconcilerIsSeparatedFromCompletionAndExecution(t *testing.T) {
+	valid := PrincipalSpec{
+		Subject: "urn:engineering-platform:operator:reconciler",
+		Scope: "platform",
+		Capabilities: []string{Read, RecoveryReconcile},
+	}
+	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
+		t.Fatalf("dedicated reconciler rejected: %v", err)
+	}
+	for _, capability := range []string{
+		RecoveryBegin, RecoveryComplete, WorkCreate, RunStart, RunControl,
+		ActionExecute, EvidenceRegister, VerificationCreate, ReviewCreate, ClosureCreate,
+		WorkerPoll, WorkerReport,
+	} {
+		spec := valid
+		spec.Capabilities = []string{Read, RecoveryReconcile, capability}
+		if capability == ActionExecute {
+			spec.Actions = []ActionGrant{{Action: "ci.dispatch", RiskClass: "CONTROLLED_MUTATION", Capability: "ci"}}
+		}
+		if capability == EvidenceRegister {
+			spec.EvidenceIssuer = "ci"
+			spec.EvidenceProcedures = []string{"ci.test"}
+		}
+		if capability == WorkerPoll || capability == WorkerReport {
+			spec.WorkerProfiles = []string{"worker/test"}
+		}
+		if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{spec}}); err == nil {
+			t.Fatalf("reconciler accepted incompatible capability %s", capability)
+		}
+	}
+}
+
+func TestReviewerWorkerProfileSeparationIsCheckedAfterProfileParsing(t *testing.T) {
+	spec := PrincipalSpec{
+		Subject: "urn:engineering-platform:reviewer:worker-leak",
+		Scope: "platform",
+		Capabilities: []string{Read, ReviewCreate},
+		WorkerProfiles: []string{"worker/test"},
+	}
+	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{spec}}); err == nil {
+		t.Fatal("reviewer accepted worker profile authority")
+	}
+}
