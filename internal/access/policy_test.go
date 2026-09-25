@@ -163,11 +163,10 @@ func TestTrustedCIEvidenceAuthorityIsReserved(t *testing.T) {
 	}
 }
 
-
 func TestIndependentReviewerCapabilitySeparation(t *testing.T) {
 	valid := PrincipalSpec{
-		Subject: "urn:engineering-platform:reviewer:independent",
-		Scope: "platform",
+		Subject:      "urn:engineering-platform:reviewer:independent",
+		Scope:        "platform",
 		Capabilities: []string{Read, ReviewCreate},
 	}
 	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
