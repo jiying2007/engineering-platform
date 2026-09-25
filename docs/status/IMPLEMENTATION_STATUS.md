@@ -1,8 +1,8 @@
 # Implementation Status
 
-Reviewed base: `34ff7d82316d1d095040ce6f62522fe5397dee86` (#44).
+Reviewed base: `747114948bfa35cf07cafcebdf1e32b7e0341047` (#46).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
-real Codex 0.155 qualification + retained Git/CI/artifact provenance + exact requirement-bound trusted CI import + mandatory independent Review gate; WIF-ready live-turn lane, no retained authenticated model-turn proof**.
+real Codex 0.155 qualification + retained Git/CI/artifact provenance + exact requirement-bound trusted CI import + mandatory independent Review + database-generated recovery proof/restore drill; WIF-ready live-turn lane, no retained authenticated model-turn proof**.
 
 ## Canonical scope
 
@@ -36,7 +36,7 @@ Evidence/Verification/Delivery/Closure automatically.
 | Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Interactive Action-Gateway approval lane not yet assembled |
 | Codex qualification | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Production/runtime pin lifecycle remains operator-owned |
 | Codex WIF live lane | Fail-closed WIF env/token-file boundary; authenticated prewarm exchange; upstream assertion must be deleted before thread/start; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
-| Action/recovery | Durable action ledger, authenticated grants, independent recovery-completion gate | Real privileged provider/effect boundary and completion verifier |
+| Action/recovery | Durable action ledger; UNKNOWN reconciliation states; dedicated reconciler/completer identities; database-generated epoch proof; production RecoveryCompletionGate; transaction revalidation; mandatory PG17 dump/restore authority drill | Real privileged provider/effect observer/reconciler remains provider-specific |
 | Engineering delivery | Frozen requirement-bound Evidence/Verification/Delivery; dedicated trusted-CI importer; authenticated independent ReviewReport; Closure requires exact PASS Verification + PASS Review for the same immutable subject | Model/changed-tree evidence procedures and real Feature/Debug pilots |
 
 ## Retained evidence
@@ -55,6 +55,7 @@ Evidence/Verification/Delivery/Closure automatically.
 - #42 WIF assertion-removal hardening merged into main `f8e9e60a517fed752d573dd7b27ed38a49175e33`; fresh-main run `36102881734` passed all four standard gates. Upstream assertion exchange is completed before thread/start and the assertion file is removed before any model-reachable turn.
 - #43 exact Evidence requirement binding merged as main `e895fc6dddb509a51897b5fe32b21216312ebb9d`; exact-head run `36108017341` and fresh-main run `36108399745` passed Go/PostgreSQL, real container, real Codex and trusted CI evidence. Evidence now requires exact frozen requirement ID and exact-delivery artifact binding.
 - #44 trusted CI import merged as main `34ff7d82316d1d095040ce6f62522fe5397dee86`; exact-head run `36112719171` and fresh-main run `36113188028` passed all four standard gates. The dedicated importer revalidates live GitHub run/jobs/artifacts and downloaded ZIP/binary/Codex bytes before registering one exact requirement-bound PASS Evidence item.
+- #46 independent Review merged as main `747114948bfa35cf07cafcebdf1e32b7e0341047`; exact-head run `36129118788` and fresh-main run `36129501979` passed Go/PostgreSQL, real container, real Codex and trusted CI evidence. Closure now requires an exact PASS ReviewReport from a certificate-separated reviewer.
 - This WIF assertion-removal follow-up is implementation hardening only. A real authenticated-model claim still requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
 
 The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
@@ -83,12 +84,13 @@ Next implementation sequence:
    execution reservation instead of workflow-only qualification;
 3. route every command/file/network approval through Action Gateway authority;
 4. add separate model/changed-tree evidence procedures; independent Review is now a mandatory Closure gate;
-5. close UNKNOWN reconciliation and restore drills;
+5. recovery proof/restore drill is now assembled; wire a real provider-specific Action observer/reconciler only together with the first privileged provider;
 6. retain one real Feature pilot and one real Debug pilot through Verification + Review + Closure before assessing M1.
 
 No new extension domains. **M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/RECOVERY_RESTORE_V1.md`
 - `docs/implementation/INDEPENDENT_REVIEW_V1.md`
 - `docs/implementation/TRUSTED_CI_IMPORT_V1.md`
 - `docs/implementation/CODEX_WIF_LIVE_V1.md`
