@@ -30,6 +30,7 @@ const (
 	DeliveryCreate     = "delivery:create"
 	EvidenceRegister   = "evidence:register"
 	VerificationCreate = "verification:create"
+	ReviewCreate       = "review:create"
 	ClosureCreate      = "closure:create"
 	RecoveryBegin      = "recovery:begin"
 	RecoveryComplete   = "recovery:complete"
@@ -40,7 +41,7 @@ var capabilities = map[string]bool{
 	WorkerPoll: true, WorkerReport: true,
 	Read: true, WorkCreate: true, TaskCreate: true, RunStart: true, RunControl: true,
 	RunComplete: true, CheckpointCreate: true, ActionExecute: true, ActionReconcile: true,
-	DeliveryCreate: true, EvidenceRegister: true, VerificationCreate: true,
+	DeliveryCreate: true, EvidenceRegister: true, VerificationCreate: true, ReviewCreate: true,
 	ClosureCreate: true, RecoveryBegin: true, RecoveryComplete: true, MaterialDegrade: true,
 }
 var subjectPattern = regexp.MustCompile(`^urn:engineering-platform:[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$`)
