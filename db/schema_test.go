@@ -28,7 +28,6 @@ func TestReviewMigrationFailsClosedInsteadOfBackfillingLegacyClosure(t *testing.
 	}
 }
 
-
 func TestRecoveryReconciliationMigrationIsAdditiveAndOrdered(t *testing.T) {
 	for _, required := range []string{
 		"CREATE TABLE recovery_reconciliation_proofs",
