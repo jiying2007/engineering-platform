@@ -124,3 +124,35 @@ func TestValidatePlanRejectsDuplicateCriterionAndRequirementIDs(t *testing.T) {
 		t.Fatal("duplicate criterion ID accepted")
 	}
 }
+
+
+func TestEvidenceArtifactRefsMustBelongToExactDelivery(t *testing.T) {
+	delivery := core.DeliveryReceipt{Artifacts: []core.ArtifactRef{
+		{ID: "firmware-a", Digest: "sha256:a"},
+		{ID: "log-a", Digest: "sha256:b"},
+	}}
+	for _, tc := range []struct {
+		name string
+		refs []string
+		want bool
+	}{
+		{name: "none", refs: nil, want: true},
+		{name: "subset", refs: []string{"firmware-a"}, want: true},
+		{name: "all", refs: []string{"firmware-a", "log-a"}, want: true},
+		{name: "foreign", refs: []string{"firmware-b"}, want: false},
+		{name: "duplicate", refs: []string{"firmware-a", "firmware-a"}, want: false},
+		{name: "blank", refs: []string{""}, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvidenceArtifactsBelongToDelivery(delivery, core.EvidenceRef{ArtifactRefs: tc.refs})
+			if got != tc.want {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+		})
+	}
+	duplicateDelivery := delivery
+	duplicateDelivery.Artifacts = append(duplicateDelivery.Artifacts, core.ArtifactRef{ID: "firmware-a", Digest: "sha256:other"})
+	if EvidenceArtifactsBelongToDelivery(duplicateDelivery, core.EvidenceRef{}) {
+		t.Fatal("ambiguous duplicate delivery artifact IDs accepted")
+	}
+}
