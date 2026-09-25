@@ -16,6 +16,7 @@ import (
 	"time"
 
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 )
 
 const (
@@ -42,6 +43,8 @@ type QualificationReceipt struct {
 	ThreadStartModel            string `json:"thread_start_model"`
 	StableSchemaContractChecked bool   `json:"stable_schema_contract_checked"`
 	ExperimentalSurfaceChecked  bool   `json:"experimental_surface_checked"`
+	CredentialSafeConfigDigest  string `json:"credential_safe_config_digest"`
+	CredentialSafeProfileChecked bool `json:"credential_safe_profile_checked"`
 }
 
 // Qualify exercises a real Codex binary without making a model turn. It verifies
@@ -108,6 +111,10 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	experimentalDigest, err := validateSchemaTree(experimental, true)
 	if err != nil {
 		return receipt, fmt.Errorf("experimental schema: %w", err)
+	}
+
+	if err := qualifyCredentialSafeProfile(ctx, executable, filepath.Join(root, "credential-safe-home")); err != nil {
+		return receipt, err
 	}
 
 	probeRoot := filepath.Join(root, "probe")
@@ -181,8 +188,46 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 		ThreadStartModel:            model,
 		StableSchemaContractChecked: true,
 		ExperimentalSurfaceChecked:  true,
+		CredentialSafeConfigDigest:  canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialSafeProfileChecked: true,
 	}
 	return receipt, nil
+}
+
+func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) error {
+	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+	}
+	configPath := filepath.Join(home, ".codex", "config.toml")
+	if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
+		return err
+	}
+	output, err := codexCommand(ctx, executable, home, "features", "list")
+	if err != nil {
+		return fmt.Errorf("credential-safe feature probe: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	required := map[string]bool{"shell_tool": false, "view_image": false}
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		if _, ok := required[fields[0]]; ok && fields[1] == "stable" && fields[2] == "false" {
+			required[fields[0]] = true
+		}
+	}
+	for feature, disabled := range required {
+		if !disabled {
+			return fmt.Errorf("credential-safe Codex feature %s was not proven disabled", feature)
+		}
+	}
+	info, err := os.Stat(configPath)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		return fmt.Errorf("credential-safe Codex config is not owner-private")
+	}
+	return nil
 }
 
 func codexVersion(ctx context.Context, executable, home string) ([]byte, string, error) {
