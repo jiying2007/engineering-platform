@@ -51,6 +51,8 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 	if plan.ID == "" || len(plan.Criteria) == 0 || len(plan.Criteria) != len(acceptanceCriteria) {
 		return false
 	}
+	criterionIDs := make(map[string]bool, len(plan.Criteria))
+	requirementIDs := map[string]bool{}
 	expected := make(map[string]int, len(acceptanceCriteria))
 	for _, ac := range acceptanceCriteria {
 		if ac == "" {
@@ -59,17 +61,19 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 		expected[ac]++
 	}
 	for _, criterion := range plan.Criteria {
-		if criterion.ID == "" || criterion.Statement == "" || len(criterion.Requirements) == 0 {
+		if criterion.ID == "" || criterionIDs[criterion.ID] || criterion.Statement == "" || len(criterion.Requirements) == 0 {
 			return false
 		}
+		criterionIDs[criterion.ID] = true
 		if expected[criterion.Statement] == 0 {
 			return false
 		}
 		expected[criterion.Statement]--
 		for _, req := range criterion.Requirements {
-			if req.ID == "" || req.Procedure == "" {
+			if req.ID == "" || requirementIDs[req.ID] || req.Procedure == "" {
 				return false
 			}
+			requirementIDs[req.ID] = true
 		}
 	}
 	for _, remaining := range expected {
@@ -127,7 +131,7 @@ func requirementSatisfied(requirement EvidenceRequirement, subjectDigest string,
 		if !item.Applicable || item.SubjectDigest != subjectDigest || item.Result != "PASS" {
 			continue
 		}
-		if item.Procedure != requirement.Procedure {
+		if item.RequirementID != requirement.ID || item.Procedure != requirement.Procedure {
 			continue
 		}
 		if requirement.Issuer != "" && item.Issuer != requirement.Issuer {
