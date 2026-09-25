@@ -155,3 +155,30 @@ func TestEvidenceArtifactRefsMustBelongToExactDelivery(t *testing.T) {
 		t.Fatal("ambiguous duplicate delivery artifact IDs accepted")
 	}
 }
+
+
+func TestGitHubActionsProcedureRequiresExactIssuer(t *testing.T) {
+	plan := Plan{
+		ID: "vp-github",
+		Criteria: []Criterion{{
+			ID:        "ac-github",
+			Statement: "CI provenance verified",
+			Requirements: []EvidenceRequirement{{
+				ID:        "req-github",
+				Procedure: GitHubActionsProcedure,
+				Issuer:    GitHubActionsIssuer,
+			}},
+		}},
+	}
+	if !ValidatePlan(plan, []string{"CI provenance verified"}) {
+		t.Fatal("exact GitHub Actions authority rejected")
+	}
+	plan.Criteria[0].Requirements[0].Issuer = ""
+	if ValidatePlan(plan, []string{"CI provenance verified"}) {
+		t.Fatal("GitHub Actions procedure accepted without frozen issuer")
+	}
+	plan.Criteria[0].Requirements[0].Issuer = "other-ci"
+	if ValidatePlan(plan, []string{"CI provenance verified"}) {
+		t.Fatal("GitHub Actions procedure accepted under another issuer")
+	}
+}
