@@ -44,6 +44,8 @@ var routeCapabilities = map[string]string{
 	"GET /api/v1/task-contracts/{id}":     access.Read,
 	"POST /api/v1/runs":                   access.RunStart,
 	"GET /api/v1/runs/{id}":               access.Read,
+	"GET /api/v1/runs/{id}/preparation":    access.Read,
+	"GET /api/v1/runs/{id}/offline-execution": access.Read,
 	"POST /api/v1/runs/{id}/steer":        access.RunControl,
 	"GET /api/v1/steering/{id}":           access.Read,
 	"POST /api/v1/runs/{id}/pause":        access.RunControl,
