@@ -33,6 +33,7 @@ const (
 	ReviewCreate       = "review:create"
 	ClosureCreate      = "closure:create"
 	RecoveryBegin      = "recovery:begin"
+	RecoveryReconcile  = "recovery:reconcile"
 	RecoveryComplete   = "recovery:complete"
 	MaterialDegrade    = "material:degrade"
 
@@ -46,7 +47,7 @@ var capabilities = map[string]bool{
 	Read: true, WorkCreate: true, TaskCreate: true, RunStart: true, RunControl: true,
 	RunComplete: true, CheckpointCreate: true, ActionExecute: true, ActionReconcile: true,
 	DeliveryCreate: true, EvidenceRegister: true, VerificationCreate: true, ReviewCreate: true,
-	ClosureCreate: true, RecoveryBegin: true, RecoveryComplete: true, MaterialDegrade: true,
+	ClosureCreate: true, RecoveryBegin: true, RecoveryReconcile: true, RecoveryComplete: true, MaterialDegrade: true,
 }
 var subjectPattern = regexp.MustCompile(`^urn:engineering-platform:[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$`)
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$`)
@@ -154,6 +155,9 @@ func New(doc Document) (*Policy, error) {
 		if reservedCI && (id.subject != TrustedCIImporterSubject || id.issuer != TrustedCIIssuer || len(id.procedures) != 1 || !id.procedures[TrustedCIProcedure]) {
 			return nil, fmt.Errorf("trusted CI evidence authority is reserved for the dedicated importer principal")
 		}
+		if err := configureWorkerProfiles(spec, &id); err != nil {
+			return nil, err
+		}
 		if id.Allows(ReviewCreate) {
 			for capability := range id.capabilities {
 				if capability != ReviewCreate && capability != Read {
@@ -164,8 +168,15 @@ func New(doc Document) (*Policy, error) {
 				return nil, fmt.Errorf("independent reviewer cannot hold execution, evidence or worker authority")
 			}
 		}
-		if err := configureWorkerProfiles(spec, &id); err != nil {
-			return nil, err
+		if id.Allows(RecoveryReconcile) {
+			for capability := range id.capabilities {
+				if capability != RecoveryReconcile && capability != Read {
+					return nil, fmt.Errorf("reconciler may only hold recovery:reconcile and core:read")
+				}
+			}
+			if len(id.actions) != 0 || id.issuer != "" || len(id.procedures) != 0 || len(id.workerProfiles) != 0 {
+				return nil, fmt.Errorf("reconciler cannot hold execution, evidence or worker authority")
+			}
 		}
 		policy.principals[id.subject] = id
 	}
