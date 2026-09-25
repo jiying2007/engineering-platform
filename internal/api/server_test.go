@@ -812,7 +812,6 @@ func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
 	}, http.StatusUnprocessableEntity)
 }
 
-
 type receiptReadbackStore struct {
 	*store.Memory
 	preparation preparation.Receipt
@@ -833,9 +832,9 @@ func TestWorkerReceiptReadbackIsExactAndUnavailableWithoutDurableStore(t *testin
 	mustRequest(t, NewServer(memory).Handler(), http.MethodGet, "/api/v1/runs/run/offline-execution", nil, http.StatusServiceUnavailable)
 
 	backend := &receiptReadbackStore{
-		Memory: memory,
+		Memory:      memory,
 		preparation: preparation.Receipt{Kind: preparation.Kind, FactsDigest: "sha256:test"},
-		offline: offline.Status{State: offline.Finished},
+		offline:     offline.Status{State: offline.Finished},
 	}
 	h := NewServer(backend).Handler()
 	prepBody := mustRequest(t, h, http.MethodGet, "/api/v1/runs/run/preparation", nil, http.StatusOK)
