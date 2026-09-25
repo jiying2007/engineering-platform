@@ -242,8 +242,12 @@ func TestWorkerInboxCompletedRecoveryDoesNotReviveOldLease(t *testing.T) {
 	workerOK(t, err)
 	active, err := s.BeginRecovery(0)
 	workerOK(t, err)
-	// Direct Store call is only a fixture, not an implementation of the protected
-	// API's independent reconciliation gate, which remains unavailable.
+	if _, err := s.CreateRecoveryProof(ctx, active.Epoch, "test-reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
+		t.Fatalf("live Worker lease did not block recovery proof: %v", err)
+	}
+	workerSQL(t, s, `UPDATE worker_inbox SET lease_until=clock_timestamp()-interval '1 second' WHERE inbox_id=$1`, a.Token.InboxID)
+	_, err = s.CreateRecoveryProof(ctx, active.Epoch, "test-reconciler")
+	workerOK(t, err)
 	_, err = s.CompleteRecovery(active.Epoch, true)
 	workerOK(t, err)
 	if _, err := s.ReportInput(ctx, "worker", report); !errors.Is(err, workerqueue.ErrRecovery) {

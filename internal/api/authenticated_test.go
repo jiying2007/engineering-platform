@@ -27,6 +27,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
@@ -37,6 +38,7 @@ const ciSubject = "urn:engineering-platform:service:ci"
 const verifierSubject = "urn:engineering-platform:service:verifier"
 const reviewerSubject = "urn:engineering-platform:service:reviewer"
 const recoverySubject = "urn:engineering-platform:operator:recovery"
+const reconcilerSubject = "urn:engineering-platform:operator:reconciler"
 
 func testAccessPolicy(t *testing.T) *access.Policy {
 	t.Helper()
@@ -46,6 +48,7 @@ func testAccessPolicy(t *testing.T) *access.Policy {
 		{Subject: verifierSubject, Scope: "platform", Capabilities: []string{access.VerificationCreate}},
 		{Subject: reviewerSubject, Scope: "platform", Capabilities: []string{access.ReviewCreate}},
 		{Subject: recoverySubject, Scope: "platform", Capabilities: []string{access.RecoveryBegin, access.RecoveryComplete}},
+		{Subject: reconcilerSubject, Scope: "platform", Capabilities: []string{access.Read, access.RecoveryReconcile}},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -255,10 +258,10 @@ func TestTLSAndWireAuthorityCannotBeSpoofed(t *testing.T) {
 	secureCall(t, engineer, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusForbidden)
 	operator := pki.Client(t, recoverySubject)
 	secureCall(t, operator, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusOK)
-	secureCall(t, operator, server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1, "reconciled": true}, http.StatusServiceUnavailable)
+	secureCall(t, operator, server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusServiceUnavailable)
 	state, err := backend.GetRecovery()
 	if err != nil || string(state.Mode) != "RECOVERY_RECONCILIATION" {
-		t.Fatal("boolean request bypassed reconciliation authority")
+		t.Fatal("completion bypassed reconciliation authority")
 	}
 	// A future route has no implicit grant, even when its path looks like an API.
 	secureCall(t, engineer, server.URL+"/api/v1/admin/new", map[string]any{}, http.StatusForbidden)
@@ -279,7 +282,7 @@ func TestRecoveryRequiresIndependentEpochGate(t *testing.T) {
 	}
 	gate := &rejectingRecoveryGate{}
 	server, pki := securedTestServer(t, backend, nil, AuthenticatedOptions{RecoveryCompletion: gate})
-	secureCall(t, pki.Client(t, recoverySubject), server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1, "reconciled": true}, http.StatusForbidden)
+	secureCall(t, pki.Client(t, recoverySubject), server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusForbidden)
 	if gate.calls.Load() != 1 {
 		t.Fatal("gate did not receive authenticated subject/exact epoch")
 	}
@@ -359,5 +362,64 @@ func TestAllCoreRoutesHaveExplicitAccessPolicy(t *testing.T) {
 	})
 	if len(seen) != len(routeCapabilities) {
 		t.Fatal("stale access policy route mapping")
+	}
+}
+
+func TestPostgresRecoveryProofRequiresSeparateIdentities(t *testing.T) {
+	databaseURL := os.Getenv("POSTGRES_TEST_URL")
+	if databaseURL == "" {
+		t.Skip("POSTGRES_TEST_URL is not set")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	admin, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		t.Fatal(err)
+	}
+	name := "ep_recovery_" + hex.EncodeToString(nonce[:])
+	quoted := pgx.Identifier{name}.Sanitize()
+	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+quoted); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		_, _ = admin.Exec(cleanup, "DROP SCHEMA "+quoted+" CASCADE")
+	})
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.ConnConfig.RuntimeParams["search_path"] = name
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := pgstore.New(pool)
+	defer backend.Close()
+	if err := backend.ApplyCoreMigration(ctx); err != nil {
+		t.Fatal(err)
+	}
+	server, pki := securedTestServer(t, backend, nil, AuthenticatedOptions{RecoveryCompletion: backend})
+	base := server.URL + "/api/v1"
+	operator := pki.Client(t, recoverySubject)
+	reconciler := pki.Client(t, reconcilerSubject)
+	engineer := pki.Client(t, engineerSubject)
+
+	secureCall(t, operator, base+"/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusOK)
+	proofBody := map[string]any{"recovery_epoch": 1, "reconciler": reconcilerSubject}
+	secureCall(t, engineer, base+"/recovery/proofs", proofBody, http.StatusForbidden)
+	secureCall(t, reconciler, base+"/recovery/proofs", map[string]any{"recovery_epoch": 1, "reconciler": recoverySubject}, http.StatusForbidden)
+	secureCall(t, reconciler, base+"/recovery/proofs", proofBody, http.StatusCreated)
+	secureCall(t, reconciler, base+"/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusForbidden)
+	secureCall(t, operator, base+"/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusOK)
+	state, err := backend.GetRecovery()
+	if err != nil || state.Mode != recovery.Normal || state.Epoch != 1 {
+		t.Fatalf("recovery did not complete through independent proof: %#v %v", state, err)
 	}
 }

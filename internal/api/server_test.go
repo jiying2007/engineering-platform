@@ -612,11 +612,10 @@ func TestRecoveryLifecycleIsEpochBound(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
 		"recovery_epoch": 1,
 		"reconciled":     false,
-	}, http.StatusUnprocessableEntity)
+	}, http.StatusBadRequest)
 
 	completeBody := mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
 		"recovery_epoch": 1,
-		"reconciled":     true,
 	}, http.StatusOK)
 	var normal struct {
 		Epoch uint64 `json:"recovery_epoch"`
@@ -629,7 +628,6 @@ func TestRecoveryLifecycleIsEpochBound(t *testing.T) {
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/recovery/complete", map[string]any{
 		"recovery_epoch": 0,
-		"reconciled":     true,
 	}, http.StatusBadRequest)
 }
 

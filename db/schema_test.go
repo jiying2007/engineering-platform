@@ -27,3 +27,26 @@ func TestReviewMigrationFailsClosedInsteadOfBackfillingLegacyClosure(t *testing.
 		t.Fatal("review migration is not ordered after offline execution migration")
 	}
 }
+
+func TestRecoveryReconciliationMigrationIsAdditiveAndOrdered(t *testing.T) {
+	for _, required := range []string{
+		"CREATE TABLE recovery_reconciliation_proofs",
+		"recovery_epoch bigint PRIMARY KEY",
+		"facts_digest text NOT NULL",
+		"proof_json jsonb NOT NULL",
+		"INSERT INTO core_schema_migrations(version) VALUES(7)",
+	} {
+		if !strings.Contains(recoveryReconciliationMigration, required) {
+			t.Fatalf("recovery migration missing %q", required)
+		}
+	}
+	lower := strings.ToLower(recoveryReconciliationMigration)
+	if strings.Contains(lower, "insert into recovery_reconciliation_proofs") {
+		t.Fatal("migration must not synthesize reconciliation proof")
+	}
+	core := CoreMigration()
+	if strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(6)") >
+		strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(7)") {
+		t.Fatal("recovery proof migration is not ordered after review migration")
+	}
+}

@@ -81,6 +81,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 			{Name: "codex-app-server-0.155.0-qualification", ID: 101, Conclusion: "success"},
 			{Name: "go", ID: 102, Conclusion: "success"},
 			{Name: "offline-container-integration", ID: 103, Conclusion: "success"},
+			{Name: "postgres-authority-restore-drill", ID: 104, Conclusion: "success"},
 		},
 		Artifacts: []Artifact{
 			{Name: "codex-0.155.0-qualification-" + commit, ID: 201, Digest: codexDigest, Size: codexInfo.Size()},

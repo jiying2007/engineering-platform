@@ -20,6 +20,9 @@ var offlineExecutionMigration string
 //go:embed migrations/0006_review_reports.sql
 var reviewReportsMigration string
 
+//go:embed migrations/0007_recovery_reconciliation.sql
+var recoveryReconciliationMigration string
+
 func CoreMigration() string {
-	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration
+	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration
 }

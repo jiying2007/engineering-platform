@@ -63,6 +63,9 @@ func TestPostgresOutboxRecoveryGateAndLeaseRecovery(t *testing.T) {
 	if _, err := s.Dispatch(ctx, messages[0].Lease(), action.Observe, succeed); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.CreateRecoveryProof(ctx, recovery.Epoch, "test-reconciler"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.CompleteRecovery(recovery.Epoch, true); err != nil {
 		t.Fatal(err)
 	}
@@ -142,16 +145,22 @@ func TestPostgresRecoveryAfterClaimAndOldEpochAfterCompletion(t *testing.T) {
 			if _, err := s.Dispatch(ctx, old.Lease(), risk, deliver); !errors.Is(err, outbox.ErrRecoveryBlocked) {
 				t.Fatalf("dispatch in recovery: %v", err)
 			}
+			if _, err := s.CreateRecoveryProof(ctx, recovery.Epoch, "test-reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
+				t.Fatalf("live mutating lease did not block recovery proof: %v", err)
+			}
+			expireLease(t, s, old.ID)
+			if _, err := s.CreateRecoveryProof(ctx, recovery.Epoch, "test-reconciler"); err != nil {
+				t.Fatal(err)
+			}
 			if _, err := s.CompleteRecovery(recovery.Epoch, true); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := s.Dispatch(ctx, old.Lease(), risk, deliver); !errors.Is(err, outbox.ErrRecoveryBlocked) {
-				t.Fatalf("old epoch resurrected: %v", err)
+				t.Fatalf("old recovery epoch lease resurrected: %v", err)
 			}
 			if calls != 0 {
 				t.Fatal("blocked mutation handler ran")
 			}
-			expireLease(t, s, old.ID)
 			fresh := claimOne(t, s, "worker")
 			if fresh.LeaseRecoveryEpoch != recovery.Epoch {
 				t.Fatal("claim not bound to current recovery epoch")

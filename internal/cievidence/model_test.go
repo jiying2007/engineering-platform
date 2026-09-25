@@ -20,6 +20,7 @@ func fixture() Receipt {
 			{Name: "codex-app-server-0.155.0-qualification", ID: 1, Conclusion: "success"},
 			{Name: "go", ID: 2, Conclusion: "success"},
 			{Name: "offline-container-integration", ID: 3, Conclusion: "success"},
+			{Name: "postgres-authority-restore-drill", ID: 4, Conclusion: "success"},
 		},
 		Artifacts: []Artifact{
 			{Name: "codex-0.155.0-qualification-x", ID: 4, Digest: "sha256:" + strings.Repeat("d", 64), Size: 10},
