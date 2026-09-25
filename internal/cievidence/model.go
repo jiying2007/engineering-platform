@@ -14,7 +14,7 @@ import (
 const SchemaVersion = 1
 
 var (
-	sha40 = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	sha40    = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	repoName = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 )
 
@@ -78,8 +78,8 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("invalid workflow run identity")
 	}
 	requiredJobs := map[string]bool{
-		"go": false,
-		"offline-container-integration": false,
+		"go":                                     false,
+		"offline-container-integration":          false,
 		"codex-app-server-0.155.0-qualification": false,
 	}
 	last := ""
@@ -122,10 +122,10 @@ func (r Receipt) Validate() error {
 	}
 	requiredFiles := map[string]bool{
 		"codex-qualifier": false,
-		"control-plane": false,
-		"eng": false,
-		"sandbox-guard": false,
-		"worker": false,
+		"control-plane":   false,
+		"eng":             false,
+		"sandbox-guard":   false,
+		"worker":          false,
 	}
 	last = ""
 	for _, f := range r.Files {
