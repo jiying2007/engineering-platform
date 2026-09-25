@@ -75,9 +75,13 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			return nil, fmt.Errorf("verified TLS transport required")
 		}
 		var err error
-		// No privileged provider or reconciliation verifier is configured yet.
-		// Keep those operations explicitly unavailable instead of injecting stubs.
-		handler, err = api.NewAuthenticatedHandler(backend, nil, c.policy, api.AuthenticatedOptions{})
+		// Privileged external action providers remain intentionally absent, but
+		// durable PostgreSQL backends now provide the recovery-completion gate.
+		options := api.AuthenticatedOptions{}
+		if gate, ok := backend.(api.RecoveryCompletionGate); ok {
+			options.RecoveryCompletion = gate
+		}
+		handler, err = api.NewAuthenticatedHandler(backend, nil, c.policy, options)
 		if err != nil {
 			return nil, err
 		}
