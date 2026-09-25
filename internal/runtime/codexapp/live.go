@@ -20,22 +20,22 @@ const (
 )
 
 type LiveReceipt struct {
-	SchemaVersion     int    `json:"schema_version"`
-	CLI               string `json:"cli"`
-	Version           string `json:"version"`
-	BinaryDigest      string `json:"binary_digest"`
+	SchemaVersion              int    `json:"schema_version"`
+	CLI                        string `json:"cli"`
+	Version                    string `json:"version"`
+	BinaryDigest               string `json:"binary_digest"`
 	CredentialSafeConfigDigest string `json:"credential_safe_config_digest"`
-	CredentialMode    string `json:"credential_mode"`
-	FederationRuleID  string `json:"federation_rule_id"`
-	Model             string `json:"model"`
-	PromptDigest      string `json:"prompt_digest"`
-	ThreadID          string `json:"thread_id"`
-	TurnID            string `json:"turn_id"`
-	TurnStatus        string `json:"turn_status"`
-	Output            string `json:"output"`
-	OutputDigest      string `json:"output_digest"`
-	ApprovalRequests  int    `json:"approval_requests"`
-	UnexpectedToolUse bool   `json:"unexpected_tool_use"`
+	CredentialMode             string `json:"credential_mode"`
+	FederationRuleID           string `json:"federation_rule_id"`
+	Model                      string `json:"model"`
+	PromptDigest               string `json:"prompt_digest"`
+	ThreadID                   string `json:"thread_id"`
+	TurnID                     string `json:"turn_id"`
+	TurnStatus                 string `json:"turn_status"`
+	Output                     string `json:"output"`
+	OutputDigest               string `json:"output_digest"`
+	ApprovalRequests           int    `json:"approval_requests"`
+	UnexpectedToolUse          bool   `json:"unexpected_tool_use"`
 }
 
 type TurnObservation struct {
@@ -213,22 +213,22 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		}
 	}
 	receipt = LiveReceipt{
-		SchemaVersion:     1,
-		CLI:               "codex-cli",
-		Version:           QualifiedCodexVersion,
-		BinaryDigest:      binaryDigest,
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    QualifiedCodexVersion,
+		BinaryDigest:               binaryDigest,
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:    "workload_identity",
-		FederationRuleID:  ruleID,
-		Model:             model,
-		PromptDigest:      canonical.BytesDigest([]byte(LiveProbePrompt)),
-		ThreadID:          threadID,
-		TurnID:            turnID,
-		TurnStatus:        observation.Status,
-		Output:            observation.Output,
-		OutputDigest:      canonical.BytesDigest([]byte(observation.Output)),
-		ApprovalRequests:  observation.ApprovalRequests,
-		UnexpectedToolUse: observation.UnexpectedToolUse,
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           ruleID,
+		Model:                      model,
+		PromptDigest:               canonical.BytesDigest([]byte(LiveProbePrompt)),
+		ThreadID:                   threadID,
+		TurnID:                     turnID,
+		TurnStatus:                 observation.Status,
+		Output:                     observation.Output,
+		OutputDigest:               canonical.BytesDigest([]byte(observation.Output)),
+		ApprovalRequests:           observation.ApprovalRequests,
+		UnexpectedToolUse:          observation.UnexpectedToolUse,
 	}
 	return receipt, receipt.Validate()
 }
