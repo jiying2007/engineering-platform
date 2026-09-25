@@ -24,13 +24,25 @@ func liveAdapter(t *testing.T) (*Adapter, io.ReadWriter) {
 	return adapter, peer
 }
 
+func liveEventAdapter(events ...Event) *Adapter {
+	queue := make(chan Event, len(events))
+	for _, event := range events {
+		queue <- event
+	}
+	client := &Client{events: queue, done: make(chan struct{})}
+	return &Adapter{client: client, thread: "thread-live", turn: "turn-live"}
+}
+
+func notification(method, params string) Event {
+	return Event{Kind: Notification, Message: Message{Method: method, Params: json.RawMessage(params)}}
+}
+
 func TestObserveTurnRetainsCompletedAgentMessage(t *testing.T) {
-	adapter, peer := liveAdapter(t)
-	go func() {
-		_, _ = io.WriteString(peer, `{"method":"item/completed","params":{"threadId":"thread-live","turnId":"turn-live","item":{"type":"reasoning","id":"reasoning-1"}}}`+"\n")
-		_, _ = io.WriteString(peer, `{"method":"item/completed","params":{"threadId":"thread-live","turnId":"turn-live","item":{"type":"agentMessage","id":"message-1","text":"engineering-platform live qualification"}}`+"\n")
-		_, _ = io.WriteString(peer, `{"method":"turn/completed","params":{"threadId":"thread-live","turn":{"id":"turn-live","status":"completed"}}}`+"\n")
-	}()
+	adapter := liveEventAdapter(
+		notification("item/completed", `{"threadId":"thread-live","turnId":"turn-live","item":{"type":"reasoning","id":"reasoning-1"}}`),
+		notification("item/completed", `{"threadId":"thread-live","turnId":"turn-live","item":{"type":"agentMessage","id":"message-1","text":"engineering-platform live qualification"}}`),
+		notification("turn/completed", `{"threadId":"thread-live","turn":{"id":"turn-live","status":"completed"}}`),
+	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	got, err := ObserveTurn(ctx, adapter, "thread-live", "turn-live")
@@ -67,10 +79,9 @@ func TestObserveTurnRejectsApprovalAndToolItems(t *testing.T) {
 		}
 	})
 	t.Run("tool-item", func(t *testing.T) {
-		adapter, peer := liveAdapter(t)
-		go func() {
-			_, _ = io.WriteString(peer, `{"method":"item/completed","params":{"threadId":"thread-live","turnId":"turn-live","item":{"type":"commandExecution","id":"cmd-1"}}}`+"\n")
-		}()
+		adapter := liveEventAdapter(
+			notification("item/completed", `{"threadId":"thread-live","turnId":"turn-live","item":{"type":"commandExecution","id":"cmd-1"}}`),
+		)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		got, err := ObserveTurn(ctx, adapter, "thread-live", "turn-live")
