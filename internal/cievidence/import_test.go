@@ -131,8 +131,8 @@ func fixtureImport(t *testing.T) ImportRequest {
 		RequirementID:      "req-ci",
 		EvidenceArtifactID: "ci-provenance",
 		Delivery:           delivery,
-		Files: ImportFiles{EnvelopeZip: envelopeZip, BinariesZip: binaryZip, CodexZip: codexZip},
-		Live:  live,
+		Files:              ImportFiles{EnvelopeZip: envelopeZip, BinariesZip: binaryZip, CodexZip: codexZip},
+		Live:               live,
 	}
 }
 
