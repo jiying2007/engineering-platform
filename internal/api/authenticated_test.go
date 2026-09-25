@@ -27,6 +27,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
