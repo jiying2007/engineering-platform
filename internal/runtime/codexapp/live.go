@@ -125,7 +125,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
 		return receipt, fmt.Errorf("qualified binary digest and bounded model required")
 	}
-	provider, err := NewPinnedProvider(executable, binaryDigest)
+	provider, err := NewPinnedWIFProvider(executable, binaryDigest)
 	if err != nil {
 		return receipt, err
 	}
