@@ -11,8 +11,7 @@ func TestOptionalPrivateToken(t *testing.T) {
 		t.Fatalf("empty optional token failed: %q %v", token, err)
 	}
 	path := filepath.Join(t.TempDir(), "token")
-	if err := os.WriteFile(path, []byte("ghs_fixture_token
-"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("ghs_fixture_token\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	token, err := optionalPrivateToken(path)
