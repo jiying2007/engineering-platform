@@ -853,6 +853,24 @@ func (s *Store) GetDelivery(id string) (core.DeliveryReceipt, error) {
 }
 
 func (s *Store) CreateEvidence(item core.EvidenceRef) error {
+	delivery, err := s.GetDelivery(item.DeliveryReceiptID)
+	if err != nil {
+		return err
+	}
+	if item.SubjectDigest != delivery.SubjectDigest {
+		return corestore.ErrConflict
+	}
+	task, err := s.GetTaskByDigest(delivery.TaskContractDigest)
+	if err != nil {
+		return err
+	}
+	plan, err := s.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	if err != nil {
+		return err
+	}
+	if !verification.EvidenceMatchesPlan(plan, item) {
+		return corestore.ErrConflict
+	}
 	raw, err := encodeJSON(item)
 	if err != nil {
 		return err
