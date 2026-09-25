@@ -66,7 +66,11 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	if err != nil {
 		return receipt, err
 	}
-	root, err := os.MkdirTemp("", "engineering-platform-codex-qualification-")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return receipt, err
+	}
+	root, err := os.MkdirTemp(cwd, ".engineering-platform-codex-qualification-")
 	if err != nil {
 		return receipt, err
 	}
@@ -76,12 +80,12 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	if err := os.Mkdir(versionHome, 0o700); err != nil {
 		return receipt, err
 	}
-	out, err := codexCommand(ctx, executable, versionHome, "--version")
+	out, diagnostics, err := codexVersion(ctx, executable, versionHome)
 	if err != nil {
-		return receipt, fmt.Errorf("codex version: %w", err)
+		return receipt, fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
 	}
 	if got, want := strings.TrimSpace(string(out)), "codex-cli "+expectedVersion; got != want {
-		return receipt, fmt.Errorf("unexpected Codex version %q want %q", got, want)
+		return receipt, fmt.Errorf("unexpected Codex version %q want %q; stderr=%s", got, want, strings.TrimSpace(diagnostics))
 	}
 
 	stable := filepath.Join(root, "stable")
@@ -179,6 +183,28 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 		ExperimentalSurfaceChecked:  true,
 	}
 	return receipt, nil
+}
+
+func codexVersion(ctx context.Context, executable, home string) ([]byte, string, error) {
+	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, "", err
+		}
+	}
+	cmd := exec.CommandContext(ctx, executable, "--version")
+	cmd.Env = []string{
+		"PATH=/usr/local/bin:/usr/bin:/bin",
+		"LANG=C.UTF-8",
+		"TZ=UTC",
+		"HOME=" + home,
+		"CODEX_HOME=" + filepath.Join(home, ".codex"),
+		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
+		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
+	stdout, err := cmd.Output()
+	return stdout, stderr.String(), err
 }
 
 func generateSchema(ctx context.Context, executable, home, out string, experimental bool) error {
