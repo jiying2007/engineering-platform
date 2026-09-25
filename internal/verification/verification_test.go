@@ -125,7 +125,6 @@ func TestValidatePlanRejectsDuplicateCriterionAndRequirementIDs(t *testing.T) {
 	}
 }
 
-
 func TestEvidenceArtifactRefsMustBelongToExactDelivery(t *testing.T) {
 	delivery := core.DeliveryReceipt{Artifacts: []core.ArtifactRef{
 		{ID: "firmware-a", Digest: "sha256:a"},
