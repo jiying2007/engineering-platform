@@ -120,7 +120,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 	live := LiveFacts{
 		Run: RunFact{
 			ID: 42, Attempt: 1, Repository: TrustedRepository, Workflow: TrustedWorkflow,
-			Event: "push", HeadSHA: commit, Status: "completed", Conclusion: "success",
+			Event: "push", HeadBranch: "main", HeadSHA: commit, WorkflowPath: ".github/workflows/ci.yml", Status: "completed", Conclusion: "success",
 		},
 		Jobs: append([]Job(nil), receipt.Jobs...),
 		Artifacts: []ArtifactFact{
