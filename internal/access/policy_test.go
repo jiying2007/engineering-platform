@@ -162,3 +162,37 @@ func TestTrustedCIEvidenceAuthorityIsReserved(t *testing.T) {
 		}
 	}
 }
+
+
+func TestIndependentReviewerCapabilitySeparation(t *testing.T) {
+	valid := PrincipalSpec{
+		Subject: "urn:engineering-platform:reviewer:independent",
+		Scope: "platform",
+		Capabilities: []string{Read, ReviewCreate},
+	}
+	if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{valid}}); err != nil {
+		t.Fatalf("independent reviewer rejected: %v", err)
+	}
+	for _, capability := range []string{
+		WorkCreate, TaskCreate, RunStart, RunControl, RunComplete,
+		CheckpointCreate, ActionExecute, ActionReconcile, DeliveryCreate,
+		EvidenceRegister, VerificationCreate, ClosureCreate,
+		RecoveryBegin, RecoveryComplete, MaterialDegrade, WorkerPoll, WorkerReport,
+	} {
+		spec := valid
+		spec.Capabilities = []string{Read, ReviewCreate, capability}
+		if capability == ActionExecute {
+			spec.Actions = []ActionGrant{{Action: "ci.dispatch", RiskClass: "CONTROLLED_MUTATION", Capability: "ci"}}
+		}
+		if capability == EvidenceRegister {
+			spec.EvidenceIssuer = "ci"
+			spec.EvidenceProcedures = []string{"ci.test"}
+		}
+		if capability == WorkerPoll || capability == WorkerReport {
+			spec.WorkerProfiles = []string{"worker/test"}
+		}
+		if _, err := New(Document{Version: 1, Principals: []PrincipalSpec{spec}}); err == nil {
+			t.Fatalf("reviewer accepted incompatible capability %s", capability)
+		}
+	}
+}
