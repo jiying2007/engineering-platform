@@ -81,6 +81,7 @@ type ArtifactRef struct {
 type EvidenceRef struct {
 	ID                string   `json:"evidence_id"`
 	DeliveryReceiptID string   `json:"delivery_receipt_id"`
+	RequirementID     string   `json:"requirement_id"`
 	SubjectDigest     string   `json:"subject_digest"`
 	Issuer            string   `json:"issuer"`
 	Procedure         string   `json:"procedure"`
