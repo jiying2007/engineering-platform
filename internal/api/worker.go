@@ -11,15 +11,21 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
-	"POST /api/v1/worker/claim":   access.WorkerPoll,
-	"POST /api/v1/worker/renew":   access.WorkerPoll,
-	"POST /api/v1/worker/report":  access.WorkerReport,
-	"GET /api/v1/runs/{id}/inbox": access.Read,
+	"POST /api/v1/worker/prepare-claim": access.WorkerPrepare,
+	"POST /api/v1/worker/prepared":      access.WorkerPrepare,
+	"GET /api/v1/runs/{id}/preparation": access.Read,
+	"POST /api/v1/worker/claim":         access.WorkerPoll,
+	"POST /api/v1/worker/renew":         access.WorkerPoll,
+	"POST /api/v1/worker/report":        access.WorkerReport,
+	"GET /api/v1/runs/{id}/inbox":       access.Read,
 }
 
 // Registered only by the authenticated constructor. Bare development/test APIs
 // cannot accidentally expose queue mutation to an anonymous local caller.
 func (s *Server) workerRoutes() {
+	s.mux.HandleFunc("POST /api/v1/worker/prepare-claim", s.handlePrepareClaim)
+	s.mux.HandleFunc("POST /api/v1/worker/prepared", s.handleWorkerPrepared)
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/preparation", s.handleGetPreparation)
 	s.mux.HandleFunc("POST /api/v1/worker/claim", s.handleWorkerClaim)
 	s.mux.HandleFunc("POST /api/v1/worker/renew", s.handleWorkerRenew)
 	s.mux.HandleFunc("POST /api/v1/worker/report", s.handleWorkerReport)
