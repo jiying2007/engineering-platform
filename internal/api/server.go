@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -87,6 +88,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/evidence/{id}", s.handleGetEvidence)
 	s.mux.HandleFunc("POST /api/v1/verifications", s.handleCreateVerification)
 	s.mux.HandleFunc("GET /api/v1/verifications/{id}", s.handleGetVerification)
+	s.mux.HandleFunc("POST /api/v1/reviews", s.handleCreateReview)
+	s.mux.HandleFunc("GET /api/v1/reviews/{id}", s.handleGetReview)
 	s.mux.HandleFunc("POST /api/v1/closures", s.handleCreateClosure)
 	s.mux.HandleFunc("GET /api/v1/closures/{id}", s.handleGetClosure)
 }
@@ -937,11 +940,99 @@ func (s *Server) handleGetVerification(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, report)
 }
 
+type createReviewRequest struct {
+	ReportID             string           `json:"review_report_id"`
+	DeliveryReceiptID    string           `json:"delivery_receipt_id"`
+	VerificationReportID string           `json:"verification_report_id"`
+	Reviewer             string           `json:"reviewer"`
+	Result               string           `json:"result"`
+	Findings             []review.Finding `json:"findings,omitempty"`
+	KnownLimits          []string         `json:"known_limits,omitempty"`
+}
+
+func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
+	var req createReviewRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.ReportID == "" || req.DeliveryReceiptID == "" || req.VerificationReportID == "" || req.Reviewer == "" || req.Result == "" {
+		writeError(w, http.StatusBadRequest, "review_report_id, delivery_receipt_id, verification_report_id, reviewer and result are required")
+		return
+	}
+	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	verificationReport, err := s.store.GetVerification(req.VerificationReportID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if verificationReport.Result != "PASS" ||
+		verificationReport.DeliveryReceiptID != delivery.ID ||
+		verificationReport.SubjectDigest != delivery.SubjectDigest {
+		writeError(w, http.StatusUnprocessableEntity, "review requires PASS verification for the exact delivery subject")
+		return
+	}
+	work, err := s.store.GetWork(delivery.WorkItemID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if work.State != core.WorkVerifying ||
+		work.ActiveTaskContractDigest != delivery.TaskContractDigest ||
+		work.ActiveRunID != delivery.RunID {
+		writeError(w, http.StatusConflict, "work is not verifying this delivery subject")
+		return
+	}
+	if req.Reviewer == verificationReport.Verifier || req.Reviewer == work.HumanOwner {
+		writeError(w, http.StatusUnprocessableEntity, "reviewer must be independent from verifier and work owner")
+		return
+	}
+	report := review.Report{
+		ID:                   req.ReportID,
+		DeliveryReceiptID:    delivery.ID,
+		VerificationReportID: verificationReport.ID,
+		TaskContractDigest:   delivery.TaskContractDigest,
+		SubjectDigest:        delivery.SubjectDigest,
+		Reviewer:             req.Reviewer,
+		Result:               req.Result,
+		Findings:             append([]review.Finding(nil), req.Findings...),
+		KnownLimits:          append([]string(nil), req.KnownLimits...),
+		CreatedAt:            s.now(),
+	}
+	if err := report.Validate(); err != nil {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	expectedVersion := work.Version
+	reviewing := work
+	if err := reviewing.Transition(core.WorkReviewing); err != nil {
+		writeError(w, http.StatusConflict, err.Error())
+		return
+	}
+	if err := s.store.CreateReviewAndUpdateWork(report, expectedVersion, reviewing); err != nil {
+		writeMutationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, report)
+}
+
+func (s *Server) handleGetReview(w http.ResponseWriter, r *http.Request) {
+	report, err := s.store.GetReview(r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, report)
+}
+
 type createClosureRequest struct {
 	ID                   string `json:"closure_receipt_id"`
 	DeliveryReceiptID    string `json:"delivery_receipt_id"`
 	VerificationReportID string `json:"verification_report_id"`
-	ReviewReportID       string `json:"review_report_id,omitempty"`
+	ReviewReportID       string `json:"review_report_id"`
 }
 
 func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
@@ -949,8 +1040,8 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if req.ID == "" || req.DeliveryReceiptID == "" || req.VerificationReportID == "" {
-		writeError(w, http.StatusBadRequest, "closure_receipt_id, delivery_receipt_id and verification_report_id are required")
+	if req.ID == "" || req.DeliveryReceiptID == "" || req.VerificationReportID == "" || req.ReviewReportID == "" {
+		writeError(w, http.StatusBadRequest, "closure_receipt_id, delivery_receipt_id, verification_report_id and review_report_id are required")
 		return
 	}
 	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
@@ -967,6 +1058,19 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "closure requires PASS verification for the exact delivery subject")
 		return
 	}
+	reviewReport, err := s.store.GetReview(req.ReviewReportID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if reviewReport.Result != review.ResultPass ||
+		reviewReport.DeliveryReceiptID != delivery.ID ||
+		reviewReport.VerificationReportID != report.ID ||
+		reviewReport.TaskContractDigest != delivery.TaskContractDigest ||
+		reviewReport.SubjectDigest != delivery.SubjectDigest {
+		writeError(w, http.StatusUnprocessableEntity, "closure requires PASS independent review for the exact verified delivery subject")
+		return
+	}
 	value, _, err := s.store.GetExecution(delivery.RunID)
 	if err != nil {
 		writeStoreError(w, err)
@@ -979,6 +1083,10 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 	work, err := s.store.GetWork(delivery.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
+		return
+	}
+	if work.State != core.WorkReviewing || work.ActiveRunID != delivery.RunID || work.ActiveTaskContractDigest != delivery.TaskContractDigest {
+		writeError(w, http.StatusConflict, "work is not reviewing this delivery subject")
 		return
 	}
 	expectedVersion := work.Version
