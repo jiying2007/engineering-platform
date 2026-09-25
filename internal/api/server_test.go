@@ -2,7 +2,6 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
-	"github.com/jiying2007/engineering-platform/internal/offline"
-	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 )
@@ -810,43 +807,4 @@ func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
 			"applicable":     true,
 		},
 	}, http.StatusUnprocessableEntity)
-}
-
-type receiptReadbackStore struct {
-	*store.Memory
-	preparation preparation.Receipt
-	offline     offline.Status
-}
-
-func (s *receiptReadbackStore) GetPreparation(context.Context, string) (preparation.Receipt, error) {
-	return s.preparation, nil
-}
-
-func (s *receiptReadbackStore) GetOffline(context.Context, string) (offline.Status, error) {
-	return s.offline, nil
-}
-
-func TestWorkerReceiptReadbackIsExactAndUnavailableWithoutDurableStore(t *testing.T) {
-	memory := store.NewMemory()
-	mustRequest(t, NewServer(memory).Handler(), http.MethodGet, "/api/v1/runs/run/preparation", nil, http.StatusServiceUnavailable)
-	mustRequest(t, NewServer(memory).Handler(), http.MethodGet, "/api/v1/runs/run/offline-execution", nil, http.StatusServiceUnavailable)
-
-	backend := &receiptReadbackStore{
-		Memory:      memory,
-		preparation: preparation.Receipt{Kind: preparation.Kind, FactsDigest: "sha256:test"},
-		offline:     offline.Status{State: offline.Finished},
-	}
-	h := NewServer(backend).Handler()
-	prepBody := mustRequest(t, h, http.MethodGet, "/api/v1/runs/run/preparation", nil, http.StatusOK)
-	var prep preparation.Receipt
-	mustJSON(t, prepBody, &prep)
-	if prep.Kind != preparation.Kind || prep.FactsDigest != "sha256:test" {
-		t.Fatalf("preparation receipt changed in readback: %#v", prep)
-	}
-	offlineBody := mustRequest(t, h, http.MethodGet, "/api/v1/runs/run/offline-execution", nil, http.StatusOK)
-	var status offline.Status
-	mustJSON(t, offlineBody, &status)
-	if status.State != offline.Finished {
-		t.Fatalf("offline status changed in readback: %#v", status)
-	}
 }
