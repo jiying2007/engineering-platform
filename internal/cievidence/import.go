@@ -28,16 +28,16 @@ const (
 )
 
 type RunFact struct {
-	ID         int64
-	Attempt    int64
-	Repository string
-	Workflow   string
+	ID           int64
+	Attempt      int64
+	Repository   string
+	Workflow     string
 	WorkflowPath string
-	Event      string
-	HeadBranch string
-	HeadSHA    string
-	Status     string
-	Conclusion string
+	Event        string
+	HeadBranch   string
+	HeadSHA      string
+	Status       string
+	Conclusion   string
 }
 
 type ArtifactFact struct {
