@@ -25,7 +25,7 @@ func validateContainer(data []byte, p Profile, user, owner, source, bundle, guar
 			Binds                                   []string
 			VolumesFrom                             []string
 			RestartPolicy                           struct{ Name string }
-			LogConfig                               struct{ Type string }
+			LogConfig                               containerLogConfig
 		}
 		Mounts []struct {
 			Type, Source, Destination, Propagation string
@@ -39,7 +39,7 @@ func validateContainer(data []byte, p Profile, user, owner, source, bundle, guar
 	if c.Image != p.Image || c.Config.User != user || c.Config.WorkingDir != "/workspace" || c.Config.Labels["engineering-platform.offline"] != owner || c.Config.Tty || c.Config.OpenStdin || !reflect.DeepEqual(c.Config.Entrypoint, []string{"/ep-guard"}) || !reflect.DeepEqual(c.Config.Cmd, append([]string{strconv.Itoa(p.Seconds)}, p.Argv...)) {
 		return ErrPolicy
 	}
-	if h.NetworkMode != "none" || h.IpcMode != "private" || h.PidMode != "" || !h.ReadonlyRootfs || h.Privileged || len(h.CapAdd) != 0 || len(h.CapDrop) != 1 || h.CapDrop[0] != "ALL" || len(h.SecurityOpt) != 1 || h.SecurityOpt[0] != "no-new-privileges:true" || h.Memory != 256<<20 || h.MemorySwap != 256<<20 || h.NanoCpus != 1_000_000_000 || h.PidsLimit != 64 || h.RestartPolicy.Name != "no" || h.LogConfig.Type != "local" || len(h.Devices) != 0 || len(h.Binds) != 0 || len(h.VolumesFrom) != 0 {
+	if h.NetworkMode != "none" || h.IpcMode != "private" || h.PidMode != "" || !h.ReadonlyRootfs || h.Privileged || len(h.CapAdd) != 0 || len(h.CapDrop) != 1 || h.CapDrop[0] != "ALL" || len(h.SecurityOpt) != 1 || h.SecurityOpt[0] != "no-new-privileges:true" || h.Memory != 256<<20 || h.MemorySwap != 256<<20 || h.NanoCpus != 1_000_000_000 || h.PidsLimit != 64 || h.RestartPolicy.Name != "no" || h.LogConfig.Type != "local" || !reflect.DeepEqual(h.LogConfig.Config, map[string]string{"max-size": "1m", "max-file": "1", "compress": "false"}) || len(h.Devices) != 0 || len(h.Binds) != 0 || len(h.VolumesFrom) != 0 {
 		return ErrPolicy
 	}
 	if len(c.Config.Env) != 4 {
@@ -69,4 +69,9 @@ func validateContainer(data []byte, p Profile, user, owner, source, bundle, guar
 		return ErrPolicy
 	}
 	return nil
+}
+
+type containerLogConfig struct {
+	Type   string
+	Config map[string]string
 }
