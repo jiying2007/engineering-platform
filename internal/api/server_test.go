@@ -200,12 +200,12 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": "delivery-f",
 		"evidence": map[string]any{
-			"evidence_id": "ev-f",
+			"evidence_id":    "ev-f",
 			"requirement_id": "req-1",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "PASS",
-			"applicable":  true,
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
@@ -251,10 +251,10 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": deliveryA.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-a",
+			"evidence_id":    "ev-a",
 			"requirement_id": "req-1",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
 			"result":      "PASS",
 			"applicable":  true,
 		},
@@ -276,12 +276,12 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-fail",
+			"evidence_id":    "ev-fail",
 			"requirement_id": "req-1",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "FAIL",
-			"applicable":  true,
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "FAIL",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
@@ -661,7 +661,6 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 		t.Fatalf("historical steering command was overwritten: %#v", stored)
 	}
 }
-
 
 func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
 	s := NewServer(store.NewMemory())
