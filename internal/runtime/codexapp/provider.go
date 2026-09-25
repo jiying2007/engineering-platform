@@ -117,6 +117,12 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if hasRule != hasToken {
 		return nil, fmt.Errorf("workload identity requires both federation rule and identity token file")
 	}
+	if hasRule && !p.credentialSafe {
+		return nil, fmt.Errorf("workload identity requires the credential-safe provider")
+	}
+	if p.credentialSafe && !hasRule {
+		return nil, fmt.Errorf("credential-safe Codex profile requires workload identity")
+	}
 	if hasContext && !hasRule {
 		return nil, fmt.Errorf("workload identity context requires workload identity")
 	}
@@ -166,9 +172,6 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 		env = append(env, "OPENAI_API_KEY="+key)
 	}
 	if p.credentialSafe {
-		if !hasRule {
-			return nil, fmt.Errorf("credential-safe Codex profile requires workload identity")
-		}
 		configPath := filepath.Join(home, ".codex", "config.toml")
 		if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
 			return nil, fmt.Errorf("write credential-safe Codex config: %w", err)
