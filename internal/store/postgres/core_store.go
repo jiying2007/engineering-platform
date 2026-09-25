@@ -998,7 +998,8 @@ FROM work_items WHERE work_item_id=$1 FOR UPDATE`
 			}
 			if version != expectedVersion ||
 				state != string(core.WorkVerifying) ||
-				work.State != core.WorkReviewing ||
+				(report.Result == review.ResultPass && work.State != core.WorkReviewing) ||
+				(report.Result == review.ResultFail && work.State != core.WorkVerifying) ||
 				humanOwner == report.Reviewer ||
 				activeTask != report.TaskContractDigest ||
 				activeRun != runID ||
