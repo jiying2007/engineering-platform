@@ -153,6 +153,15 @@ jobs:
           test -x "$codex"
           test "$("$codex" --version)" = "codex-cli 0.155.0"
           printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
+      - name: Require Linux sandbox prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          command -v bwrap
+          bwrap --version
+          bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
       - name: Qualify real stable app-server and generated protocol
         shell: bash
         run: |
