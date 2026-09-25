@@ -90,6 +90,9 @@ jobs:
               raise SystemExit("unexpected OIDC audience")
           if claims.get("repository") != repository or claims.get("ref") != ref:
               raise SystemExit("unexpected repository/ref claims")
+          subject = claims.get("sub", "")
+          if not subject.startswith("repo:" + repository + ":"):
+              raise SystemExit("unexpected OIDC subject")
           workflow_ref = claims.get("workflow_ref", "")
           expected = repository + "/.github/workflows/codex-wif-live.yml@refs/heads/main"
           if workflow_ref != expected:
