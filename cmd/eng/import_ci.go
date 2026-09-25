@@ -92,8 +92,10 @@ func importCIEvidence(args []string) error {
 	if err := control.Call(ctx, "POST", "/api/v1/evidence", request, &stored); err != nil {
 		return err
 	}
-	if stored.ID != evidence.ID || stored.RequirementID != evidence.RequirementID || stored.SubjectDigest != evidence.SubjectDigest ||
-		stored.Issuer != evidence.Issuer || stored.Procedure != evidence.Procedure || stored.Result != "PASS" || !stored.Applicable {
+	if stored.ID != evidence.ID || stored.DeliveryReceiptID != evidence.DeliveryReceiptID ||
+		stored.RequirementID != evidence.RequirementID || stored.SubjectDigest != evidence.SubjectDigest ||
+		stored.Issuer != evidence.Issuer || stored.Procedure != evidence.Procedure || stored.Result != "PASS" ||
+		!stored.Applicable || len(stored.ArtifactRefs) != 1 || stored.ArtifactRefs[0] != evidence.ArtifactRefs[0] {
 		return fmt.Errorf("control plane returned a different evidence identity")
 	}
 	printJSON(stored)
