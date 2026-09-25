@@ -87,7 +87,6 @@ func TestWrongProcedureCannotSatisfyFrozenPlan(t *testing.T) {
 	}
 }
 
-
 func TestVerificationRequirementIDCannotBeSubstitutedBySameProcedure(t *testing.T) {
 	plan := Plan{ID: "vp-two", Criteria: []Criterion{{
 		ID: "ac-two", Statement: "two facts", Requirements: []EvidenceRequirement{
