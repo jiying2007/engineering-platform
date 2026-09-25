@@ -81,6 +81,8 @@ jobs:
           go test -race -count=3 -timeout 3m ./cmd/control-plane -run TestPreparationCommand
       - name: Offline authority repeated database regression
         run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestOfflineStore
+      - name: Recovery proof repeated database regression
+        run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run 'Test(PostgresRecoveryLifecycle|RecoveryProof)'
       - name: Vet
         run: go vet ./...
       - name: Build candidate binaries with raw-byte manifest
@@ -149,6 +151,43 @@ jobs:
         run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 
 
+  restore:
+    name: postgres-authority-restore-drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+      EP_RESTORE_DRILL: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Require PostgreSQL 17 dump/restore environment
+        run: |
+          set -euo pipefail
+          test -S /var/run/docker.sock
+          docker version
+          docker image inspect postgres:17-alpine >/dev/null 2>&1 || docker pull postgres:17-alpine
+          go mod download
+      - name: Restore authoritative Core state and complete recovered epoch
+        run: go test -race -v -count=1 -timeout 8m ./internal/store/postgres -run TestPostgresAuthorityRestoreDrill
+
   codex:
     name: codex-app-server-0.155.0-qualification
     runs-on: ubuntu-latest
@@ -216,8 +255,8 @@ jobs:
 
   evidence:
     name: trusted-ci-artifact-evidence
-    needs: [go, offline, codex]
-    if: ${{ always() && needs.go.result == 'success' && needs.offline.result == 'success' && needs.codex.result == 'success' }}
+    needs: [go, offline, restore, codex]
+    if: ${{ always() && needs.go.result == 'success' && needs.offline.result == 'success' && needs.restore.result == 'success' && needs.codex.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -239,7 +278,7 @@ jobs:
           curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
           curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
 
-          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==3 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
+          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==4 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
           binary_id="$(jq -er '.artifacts[] | select(.name|startswith("engineering-binaries-")) | .id' "$RUNNER_TEMP/artifacts.json")"
           codex_id="$(jq -er '.artifacts[] | select(.name|startswith("codex-0.155.0-qualification-")) | .id' "$RUNNER_TEMP/artifacts.json")"
           test -n "$binary_id" -a -n "$codex_id"
@@ -251,7 +290,7 @@ jobs:
           test -n "$manifest"
           jq -e 'length==5 and all(.[]; (.digest|test("^sha256:[0-9a-f]{64}$")) and .size>0)' "$manifest" >/dev/null
 
-          jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
+          jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
           artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-0.155.0-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
           files="$(jq -c '.' "$manifest")"
           tested_sha="$(git rev-parse HEAD)"
