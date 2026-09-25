@@ -200,11 +200,12 @@ func TestFeatureLifecycleClosesOnlyAfterExactVerification(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": "delivery-f",
 		"evidence": map[string]any{
-			"evidence_id": "ev-f",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "PASS",
-			"applicable":  true,
+			"evidence_id":    "ev-f",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
@@ -250,11 +251,12 @@ func TestEvidenceFromAnotherDeliveryCannotVerifySubject(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": deliveryA.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-a",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "PASS",
-			"applicable":  true,
+			"evidence_id":    "ev-a",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
@@ -274,11 +276,12 @@ func TestFailedVerificationCannotClose(t *testing.T) {
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-fail",
-			"issuer":      "ci",
-			"procedure":   "ci.test",
-			"result":      "FAIL",
-			"applicable":  true,
+			"evidence_id":    "ev-fail",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "FAIL",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 
@@ -657,4 +660,58 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 	if stored.Sequence != 1 || stored.ContentDigest != "sha256:first" {
 		t.Fatalf("historical steering command was overwritten: %#v", stored)
 	}
+}
+
+func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
+	s := NewServer(store.NewMemory())
+	h := s.Handler()
+	delivery := createCompletedDelivery(t, h, "requirement")
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id":    "ev-missing-requirement",
+			"requirement_id": "req-missing",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
+		},
+	}, http.StatusUnprocessableEntity)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id":    "ev-wrong-procedure",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "other.test",
+			"result":         "PASS",
+			"applicable":     true,
+		},
+	}, http.StatusUnprocessableEntity)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id": "ev-no-requirement",
+			"issuer":      "ci",
+			"procedure":   "ci.test",
+			"result":      "PASS",
+			"applicable":  true,
+		},
+	}, http.StatusBadRequest)
+
+	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
+		"delivery_receipt_id": delivery.ID,
+		"evidence": map[string]any{
+			"evidence_id":    "ev-foreign-artifact",
+			"requirement_id": "req-1",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"artifact_refs":  []string{"not-in-delivery"},
+			"applicable":     true,
+		},
+	}, http.StatusUnprocessableEntity)
 }

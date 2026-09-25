@@ -365,3 +365,46 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 		t.Fatalf("atomic completion failed run=%s work=%s", finished.State, verifying.State)
 	}
 }
+
+func TestMemoryEvidenceRequiresExactFrozenRequirement(t *testing.T) {
+	store := NewMemory()
+	plan := planFor("tests pass", "ci.test")
+	planDigest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := core.TaskContract{ID: "task-evidence", VerificationPlanID: plan.ID, VerificationPlanDigest: planDigest}
+	taskDigest, err := task.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.tasksByDigest[taskDigest] = task
+	store.verificationPlans[planDigest] = plan
+	store.deliveries["delivery-evidence"] = core.DeliveryReceipt{
+		ID:                 "delivery-evidence",
+		TaskContractDigest: taskDigest,
+		SubjectDigest:      "sha256:subject",
+	}
+	base := core.EvidenceRef{
+		ID:                "evidence-evidence",
+		DeliveryReceiptID: "delivery-evidence",
+		RequirementID:     "wrong",
+		SubjectDigest:     "sha256:subject",
+		Issuer:            "ci",
+		Procedure:         "ci.test",
+		Result:            "PASS",
+		Applicable:        true,
+	}
+	if err := store.CreateEvidence(base); !errors.Is(err, ErrConflict) {
+		t.Fatalf("wrong requirement persisted: %v", err)
+	}
+	base.RequirementID = "req-1"
+	base.SubjectDigest = "sha256:other"
+	if err := store.CreateEvidence(base); !errors.Is(err, ErrConflict) {
+		t.Fatalf("wrong subject persisted: %v", err)
+	}
+	base.SubjectDigest = "sha256:subject"
+	if err := store.CreateEvidence(base); err != nil {
+		t.Fatal(err)
+	}
+}
