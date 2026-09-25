@@ -745,7 +745,8 @@ func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion
 	}
 	if current.Version != expectedVersion ||
 		current.State != core.WorkVerifying ||
-		work.State != core.WorkReviewing ||
+		(report.Result == review.ResultPass && work.State != core.WorkReviewing) ||
+		(report.Result == review.ResultFail && work.State != core.WorkVerifying) ||
 		current.ID != delivery.WorkItemID ||
 		current.ActiveRunID != delivery.RunID ||
 		current.ActiveTaskContractDigest != delivery.TaskContractDigest ||
