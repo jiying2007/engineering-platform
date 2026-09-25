@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 	"time"
@@ -191,8 +190,11 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	case <-waitCtx.Done():
 		cancel()
 		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
-	case <-done:
+	case waitErr := <-done:
 		waited = true
+		if waitErr != nil {
+			return receipt, fmt.Errorf("app-server exited after live qualification: %w", waitErr)
+		}
 	}
 	receipt = LiveReceipt{
 		SchemaVersion:     1,
@@ -227,7 +229,3 @@ func MarshalLiveReceipt(r LiveReceipt) ([]byte, error) {
 	}
 	return json.MarshalIndent(r, "", "  ")
 }
-
-// Keep io referenced here because this file's process boundary intentionally
-// relies on closable pipes; compile-time assertion catches accidental wrappers.
-var _ io.ReadCloser
