@@ -12,8 +12,6 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
-	"github.com/jiying2007/engineering-platform/internal/offline"
-	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/routing"
@@ -32,14 +30,6 @@ type ActionGateway interface {
 type RecoveryProofStore interface {
 	CreateRecoveryProof(context.Context, uint64, string) (recovery.Proof, error)
 	GetRecoveryProof(context.Context, uint64) (recovery.Proof, error)
-}
-
-type PreparationReceiptStore interface {
-	GetPreparation(context.Context, string) (preparation.Receipt, error)
-}
-
-type OfflineExecutionStore interface {
-	GetOffline(context.Context, string) (offline.Status, error)
 }
 
 type Server struct {
@@ -89,8 +79,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/task-contracts/{id}", s.handleGetTask)
 	s.mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
-	s.mux.HandleFunc("GET /api/v1/runs/{id}/preparation", s.handleGetPreparation)
-	s.mux.HandleFunc("GET /api/v1/runs/{id}/offline-execution", s.handleGetOfflineExecution)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/steer", s.handleSteer)
 	s.mux.HandleFunc("GET /api/v1/steering/{id}", s.handleGetSteering)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
@@ -464,34 +452,6 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"run": value, "session": sess, "run_input": input})
-}
-
-func (s *Server) handleGetPreparation(w http.ResponseWriter, r *http.Request) {
-	receipts, ok := s.store.(PreparationReceiptStore)
-	if !ok {
-		writeError(w, http.StatusServiceUnavailable, "durable preparation receipt store is not configured")
-		return
-	}
-	receipt, err := receipts.GetPreparation(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeStoreError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, receipt)
-}
-
-func (s *Server) handleGetOfflineExecution(w http.ResponseWriter, r *http.Request) {
-	executions, ok := s.store.(OfflineExecutionStore)
-	if !ok {
-		writeError(w, http.StatusServiceUnavailable, "durable offline execution store is not configured")
-		return
-	}
-	status, err := executions.GetOffline(r.Context(), r.PathValue("id"))
-	if err != nil {
-		writeStoreError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, status)
 }
 
 type epochRequest struct {
