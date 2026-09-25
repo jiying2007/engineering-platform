@@ -36,6 +36,8 @@ var routeCapabilities = map[string]string{
 	"GET /api/v1/recovery":                access.Read,
 	"POST /api/v1/recovery/begin":         access.RecoveryBegin,
 	"POST /api/v1/recovery/complete":      access.RecoveryComplete,
+	"POST /api/v1/recovery/proofs":        access.RecoveryReconcile,
+	"GET /api/v1/recovery/proofs/{epoch}": access.Read,
 	"POST /api/v1/work-items":             access.WorkCreate,
 	"GET /api/v1/work-items/{id}":         access.Read,
 	"POST /api/v1/task-contracts":         access.TaskCreate,
@@ -182,18 +184,24 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 		if body.Reviewer != id.Subject() {
 			return http.StatusForbidden
 		}
+	case "POST /api/v1/recovery/proofs":
+		var body createRecoveryProofRequest
+		if strictjson.Decode(data, &body) != nil || body.RecoveryEpoch == 0 || body.Reconciler == "" {
+			return http.StatusBadRequest
+		}
+		if body.Reconciler != id.Subject() {
+			return http.StatusForbidden
+		}
 	case "POST /api/v1/recovery/complete":
 		var body completeRecoveryRequest
 		if strictjson.Decode(data, &body) != nil || body.RecoveryEpoch == 0 {
 			return http.StatusBadRequest
 		}
-		if body.Reconciled {
-			if options.RecoveryCompletion == nil {
-				return http.StatusServiceUnavailable
-			}
-			if options.RecoveryCompletion.AuthorizeCompletion(ctx, id.Subject(), body.RecoveryEpoch) != nil {
-				return http.StatusForbidden
-			}
+		if options.RecoveryCompletion == nil {
+			return http.StatusServiceUnavailable
+		}
+		if options.RecoveryCompletion.AuthorizeCompletion(ctx, id.Subject(), body.RecoveryEpoch) != nil {
+			return http.StatusForbidden
 		}
 	}
 	return 0
