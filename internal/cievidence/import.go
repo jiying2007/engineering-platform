@@ -32,7 +32,9 @@ type RunFact struct {
 	Attempt    int64
 	Repository string
 	Workflow   string
+	WorkflowPath string
 	Event      string
+	HeadBranch string
 	HeadSHA    string
 	Status     string
 	Conclusion string
@@ -165,7 +167,8 @@ func verifyLiveFacts(envelope Envelope, live LiveFacts, resultCommit string) err
 		return fmt.Errorf("CI receipt is not exact trusted-main evidence for the delivery commit")
 	}
 	if live.Run.ID != r.RunID || live.Run.Attempt != r.RunAttempt || live.Run.Repository != TrustedRepository ||
-		live.Run.Workflow != TrustedWorkflow || live.Run.Event != "push" || live.Run.HeadSHA != resultCommit ||
+		live.Run.Workflow != TrustedWorkflow || live.Run.WorkflowPath != ".github/workflows/ci.yml" ||
+		live.Run.Event != "push" || live.Run.HeadBranch != "main" || live.Run.HeadSHA != resultCommit ||
 		live.Run.Status != "completed" || live.Run.Conclusion != "success" {
 		return fmt.Errorf("live GitHub run does not match retained receipt")
 	}
