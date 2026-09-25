@@ -15,7 +15,10 @@ import (
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
-const LiveProbePrompt = "Reply with only: engineering-platform live qualification"
+const (
+	LiveProbePrompt   = "Reply with only: engineering-platform live qualification"
+	LiveProbeExpected = "engineering-platform live qualification"
+)
 
 type LiveReceipt struct {
 	SchemaVersion     int    `json:"schema_version"`
@@ -230,7 +233,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || !canonical.ValidDigest(r.PromptDigest) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse {
 		return fmt.Errorf("invalid live qualification receipt")
 	}
 	return nil
