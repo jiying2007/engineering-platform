@@ -26,7 +26,10 @@ func TestIndependentWorkspaceCancellationReapsChildrenAndOwnedSlot(t *testing.T)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { _, err := m.Create(ctx, Spec{ID: "cancelled", Repository: repo, BaseCommit: commit}); done <- err }()
+	go func() {
+		_, err := m.Create(ctx, Spec{ID: "cancelled", Repository: repo, BaseCommit: commit})
+		done <- err
+	}()
 	deadline := time.After(5 * time.Second)
 	for !pathExists(ready) {
 		select {
