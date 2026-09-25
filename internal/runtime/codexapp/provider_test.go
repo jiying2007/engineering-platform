@@ -224,7 +224,6 @@ func TestRejectedCredentialConfigurationLeavesRuntimeHomeFresh(t *testing.T) {
 	}
 }
 
-
 func TestNormalProviderRejectsWorkloadIdentity(t *testing.T) {
 	p, spec := launchFixture(t)
 	spec.Env = append(spec.Env, workloadIdentityEnv(t, spec)...)
