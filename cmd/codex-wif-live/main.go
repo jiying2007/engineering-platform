@@ -21,7 +21,7 @@ func main() {
 	model := flag.String("model", "gpt-5.6-sol", "qualified model identifier")
 	flag.Parse()
 	if flag.NArg() != 0 || *executable == "" || *digest == "" || *work == "" || *home == "" || *rule == "" || *token == "" {
-		fmt.Fprintln(os.Stderr, "usage: codex-wif-live --codex <absolute> --digest sha256:<...> --work <dir> --home <fresh-dir> --federation-rule idpm_... --identity-token-file <absolute> [--audit-context <json>] [--model gpt-5.6-sol]")
+		fmt.Fprintln(os.Stderr, "usage: codex-wif-live --codex <absolute> --digest sha256:<...> --work <dir> --home <fresh-dir> --federation-rule <rule-id> --identity-token-file <absolute> [--audit-context <json>] [--model gpt-5.6-sol]")
 		os.Exit(2)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 110*time.Second)
