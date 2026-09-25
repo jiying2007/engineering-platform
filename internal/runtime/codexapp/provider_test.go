@@ -95,3 +95,102 @@ func TestProviderRejectsUnsafeLaunchInputs(t *testing.T) {
 		t.Fatal("PATH executable accepted")
 	}
 }
+
+
+func workloadIdentityEnv(t *testing.T, spec runtimeprovider.LaunchSpec) []string {
+	t.Helper()
+	home := strings.TrimPrefix(spec.Env[0], "HOME=")
+	secretDir := filepath.Join(filepath.Dir(home), "identity")
+	if err := os.Mkdir(secretDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	token := filepath.Join(secretDir, "token")
+	if err := os.WriteFile(token, []byte("eyJhbGciOiJub25lIn0.fixture.signature"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return []string{
+		"OPENAI_FEDERATION_RULE_ID=idpm_engineering_platform_test",
+		"OPENAI_IDENTITY_TOKEN_FILE=" + token,
+		`OPENAI_WORKLOAD_IDENTITY_CONTEXT={"run_id":"test-run","worker":"test-worker"}`,
+	}
+}
+
+func TestProviderAcceptsPrivateWorkloadIdentityWithoutReadingSecret(t *testing.T) {
+	p, spec := launchFixture(t)
+	spec.Env = append(spec.Env, workloadIdentityEnv(t, spec)...)
+	cmd, err := p.Command(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(cmd.Env, "\n")
+	for _, required := range []string{
+		"OPENAI_FEDERATION_RULE_ID=idpm_engineering_platform_test",
+		"OPENAI_IDENTITY_TOKEN_FILE=",
+		"OPENAI_WORKLOAD_IDENTITY_CONTEXT=",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatal("missing workload identity configuration", required)
+		}
+	}
+	if strings.Contains(joined, "eyJhbGciOiJub25lIn0.fixture.signature") {
+		t.Fatal("identity token contents leaked into environment")
+	}
+	if strings.Contains(joined, "OPENAI_API_KEY=") || strings.Contains(joined, "OPENAI_BASE_URL=") {
+		t.Fatal("workload identity carried alternate provider credentials")
+	}
+}
+
+func TestProviderRejectsIncompleteOrUnsafeWorkloadIdentity(t *testing.T) {
+	for _, kind := range []string{"rule-only", "token-only", "context-only", "api-key", "base-url", "bad-rule", "public-file", "public-parent", "relative-token", "worktree-token", "bad-context"} {
+		t.Run(kind, func(t *testing.T) {
+			p, spec := launchFixture(t)
+			wif := workloadIdentityEnv(t, spec)
+			switch kind {
+			case "rule-only":
+				spec.Env = append(spec.Env, wif[0])
+			case "token-only":
+				spec.Env = append(spec.Env, wif[1])
+			case "context-only":
+				spec.Env = append(spec.Env, wif[2])
+			case "api-key":
+				spec.Env = append(spec.Env, wif...)
+				spec.Env = append(spec.Env, "OPENAI_API_KEY=must-not-coexist")
+			case "base-url":
+				spec.Env = append(spec.Env, wif...)
+				spec.Env = append(spec.Env, "OPENAI_BASE_URL=https://provider.example/v1")
+			case "bad-rule":
+				spec.Env = append(spec.Env, "OPENAI_FEDERATION_RULE_ID=not-a-rule", wif[1])
+			case "public-file":
+				token := strings.TrimPrefix(wif[1], "OPENAI_IDENTITY_TOKEN_FILE=")
+				if err := os.Chmod(token, 0o644); err != nil {
+					t.Fatal(err)
+				}
+				spec.Env = append(spec.Env, wif[:2]...)
+			case "public-parent":
+				token := strings.TrimPrefix(wif[1], "OPENAI_IDENTITY_TOKEN_FILE=")
+				if err := os.Chmod(filepath.Dir(token), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				spec.Env = append(spec.Env, wif[:2]...)
+			case "relative-token":
+				spec.Env = append(spec.Env, wif[0], "OPENAI_IDENTITY_TOKEN_FILE=relative.jwt")
+			case "worktree-token":
+				token := filepath.Join(spec.Dir, "identity-token")
+				if err := os.WriteFile(token, []byte("eyJhbGciOiJub25lIn0.fixture.signature"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				spec.Env = append(spec.Env, wif[0], "OPENAI_IDENTITY_TOKEN_FILE="+token)
+			case "bad-context":
+				spec.Env = append(spec.Env, wif[:2]...)
+				spec.Env = append(spec.Env, `OPENAI_WORKLOAD_IDENTITY_CONTEXT={"Bad-Key":"x"}`)
+			}
+			_, err := p.Command(context.Background(), spec)
+			if err == nil {
+				t.Fatal("unsafe workload identity accepted", kind)
+			}
+			if strings.Contains(err.Error(), "eyJhbGciOiJub25l") {
+				t.Fatal("identity token contents leaked in error")
+			}
+		})
+	}
+}
