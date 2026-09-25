@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
@@ -21,9 +22,9 @@ import (
 const (
 	TrustedRepository = "jiying2007/engineering-platform"
 	TrustedWorkflow   = "CI"
-	TrustedIssuer     = "github-actions-importer"
-	TrustedProcedure  = "github.actions.trusted-ci.v1"
-	ImporterSubject   = "urn:engineering-platform:github-ci-importer"
+	TrustedIssuer     = access.TrustedCIIssuer
+	TrustedProcedure  = access.TrustedCIProcedure
+	ImporterSubject   = access.TrustedCIImporterSubject
 )
 
 type RunFact struct {
