@@ -40,6 +40,14 @@ const (
 	TrustedCIImporterSubject = "urn:engineering-platform:github-ci-importer"
 	TrustedCIIssuer          = "github-actions-importer"
 	TrustedCIProcedure       = "github.actions.trusted-ci.v1"
+
+	WorkerEvidenceImporterSubject = "urn:engineering-platform:worker-evidence-importer"
+	WorkerEvidenceIssuer          = "worker-execution-importer"
+	WorkerEvidenceProcedure       = "worker.offline.execution.v1"
+
+	GitEvidenceImporterSubject = "urn:engineering-platform:git-evidence-importer"
+	GitEvidenceIssuer          = "git-change-importer"
+	GitEvidenceProcedure       = "git.changed-tree.v1"
 )
 
 var capabilities = map[string]bool{
@@ -151,9 +159,14 @@ func New(doc Document) (*Policy, error) {
 		} else if id.issuer != "" || len(id.procedures) > 0 {
 			return nil, fmt.Errorf("evidence binding without evidence grant")
 		}
-		reservedCI := id.issuer == TrustedCIIssuer || id.procedures[TrustedCIProcedure]
-		if reservedCI && (id.subject != TrustedCIImporterSubject || id.issuer != TrustedCIIssuer || len(id.procedures) != 1 || !id.procedures[TrustedCIProcedure]) {
-			return nil, fmt.Errorf("trusted CI evidence authority is reserved for the dedicated importer principal")
+		if err := validateReservedEvidenceAuthority(id, TrustedCIImporterSubject, TrustedCIIssuer, TrustedCIProcedure); err != nil {
+			return nil, err
+		}
+		if err := validateReservedEvidenceAuthority(id, WorkerEvidenceImporterSubject, WorkerEvidenceIssuer, WorkerEvidenceProcedure); err != nil {
+			return nil, err
+		}
+		if err := validateReservedEvidenceAuthority(id, GitEvidenceImporterSubject, GitEvidenceIssuer, GitEvidenceProcedure); err != nil {
+			return nil, err
 		}
 		if err := configureWorkerProfiles(spec, &id); err != nil {
 			return nil, err
@@ -181,6 +194,20 @@ func New(doc Document) (*Policy, error) {
 		policy.principals[id.subject] = id
 	}
 	return policy, nil
+}
+
+func validateReservedEvidenceAuthority(id Identity, subject, issuer, procedure string) error {
+	reserved := id.subject == subject || id.issuer == issuer || id.procedures[procedure]
+	if !reserved {
+		return nil
+	}
+	if id.subject != subject || id.issuer != issuer || len(id.procedures) != 1 || !id.procedures[procedure] {
+		return fmt.Errorf("reserved evidence authority requires its dedicated importer principal")
+	}
+	if len(id.actions) != 0 || len(id.workerProfiles) != 0 || len(id.capabilities) != 2 || !id.Allows(Read) || !id.Allows(EvidenceRegister) {
+		return fmt.Errorf("dedicated evidence importer may only hold core:read and evidence:register")
+	}
+	return nil
 }
 
 func validRisk(risk string) bool {
