@@ -313,11 +313,11 @@ func verifyCodexArchive(path string) error {
 		return fmt.Errorf("invalid Codex qualification receipt")
 	}
 	if q.SchemaVersion != 1 || q.CLI != "codex-cli" || q.Version != codexapp.QualifiedCodexVersion ||
-		q.ReleaseTag != codexapp.QualifiedCodexReleaseTag || !strings.HasPrefix(q.ReleaseCommit, codexapp.QualifiedCodexReleaseCommit) ||
+		q.ReleaseTag != codexapp.QualifiedCodexReleaseTag || q.ReleaseCommit != codexapp.QualifiedCodexReleaseCommit ||
 		!canonical.ValidDigest(q.BinaryDigest) || !canonical.ValidDigest(q.StableSchemaDigest) ||
 		!canonical.ValidDigest(q.ExperimentalSchemaDigest) || q.Transport != "stdio" || !q.FreshProcess ||
 		q.ManagedDaemon || q.PerThreadConfigOverride || !q.InitializePassed || !q.ThreadStartPassed ||
-		strings.TrimSpace(q.ThreadStartModel) == "" || !q.StableSchemaContractChecked || !q.ExperimentalSurfaceChecked ||
+		q.ThreadStartModel != "gpt-5.6-sol" || !q.StableSchemaContractChecked || !q.ExperimentalSurfaceChecked ||
 		!canonical.ValidDigest(q.CredentialSafeConfigDigest) || !q.CredentialSafeProfileChecked {
 		return fmt.Errorf("Codex qualification receipt does not satisfy pinned contract")
 	}
