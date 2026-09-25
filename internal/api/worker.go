@@ -11,6 +11,11 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
+	"POST /api/v1/worker/codex/start":    access.ActionExecute,
+	"POST /api/v1/worker/codex/renew":    access.ActionExecute,
+	"POST /api/v1/worker/codex/report":   access.ActionExecute,
+	"POST /api/v1/worker/codex/fail":     access.ActionExecute,
+	"GET /api/v1/runs/{id}/codex":        access.Read,
 	"POST /api/v1/worker/offline/start":  access.ActionExecute,
 	"POST /api/v1/worker/offline/renew":  access.ActionExecute,
 	"POST /api/v1/worker/offline/report": access.ActionExecute,
@@ -27,6 +32,11 @@ var workerRouteCapabilities = map[string]string{
 
 // Only the authenticated constructor registers these routes.
 func (s *Server) workerRoutes() {
+	s.mux.HandleFunc("POST /api/v1/worker/codex/start", s.handleCodexStart)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/renew", s.handleCodexRenew)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/report", s.handleCodexReport)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/fail", s.handleCodexFail)
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/codex", s.handleCodexGet)
 	s.mux.HandleFunc("POST /api/v1/worker/offline/start", s.handleOfflineStart)
 	s.mux.HandleFunc("POST /api/v1/worker/offline/renew", s.handleOfflineRenew)
 	s.mux.HandleFunc("POST /api/v1/worker/offline/report", s.handleOfflineReport)
