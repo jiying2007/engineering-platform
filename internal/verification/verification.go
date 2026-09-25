@@ -7,6 +7,11 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 )
 
+const (
+	GitHubActionsIssuer    = "github-actions"
+	GitHubActionsProcedure = "github.actions.ci.v1"
+)
+
 type EvidenceRequirement struct {
 	ID        string `json:"requirement_id"`
 	Procedure string `json:"procedure"`
@@ -71,6 +76,9 @@ func ValidatePlan(plan Plan, acceptanceCriteria []string) bool {
 		expected[criterion.Statement]--
 		for _, req := range criterion.Requirements {
 			if req.ID == "" || requirementIDs[req.ID] || req.Procedure == "" {
+				return false
+			}
+			if req.Procedure == GitHubActionsProcedure && req.Issuer != GitHubActionsIssuer {
 				return false
 			}
 			requirementIDs[req.ID] = true
