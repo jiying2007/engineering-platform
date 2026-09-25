@@ -32,9 +32,9 @@ func offlineFixture(t *testing.T, exitCode int) OfflineImportRequest {
 	}
 	worker := "urn:engineering-platform:worker:test"
 	prep := preparation.Receipt{
-		Kind: preparation.Kind,
+		Kind:      preparation.Kind,
 		Admission: workerqueue.Receipt{Worker: worker},
-		Facts: prepFacts, FactsDigest: prepDigest, ReceivedAt: time.Unix(10, 0).UTC(),
+		Facts:     prepFacts, FactsDigest: prepDigest, ReceivedAt: time.Unix(10, 0).UTC(),
 	}
 	result := sandbox.Result{
 		Recipe: sandbox.Recipe, ProfileDigest: profileDigest,
@@ -48,8 +48,8 @@ func offlineFixture(t *testing.T, exitCode int) OfflineImportRequest {
 		t.Fatal(err)
 	}
 	receipt := offline.Receipt{
-		Kind: offline.Kind,
-		Token: offline.Token{ID: strings.Repeat("d", 64), RunID: "run-1", WorkerProfile: "worker/test", ProfileDigest: profileDigest},
+		Kind:   offline.Kind,
+		Token:  offline.Token{ID: strings.Repeat("d", 64), RunID: "run-1", WorkerProfile: "worker/test", ProfileDigest: profileDigest},
 		Worker: worker, PreparationDigest: prepDigest, Result: result, ResultDigest: resultDigest,
 		ReceivedAt: time.Unix(20, 0).UTC(),
 	}
