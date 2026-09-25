@@ -76,6 +76,8 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 		Conclusion string `json:"conclusion"`
 		RunAttempt int64  `json:"run_attempt"`
 		HeadSHA    string `json:"head_sha"`
+		HeadBranch string `json:"head_branch"`
+		Path       string `json:"path"`
 		Repository struct {
 			FullName string `json:"full_name"`
 		} `json:"repository"`
@@ -85,7 +87,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 	}
 	facts.Run = RunFact{
 		ID: run.ID, Attempt: run.RunAttempt, Repository: run.Repository.FullName,
-		Workflow: run.Name, Event: run.Event, HeadSHA: run.HeadSHA,
+		Workflow: run.Name, WorkflowPath: run.Path, Event: run.Event, HeadBranch: run.HeadBranch, HeadSHA: run.HeadSHA,
 		Status: run.Status, Conclusion: run.Conclusion,
 	}
 	var jobs struct {
@@ -95,6 +97,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 			Name       string `json:"name"`
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
+			HeadSHA    string `json:"head_sha"`
 		} `json:"jobs"`
 	}
 	if err := c.getJSON(ctx, "/repos/"+TrustedRepository+"/actions/runs/"+strconv.FormatInt(runID, 10)+"/jobs?per_page=100&filter=latest", &jobs); err != nil {
@@ -104,7 +107,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 		return facts, fmt.Errorf("GitHub job pagination/count is not authoritative")
 	}
 	for _, job := range jobs.Jobs {
-		if job.ID <= 0 || strings.TrimSpace(job.Name) == "" || job.Status != "completed" {
+		if job.ID <= 0 || strings.TrimSpace(job.Name) == "" || job.Status != "completed" || job.HeadSHA != run.HeadSHA {
 			return facts, fmt.Errorf("GitHub job is incomplete or malformed")
 		}
 		facts.Jobs = append(facts.Jobs, Job{Name: job.Name, ID: job.ID, Conclusion: job.Conclusion})
