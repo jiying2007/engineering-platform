@@ -1,8 +1,8 @@
 # Implementation Status
 
-Reviewed base: `df5d69d2d2f822d90571c44526b313eb9a872090` (#35).
+Reviewed base: `810d01c7e1c89efe22aa7c3c99bcbd2398b35380` (#36).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
-real Codex 0.155 app-server qualification gate; no authenticated model pilot**.
+real Codex 0.155 qualification + retained Git/CI/artifact provenance; no authenticated model pilot**.
 
 ## Canonical scope
 
@@ -36,7 +36,7 @@ Evidence/Verification/Delivery/Closure automatically.
 | Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Real model turn and interactive approval lane not yet assembled |
 | Codex qualification (this change) | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Provider credentials/network policy and real model-output qualification |
 | Action/recovery | Durable action ledger, authenticated grants, independent recovery-completion gate | Real privileged provider/effect boundary and completion verifier |
-| Engineering delivery | Frozen verification plus Delivery/Evidence/Closure contracts | Actual Git/CI/Artifact facts, independent Review and Feature/Debug pilots |
+| Engineering delivery | Frozen verification plus Delivery/Evidence/Closure contracts; exact Git/CI/artifact provenance envelope with GitHub and raw-binary digests | Import provenance into Run-bound Core Evidence, independent Review and Feature/Debug pilots |
 
 ## Retained evidence
 
@@ -47,9 +47,8 @@ Evidence/Verification/Delivery/Closure automatically.
 - #35 offline execution: main `df5d69d2d2f822d90571c44526b313eb9a872090`;
   PR `36084019664` and fresh main `36084270695` passed both normal Go/PG
   regression and mandatory real-container jobs.
-- This Codex change requires exact PR-head normal CI plus
-  `codex-app-server-0.155.0-qualification`, then fresh-main copies of both.
-  No helper-process test or earlier green checkpoint substitutes for them.
+- #36 real Codex qualification: main `810d01c7e1c89efe22aa7c3c99bcbd2398b35380`; PR run `36088616108` and fresh-main run `36093348940` passed `go`, real container and real Codex qualification jobs. PR qualification artifact `10844861935` retained exact native/schema digests.
+- This CI provenance change additionally requires a successful `trusted-ci-artifact-evidence` job on the exact PR head and fresh main. Earlier logs or manually copied job IDs do not substitute.
 
 The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
 platform executable, verifies the reported version, hashes the executable,
@@ -75,14 +74,14 @@ Next implementation sequence:
    reservation and perform a real authenticated Codex turn under explicit egress;
 2. route every interactive command/file/network approval through current
    Action Gateway authority, never through provider self-approval;
-3. retain exact model/protocol/output receipt plus Git diff, CI and Artifact-byte
-   facts, then independent Review;
+3. import the now-retained Git/CI/artifact provenance into exact Run/VerificationPlan-bound Core Evidence, plus model/protocol/output and changed-tree facts, then independent Review;
 4. close UNKNOWN/reconciliation and restore drills;
 5. retain one real Feature pilot and one real Debug pilot before assessing M1.
 
 No new extension domains. **M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/TRUSTED_CI_EVIDENCE_V1.md`
 - `docs/implementation/CODEX_QUALIFICATION_V1.md`
 - `docs/implementation/OFFLINE_EXECUTION_V1.md`
 - `docs/implementation/WORKER_PREPARATION_V1.md`
