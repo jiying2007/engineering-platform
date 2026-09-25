@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/cievidence"
@@ -63,7 +64,7 @@ func importGitHubEvidence(args []string) error {
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		return fmt.Errorf("usage: eng evidence-import-github-ci --repository owner/repo --github-run-id N --core-run-id ID --task-id ID --delivery-id ID --requirement-id ID")
 	}
-	if *repository == "" || *githubRun <= 0 || !safeImportID(*coreRun) || !safeImportID(*taskID) || !safeImportID(*deliveryID) || !safeImportID(*requirementID) {
+	if *repository == "" || *githubRun <= 0 || !safeImportID(*coreRun) || !safeImportID(*taskID) || !safeImportID(*deliveryID) || !boundedImportLabel(*requirementID) {
 		return fmt.Errorf("explicit canonical repository/run/task/delivery/requirement identity required")
 	}
 	token := os.Getenv("GITHUB_TOKEN")
@@ -141,17 +142,43 @@ func safeImportID(value string) bool {
 	return importIDPattern.MatchString(value)
 }
 
+func boundedImportLabel(value string) bool {
+	if value == "" || len(value) > 256 || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, ch := range value {
+		if ch < 0x20 || ch == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
 func createOrReconcileDelivery(ctx context.Context, client *controlclient.Client, input createDeliveryInput) (core.DeliveryReceipt, error) {
 	var created core.DeliveryReceipt
 	err := client.Call(ctx, http.MethodPost, "/api/v1/deliveries", input, &created)
 	if err == nil {
+		if !deliveryMatchesInput(created, input) {
+			return core.DeliveryReceipt{}, fmt.Errorf("created delivery differs from deterministic input")
+		}
 		return created, nil
 	}
 	var existing core.DeliveryReceipt
 	if readErr := client.Call(ctx, http.MethodGet, "/api/v1/deliveries/"+input.ID, nil, &existing); readErr != nil {
 		return core.DeliveryReceipt{}, fmt.Errorf("delivery create outcome unresolved: create=%v reconcile=%v", err, readErr)
 	}
+	if !deliveryMatchesInput(existing, input) {
+		return core.DeliveryReceipt{}, fmt.Errorf("existing delivery ID is bound to different content")
+	}
 	return existing, nil
+}
+
+func deliveryMatchesInput(delivery core.DeliveryReceipt, input createDeliveryInput) bool {
+	return delivery.ID == input.ID &&
+		delivery.RunID == input.RunID &&
+		delivery.ResultCommit == input.ResultCommit &&
+		reflect.DeepEqual(delivery.Artifacts, input.Artifacts) &&
+		reflect.DeepEqual(delivery.KnownLimits, input.KnownLimits)
 }
 
 func createOrReconcileEvidence(ctx context.Context, client *controlclient.Client, deliveryID string, evidence core.EvidenceRef) (core.EvidenceRef, error) {
