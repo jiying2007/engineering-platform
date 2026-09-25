@@ -2,11 +2,13 @@ package store
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -406,5 +408,60 @@ func TestMemoryEvidenceRequiresExactFrozenRequirement(t *testing.T) {
 	base.SubjectDigest = "sha256:subject"
 	if err := store.CreateEvidence(base); err != nil {
 		t.Fatal(err)
+	}
+}
+
+
+func TestMemoryReviewReportIsImmutableAcrossCallers(t *testing.T) {
+	store := NewMemory()
+	taskDigest := "sha256:" + strings.Repeat("a", 64)
+	subjectDigest := "sha256:" + strings.Repeat("b", 64)
+	work := core.WorkItem{
+		ID: "work-review-copy", HumanOwner: "owner",
+		State: core.WorkVerifying, Version: 1,
+		ActiveTaskContractDigest: taskDigest, ActiveRunID: "run-review-copy",
+	}
+	store.works[work.ID] = work
+	store.deliveries["delivery-review-copy"] = core.DeliveryReceipt{
+		ID: "delivery-review-copy", WorkItemID: work.ID, RunID: work.ActiveRunID,
+		TaskContractDigest: taskDigest, SubjectDigest: subjectDigest,
+	}
+	store.verificationReports["verification-review-copy"] = verification.Report{
+		ID: "verification-review-copy", DeliveryReceiptID: "delivery-review-copy",
+		SubjectDigest: subjectDigest, Result: "PASS", Verifier: "verifier",
+	}
+	report := review.Report{
+		ID: "review-copy", DeliveryReceiptID: "delivery-review-copy",
+		VerificationReportID: "verification-review-copy",
+		TaskContractDigest: taskDigest, SubjectDigest: subjectDigest,
+		Reviewer: "reviewer", Result: review.ResultPass,
+		Findings: []review.Finding{{ID: "note", Severity: review.SeverityWarning, Summary: "bounded warning"}},
+		KnownLimits: []string{"host trust"},
+		CreatedAt: time.Unix(10, 0).UTC(),
+	}
+	reviewing := work
+	if err := reviewing.Transition(core.WorkReviewing); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CreateReviewAndUpdateWork(report, work.Version, reviewing); err != nil {
+		t.Fatal(err)
+	}
+	report.Findings[0].Summary = "caller rewrite"
+	report.KnownLimits[0] = "caller rewrite"
+	first, err := store.GetReview("review-copy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Findings[0].Summary != "bounded warning" || first.KnownLimits[0] != "host trust" {
+		t.Fatalf("stored review aliased input: %#v", first)
+	}
+	first.Findings[0].Summary = "returned rewrite"
+	first.KnownLimits[0] = "returned rewrite"
+	second, err := store.GetReview("review-copy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Findings[0].Summary != "bounded warning" || second.KnownLimits[0] != "host trust" {
+		t.Fatalf("stored review aliased returned value: %#v", second)
 	}
 }
