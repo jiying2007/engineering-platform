@@ -31,8 +31,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 		t.Fatal(err)
 	}
 	binaryMembers["file-manifest.json"] = manifest
-	binaryMembers["SHA256SUMS"] = []byte("fixture
-")
+	binaryMembers["SHA256SUMS"] = []byte("fixture\n")
 	binaryZip := writeFixtureZip(t, root, "binaries.zip", binaryMembers)
 	binaryInfo, _ := os.Stat(binaryZip)
 	binaryDigest := digestFixtureFile(t, binaryZip)
@@ -64,8 +63,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 	}
 	codexZip := writeFixtureZip(t, root, "codex.zip", map[string][]byte{
 		"codex-qualification.json": qdata,
-		"codex-npm-integrity.txt":  []byte("sha512-fixture
-"),
+		"codex-npm-integrity.txt":  []byte("sha512-fixture\n"),
 	})
 	codexInfo, _ := os.Stat(codexZip)
 	codexDigest := digestFixtureFile(t, codexZip)
