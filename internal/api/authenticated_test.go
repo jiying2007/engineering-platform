@@ -37,6 +37,7 @@ const ciSubject = "urn:engineering-platform:service:ci"
 const verifierSubject = "urn:engineering-platform:service:verifier"
 const reviewerSubject = "urn:engineering-platform:service:reviewer"
 const recoverySubject = "urn:engineering-platform:operator:recovery"
+const reconcilerSubject = "urn:engineering-platform:operator:reconciler"
 
 func testAccessPolicy(t *testing.T) *access.Policy {
 	t.Helper()
@@ -46,6 +47,7 @@ func testAccessPolicy(t *testing.T) *access.Policy {
 		{Subject: verifierSubject, Scope: "platform", Capabilities: []string{access.VerificationCreate}},
 		{Subject: reviewerSubject, Scope: "platform", Capabilities: []string{access.ReviewCreate}},
 		{Subject: recoverySubject, Scope: "platform", Capabilities: []string{access.RecoveryBegin, access.RecoveryComplete}},
+		{Subject: reconcilerSubject, Scope: "platform", Capabilities: []string{access.Read, access.RecoveryReconcile}},
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -255,10 +257,10 @@ func TestTLSAndWireAuthorityCannotBeSpoofed(t *testing.T) {
 	secureCall(t, engineer, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusForbidden)
 	operator := pki.Client(t, recoverySubject)
 	secureCall(t, operator, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusOK)
-	secureCall(t, operator, server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1, "reconciled": true}, http.StatusServiceUnavailable)
+	secureCall(t, operator, server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusServiceUnavailable)
 	state, err := backend.GetRecovery()
 	if err != nil || string(state.Mode) != "RECOVERY_RECONCILIATION" {
-		t.Fatal("boolean request bypassed reconciliation authority")
+		t.Fatal("completion bypassed reconciliation authority")
 	}
 	// A future route has no implicit grant, even when its path looks like an API.
 	secureCall(t, engineer, server.URL+"/api/v1/admin/new", map[string]any{}, http.StatusForbidden)
