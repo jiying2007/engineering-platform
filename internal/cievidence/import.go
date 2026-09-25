@@ -103,19 +103,19 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	if err != nil || calculated != req.Delivery.SubjectDigest {
 		return empty, fmt.Errorf("delivery subject digest mismatch")
 	}
-	envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
-	if err != nil {
-		return empty, err
-	}
-	if err := verifyLiveFacts(envelope, req.Live, req.Delivery.ResultCommit); err != nil {
-		return empty, err
-	}
 	trustedArtifact, ok := findArtifact(req.Live.Artifacts, "trusted-ci-evidence-"+req.Delivery.ResultCommit)
 	if !ok {
 		return empty, fmt.Errorf("trusted CI evidence artifact missing")
 	}
 	if err := verifyArchiveFile(req.Files.EnvelopeZip, trustedArtifact); err != nil {
 		return empty, fmt.Errorf("trusted envelope archive: %w", err)
+	}
+	envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
+	if err != nil {
+		return empty, err
+	}
+	if err := verifyLiveFacts(envelope, req.Live, req.Delivery.ResultCommit); err != nil {
+		return empty, err
 	}
 	binaryArtifact, ok := findArtifact(req.Live.Artifacts, "engineering-binaries-"+req.Delivery.ResultCommit)
 	if !ok {
@@ -127,6 +127,9 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	if err := verifyBinaryArchive(req.Files.BinariesZip, envelope.Receipt.Files); err != nil {
 		return empty, err
 	}
+	if err := verifyArchiveFile(req.Files.BinariesZip, binaryArtifact); err != nil {
+		return empty, fmt.Errorf("binary archive changed during verification: %w", err)
+	}
 	codexArtifact, ok := findArtifact(req.Live.Artifacts, "codex-0.155.0-qualification-"+req.Delivery.ResultCommit)
 	if !ok {
 		return empty, fmt.Errorf("Codex qualification artifact missing")
@@ -136,6 +139,9 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	}
 	if err := verifyCodexArchive(req.Files.CodexZip); err != nil {
 		return empty, err
+	}
+	if err := verifyArchiveFile(req.Files.CodexZip, codexArtifact); err != nil {
+		return empty, fmt.Errorf("Codex archive changed during verification: %w", err)
 	}
 	deliveryArtifact, ok := exactDeliveryArtifact(req.Delivery, req.EvidenceArtifactID)
 	if !ok || deliveryArtifact.Digest != trustedArtifact.Digest {
@@ -200,13 +206,27 @@ func verifyLiveFacts(envelope Envelope, live LiveFacts, resultCommit string) err
 }
 
 func verifyArchiveFile(path string, fact ArtifactFact) error {
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() != fact.Size {
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() || before.Mode()&os.ModeSymlink != 0 || before.Size() != fact.Size {
 		return fmt.Errorf("artifact file size/type mismatch")
 	}
-	digest, err := fileDigest(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return err
+	}
+	defer f.Close()
+	opened, err := f.Stat()
+	if err != nil || !os.SameFile(before, opened) {
+		return fmt.Errorf("artifact file changed before verification")
+	}
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	digest := "sha256:" + hex.EncodeToString(h.Sum(nil))
+	after, err := os.Lstat(path)
+	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
+		return fmt.Errorf("artifact file changed during verification")
 	}
 	if digest != fact.Digest {
 		return fmt.Errorf("artifact archive digest mismatch")
