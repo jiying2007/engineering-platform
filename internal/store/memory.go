@@ -780,7 +780,10 @@ func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion
 		return ErrConflict
 	}
 	work.Version = expectedVersion + 1
-	m.reviewReports[report.ID] = report
+	storedReview := report
+	storedReview.Findings = append([]review.Finding(nil), report.Findings...)
+	storedReview.KnownLimits = append([]string(nil), report.KnownLimits...)
+	m.reviewReports[report.ID] = storedReview
 	m.reviewByVerification[report.VerificationReportID] = report.ID
 	m.works[work.ID] = work
 	return nil
@@ -793,6 +796,8 @@ func (m *Memory) GetReview(id string) (review.Report, error) {
 	if !ok {
 		return review.Report{}, ErrNotFound
 	}
+	report.Findings = append([]review.Finding(nil), report.Findings...)
+	report.KnownLimits = append([]string(nil), report.KnownLimits...)
 	return report, nil
 }
 
