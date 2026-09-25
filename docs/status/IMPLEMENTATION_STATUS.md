@@ -1,8 +1,8 @@
 # Implementation Status
 
-Reviewed base: `d3bb6d591ee4b8b70e137d62d85fa3384109325e` (#40).
+Reviewed base: `e895fc6dddb509a51897b5fe32b21216312ebb9d` (#43).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
-real Codex 0.155 qualification + retained Git/CI/artifact provenance + WIF-ready live-turn lane; no retained authenticated model-turn proof**.
+real Codex 0.155 qualification + retained Git/CI/artifact provenance + exact requirement-bound trusted CI import; WIF-ready live-turn lane, no retained authenticated model-turn proof**.
 
 ## Canonical scope
 
@@ -37,7 +37,7 @@ Evidence/Verification/Delivery/Closure automatically.
 | Codex qualification | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Production/runtime pin lifecycle remains operator-owned |
 | Codex WIF live lane | Fail-closed WIF env/token-file boundary; authenticated prewarm exchange; upstream assertion must be deleted before thread/start; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
 | Action/recovery | Durable action ledger, authenticated grants, independent recovery-completion gate | Real privileged provider/effect boundary and completion verifier |
-| Engineering delivery | Frozen verification plus Delivery/Evidence/Closure contracts; exact Git/CI/artifact provenance envelope with GitHub and raw-binary digests | Import provenance into Run-bound Core Evidence, independent Review and Feature/Debug pilots |
+| Engineering delivery | Frozen requirement-bound Evidence/Verification/Delivery/Closure; exact Git/CI/artifact provenance envelope; dedicated live-GitHub importer revalidates run/jobs/artifacts and local ZIP bytes before registering PASS | Model/changed-tree evidence procedures, independent Review and Feature/Debug pilots |
 
 ## Retained evidence
 
@@ -52,6 +52,8 @@ Evidence/Verification/Delivery/Closure automatically.
 - #37 trusted CI provenance: main `c817876c8c10fddebe21fc38d394fee944f66c47`; PR run `36095060443` and fresh-main run `36095388934` passed `go`, real container, real Codex and `trusted-ci-artifact-evidence`. Main retained binary artifact `10847815571`, Codex qualification `10847795311`, trusted evidence `10847531493`; main receipt digest `sha256:9db9637b40c0ce09c71348a9d17d7681fba1c8cdcb48e95b26b2b101cb6c6c01`.
 - #38 WIF-ready lane merged as main `0d786e73f952412dda5853dc8be675451db6d549`; its first fresh-main run `36099892960` exposed a Docker cold-start timeout while Go and real Codex qualification passed.
 - #40 bounded Docker cold-start hotfix merged as main `d3bb6d591ee4b8b70e137d62d85fa3384109325e`; exact-head run `36101425449` and fresh-main run `36101773459` passed Go/PostgreSQL, 3x real-container, real Codex and trusted CI evidence.
+- #42 WIF assertion-removal hardening merged into main `f8e9e60a517fed752d573dd7b27ed38a49175e33`; fresh-main run `36102881734` passed all four standard gates. Upstream assertion exchange is completed before thread/start and the assertion file is removed before any model-reachable turn.
+- #43 exact Evidence requirement binding merged as main `e895fc6dddb509a51897b5fe32b21216312ebb9d`; exact-head run `36108017341` and fresh-main run `36108399745` passed Go/PostgreSQL, real container, real Codex and trusted CI evidence. Evidence now requires exact frozen requirement ID and exact-delivery artifact binding.
 - This WIF assertion-removal follow-up is implementation hardening only. A real authenticated-model claim still requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
 
 The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
@@ -79,14 +81,14 @@ Next implementation sequence:
 2. consume that qualified WIF/binary boundary inside the existing Worker/Core
    execution reservation instead of workflow-only qualification;
 3. route every command/file/network approval through Action Gateway authority;
-4. import retained CI/model/changed-tree provenance into exact
-   Run/VerificationPlan-bound Core Evidence, then independent Review;
+4. use the dedicated trusted CI importer for main-push provenance, then add separate model/changed-tree evidence procedures and independent Review;
 5. close UNKNOWN reconciliation and restore drills;
 6. retain one real Feature pilot and one real Debug pilot before assessing M1.
 
 No new extension domains. **M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/TRUSTED_CI_IMPORT_V1.md`
 - `docs/implementation/CODEX_WIF_LIVE_V1.md`
 - `docs/implementation/TRUSTED_CI_EVIDENCE_V1.md`
 - `docs/implementation/CODEX_QUALIFICATION_V1.md`
