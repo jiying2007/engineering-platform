@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
@@ -24,6 +25,11 @@ type ActionGateway interface {
 	Execute(context.Context, action.Request) (action.Receipt, error)
 	Get(string) (action.Operation, error)
 	Reconcile(context.Context, string) (action.Receipt, error)
+}
+
+type RecoveryProofStore interface {
+	CreateRecoveryProof(context.Context, uint64, string) (recovery.Proof, error)
+	GetRecoveryProof(context.Context, uint64) (recovery.Proof, error)
 }
 
 type Server struct {
@@ -65,6 +71,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/recovery", s.handleGetRecovery)
 	s.mux.HandleFunc("POST /api/v1/recovery/begin", s.handleBeginRecovery)
 	s.mux.HandleFunc("POST /api/v1/recovery/complete", s.handleCompleteRecovery)
+	s.mux.HandleFunc("POST /api/v1/recovery/proofs", s.handleCreateRecoveryProof)
+	s.mux.HandleFunc("GET /api/v1/recovery/proofs/{epoch}", s.handleGetRecoveryProof)
 	s.mux.HandleFunc("POST /api/v1/work-items", s.handleCreateWork)
 	s.mux.HandleFunc("GET /api/v1/work-items/{id}", s.handleGetWork)
 	s.mux.HandleFunc("POST /api/v1/task-contracts", s.handleCreateTask)
@@ -141,7 +149,6 @@ func (s *Server) handleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 
 type completeRecoveryRequest struct {
 	RecoveryEpoch uint64 `json:"recovery_epoch"`
-	Reconciled    bool   `json:"reconciled"`
 }
 
 func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +160,7 @@ func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "recovery_epoch is required")
 		return
 	}
-	state, err := s.store.CompleteRecovery(req.RecoveryEpoch, req.Reconciled)
+	state, err := s.store.CompleteRecovery(req.RecoveryEpoch, true)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch):
@@ -166,6 +173,57 @@ func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, state)
+}
+
+type createRecoveryProofRequest struct {
+	RecoveryEpoch uint64 `json:"recovery_epoch"`
+	Reconciler    string `json:"reconciler"`
+}
+
+func (s *Server) handleCreateRecoveryProof(w http.ResponseWriter, r *http.Request) {
+	var req createRecoveryProofRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.RecoveryEpoch == 0 || req.Reconciler == "" {
+		writeError(w, http.StatusBadRequest, "recovery_epoch and reconciler are required")
+		return
+	}
+	proofs, ok := s.store.(RecoveryProofStore)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "durable recovery proof store is not configured")
+		return
+	}
+	proof, err := proofs.CreateRecoveryProof(r.Context(), req.RecoveryEpoch, req.Reconciler)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrConflict):
+			writeError(w, http.StatusConflict, err.Error())
+		default:
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+		}
+		return
+	}
+	writeJSON(w, http.StatusCreated, proof)
+}
+
+func (s *Server) handleGetRecoveryProof(w http.ResponseWriter, r *http.Request) {
+	epoch, err := strconv.ParseUint(r.PathValue("epoch"), 10, 64)
+	if err != nil || epoch == 0 {
+		writeError(w, http.StatusBadRequest, "valid recovery epoch required")
+		return
+	}
+	proofs, ok := s.store.(RecoveryProofStore)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "durable recovery proof store is not configured")
+		return
+	}
+	proof, err := proofs.GetRecoveryProof(r.Context(), epoch)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, proof)
 }
 
 func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
