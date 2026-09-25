@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 )
 
 func writeSchemaFixture(t *testing.T, experimental bool) string {
@@ -96,11 +97,55 @@ func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 		ThreadStartModel:            "gpt-5.6-sol",
 		StableSchemaContractChecked: true,
 		ExperimentalSurfaceChecked:  true,
+		CredentialSafeConfigDigest:  canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialSafeProfileChecked: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(data), t.TempDir()) {
 		t.Fatal("qualification receipt contains machine locator")
+	}
+}
+
+
+func TestCredentialSafeProfileProbeRequiresDisabledStableFeatures(t *testing.T) {
+	root := t.TempDir()
+	executable := filepath.Join(root, "codex")
+	script := `#!/bin/sh
+set -eu
+test "$1" = features
+test "$2" = list
+test "$(cat "$CODEX_HOME/config.toml")" = "[features]
+shell_tool = false
+view_image = false"
+printf '%s
+' 'shell_tool stable false' 'view_image stable false' 'unified_exec stable true'
+`
+	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	home := filepath.Join(root, "home")
+	if err := qualifyCredentialSafeProfile(context.Background(), executable, home); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != credentialSafeConfig {
+		t.Fatalf("unexpected safe config: %q", data)
+	}
+}
+
+func TestCredentialSafeProfileProbeFailsWhenShellRemainsEnabled(t *testing.T) {
+	root := t.TempDir()
+	executable := filepath.Join(root, "codex")
+	script := "#!/bin/sh\nprintf '%s\\n' 'shell_tool stable true' 'view_image stable false'\n"
+	if err := os.WriteFile(executable, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := qualifyCredentialSafeProfile(context.Background(), executable, filepath.Join(root, "home")); err == nil {
+		t.Fatal("enabled shell tool accepted")
 	}
 }
