@@ -35,6 +35,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Go module download failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
       - name: Module hygiene
         shell: bash
         run: |
@@ -141,12 +155,25 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Go module download failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
       - name: Require real container environment
         run: |
           test "$(id -u)" -ne 0
           test -S /var/run/docker.sock
           docker version
-          go mod download
       - name: Real offline boundary and command integration
         run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 
@@ -178,13 +205,26 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Go module download failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
       - name: Require PostgreSQL 17 dump/restore environment
         run: |
           set -euo pipefail
           test -S /var/run/docker.sock
           docker version
           docker image inspect postgres:17-alpine >/dev/null 2>&1 || docker pull postgres:17-alpine
-          go mod download
       - name: Restore authoritative Core state and complete recovered epoch
         run: go test -race -v -count=1 -timeout 8m ./internal/store/postgres -run TestPostgresAuthorityRestoreDrill
 
@@ -198,6 +238,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Go module download failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -265,6 +319,20 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Go module download failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 2))
+          done
       - name: Collect exact Git, CI and artifact facts
         shell: bash
         env:
