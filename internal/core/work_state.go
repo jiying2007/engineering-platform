@@ -17,7 +17,7 @@ func (w *WorkItem) Transition(to WorkState) error {
 	case WorkExecuting:
 		allowed = to == WorkVerifying || to == WorkCancelled
 	case WorkVerifying:
-		allowed = to == WorkReviewing || to == WorkClosed || to == WorkCancelled
+		allowed = to == WorkReviewing || to == WorkCancelled
 	case WorkReviewing:
 		allowed = to == WorkClosed || to == WorkCancelled
 	}
