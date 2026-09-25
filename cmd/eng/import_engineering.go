@@ -32,7 +32,7 @@ func offlineReceiptDigest(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	var status offline.Status
-	if err := control.Call(ctx, "GET", "/api/v1/runs/"+*runID+"/offline-execution", nil, &status); err != nil {
+	if err := control.Call(ctx, "GET", "/api/v1/runs/"+*runID+"/offline", nil, &status); err != nil {
 		return err
 	}
 	if status.State != offline.Finished || status.Receipt == nil {
@@ -84,7 +84,7 @@ func importOfflineEvidence(args []string) error {
 		return err
 	}
 	var status offline.Status
-	if err := control.Call(ctx, "GET", "/api/v1/runs/"+delivery.RunID+"/offline-execution", nil, &status); err != nil {
+	if err := control.Call(ctx, "GET", "/api/v1/runs/"+delivery.RunID+"/offline", nil, &status); err != nil {
 		return err
 	}
 	evidence, err := engineeringevidence.VerifyOfflineImport(engineeringevidence.OfflineImportRequest{
