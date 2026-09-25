@@ -97,6 +97,7 @@ func TestLiveReceiptRejectsTamper(t *testing.T) {
 		CLI:               "codex-cli",
 		Version:           QualifiedCodexVersion,
 		BinaryDigest:      "sha256:" + strings.Repeat("a", 64),
+		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:    "workload_identity",
 		FederationRuleID:  "idpm_test",
 		Model:             "gpt-5.6-sol",
