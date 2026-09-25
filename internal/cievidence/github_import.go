@@ -120,87 +120,126 @@ func GitHubArtifactID(runID, artifactID int64) string {
 	return "github-actions/run/" + strconv.FormatInt(runID, 10) + "/artifact/" + strconv.FormatInt(artifactID, 10)
 }
 
-func (v *githubVerifier) VerifyPullRequest(ctx context.Context, repository string, runID int64, delivery core.DeliveryReceipt, requirementID string) (core.EvidenceRef, Envelope, error) {
-	var zero core.EvidenceRef
-	var envelope Envelope
-	if v == nil || v.client == nil || v.base == nil || !repoName.MatchString(repository) || runID <= 0 || delivery.ID == "" || delivery.SubjectDigest == "" || delivery.ResultCommit == "" || delivery.BaseCommit == "" || strings.TrimSpace(requirementID) == "" {
-		return zero, envelope, fmt.Errorf("complete repository/run/delivery/requirement identity required")
+type PullRequestFacts struct {
+	repository    string
+	runID         int64
+	envelope      Envelope
+	artifactRefs  []core.ArtifactRef
+	trustedDigest string
+}
+
+func (f PullRequestFacts) SourceSHA() string     { return f.envelope.Receipt.SourceSHA }
+func (f PullRequestFacts) BaseSHA() string       { return f.envelope.Receipt.BaseSHA }
+func (f PullRequestFacts) TestedSHA() string     { return f.envelope.Receipt.TestedSHA }
+func (f PullRequestFacts) ReceiptDigest() string { return f.envelope.ReceiptDigest }
+
+func (f PullRequestFacts) Artifacts() []core.ArtifactRef {
+	out := make([]core.ArtifactRef, len(f.artifactRefs))
+	copy(out, f.artifactRefs)
+	return out
+}
+
+func (f PullRequestFacts) ValidateTask(task core.TaskContract) error {
+	if f.repository == "" || task.Repository != f.repository || task.BaseCommit != f.BaseSHA() {
+		return fmt.Errorf("task repository/base do not match verified GitHub PR")
+	}
+	return nil
+}
+
+func (v *githubVerifier) ResolvePullRequest(ctx context.Context, repository string, runID int64) (PullRequestFacts, error) {
+	var facts PullRequestFacts
+	if v == nil || v.client == nil || v.base == nil || !repoName.MatchString(repository) || runID <= 0 {
+		return facts, fmt.Errorf("complete repository/run identity required")
 	}
 	var run githubRun
 	if err := v.getJSON(ctx, "/repos/"+repository+"/actions/runs/"+strconv.FormatInt(runID, 10), &run); err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	if run.ID != runID || run.Name != "CI" || run.Event != "pull_request" || run.Status != "completed" || run.Conclusion != "success" || run.RunAttempt <= 0 || !sha40.MatchString(run.HeadSHA) {
-		return zero, envelope, fmt.Errorf("workflow run is not an accepted completed PR CI run")
+		return facts, fmt.Errorf("workflow run is not an accepted completed PR CI run")
 	}
 	var jobs githubJobs
 	if err := v.getJSON(ctx, "/repos/"+repository+"/actions/runs/"+strconv.FormatInt(runID, 10)+"/jobs?per_page=100", &jobs); err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	var artifacts githubArtifacts
 	if err := v.getJSON(ctx, "/repos/"+repository+"/actions/runs/"+strconv.FormatInt(runID, 10)+"/artifacts?per_page=100", &artifacts); err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	trusted, err := uniqueTrustedArtifact(artifacts.Artifacts, runID, run.HeadSHA)
 	if err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	zipBytes, err := v.download(ctx, "/repos/"+repository+"/actions/artifacts/"+strconv.FormatInt(trusted.ID, 10)+"/zip")
 	if err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	if canonical.BytesDigest(zipBytes) != trusted.Digest {
-		return zero, envelope, fmt.Errorf("trusted evidence artifact digest mismatch")
+		return facts, fmt.Errorf("trusted evidence artifact digest mismatch")
 	}
 	envelopeBytes, err := readEnvelopeZIP(zipBytes)
 	if err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
+	var envelope Envelope
 	if err := strictjson.Decode(envelopeBytes, &envelope); err != nil {
-		return zero, Envelope{}, fmt.Errorf("strict CI evidence envelope: %w", err)
+		return facts, fmt.Errorf("strict CI evidence envelope: %w", err)
 	}
 	if err := envelope.Verify(); err != nil {
-		return zero, Envelope{}, err
+		return facts, err
 	}
 	receipt := envelope.Receipt
 	if receipt.Repository != repository || receipt.Workflow != "CI" || receipt.Event != "pull_request" || receipt.RunID != runID || receipt.RunAttempt != run.RunAttempt || receipt.TestedSHA != run.HeadSHA {
-		return zero, envelope, fmt.Errorf("CI envelope does not identify the live workflow run")
-	}
-	if delivery.ResultCommit != receipt.SourceSHA || delivery.BaseCommit != receipt.BaseSHA {
-		return zero, envelope, fmt.Errorf("delivery commits do not match CI PR source/base")
+		return facts, fmt.Errorf("CI envelope does not identify the live workflow run")
 	}
 	if !livePullMatches(run, receipt.SourceSHA, receipt.BaseSHA) {
-		return zero, envelope, fmt.Errorf("live workflow PR identity does not match envelope")
+		return facts, fmt.Errorf("live workflow PR identity does not match envelope")
 	}
 	if err := liveJobsMatch(jobs, receipt.Jobs); err != nil {
-		return zero, envelope, err
+		return facts, err
 	}
 	liveArtifactByID := make(map[int64]githubArtifact, len(artifacts.Artifacts))
 	for _, a := range artifacts.Artifacts {
 		if _, exists := liveArtifactByID[a.ID]; exists {
-			return zero, envelope, fmt.Errorf("duplicate live artifact ID")
+			return facts, fmt.Errorf("duplicate live artifact ID")
 		}
 		liveArtifactByID[a.ID] = a
 	}
-	requiredArtifactIDs := make([]string, 0, len(receipt.Artifacts)+1)
-	for _, fact := range receipt.Artifacts {
-		live, ok := liveArtifactByID[fact.ID]
-		if !ok || !sameArtifact(live, fact, runID, run.HeadSHA) {
-			return zero, envelope, fmt.Errorf("live GitHub artifact does not match CI envelope")
+	refs := make([]core.ArtifactRef, 0, len(receipt.Artifacts)+1)
+	for _, retained := range receipt.Artifacts {
+		live, ok := liveArtifactByID[retained.ID]
+		if !ok || !sameArtifact(live, retained, runID, run.HeadSHA) {
+			return facts, fmt.Errorf("live GitHub artifact does not match CI envelope")
 		}
-		id := GitHubArtifactID(runID, fact.ID)
-		if !deliveryHasArtifact(delivery, id, fact.Digest) {
-			return zero, envelope, fmt.Errorf("delivery is missing an exact upstream CI artifact")
-		}
-		requiredArtifactIDs = append(requiredArtifactIDs, id)
+		refs = append(refs, githubArtifactRef(repository, runID, live))
 	}
-	trustedID := GitHubArtifactID(runID, trusted.ID)
-	if !deliveryHasArtifact(delivery, trustedID, trusted.Digest) {
-		return zero, envelope, fmt.Errorf("delivery is missing the trusted CI evidence artifact")
-	}
-	requiredArtifactIDs = append(requiredArtifactIDs, trustedID)
-	sort.Strings(requiredArtifactIDs)
+	refs = append(refs, githubArtifactRef(repository, runID, trusted))
+	sort.Slice(refs, func(i, j int) bool { return refs[i].ID < refs[j].ID })
+	return PullRequestFacts{
+		repository:    repository,
+		runID:         runID,
+		envelope:      envelope,
+		artifactRefs:  refs,
+		trustedDigest: trusted.Digest,
+	}, nil
+}
 
+func (f PullRequestFacts) BindDelivery(delivery core.DeliveryReceipt, requirementID string) (core.EvidenceRef, error) {
+	var zero core.EvidenceRef
+	if f.repository == "" || delivery.ID == "" || delivery.SubjectDigest == "" || delivery.ResultCommit == "" || delivery.BaseCommit == "" || strings.TrimSpace(requirementID) == "" {
+		return zero, fmt.Errorf("complete delivery/requirement identity required")
+	}
+	if delivery.ResultCommit != f.SourceSHA() || delivery.BaseCommit != f.BaseSHA() {
+		return zero, fmt.Errorf("delivery commits do not match CI PR source/base")
+	}
+	artifactIDs := make([]string, 0, len(f.artifactRefs))
+	for _, required := range f.artifactRefs {
+		if !deliveryHasArtifact(delivery, required.ID, required.Digest) {
+			return zero, fmt.Errorf("delivery is missing an exact GitHub CI artifact")
+		}
+		artifactIDs = append(artifactIDs, required.ID)
+	}
+	sort.Strings(artifactIDs)
 	evidenceDigest, err := canonical.Digest(struct {
 		DeliverySubject string `json:"delivery_subject"`
 		RequirementID   string `json:"requirement_id"`
@@ -209,13 +248,13 @@ func (v *githubVerifier) VerifyPullRequest(ctx context.Context, repository strin
 	}{
 		DeliverySubject: delivery.SubjectDigest,
 		RequirementID:   requirementID,
-		ReceiptDigest:   envelope.ReceiptDigest,
-		TrustedArtifact: trusted.Digest,
+		ReceiptDigest:   f.ReceiptDigest(),
+		TrustedArtifact: f.trustedDigest,
 	})
 	if err != nil {
-		return zero, envelope, err
+		return zero, err
 	}
-	evidence := core.EvidenceRef{
+	return core.EvidenceRef{
 		ID:                "github-ci-" + strings.TrimPrefix(evidenceDigest, "sha256:"),
 		DeliveryReceiptID: delivery.ID,
 		RequirementID:     requirementID,
@@ -223,10 +262,30 @@ func (v *githubVerifier) VerifyPullRequest(ctx context.Context, repository strin
 		Issuer:            GitHubIssuer,
 		Procedure:         GitHubProcedure,
 		Result:            "PASS",
-		ArtifactRefs:      requiredArtifactIDs,
+		ArtifactRefs:      artifactIDs,
 		Applicable:        true,
+	}, nil
+}
+
+func (v *githubVerifier) VerifyPullRequest(ctx context.Context, repository string, runID int64, delivery core.DeliveryReceipt, requirementID string) (core.EvidenceRef, Envelope, error) {
+	facts, err := v.ResolvePullRequest(ctx, repository, runID)
+	if err != nil {
+		return core.EvidenceRef{}, Envelope{}, err
 	}
-	return evidence, envelope, nil
+	evidence, err := facts.BindDelivery(delivery, requirementID)
+	if err != nil {
+		return core.EvidenceRef{}, facts.envelope, err
+	}
+	return evidence, facts.envelope, nil
+}
+
+func githubArtifactRef(repository string, runID int64, artifact githubArtifact) core.ArtifactRef {
+	return core.ArtifactRef{
+		ID:        GitHubArtifactID(runID, artifact.ID),
+		Digest:    artifact.Digest,
+		MediaType: GitHubArtifactMediaType,
+		Locator:   "https://github.com/" + repository + "/actions/runs/" + strconv.FormatInt(runID, 10) + "/artifacts/" + strconv.FormatInt(artifact.ID, 10),
+	}
 }
 
 func (v *githubVerifier) getJSON(ctx context.Context, p string, out any) error {
