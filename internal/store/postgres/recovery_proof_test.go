@@ -11,7 +11,7 @@ import (
 )
 
 func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
-	s := newIntegrationStore(t)
+	s := newIsolatedIntegrationStore(t)
 	runID := setupPostgresActionRun(t, s, "recovery-proof")
 	now := time.Now().UTC()
 	req := action.Request{
@@ -48,7 +48,7 @@ func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
 }
 
 func TestRecoveryProofBlocksLiveMutationOutboxLease(t *testing.T) {
-	s := newIntegrationStore(t)
+	s := newIsolatedIntegrationStore(t)
 	ctx := context.Background()
 	if _, err := s.BeginRecovery(0); err != nil {
 		t.Fatal(err)
