@@ -14,6 +14,89 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
+func TestPostgresDirectTaskWriteRejectsUnpinnedGitHubAuthority(t *testing.T) {
+	url := os.Getenv("POSTGRES_TEST_URL")
+	if url == "" {
+		t.Skip("POSTGRES_TEST_URL is not set")
+	}
+	ctx := context.Background()
+	s, err := Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.ApplyCoreMigration(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	work := core.WorkItem{
+		ID: "work-github-authority-" + suffix, Title: "authority guard",
+		HumanOwner: "integration-test", State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC(),
+	}
+	if err := s.CreateWork(work); err != nil {
+		t.Fatal(err)
+	}
+	plan := verification.Plan{
+		ID: "vp-github-authority-" + suffix,
+		Criteria: []verification.Criterion{{
+			ID: "ac-github", Statement: "CI provenance verified",
+			Requirements: []verification.EvidenceRequirement{{
+				ID: "req-github", Procedure: verification.GitHubActionsProcedure,
+			}},
+		}},
+	}
+	task := core.TaskContract{
+		ID: "task-github-authority-" + suffix, WorkItemID: work.ID, TaskType: "FEATURE",
+		Repository: "owner/repo", BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		AcceptanceCriteria: []string{"CI provenance verified"}, Revision: 1,
+	}
+	bind := func() string {
+		t.Helper()
+		digest, err := plan.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		task.VerificationPlanID = plan.ID
+		task.VerificationPlanDigest = digest
+		taskDigest, err := task.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return taskDigest
+	}
+	taskDigest := bind()
+	ready := work
+	ready.ActiveTaskContractDigest = taskDigest
+	if err := ready.Transition(core.WorkReady); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateTaskAndUpdateWork(task, plan, work.Version, ready); err == nil {
+		t.Fatal("PostgreSQL accepted GitHub CI procedure without frozen issuer")
+	}
+	if _, err := s.GetTask(task.ID); err == nil {
+		t.Fatal("invalid authority task survived failed PostgreSQL mutation")
+	}
+	storedWork, err := s.GetWork(work.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if storedWork.State != core.WorkDraft || storedWork.ActiveTaskContractDigest != "" {
+		t.Fatalf("work changed during rejected authority write: %#v", storedWork)
+	}
+
+	plan.Criteria[0].Requirements[0].Issuer = verification.GitHubActionsIssuer
+	taskDigest = bind()
+	ready = work
+	ready.ActiveTaskContractDigest = taskDigest
+	if err := ready.Transition(core.WorkReady); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateTaskAndUpdateWork(task, plan, work.Version, ready); err != nil {
+		t.Fatalf("exact GitHub authority rejected: %v", err)
+	}
+}
+
 func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	url := os.Getenv("POSTGRES_TEST_URL")
 	if url == "" {
