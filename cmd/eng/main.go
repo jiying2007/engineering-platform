@@ -16,6 +16,11 @@ func main() {
 		return
 	}
 	switch os.Args[1] {
+	case "evidence-import-github-ci":
+		if err := importGitHubEvidence(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "api":
 		if err := remoteAPI(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -72,6 +77,7 @@ func printJSON(value any) {
 
 func usage() {
 	fmt.Println("eng <command>")
+	fmt.Println("  evidence-import-github-ci <flags>       verify GitHub CI and register exact Core Evidence")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  capabilities                         list embedded capabilities and skills")
 	fmt.Println("  route <task-type> <subsystem>       resolve explicit M1 capability/skill route")
