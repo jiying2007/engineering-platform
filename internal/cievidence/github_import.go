@@ -44,23 +44,29 @@ type githubRun struct {
 	Conclusion string `json:"conclusion"`
 	HeadSHA    string `json:"head_sha"`
 	RunAttempt int64  `json:"run_attempt"`
-	Pulls      []struct {
-		Head struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
-		Base struct {
-			SHA string `json:"sha"`
-		} `json:"base"`
-	} `json:"pull_requests"`
 }
 
 type githubJobs struct {
 	Jobs []struct {
 		ID         int64  `json:"id"`
+		RunID      int64  `json:"run_id"`
+		HeadSHA    string `json:"head_sha"`
 		Name       string `json:"name"`
 		Status     string `json:"status"`
 		Conclusion string `json:"conclusion"`
 	} `json:"jobs"`
+}
+
+type githubCommit struct {
+	SHA      string `json:"sha"`
+	Message  string `json:"message"`
+	Parents  []struct {
+		SHA string `json:"sha"`
+	} `json:"parents"`
+	Verification struct {
+		Verified bool   `json:"verified"`
+		Reason   string `json:"reason"`
+	} `json:"verification"`
 }
 
 type githubArtifact struct {
@@ -189,13 +195,20 @@ func (v *githubVerifier) ResolvePullRequest(ctx context.Context, repository stri
 		return facts, err
 	}
 	receipt := envelope.Receipt
-	if receipt.Repository != repository || receipt.Workflow != "CI" || receipt.Event != "pull_request" || receipt.RunID != runID || receipt.RunAttempt != run.RunAttempt || receipt.TestedSHA != run.HeadSHA {
-		return facts, fmt.Errorf("CI envelope does not identify the live workflow run")
+	if receipt.Repository != repository || receipt.Workflow != "CI" || receipt.Event != "pull_request" || receipt.RunID != runID || receipt.RunAttempt != run.RunAttempt || receipt.SourceSHA != run.HeadSHA {
+		return facts, fmt.Errorf("CI envelope does not identify the live workflow source")
 	}
-	if !livePullMatches(run, receipt.SourceSHA, receipt.BaseSHA) {
-		return facts, fmt.Errorf("live workflow PR identity does not match envelope")
+	if trusted.Name != "trusted-ci-evidence-"+receipt.TestedSHA {
+		return facts, fmt.Errorf("trusted CI artifact does not identify the tested commit")
 	}
-	if err := liveJobsMatch(jobs, receipt.Jobs); err != nil {
+	var tested githubCommit
+	if err := v.getJSON(ctx, "/repos/"+repository+"/git/commits/"+receipt.TestedSHA, &tested); err != nil {
+		return facts, err
+	}
+	if !validTestedMerge(tested, receipt.BaseSHA, receipt.SourceSHA, receipt.TestedSHA) {
+		return facts, fmt.Errorf("tested SHA is not the exact GitHub-verified PR merge commit")
+	}
+	if err := liveJobsMatch(jobs, receipt.Jobs, runID, receipt.SourceSHA); err != nil {
 		return facts, err
 	}
 	liveArtifactByID := make(map[int64]githubArtifact, len(artifacts.Artifacts))
@@ -342,13 +355,12 @@ func (v *githubVerifier) request(ctx context.Context, p string, limit int64, acc
 	return body, nil
 }
 
-func uniqueTrustedArtifact(artifacts []githubArtifact, runID int64, testedSHA string) (githubArtifact, error) {
-	want := "trusted-ci-evidence-" + testedSHA
+func uniqueTrustedArtifact(artifacts []githubArtifact, runID int64, sourceSHA string) (githubArtifact, error) {
 	var found githubArtifact
 	count := 0
 	for _, artifact := range artifacts {
-		if artifact.Name == want {
-			if !validTrustedArtifact(artifact, runID, testedSHA) {
+		if strings.HasPrefix(artifact.Name, "trusted-ci-evidence-") {
+			if !validTrustedArtifact(artifact, runID, sourceSHA) {
 				return githubArtifact{}, fmt.Errorf("invalid trusted CI evidence artifact")
 			}
 			found = artifact
@@ -373,31 +385,31 @@ func sameArtifact(live githubArtifact, fact Artifact, runID int64, headSHA strin
 	return validArtifactIdentity(live, runID, headSHA, maxRetainedArtifact) && live.Name == fact.Name && live.ID == fact.ID && live.Digest == fact.Digest && live.Size == fact.Size
 }
 
-func livePullMatches(run githubRun, sourceSHA, baseSHA string) bool {
-	count := 0
-	for _, pr := range run.Pulls {
-		if pr.Head.SHA == sourceSHA && pr.Base.SHA == baseSHA {
-			count++
-		}
-	}
-	return count == 1
+func validTestedMerge(commit githubCommit, baseSHA, sourceSHA, testedSHA string) bool {
+	return commit.SHA == testedSHA &&
+		commit.Verification.Verified &&
+		commit.Verification.Reason == "valid" &&
+		len(commit.Parents) == 2 &&
+		commit.Parents[0].SHA == baseSHA &&
+		commit.Parents[1].SHA == sourceSHA
 }
 
-func liveJobsMatch(live githubJobs, retained []Job) error {
-	byID := make(map[int64]struct {
+func liveJobsMatch(live githubJobs, retained []Job, runID int64, sourceSHA string) error {
+	type liveJob struct {
+		runID                    int64
+		headSHA                  string
 		name, status, conclusion string
-	}, len(live.Jobs))
+	}
+	byID := make(map[int64]liveJob, len(live.Jobs))
 	for _, job := range live.Jobs {
 		if _, exists := byID[job.ID]; exists {
 			return fmt.Errorf("duplicate live job ID")
 		}
-		byID[job.ID] = struct {
-			name, status, conclusion string
-		}{job.Name, job.Status, job.Conclusion}
+		byID[job.ID] = liveJob{runID: job.RunID, headSHA: job.HeadSHA, name: job.Name, status: job.Status, conclusion: job.Conclusion}
 	}
 	for _, fact := range retained {
 		job, ok := byID[fact.ID]
-		if !ok || job.name != fact.Name || job.status != "completed" || job.conclusion != fact.Conclusion || fact.Conclusion != "success" {
+		if !ok || job.runID != runID || job.headSHA != sourceSHA || job.name != fact.Name || job.status != "completed" || job.conclusion != fact.Conclusion || fact.Conclusion != "success" {
 			return fmt.Errorf("live GitHub job does not match CI envelope")
 		}
 	}
