@@ -32,16 +32,16 @@ func NewGitHubClient(token string) (*GitHubClient, error) {
 	}
 	base, _ := url.Parse("https://api.github.com")
 	transport := &http.Transport{
-		Proxy:                 nil,
-		DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS13, ServerName: "api.github.com"},
-		TLSHandshakeTimeout:   5 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Second,
-		IdleConnTimeout:       30 * time.Second,
-		MaxIdleConns:          2,
-		MaxConnsPerHost:       2,
+		Proxy:                  nil,
+		DialContext:            (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS13, ServerName: "api.github.com"},
+		TLSHandshakeTimeout:    5 * time.Second,
+		ResponseHeaderTimeout:  10 * time.Second,
+		IdleConnTimeout:        30 * time.Second,
+		MaxIdleConns:           2,
+		MaxConnsPerHost:        2,
 		MaxResponseHeaderBytes: 32 << 10,
-		DisableCompression:    true,
+		DisableCompression:     true,
 	}
 	return &GitHubClient{
 		base: base,
@@ -91,7 +91,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 	}
 	var jobs struct {
 		TotalCount int `json:"total_count"`
-		Jobs []struct {
+		Jobs       []struct {
 			ID         int64  `json:"id"`
 			Name       string `json:"name"`
 			Status     string `json:"status"`
@@ -113,7 +113,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 	}
 	var artifacts struct {
 		TotalCount int `json:"total_count"`
-		Artifacts []struct {
+		Artifacts  []struct {
 			ID          int64  `json:"id"`
 			Name        string `json:"name"`
 			Size        int64  `json:"size_in_bytes"`
