@@ -1007,12 +1007,14 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expectedVersion := work.Version
-	reviewing := work
-	if err := reviewing.Transition(core.WorkReviewing); err != nil {
-		writeError(w, http.StatusConflict, err.Error())
-		return
+	nextWork := work
+	if report.Result == review.ResultPass {
+		if err := nextWork.Transition(core.WorkReviewing); err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 	}
-	if err := s.store.CreateReviewAndUpdateWork(report, expectedVersion, reviewing); err != nil {
+	if err := s.store.CreateReviewAndUpdateWork(report, expectedVersion, nextWork); err != nil {
 		writeMutationError(w, err)
 		return
 	}
