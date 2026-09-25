@@ -146,7 +146,7 @@ jobs:
           docker version
           go mod download
       - name: Real offline boundary and command integration
-        run: go test -race -v -count=2 -timeout 5m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
+        run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 
 
   codex:
