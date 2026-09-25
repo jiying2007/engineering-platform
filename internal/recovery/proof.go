@@ -11,10 +11,10 @@ import (
 const ProofKind = "RECOVERY_RECONCILIATION_V1"
 
 type Facts struct {
-	ExternalUnresolved uint64 `json:"external_unresolved"`
+	ExternalUnresolved   uint64 `json:"external_unresolved"`
 	MutationOutboxLeases uint64 `json:"mutation_outbox_leases"`
-	WorkerLeases uint64 `json:"worker_leases"`
-	OfflineUnresolved uint64 `json:"offline_unresolved"`
+	WorkerLeases         uint64 `json:"worker_leases"`
+	OfflineUnresolved    uint64 `json:"offline_unresolved"`
 }
 
 func (f Facts) Clear() bool {
