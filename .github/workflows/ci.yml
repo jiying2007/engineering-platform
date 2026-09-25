@@ -256,8 +256,26 @@ jobs:
           files="$(jq -c '.' "$manifest")"
           tested_sha="$(git rev-parse HEAD)"
           event="$GITHUB_EVENT_NAME"
-          jq -n             --argjson schema_version 1             --arg repository "$GITHUB_REPOSITORY"             --arg workflow "$GITHUB_WORKFLOW"             --arg event "$event"             --arg source_sha "$SOURCE_SHA"             --arg tested_sha "$tested_sha"             --arg base_sha "$BASE_SHA"             --argjson run_id "$GITHUB_RUN_ID"             --argjson run_attempt "$GITHUB_RUN_ATTEMPT"             --argjson jobs "$jobs"             --argjson artifacts "$artifacts"             --argjson files "$files"             '{schema_version:$schema_version,repository:$repository,workflow:$workflow,event:$event,source_sha:$source_sha,tested_sha:$tested_sha,base_sha:$base_sha,run_id:$run_id,run_attempt:$run_attempt,jobs:$jobs,artifacts:$artifacts,files:$files}
-            | if [ "$event" = push ]; then jq 'del(.base_sha)'; else cat; fi             > "$RUNNER_TEMP/ci-evidence-receipt.json"
+          jq -n \
+            --argjson schema_version 1 \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg event "$event" \
+            --arg source_sha "$SOURCE_SHA" \
+            --arg tested_sha "$tested_sha" \
+            --arg base_sha "$BASE_SHA" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --argjson jobs "$jobs" \
+            --argjson artifacts "$artifacts" \
+            --argjson files "$files" \
+            '{schema_version:$schema_version,repository:$repository,workflow:$workflow,event:$event,source_sha:$source_sha,tested_sha:$tested_sha,base_sha:$base_sha,run_id:$run_id,run_attempt:$run_attempt,jobs:$jobs,artifacts:$artifacts,files:$files}' \
+            > "$RUNNER_TEMP/ci-evidence-raw.json"
+          if [ "$event" = push ]; then
+            jq 'del(.base_sha)' "$RUNNER_TEMP/ci-evidence-raw.json" > "$RUNNER_TEMP/ci-evidence-receipt.json"
+          else
+            cp "$RUNNER_TEMP/ci-evidence-raw.json" "$RUNNER_TEMP/ci-evidence-receipt.json"
+          fi
           go run ./cmd/ci-evidence --input "$RUNNER_TEMP/ci-evidence-receipt.json" > "$RUNNER_TEMP/ci-evidence-envelope.json"
           cat "$RUNNER_TEMP/ci-evidence-envelope.json"
       - name: Retain verified CI evidence envelope
