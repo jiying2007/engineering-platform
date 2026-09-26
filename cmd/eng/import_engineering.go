@@ -203,9 +203,13 @@ func registerEngineeringEvidence(ctx context.Context, control *controlclient.Cli
 	if stored.ID != evidence.ID || stored.DeliveryReceiptID != evidence.DeliveryReceiptID ||
 		stored.RequirementID != evidence.RequirementID || stored.SubjectDigest != evidence.SubjectDigest ||
 		stored.Issuer != evidence.Issuer || stored.Procedure != evidence.Procedure || stored.Result != evidence.Result ||
-		stored.Applicable != evidence.Applicable || len(stored.ArtifactRefs) != 1 ||
-		len(evidence.ArtifactRefs) != 1 || stored.ArtifactRefs[0] != evidence.ArtifactRefs[0] {
+		stored.Applicable != evidence.Applicable || len(stored.ArtifactRefs) != len(evidence.ArtifactRefs) {
 		return fmt.Errorf("control plane returned a different evidence identity")
+	}
+	for i := range evidence.ArtifactRefs {
+		if stored.ArtifactRefs[i] != evidence.ArtifactRefs[i] {
+			return fmt.Errorf("control plane returned different evidence artifacts")
+		}
 	}
 	printJSON(stored)
 	return nil
