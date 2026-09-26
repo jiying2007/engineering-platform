@@ -1,0 +1,104 @@
+name: Retained M1 pilot verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Retained pilot
+        required: true
+        type: choice
+        options:
+          - feature
+          - debug
+      engineering_run_id:
+        description: Successful Retained M1 pilot engineering workflow run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  verify:
+    name: verify-${{ inputs.pilot }}-retained-subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - name: Require protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            test "$attempt" -lt 3
+            sleep $((attempt * 2))
+          done
+
+      - name: Resume exact retained subject and produce Verification
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          ENGINEERING_RUN_ID: ${{ inputs.engineering_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash examples/pilots/actions/verify-retained.sh
+
+      - name: Retain verification state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-pilot-verification-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-verification
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summarize independent review gate
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/retained-pilot-verification/verification-response.json"
+          test "$(jq -er .result "$report")" = PASS
+          {
+            echo "## Retained ${{ inputs.pilot }} verification"
+            echo
+            echo "- Exact PR-head trusted CI: **PASS**"
+            echo "- Codex execution Evidence: **PASS**"
+            echo "- Git changed-tree Evidence: **PASS**"
+            echo "- Verification: **PASS**"
+            echo "- Next gate: **Independent Review** of the exact Delivery subject."
+            echo "- Closure remains forbidden until an independent reviewer records PASS."
+          } >> "$GITHUB_STEP_SUMMARY"
