@@ -74,10 +74,7 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 	}
 	options.WIFReceiptFile = writePilotJSON(t, root, "wif-receipt.json", wif)
 
-	artifactRoot := filepath.Join(root, "publisher-artifacts")
-	if err := os.Mkdir(artifactRoot, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	artifactRoot := filepath.Join(root, "preparation-root", "artifacts")
 	tokenFile := filepath.Join(root, "publisher-token")
 	if err := os.WriteFile(tokenFile, []byte("test-token"), 0o600); err != nil {
 		t.Fatal(err)
@@ -112,6 +109,74 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 	if result.Internal != "READY" || result.ModelExecution != "READY" ||
 		result.Publication != "READY" || len(result.Blockers) != 0 {
 		t.Fatalf("unexpected full readiness: %#v", result)
+	}
+}
+
+func TestPilotPreflightRejectsPublisherArtifactViewDrift(t *testing.T) {
+	options, profile, rule := pilotPreflightFixture(t)
+	root := filepath.Dir(options.ProfileFile)
+
+	workerCodex := map[string]any{
+		"version":            1,
+		"codex_executable":   profile.CodexExecutable,
+		"federation_rule_id": rule,
+		"profile":            profile.Profile,
+	}
+	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
+
+	wif := codexapp.LiveReceipt{
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    codexapp.QualifiedCodexVersion,
+		BinaryDigest:               profile.Profile.BinaryDigest,
+		CredentialSafeConfigDigest: canonical.BytesDigest([]byte("[features]\nshell_tool = false\nview_image = false\n")),
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           rule,
+		Model:                      profile.Profile.Model,
+		PromptDigest:               canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
+		ThreadID:                   "thread-preflight-drift",
+		TurnID:                     "turn-preflight-drift",
+		TurnStatus:                 "completed",
+		Output:                     codexapp.LiveProbeExpected,
+		OutputDigest:               canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
+		AssertionRemovedBeforeTurn: true,
+	}
+	if err := wif.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	options.WIFReceiptFile = writePilotJSON(t, root, "wif-receipt.json", wif)
+
+	wrongRoot := filepath.Join(root, "publisher-artifacts")
+	if err := os.Mkdir(wrongRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tokenFile := filepath.Join(root, "publisher-token")
+	if err := os.WriteFile(tokenFile, []byte("test-token"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	git, err = filepath.EvalSymlinks(git)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.PublisherFile = writePilotJSON(t, root, "publisher-drift.json", map[string]any{
+		"version":        1,
+		"artifact_root":  wrongRoot,
+		"git_executable": git,
+		"token_file":     tokenFile,
+		"targets": []any{map[string]any{
+			"repository":    "jiying2007/engineering-platform",
+			"base_ref":      "main",
+			"branch_prefix": "engineering-platform/",
+		}},
+	})
+
+	if _, err := checkPilotPreflight(options); err == nil ||
+		!strings.Contains(err.Error(), "retained Worker artifact root") {
+		t.Fatalf("publisher artifact-view drift accepted: %v", err)
 	}
 }
 
@@ -169,7 +234,7 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 
 	preparationRoot := filepath.Join(root, "preparation-root")
 	contextSource := filepath.Join(root, "context-source")
-	for _, dir := range []string{preparationRoot, contextSource} {
+	for _, dir := range []string{preparationRoot, filepath.Join(preparationRoot, "artifacts"), contextSource} {
 		if err := os.Mkdir(dir, 0o700); err != nil {
 			t.Fatal(err)
 		}
