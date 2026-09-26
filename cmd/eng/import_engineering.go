@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
-	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/engineeringevidence"
 	"github.com/jiying2007/engineering-platform/internal/offline"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
@@ -124,11 +124,11 @@ func codexReceiptDigest(args []string) error {
 		return err
 	}
 	printJSON(map[string]any{
-		"run_id":          *runID,
-		"artifact_digest": digest,
-		"media_type":      engineeringevidence.CodexReceiptArtifactType,
-		"bundle_digest":   status.Receipt.Result.Change.BundleDigest,
-		"bundle_size":     status.Receipt.Result.Change.BundleSize,
+		"run_id":            *runID,
+		"artifact_digest":   digest,
+		"media_type":        engineeringevidence.CodexReceiptArtifactType,
+		"bundle_digest":     status.Receipt.Result.Change.BundleDigest,
+		"bundle_size":       status.Receipt.Result.Change.BundleSize,
 		"bundle_media_type": engineeringevidence.CodexBundleArtifactType,
 	})
 	return nil
