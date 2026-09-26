@@ -31,7 +31,9 @@ than silently broadening or rewriting administrator policy.
 
 The provider is bound to GitHub Actions OIDC issuer
 `https://token.actions.githubusercontent.com`, the dedicated audience,
-replay checking, and a 600-second assertion lifetime.
+replay checking, and a 600-second assertion lifetime. Provider creation omits
+the Admin API's update-only `enabled` field; the returned provider is still
+required to report `enabled=true` before the helper proceeds.
 
 The rule requires:
 
