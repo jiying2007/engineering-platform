@@ -1,0 +1,157 @@
+name: Retained M1 pilot engineering
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Real retained pilot requirement
+        required: true
+        type: choice
+        options:
+          - feature
+          - debug
+      model:
+        description: Exact Codex model available to the mapped managed-workspace principal
+        required: true
+        default: gpt-5.6-sol
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  id-token: write
+
+jobs:
+  engineer:
+    name: real-${{ inputs.pilot }}-engineering-to-pr
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - name: Require protected main and configured managed-workspace WIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+          test -n "${{ vars.OPENAI_WIF_AUDIENCE }}"
+          test -n "${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            test "$attempt" -lt 3
+            sleep $((attempt * 2))
+          done
+
+      - name: Install exact qualified Codex native binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/codex-0.155.0"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
+          mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
+          test "${#candidates[@]}" -eq 1
+          codex="$(readlink -f "${candidates[0]}")"
+          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
+
+      - name: Require Codex Linux sandbox prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          export NEEDRESTART_MODE=l
+          sudo -E apt-get update -qq
+          sudo -E apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils
+          if [ -f /usr/share/apparmor/extra-profiles/bwrap-userns-restrict ]; then
+            sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+          fi
+          bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
+
+      - name: Build retained-pilot binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="$RUNNER_TEMP/bin"
+          install -d -m 0700 "$bin"
+          go build -trimpath -o "$bin/control-plane" ./cmd/control-plane
+          go build -trimpath -o "$bin/eng" ./cmd/eng
+          go build -trimpath -o "$bin/worker" ./cmd/worker
+          go build -trimpath -o "$bin/codex-wif-live" ./cmd/codex-wif-live
+          printf 'BIN_DIR=%s\n' "$bin" >> "$GITHUB_ENV"
+
+      - name: Real WIF qualification and retained engineering turn
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          MODEL: ${{ inputs.model }}
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_CODEX_FEDERATION_RULE_ID: ${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}
+        run: bash examples/pilots/actions/engineer-model.sh
+
+      - name: Publish retained result only after model process exits
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          PUBLISH_TOKEN: ${{ github.token }}
+        run: bash examples/pilots/actions/engineer-publish.sh
+
+      - name: Retain resumable engineering state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-pilot-engineering-${{ inputs.pilot }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-state
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summarize next gate
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/retained-pilot-state/engineering-state.json"
+          pr_url="$(jq -er .pull_request.url "$state")"
+          {
+            echo "## Retained ${{ inputs.pilot }} engineering"
+            echo
+            echo "- Model/WIF engineering: **FINISHED**"
+            echo "- Independent Git/PR publication: **CONFIRMED**"
+            echo "- PR: $pr_url"
+            echo "- Next gate: approve the PR workflow run if GitHub marks it approval-required, wait for exact PR-head CI PASS, then run **Retained M1 pilot verification** with engineering run ID \`$GITHUB_RUN_ID\`."
+            echo "- Independent Review/Closure are intentionally not performed by this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
