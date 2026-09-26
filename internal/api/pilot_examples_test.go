@@ -24,33 +24,33 @@ func TestRetainedPilotTemplatesDryRunToRunning(t *testing.T) {
 	)
 
 	for _, pilot := range []struct {
-		name      string
-		dir       string
-		workID    string
-		taskID    string
-		runID     string
-		wantType  string
-		sourceRef      string
+		name          string
+		dir           string
+		workID        string
+		taskID        string
+		runID         string
+		wantType      string
+		sourceRef     string
 		contextDigest string
 	}{
 		{
-			name:      "feature",
-			dir:       "feature-routing",
-			workID:    "m1-feature-routing-work",
-			taskID:    "m1-feature-routing-task",
-			runID:     "m1-feature-routing-run",
-			wantType:  "FEATURE",
-			sourceRef:      "https://github.com/jiying2007/engineering-platform/issues/54",
+			name:          "feature",
+			dir:           "feature-routing",
+			workID:        "m1-feature-routing-work",
+			taskID:        "m1-feature-routing-task",
+			runID:         "m1-feature-routing-run",
+			wantType:      "FEATURE",
+			sourceRef:     "https://github.com/jiying2007/engineering-platform/issues/54",
 			contextDigest: "sha256:033b5712bedcb2b2be1bd52946c6c600ed1641ea721e44750b6a0b44963e2d67",
 		},
 		{
-			name:      "debug",
-			dir:       "debug-firmware-identity",
-			workID:    "m1-debug-firmware-identity-work",
-			taskID:    "m1-debug-firmware-identity-task",
-			runID:     "m1-debug-firmware-identity-run",
-			wantType:  "DEBUG",
-			sourceRef:      "https://github.com/jiying2007/engineering-platform/issues/55",
+			name:          "debug",
+			dir:           "debug-firmware-identity",
+			workID:        "m1-debug-firmware-identity-work",
+			taskID:        "m1-debug-firmware-identity-task",
+			runID:         "m1-debug-firmware-identity-run",
+			wantType:      "DEBUG",
+			sourceRef:     "https://github.com/jiying2007/engineering-platform/issues/55",
 			contextDigest: "sha256:09c30086243173ae7cbf946de841d506b9620e929463e9b61fc1eb6583d73230",
 		},
 	} {
