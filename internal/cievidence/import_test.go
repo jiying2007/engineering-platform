@@ -56,6 +56,8 @@ func fixtureImport(t *testing.T) ImportRequest {
 		ExperimentalSurfaceChecked:   true,
 		CredentialSafeConfigDigest:   "sha256:" + strings.Repeat("4", 64),
 		CredentialSafeProfileChecked: true,
+		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
+		EngineeringProfileChecked:    true,
 	}
 	qdata, err := json.Marshal(qualification)
 	if err != nil {
