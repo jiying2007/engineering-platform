@@ -112,6 +112,10 @@ func helperServer() error {
 				} else if _, err := os.Stat(token); !os.IsNotExist(err) {
 					return errors.New("WIF assertion remained reachable at engineering thread/start")
 				}
+				config, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
+				if err != nil || string(config) != engineeringConfig {
+					return errors.New("engineering config was not the fixed qualified profile")
+				}
 			}
 			thread = true
 			if err := send(m.ID, map[string]any{"thread": map[string]string{"id": "thread-1"}}); err != nil {
