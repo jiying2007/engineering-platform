@@ -51,7 +51,10 @@ func TestBuildCodexProfileRejectsWrongVersionAndUnsafeBinary(t *testing.T) {
 		t.Fatal("wrong Codex version accepted")
 	}
 	unsafe := filepath.Join(dir, "unsafe")
-	if err := os.WriteFile(unsafe, []byte("#!/bin/sh\necho codex-cli 0.155.0\n"), 0o722); err != nil {
+	if err := os.WriteFile(unsafe, []byte("#!/bin/sh\necho codex-cli 0.155.0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unsafe, 0o722); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := buildCodexProfile(unsafe, "gpt-5.6-sol"); err == nil {
