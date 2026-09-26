@@ -15,11 +15,11 @@ import (
 )
 
 type configuration struct {
-	address     string
-	databaseURL string
-	autoMigrate bool
-	development bool
-	tls         *tls.Config
+	address         string
+	databaseURL     string
+	autoMigrate     bool
+	development     bool
+	tls             *tls.Config
 	policy          *access.Policy
 	publisherConfig string
 }
