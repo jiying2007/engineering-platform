@@ -14,6 +14,8 @@ import (
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
+const engineeringWIFTurnTimeout = 8 * time.Minute
+
 type EngineeringObservation struct {
 	Status           string
 	Output           string
@@ -150,7 +152,7 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
 		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
 	}
-	runCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	runCtx, cancel := context.WithTimeout(ctx, engineeringWIFTurnTimeout)
 	defer cancel()
 	env := []string{
 		"HOME=" + home,

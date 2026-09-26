@@ -31,7 +31,20 @@ than silently broadening or rewriting administrator policy.
 
 The provider is bound to GitHub Actions OIDC issuer
 `https://token.actions.githubusercontent.com`, the dedicated audience,
-replay checking, and a 600-second assertion lifetime.
+replay checking, and a 600-second assertion lifetime. Provider creation omits
+the Admin API's update-only `enabled` field; the returned provider is still
+required to report `enabled=true` before the helper proceeds. Reuse also
+requires the default issuer-discovery trust mode: no custom discovery URL,
+explicit/uploaded JWKS, custom CA bundle, or provider-level CEL condition may be
+present under the same provider name.
+
+The current retained M1 engineering turn is intentionally bounded to **8
+minutes**. The rule/provider assertion window is 600 seconds, and the upstream
+GitHub OIDC assertion is deleted before model-reachable work begins. This keeps
+the model/tool sandbox from retaining a refresh credential while leaving an
+explicit safety margin for the two bounded M1 pilot changes. Longer-running
+production turns require a separately designed host-owned refresh mechanism;
+do not extend the turn timeout past the federation window.
 
 The rule requires:
 

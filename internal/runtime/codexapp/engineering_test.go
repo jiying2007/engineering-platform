@@ -11,6 +11,16 @@ import (
 	"time"
 )
 
+func TestEngineeringWIFTurnFitsConfiguredAssertionFreeWindow(t *testing.T) {
+	const configuredWIFWindow = 10 * time.Minute
+	const minimumRefreshMargin = time.Minute
+	if engineeringWIFTurnTimeout <= 0 ||
+		engineeringWIFTurnTimeout > configuredWIFWindow-minimumRefreshMargin {
+		t.Fatalf("engineering WIF turn timeout %s does not leave refresh margin inside %s",
+			engineeringWIFTurnTimeout, configuredWIFWindow)
+	}
+}
+
 func TestWIFEngineeringProviderWritesFixedNoNetworkProfile(t *testing.T) {
 	base, spec := launchFixture(t)
 	digest, err := executableDigest(base.executable)

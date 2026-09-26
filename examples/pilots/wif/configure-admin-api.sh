@@ -89,8 +89,7 @@ jq -n   --arg name "$PROVIDER_NAME"   --arg issuer "$ISSUER"   --arg audience "$
     audience:$audience,
     description:"engineering-platform protected-main Codex retained pilots",
     max_assertion_lifetime_seconds:600,
-    check_jti:true,
-    enabled:true
+    check_jti:true
   }' > "$PROVIDER_REQUEST"
 chmod 600 "$PROVIDER_REQUEST"
 
@@ -111,7 +110,13 @@ printf '%s' "$provider" |
       .audience==$audience and
       .enabled==true and
       .check_jti==true and
-      .max_assertion_lifetime_seconds==600
+      .max_assertion_lifetime_seconds==600 and
+      ((.custom_url // "") == "") and
+      ((.jwks_uri // "") == "") and
+      ((.jwks_local // false) == false) and
+      ((.jwks // null) == null) and
+      ((.custom_ca_certificate // "") == "") and
+      ((.attribute_conditions // "") == "")
     ' >/dev/null || {
       echo "existing/created provider does not match required trust policy" >&2
       exit 1
