@@ -78,16 +78,61 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 		HeadBranch string `json:"head_branch"`
 		Path       string `json:"path"`
 		Repository struct {
+			ID       int64  `json:"id"`
 			FullName string `json:"full_name"`
 		} `json:"repository"`
+		PullRequests []struct {
+			Number int `json:"number"`
+			Head   struct {
+				Ref  string `json:"ref"`
+				SHA  string `json:"sha"`
+				Repo struct {
+					ID int64 `json:"id"`
+				} `json:"repo"`
+			} `json:"head"`
+			Base struct {
+				Ref  string `json:"ref"`
+				SHA  string `json:"sha"`
+				Repo struct {
+					ID int64 `json:"id"`
+				} `json:"repo"`
+			} `json:"base"`
+		} `json:"pull_requests"`
 	}
 	if err := c.getJSON(ctx, "/repos/"+TrustedRepository+"/actions/runs/"+strconv.FormatInt(runID, 10), &run); err != nil {
 		return facts, err
 	}
 	facts.Run = RunFact{
-		ID: run.ID, Attempt: run.RunAttempt, Repository: run.Repository.FullName,
+		ID: run.ID, Attempt: run.RunAttempt, Repository: run.Repository.FullName, RepositoryID: run.Repository.ID,
 		Workflow: run.Name, WorkflowPath: run.Path, Event: run.Event, HeadBranch: run.HeadBranch, HeadSHA: run.HeadSHA,
 		Status: run.Status, Conclusion: run.Conclusion,
+	}
+	if run.Event == "pull_request" {
+		if len(run.PullRequests) != 1 {
+			return facts, fmt.Errorf("trusted pull-request run must bind exactly one pull request")
+		}
+		pr := run.PullRequests[0]
+		if pr.Number <= 0 || pr.Head.Ref == "" || !sha40.MatchString(pr.Head.SHA) || pr.Head.Repo.ID <= 0 ||
+			pr.Base.Ref == "" || !sha40.MatchString(pr.Base.SHA) || pr.Base.Repo.ID <= 0 {
+			return facts, fmt.Errorf("GitHub pull-request identity is malformed")
+		}
+		facts.Run.PullRequestNumber = pr.Number
+		facts.Run.PullHeadRef = pr.Head.Ref
+		facts.Run.PullHeadSHA = pr.Head.SHA
+		facts.Run.PullHeadRepositoryID = pr.Head.Repo.ID
+		facts.Run.PullBaseRef = pr.Base.Ref
+		facts.Run.PullBaseSHA = pr.Base.SHA
+		facts.Run.PullBaseRepositoryID = pr.Base.Repo.ID
+		headBlob, err := c.fetchWorkflowBlob(ctx, pr.Head.SHA)
+		if err != nil {
+			return facts, err
+		}
+		baseBlob, err := c.fetchWorkflowBlob(ctx, pr.Base.SHA)
+		if err != nil {
+			return facts, err
+		}
+		facts.Run.WorkflowHeadBlobSHA = headBlob
+		facts.Run.WorkflowBaseBlobSHA = baseBlob
 	}
 	var jobs struct {
 		TotalCount int `json:"total_count"`
@@ -102,7 +147,7 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 	if err := c.getJSON(ctx, "/repos/"+TrustedRepository+"/actions/runs/"+strconv.FormatInt(runID, 10)+"/jobs?per_page=100&filter=latest", &jobs); err != nil {
 		return facts, err
 	}
-	if jobs.TotalCount < 3 || jobs.TotalCount > 100 || len(jobs.Jobs) != jobs.TotalCount {
+	if jobs.TotalCount < 4 || jobs.TotalCount > 100 || len(jobs.Jobs) != jobs.TotalCount {
 		return facts, fmt.Errorf("GitHub job pagination/count is not authoritative")
 	}
 	for _, job := range jobs.Jobs {
@@ -143,8 +188,38 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 	return facts, nil
 }
 
+func (c *GitHubClient) fetchWorkflowBlob(ctx context.Context, commit string) (string, error) {
+	if !sha40.MatchString(commit) {
+		return "", fmt.Errorf("exact workflow commit required")
+	}
+	var item struct {
+		Path string `json:"path"`
+		Type string `json:"type"`
+		SHA  string `json:"sha"`
+		Size int64  `json:"size"`
+	}
+	requestPath := "/repos/" + TrustedRepository + "/contents/.github/workflows/ci.yml?ref=" + url.QueryEscape(commit)
+	if err := c.getJSON(ctx, requestPath, &item); err != nil {
+		return "", err
+	}
+	if item.Path != ".github/workflows/ci.yml" || item.Type != "file" || !sha40.MatchString(item.SHA) || item.Size <= 0 {
+		return "", fmt.Errorf("trusted CI workflow blob is malformed")
+	}
+	return item.SHA, nil
+}
+
+func validGitHubReadPath(requestPath string) bool {
+	if strings.ContainsAny(requestPath, "\r\n#") {
+		return false
+	}
+	if strings.HasPrefix(requestPath, "/repos/"+TrustedRepository+"/actions/") {
+		return true
+	}
+	return strings.HasPrefix(requestPath, "/repos/"+TrustedRepository+"/contents/.github/workflows/ci.yml?ref=")
+}
+
 func (c *GitHubClient) getJSON(ctx context.Context, requestPath string, dst any) error {
-	if c == nil || c.http == nil || !strings.HasPrefix(requestPath, "/repos/"+TrustedRepository+"/actions/") || strings.ContainsAny(requestPath, "\r\n#") {
+	if c == nil || c.http == nil || !validGitHubReadPath(requestPath) {
 		return fmt.Errorf("invalid GitHub API path")
 	}
 	u := *c.base

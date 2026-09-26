@@ -36,8 +36,9 @@ func importCIEvidence(args []string) error {
 	if err != nil {
 		return err
 	}
-	if envelope.Receipt.Repository != cievidence.TrustedRepository || envelope.Receipt.Event != "push" {
-		return fmt.Errorf("only trusted main-push CI evidence can be imported")
+	if envelope.Receipt.Repository != cievidence.TrustedRepository ||
+		(envelope.Receipt.Event != "push" && envelope.Receipt.Event != "pull_request") {
+		return fmt.Errorf("only trusted main-push or exact PR-head CI evidence can be imported")
 	}
 
 	token, err := optionalPrivateToken(os.Getenv("GITHUB_TOKEN_FILE"))

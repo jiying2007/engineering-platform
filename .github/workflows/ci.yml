@@ -31,6 +31,8 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -123,7 +125,7 @@ jobs:
       - name: Retain candidate binary bytes
         uses: actions/upload-artifact@v4
         with:
-          name: engineering-binaries-${{ github.sha }}
+          name: engineering-binaries-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/engineering-dist
           if-no-files-found: error
           retention-days: 30
@@ -151,6 +153,8 @@ jobs:
       EP_SANDBOX_INTEGRATION: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -201,6 +205,8 @@ jobs:
       EP_RESTORE_DRILL: '1'
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -234,6 +240,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -299,7 +307,7 @@ jobs:
       - name: Retain Codex qualification receipt
         uses: actions/upload-artifact@v4
         with:
-          name: codex-0.155.0-qualification-${{ github.sha }}
+          name: codex-0.155.0-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/codex-qualification.json
             ${{ runner.temp }}/codex-npm-integrity.txt
@@ -315,6 +323,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
@@ -388,7 +398,7 @@ jobs:
       - name: Retain verified CI evidence envelope
         uses: actions/upload-artifact@v4
         with:
-          name: trusted-ci-evidence-${{ github.sha }}
+          name: trusted-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/ci-evidence-envelope.json
           if-no-files-found: error
           retention-days: 90

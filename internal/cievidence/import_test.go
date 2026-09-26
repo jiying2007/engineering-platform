@@ -139,6 +139,113 @@ func fixtureImport(t *testing.T) ImportRequest {
 	}
 }
 
+func pullRequestFixture(t *testing.T) ImportRequest {
+	t.Helper()
+	req := fixtureImport(t)
+	envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope.Receipt.Event = "pull_request"
+	envelope.Receipt.BaseSHA = req.Delivery.BaseCommit
+	envelope.Receipt.SourceSHA = req.Delivery.ResultCommit
+	envelope.Receipt.TestedSHA = req.Delivery.ResultCommit
+	envelope, err = NewEnvelope(envelope.Receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureZip(t, filepath.Dir(req.Files.EnvelopeZip), filepath.Base(req.Files.EnvelopeZip), map[string][]byte{
+		"ci-evidence-envelope.json": data,
+	})
+	info, err := os.Stat(req.Files.EnvelopeZip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := digestFixtureFile(t, req.Files.EnvelopeZip)
+	for i := range req.Live.Artifacts {
+		if strings.HasPrefix(req.Live.Artifacts[i].Name, "trusted-ci-evidence-") {
+			req.Live.Artifacts[i].Digest = digest
+			req.Live.Artifacts[i].Size = info.Size()
+		}
+	}
+	req.Delivery.Artifacts[0].Digest = digest
+	req.Delivery.SubjectDigest, err = req.Delivery.CalculateSubjectDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const repositoryID int64 = 1383377268
+	req.Live.Run.RepositoryID = repositoryID
+	req.Live.Run.Event = "pull_request"
+	req.Live.Run.HeadBranch = "engineering-platform/aaaaaaaaaaaaaaaaaaaaaaaa"
+	req.Live.Run.PullRequestNumber = 7
+	req.Live.Run.PullHeadRef = req.Live.Run.HeadBranch
+	req.Live.Run.PullHeadSHA = req.Delivery.ResultCommit
+	req.Live.Run.PullHeadRepositoryID = repositoryID
+	req.Live.Run.PullBaseRef = "main"
+	req.Live.Run.PullBaseSHA = req.Delivery.BaseCommit
+	req.Live.Run.PullBaseRepositoryID = repositoryID
+	req.Live.Run.WorkflowHeadBlobSHA = strings.Repeat("c", 40)
+	req.Live.Run.WorkflowBaseBlobSHA = strings.Repeat("c", 40)
+	return req
+}
+
+func TestVerifyTrustedImportAcceptsExactPRHead(t *testing.T) {
+	req := pullRequestFixture(t)
+	got, err := VerifyTrustedImport(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Result != "PASS" || got.SubjectDigest != req.Delivery.SubjectDigest {
+		t.Fatalf("unexpected PR-head evidence: %#v", got)
+	}
+}
+
+func TestVerifyTrustedImportRejectsUntrustedPRHeadVariants(t *testing.T) {
+	for _, kind := range []string{"tested-merge", "base", "fork", "workflow-drift", "live-head"} {
+		t.Run(kind, func(t *testing.T) {
+			req := pullRequestFixture(t)
+			switch kind {
+			case "tested-merge":
+				envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
+				if err != nil {
+					t.Fatal(err)
+				}
+				envelope.Receipt.TestedSHA = strings.Repeat("d", 40)
+				envelope, err = NewEnvelope(envelope.Receipt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				data, _ := json.Marshal(envelope)
+				writeFixtureZip(t, filepath.Dir(req.Files.EnvelopeZip), filepath.Base(req.Files.EnvelopeZip), map[string][]byte{"ci-evidence-envelope.json": data})
+				info, _ := os.Stat(req.Files.EnvelopeZip)
+				digest := digestFixtureFile(t, req.Files.EnvelopeZip)
+				for i := range req.Live.Artifacts {
+					if strings.HasPrefix(req.Live.Artifacts[i].Name, "trusted-ci-evidence-") {
+						req.Live.Artifacts[i].Digest, req.Live.Artifacts[i].Size = digest, info.Size()
+					}
+				}
+				req.Delivery.Artifacts[0].Digest = digest
+				req.Delivery.SubjectDigest, _ = req.Delivery.CalculateSubjectDigest()
+			case "base":
+				req.Live.Run.PullBaseSHA = strings.Repeat("e", 40)
+			case "fork":
+				req.Live.Run.PullHeadRepositoryID++
+			case "workflow-drift":
+				req.Live.Run.WorkflowHeadBlobSHA = strings.Repeat("f", 40)
+			case "live-head":
+				req.Live.Run.PullHeadSHA = strings.Repeat("9", 40)
+			}
+			if _, err := VerifyTrustedImport(req); err == nil {
+				t.Fatalf("%s PR-head authority drift accepted", kind)
+			}
+		})
+	}
+}
+
 func TestVerifyTrustedImportProducesRequirementBoundEvidence(t *testing.T) {
 	req := fixtureImport(t)
 	got, err := VerifyTrustedImport(req)

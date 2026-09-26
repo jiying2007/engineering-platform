@@ -28,16 +28,26 @@ const (
 )
 
 type RunFact struct {
-	ID           int64
-	Attempt      int64
-	Repository   string
-	Workflow     string
-	WorkflowPath string
-	Event        string
-	HeadBranch   string
-	HeadSHA      string
-	Status       string
-	Conclusion   string
+	ID                   int64
+	Attempt              int64
+	Repository           string
+	RepositoryID         int64
+	Workflow             string
+	WorkflowPath         string
+	Event                string
+	HeadBranch           string
+	HeadSHA              string
+	Status               string
+	Conclusion           string
+	PullRequestNumber    int
+	PullHeadRef          string
+	PullHeadSHA          string
+	PullHeadRepositoryID int64
+	PullBaseRef          string
+	PullBaseSHA          string
+	PullBaseRepositoryID int64
+	WorkflowHeadBlobSHA  string
+	WorkflowBaseBlobSHA  string
 }
 
 type ArtifactFact struct {
@@ -114,7 +124,7 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	if err != nil {
 		return empty, err
 	}
-	if err := verifyLiveFacts(envelope, req.Live, req.Delivery.ResultCommit); err != nil {
+	if err := verifyLiveFacts(envelope, req.Live, req.Delivery.ResultCommit, req.Delivery.BaseCommit); err != nil {
 		return empty, err
 	}
 	binaryArtifact, ok := findArtifact(req.Live.Artifacts, "engineering-binaries-"+req.Delivery.ResultCommit)
@@ -163,20 +173,39 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	}, nil
 }
 
-func verifyLiveFacts(envelope Envelope, live LiveFacts, resultCommit string) error {
+func verifyLiveFacts(envelope Envelope, live LiveFacts, resultCommit, baseCommit string) error {
 	if err := envelope.Verify(); err != nil {
 		return err
 	}
+	resultCommit = strings.ToLower(resultCommit)
+	baseCommit = strings.ToLower(baseCommit)
 	r := envelope.Receipt
-	if r.Repository != TrustedRepository || r.Workflow != TrustedWorkflow || r.Event != "push" ||
-		r.SourceSHA != resultCommit || r.TestedSHA != resultCommit || r.BaseSHA != "" {
-		return fmt.Errorf("CI receipt is not exact trusted-main evidence for the delivery commit")
+	if r.Repository != TrustedRepository || r.Workflow != TrustedWorkflow ||
+		r.SourceSHA != resultCommit || r.TestedSHA != resultCommit {
+		return fmt.Errorf("CI receipt is not exact trusted evidence for the delivery commit")
 	}
 	if live.Run.ID != r.RunID || live.Run.Attempt != r.RunAttempt || live.Run.Repository != TrustedRepository ||
 		live.Run.Workflow != TrustedWorkflow || live.Run.WorkflowPath != ".github/workflows/ci.yml" ||
-		live.Run.Event != "push" || live.Run.HeadBranch != "main" || live.Run.HeadSHA != resultCommit ||
-		live.Run.Status != "completed" || live.Run.Conclusion != "success" {
+		live.Run.HeadSHA != resultCommit || live.Run.Status != "completed" || live.Run.Conclusion != "success" {
 		return fmt.Errorf("live GitHub run does not match retained receipt")
+	}
+	switch r.Event {
+	case "push":
+		if r.BaseSHA != "" || live.Run.Event != "push" || live.Run.HeadBranch != "main" {
+			return fmt.Errorf("trusted push CI must be exact main evidence")
+		}
+	case "pull_request":
+		if r.BaseSHA != baseCommit || live.Run.Event != "pull_request" || live.Run.HeadBranch == "" ||
+			live.Run.HeadBranch == "main" || live.Run.RepositoryID <= 0 || live.Run.PullRequestNumber <= 0 ||
+			live.Run.PullHeadRef != live.Run.HeadBranch || live.Run.PullHeadSHA != resultCommit ||
+			live.Run.PullHeadRepositoryID != live.Run.RepositoryID || live.Run.PullBaseRef != "main" ||
+			live.Run.PullBaseSHA != baseCommit || live.Run.PullBaseRepositoryID != live.Run.RepositoryID ||
+			live.Run.WorkflowHeadBlobSHA == "" || live.Run.WorkflowBaseBlobSHA == "" ||
+			live.Run.WorkflowHeadBlobSHA != live.Run.WorkflowBaseBlobSHA {
+			return fmt.Errorf("trusted pull-request CI must bind exact same-repository head/base and unchanged workflow")
+		}
+	default:
+		return fmt.Errorf("unsupported trusted CI event")
 	}
 	jobs := append([]Job(nil), live.Jobs...)
 	sort.Slice(jobs, func(i, j int) bool { return jobs[i].Name < jobs[j].Name })
