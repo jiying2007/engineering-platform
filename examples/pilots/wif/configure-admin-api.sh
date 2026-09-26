@@ -45,6 +45,11 @@ command -v jq >/dev/null
 
 install -d -m 0700 "$OUTPUT_DIR"
 
+ADMIN_HEADER_FILE="$OUTPUT_DIR/.openai-admin-header"
+printf 'Authorization: Bearer %s\n' "$OPENAI_ADMIN_KEY" > "$ADMIN_HEADER_FILE"
+chmod 600 "$ADMIN_HEADER_FILE"
+trap 'rm -f "$ADMIN_HEADER_FILE"' EXIT
+
 API_BASE="https://api.openai.com"
 PROVIDER_NAME="engineering-platform-github-actions-codex"
 RULE_NAME="engineering-platform-retained-pilot-main"
@@ -57,13 +62,13 @@ CONDITION="assertion.workflow_ref in [\"$LIVE_WORKFLOW_REF\", \"$ENGINEER_WORKFL
 
 api_get() {
   local path="$1"
-  curl --fail-with-body --silent --show-error     "$API_BASE$path"     -H "Authorization: Bearer $OPENAI_ADMIN_KEY"
+  curl --fail-with-body --silent --show-error     "$API_BASE$path"     -H @"$ADMIN_HEADER_FILE"
 }
 
 api_post() {
   local path="$1"
   local file="$2"
-  curl --fail-with-body --silent --show-error     "$API_BASE$path"     -H "Authorization: Bearer $OPENAI_ADMIN_KEY"     -H "Content-Type: application/json"     --data @"$file"
+  curl --fail-with-body --silent --show-error     "$API_BASE$path"     -H @"$ADMIN_HEADER_FILE"     -H "Content-Type: application/json"     --data @"$file"
 }
 
 providers="$(api_get /v1/organization/workload_identity/providers)"
