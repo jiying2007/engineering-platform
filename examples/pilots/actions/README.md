@@ -47,3 +47,34 @@ and exact frozen identities. The verification workflow resumes only after exact
 PR-head CI succeeds.
 
 Independent Review and Closure are deliberately outside the engineer workflow.
+
+## Verification workflow
+
+After the engineer workflow creates the retained PR, approve the generated
+approval-required PR CI run when GitHub requests it. Wait for the exact PR-head
+CI to pass all five gates, then dispatch:
+
+```sh
+gh workflow run retained-pilot-verify.yml \
+  --repo jiying2007/engineering-platform \
+  --ref main \
+  -f pilot=feature \
+  -f engineering_run_id=<engineer-workflow-run-id>
+```
+
+The verification workflow:
+
+1. downloads the exact retained engineering state;
+2. rebuilds `control-plane` and `eng` from the frozen engineering base;
+3. restores the post-publication PostgreSQL state;
+4. discovers one successful exact PR-head CI run;
+5. downloads and verifies the raw GitHub artifact ZIPs;
+6. completes the Run;
+7. creates Delivery bound to the exact Codex receipt/bundle, Git manifest and
+   GitHub CI artifact digest;
+8. imports Codex/Git/CI Evidence under three dedicated mTLS identities;
+9. creates Verification under a separate verifier identity;
+10. retains the PASS verification state for independent Review.
+
+It does not create a Review or Closure. A Verification PASS is only the input to
+the next independent-review gate.
