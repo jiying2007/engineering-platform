@@ -41,6 +41,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "pilot-preflight":
+		if err := pilotPreflight(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "codex-receipt-digest":
 		if err := codexReceiptDigest(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -117,6 +122,7 @@ func usage() {
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  codex-profile --codex PATH --model MODEL derive exact Core-bound Codex profile/tool grant")
+	fmt.Println("  pilot-preflight <flags>                   validate retained-pilot local/deployment readiness")
 	fmt.Println("  codex-receipt-digest --run ID            compute immutable Core-bound Codex receipt digest")
 	fmt.Println("  import-codex-evidence <flags>            verify Codex receipt/bundle and register Evidence")
 	fmt.Println("  git-change-manifest <flags>              capture exact base/result Git tree provenance")
