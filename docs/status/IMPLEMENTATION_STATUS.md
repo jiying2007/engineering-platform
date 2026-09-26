@@ -167,8 +167,8 @@ to create ClosureReceipt.
 - #67 aligned the canonical implementation status with the complete retained
   execution workflow set.
 - #68 managed-workspace WIF Admin API provisioning helper: PR exact-head
-  `36252504615` and fresh-main `36252808263` passed all five gates. Current
-  main is `973bf27daad5b546fe4fdd4d6c62d2d6cce17443`. The helper creates/reuses
+  `36252504615` and fresh-main `36252808263` passed all five gates. At that
+  implementation checkpoint main was `973bf27daad5b546fe4fdd4d6c62d2d6cce17443`. The helper creates/reuses
   exact GitHub OIDC provider/rule policy and can hand off the two non-secret
   repository variables without exposing the Admin API key to Runtime/Worker.
 
