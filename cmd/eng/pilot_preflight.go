@@ -22,6 +22,18 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
+type pilotPreflightOptions struct {
+	Repository        string
+	Base              string
+	ProfileFile       string
+	PolicyFile        string
+	PreparationFile   string
+	WorkerProfile     string
+	WorkerCodexFile   string
+	PublisherFile     string
+	WIFReceiptFile    string
+}
+
 type pilotPreflightResult struct {
 	Version        int      `json:"version"`
 	Repository     string   `json:"repository"`
@@ -44,112 +56,152 @@ type pilotWorkerCodexConfig struct {
 func pilotPreflight(args []string) error {
 	fs := flag.NewFlagSet("pilot-preflight", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	repository := fs.String("repository", "", "absolute operator repository checkout")
-	base := fs.String("base", "", "exact frozen main commit")
-	profileFile := fs.String("codex-profile", "", "eng codex-profile JSON")
-	policyFile := fs.String("access-policy", "", "rendered access policy JSON")
-	preparationFile := fs.String("preparation", "", "rendered Worker preparation JSON")
-	workerProfile := fs.String("worker-profile", "", "exact WorkerProfile")
-	workerCodexFile := fs.String("worker-codex", "", "rendered Worker Codex config JSON; optional until WIF rule exists")
-	publisherFile := fs.String("publisher", "", "publisher config JSON; optional until publisher credential exists")
-	wifReceiptFile := fs.String("wif-receipt", "", "real codex-wif-live receipt JSON; optional until administrator WIF succeeds")
+	var options pilotPreflightOptions
+	fs.StringVar(&options.Repository, "repository", "", "absolute operator repository checkout")
+	fs.StringVar(&options.Base, "base", "", "exact frozen main commit")
+	fs.StringVar(&options.ProfileFile, "codex-profile", "", "eng codex-profile JSON")
+	fs.StringVar(&options.PolicyFile, "access-policy", "", "rendered access policy JSON")
+	fs.StringVar(&options.PreparationFile, "preparation", "", "rendered Worker preparation JSON")
+	fs.StringVar(&options.WorkerProfile, "worker-profile", "", "exact WorkerProfile")
+	fs.StringVar(&options.WorkerCodexFile, "worker-codex", "", "rendered Worker Codex config JSON; optional until WIF rule exists")
+	fs.StringVar(&options.PublisherFile, "publisher", "", "publisher config JSON; optional until publisher credential exists")
+	fs.StringVar(&options.WIFReceiptFile, "wif-receipt", "", "real codex-wif-live receipt JSON; optional until administrator WIF succeeds")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		return fmt.Errorf("invalid pilot-preflight arguments")
 	}
-	for _, value := range []string{*repository, *base, *profileFile, *policyFile, *preparationFile, *workerProfile} {
-		if strings.TrimSpace(value) == "" {
-			return fmt.Errorf("repository, base, codex-profile, access-policy, preparation and worker-profile are required")
-		}
-	}
-	if !filepath.IsAbs(*repository) || len(*base) != 40 {
-		return fmt.Errorf("absolute repository path and full base commit are required")
-	}
-
-	profile, err := readPilotProfile(*profileFile)
+	result, err := checkPilotPreflight(options)
 	if err != nil {
 		return err
 	}
+	printJSON(result)
+	return nil
+}
+
+func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, error) {
+	var empty pilotPreflightResult
+	for _, value := range []string{options.Repository, options.Base, options.ProfileFile, options.PolicyFile, options.PreparationFile, options.WorkerProfile} {
+		if strings.TrimSpace(value) == "" {
+			return empty, fmt.Errorf("repository, base, codex-profile, access-policy, preparation and worker-profile are required")
+		}
+	}
+	if err := pilotSafeDir(options.Repository); err != nil {
+		return empty, fmt.Errorf("repository checkout: %w", err)
+	}
+	if len(options.Base) != 40 {
+		return empty, fmt.Errorf("full base commit required")
+	}
+
+	profile, err := readPilotProfile(options.ProfileFile)
+	if err != nil {
+		return empty, err
+	}
 	if profile.ToolProfile != "codex/"+profile.ProfileDigest || profile.ProfileDigest == "" {
-		return fmt.Errorf("invalid retained Codex profile output")
+		return empty, fmt.Errorf("invalid retained Codex profile output")
 	}
 	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model)
 	if err != nil {
-		return err
+		return empty, err
 	}
 	if current.ProfileDigest != profile.ProfileDigest || current.CodexExecutable != profile.CodexExecutable {
-		return fmt.Errorf("installed Codex profile bytes/model drifted")
+		return empty, fmt.Errorf("installed Codex profile bytes/model drifted")
 	}
-	mainCommit, err := pilotGitCommit(*repository, "refs/heads/main")
+	mainCommit, err := pilotGitCommit(options.Repository, "refs/heads/main")
 	if err != nil {
-		return err
+		return empty, err
 	}
-	if strings.ToLower(*base) != mainCommit {
-		return fmt.Errorf("repository main no longer matches frozen base")
+	if strings.ToLower(options.Base) != mainCommit {
+		return empty, fmt.Errorf("repository main no longer matches frozen base")
 	}
 
-	doc, err := readPilotAccessPolicy(*policyFile)
+	doc, err := readPilotAccessPolicy(options.PolicyFile)
 	if err != nil {
-		return err
+		return empty, err
 	}
-	if err := validatePilotPolicy(doc, *workerProfile, profile.ProfileDigest); err != nil {
-		return err
+	if err := validatePilotPolicy(doc, options.WorkerProfile, profile.ProfileDigest); err != nil {
+		return empty, err
 	}
-	if err := validatePilotPreparation(*preparationFile, *repository); err != nil {
-		return err
+	if err := validatePilotPreparation(options.PreparationFile, options.Repository); err != nil {
+		return empty, err
 	}
 
 	result := pilotPreflightResult{
 		Version: 1, Repository: "jiying2007/engineering-platform",
 		BaseCommit: mainCommit, ProfileDigest: profile.ProfileDigest,
-		WorkerProfile: *workerProfile, Internal: "READY",
+		WorkerProfile: options.WorkerProfile, Internal: "READY",
 		ModelExecution: "BLOCKED_EXTERNAL_WIF", Publication: "BLOCKED_EXTERNAL_PUBLISHER",
 	}
 
 	var workerCodex *pilotWorkerCodexConfig
-	if *workerCodexFile == "" {
+	if options.WorkerCodexFile == "" {
 		result.Blockers = append(result.Blockers, "worker_codex_federation_rule")
 	} else {
-		config, err := readPilotWorkerCodex(*workerCodexFile)
+		config, err := readPilotWorkerCodex(options.WorkerCodexFile)
 		if err != nil {
-			return err
+			return empty, err
 		}
 		if config.Executable != profile.CodexExecutable || config.Profile != profile.Profile {
-			return fmt.Errorf("Worker Codex config does not bind exact generated profile")
+			return empty, fmt.Errorf("Worker Codex config does not bind exact generated profile")
 		}
 		workerCodex = &config
 	}
 
-	if *wifReceiptFile == "" {
+	if options.WIFReceiptFile == "" {
 		result.Blockers = append(result.Blockers, "managed_workspace_wif_qualification")
 	} else {
 		if workerCodex == nil {
-			return fmt.Errorf("WIF receipt cannot be checked without Worker Codex configuration")
+			return empty, fmt.Errorf("WIF receipt cannot be checked without Worker Codex configuration")
 		}
-		receipt, err := readPilotWIFReceipt(*wifReceiptFile)
+		receipt, err := readPilotWIFReceipt(options.WIFReceiptFile)
 		if err != nil {
-			return err
+			return empty, err
 		}
 		if receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 			receipt.Model != profile.Profile.Model ||
 			receipt.FederationRuleID != workerCodex.FederationRuleID {
-			return fmt.Errorf("WIF qualification does not bind the exact Worker Codex profile")
+			return empty, fmt.Errorf("WIF qualification does not bind the exact Worker Codex profile")
 		}
 		result.ModelExecution = "READY"
 	}
 
-	if *publisherFile == "" {
+	if options.PublisherFile == "" {
 		result.Blockers = append(result.Blockers, "publisher_configuration_or_credential")
-	} else if err := validatePilotPublisher(*publisherFile); err != nil {
-		return err
+	} else if err := validatePilotPublisher(options.PublisherFile); err != nil {
+		return empty, err
 	} else {
 		result.Publication = "READY"
 	}
 
-	if len(result.Blockers) == 0 {
-		result.ModelExecution = "READY"
-		result.Publication = "READY"
+	return result, nil
+}
+func pilotSafeDir(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("absolute directory required")
 	}
-	printJSON(result)
+	clean := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(clean)
+	if err != nil || resolved != clean {
+		return fmt.Errorf("canonical directory required")
+	}
+	info, err := os.Lstat(clean)
+	if err != nil || !info.IsDir() || info.Mode().Perm()&0o022 != 0 {
+		return fmt.Errorf("safe non-group/world-writable directory required")
+	}
+	return nil
+}
+
+func pilotSafeExecutable(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("absolute executable required")
+	}
+	clean := filepath.Clean(path)
+	resolved, err := filepath.EvalSymlinks(clean)
+	if err != nil || resolved != clean {
+		return fmt.Errorf("canonical executable required")
+	}
+	info, err := os.Lstat(clean)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o022 != 0 || info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("safe executable required")
+	}
 	return nil
 }
 
@@ -181,8 +233,22 @@ func readPilotAccessPolicy(path string) (access.Document, error) {
 }
 
 func validatePilotPolicy(doc access.Document, workerProfile, profileDigest string) error {
+	required := map[string]bool{
+		"urn:engineering-platform:operator:pilot-owner": false,
+		"urn:engineering-platform:worker:codex-pilot": false,
+		"urn:engineering-platform:operator:pilot-publisher": false,
+		access.CodexEvidenceImporterSubject: false,
+		access.GitEvidenceImporterSubject: false,
+		access.TrustedCIImporterSubject: false,
+		"urn:engineering-platform:verifier:pilot": false,
+		"urn:engineering-platform:reviewer:pilot": false,
+		"urn:engineering-platform:closure:pilot": false,
+	}
 	var workerOK, publisherOK bool
 	for _, principal := range doc.Principals {
+		if _, ok := required[principal.Subject]; ok {
+			required[principal.Subject] = true
+		}
 		switch principal.Subject {
 		case "urn:engineering-platform:worker:codex-pilot":
 			if len(principal.WorkerProfiles) != 1 || principal.WorkerProfiles[0] != workerProfile {
@@ -207,6 +273,11 @@ func validatePilotPolicy(doc access.Document, workerProfile, profileDigest strin
 			}
 		}
 	}
+	for subject, found := range required {
+		if !found {
+			return fmt.Errorf("pilot access policy missing principal %s", subject)
+		}
+	}
 	if !workerOK || !publisherOK {
 		return fmt.Errorf("pilot access policy lacks exact Worker/publisher grants")
 	}
@@ -227,10 +298,17 @@ func validatePilotPreparation(path, repository string) error {
 		filepath.Clean(config.Approvals[0].RepositoryPath) != filepath.Clean(repository) {
 		return fmt.Errorf("pilot preparation config identity mismatch")
 	}
-	for _, path := range []string{config.Root, config.ContextSource, config.Git, config.Approvals[0].RepositoryPath} {
-		if !filepath.IsAbs(path) {
-			return fmt.Errorf("pilot preparation paths must be absolute")
-		}
+	if err := pilotSafeDir(config.Root); err != nil {
+		return fmt.Errorf("preparation root: %w", err)
+	}
+	if err := pilotSafeDir(config.ContextSource); err != nil {
+		return fmt.Errorf("context source: %w", err)
+	}
+	if err := pilotSafeDir(config.Approvals[0].RepositoryPath); err != nil {
+		return fmt.Errorf("approved repository: %w", err)
+	}
+	if err := pilotSafeExecutable(config.Git); err != nil {
+		return fmt.Errorf("preparation git: %w", err)
 	}
 	return nil
 }
