@@ -46,7 +46,7 @@ set -a
 set +a
 "$CONTROL" >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
 CONTROL_PID=$!
-trap 'kill "$CONTROL_PID" 2>/dev/null || true; wait "$CONTROL_PID" 2>/dev/null || true; rm -f "$TOKEN_FILE"' EXIT
+trap 'if [ -n "${CONTROL_PID:-}" ]; then kill "$CONTROL_PID" 2>/dev/null || true; wait "$CONTROL_PID" 2>/dev/null || true; fi; rm -f "$TOKEN_FILE"' EXIT
 for _ in $(seq 1 60); do
   if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
     break
@@ -113,7 +113,7 @@ install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
 # Stop Core before snapshot handoff. PostgreSQL service remains alive for pg_dump.
 kill "$CONTROL_PID"
 wait "$CONTROL_PID" || true
-unset CONTROL_PID
+CONTROL_PID=""
 rm -f "$TOKEN_FILE"
 
 docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state"   postgres:17-alpine   pg_dump -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     -Fc -f /state/core.dump
