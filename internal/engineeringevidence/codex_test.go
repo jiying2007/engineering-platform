@@ -33,61 +33,61 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		BundleSize:         int64(len(bundle)),
 	}
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 1,
-		CLI: "codex-cli",
-		Version: codexapp.QualifiedCodexVersion,
-		BinaryDigest: "sha256:" + strings.Repeat("7", 64),
-		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
-		CredentialMode: "workload_identity",
-		FederationRuleID: "rule-test",
-		Model: "gpt-5.6-sol",
-		PromptDigest: "sha256:" + strings.Repeat("8", 64),
-		ThreadID: "thread-1",
-		TurnID: "turn-1",
-		TurnStatus: "completed",
-		Output: "implemented and tested",
-		OutputDigest: canonical.BytesDigest([]byte("implemented and tested")),
-		CommandCount: 2,
-		FailedCommands: 0,
-		FileChangeCount: 1,
-		ApprovalRequests: 0,
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    codexapp.QualifiedCodexVersion,
+		BinaryDigest:               "sha256:" + strings.Repeat("7", 64),
+		EngineeringConfigDigest:    codexapp.EngineeringConfigDigest(),
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           "rule-test",
+		Model:                      "gpt-5.6-sol",
+		PromptDigest:               "sha256:" + strings.Repeat("8", 64),
+		ThreadID:                   "thread-1",
+		TurnID:                     "turn-1",
+		TurnStatus:                 "completed",
+		Output:                     "implemented and tested",
+		OutputDigest:               canonical.BytesDigest([]byte("implemented and tested")),
+		CommandCount:               2,
+		FailedCommands:             0,
+		FileChangeCount:            1,
+		ApprovalRequests:           0,
 		AssertionRemovedBeforeTurn: true,
 	}
 	result := codexexec.Result{
 		PromptIdentityDigest: "sha256:" + strings.Repeat("9", 64),
-		Codex: modelReceipt,
-		Change: change,
+		Codex:                modelReceipt,
+		Change:               change,
 	}
 	resultDigest, err := canonical.Digest(result)
 	if err != nil {
 		t.Fatal(err)
 	}
 	token := codexexec.Token{
-		ID: strings.Repeat("a", 64),
-		RunID: "run-codex",
+		ID:            strings.Repeat("a", 64),
+		RunID:         "run-codex",
 		WorkerProfile: "worker/codex",
 		ProfileDigest: "sha256:" + strings.Repeat("b", 64),
 		RecoveryEpoch: 1,
 	}
 	receipt := codexexec.Receipt{
-		Kind: codexexec.Kind,
-		Token: token,
-		Worker: "urn:engineering-platform:worker:codex",
+		Kind:              codexexec.Kind,
+		Token:             token,
+		Worker:            "urn:engineering-platform:worker:codex",
 		PreparationDigest: "sha256:" + strings.Repeat("c", 64),
-		Result: result,
-		ResultDigest: resultDigest,
-		ReceivedAt: time.Unix(100, 0).UTC(),
+		Result:            result,
+		ResultDigest:      resultDigest,
+		ReceivedAt:        time.Unix(100, 0).UTC(),
 	}
 	receiptDigest, err := CodexReceiptDigest(receipt)
 	if err != nil {
 		t.Fatal(err)
 	}
 	delivery := core.DeliveryReceipt{
-		ID: "delivery-codex",
+		ID:                 "delivery-codex",
 		TaskContractDigest: "sha256:" + strings.Repeat("d", 64),
-		RunID: token.RunID,
-		BaseCommit: change.BaseCommit,
-		ResultCommit: change.ResultCommit,
+		RunID:              token.RunID,
+		BaseCommit:         change.BaseCommit,
+		ResultCommit:       change.ResultCommit,
 		Artifacts: []core.ArtifactRef{
 			{ID: "codex-receipt", Digest: receiptDigest, MediaType: CodexReceiptArtifactType},
 			{ID: "codex-bundle", Digest: change.BundleDigest, MediaType: CodexBundleArtifactType},
@@ -98,13 +98,13 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		t.Fatal(err)
 	}
 	return CodexImportRequest{
-		EvidenceID: "evidence-codex",
-		RequirementID: "req-codex",
+		EvidenceID:        "evidence-codex",
+		RequirementID:     "req-codex",
 		ReceiptArtifactID: "codex-receipt",
-		BundleArtifactID: "codex-bundle",
-		Delivery: delivery,
-		Execution: codexexec.Status{Token: token, State: codexexec.Finished, Receipt: &receipt},
-		BundlePath: bundlePath,
+		BundleArtifactID:  "codex-bundle",
+		Delivery:          delivery,
+		Execution:         codexexec.Status{Token: token, State: codexexec.Finished, Receipt: &receipt},
+		BundlePath:        bundlePath,
 	}
 }
 
