@@ -13,8 +13,8 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/contextbundle"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
-	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/run"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/verification"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
@@ -26,9 +26,9 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 	ctx := context.Background()
 	profile := codexexec.Profile{
 		Version: 1, CodexVersion: codexapp.QualifiedCodexVersion,
-		BinaryDigest: "sha256:" + strings.Repeat("a", 64),
+		BinaryDigest:            "sha256:" + strings.Repeat("a", 64),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
-		Model: "gpt-test", Sandbox: "workspace-write", ApprovalPolicy: "never",
+		Model:                   "gpt-test", Sandbox: "workspace-write", ApprovalPolicy: "never",
 	}
 	pd, err := profile.Digest()
 	workerOK(t, err)
@@ -96,13 +96,13 @@ func codexResult(t *testing.T, permit codexexec.Permit) codexexec.Result {
 	}
 	return codexexec.Result{
 		PromptIdentityDigest: promptIdentity,
-		Codex: modelReceipt,
+		Codex:                modelReceipt,
 		Change: workspace.ChangeFacts{
 			Recipe: workspace.FinalizeRecipe, BaseCommit: permit.Preparation.Facts.BaseCommit,
 			BaseTree: permit.Preparation.Facts.TreeCommit, BaseSourceDigest: permit.Preparation.Facts.SourceDigest,
 			ResultCommit: strings.Repeat("3", 40), ResultTree: strings.Repeat("4", 40),
 			ResultSourceDigest: canonical.BytesDigest([]byte("result source")),
-			BundleDigest: canonical.BytesDigest([]byte("bundle")), BundleSize: 128,
+			BundleDigest:       canonical.BytesDigest([]byte("bundle")), BundleSize: 128,
 		},
 	}
 }
