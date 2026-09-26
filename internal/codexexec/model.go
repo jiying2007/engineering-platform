@@ -125,10 +125,10 @@ func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptI
 		RunInputDigest: a.Intent.InputDigest, TaskType: a.Task.TaskType,
 		Repository: a.Task.Repository, BaseCommit: strings.ToLower(a.Task.BaseCommit),
 		TargetID: a.Task.TargetID, CapabilityIDs: append([]string(nil), a.Task.CapabilityIDs...),
-		SkillIDs: append([]string(nil), a.Task.SkillIDs...),
+		SkillIDs:           append([]string(nil), a.Task.SkillIDs...),
 		AcceptanceCriteria: append([]string(nil), a.Task.AcceptanceCriteria...),
-		ExpectedOutputs: append([]string(nil), a.Task.ExpectedOutputs...),
-		BundleDigest: prep.Facts.BundleDigest,
+		ExpectedOutputs:    append([]string(nil), a.Task.ExpectedOutputs...),
+		BundleDigest:       prep.Facts.BundleDigest,
 	}
 	digest, err := canonical.Digest(identity)
 	return identity, digest, err
