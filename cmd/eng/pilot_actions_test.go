@@ -99,6 +99,91 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	}
 }
 
+
+func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
+	root := filepath.Join("..", "..")
+	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-pilot-verify.yml"))
+	verify := readPilotActionFile(t, filepath.Join(root, "examples", "pilots", "actions", "verify-retained.sh"))
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", filepath.Join(root, "examples", "pilots", "actions", "verify-retained.sh")).CombinedOutput(); err != nil {
+		t.Fatalf("verify-retained.sh syntax: %v: %s", err, out)
+	}
+
+	for _, required := range []string{
+		"permissions:",
+		"contents: read",
+		"actions: read",
+		"pull-requests: read",
+		"persist-credentials: false",
+		"GH_TOKEN: ${{ github.token }}",
+		"name: Resume exact retained subject and produce Verification",
+		"retained-pilot-verification-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Fatalf("verification workflow missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"contents: write",
+		"pull-requests: write",
+		"id-token: write",
+		"PUBLISH_TOKEN",
+		"--execute-codex",
+		"OPENAI_IDENTITY_TOKEN_FILE",
+	} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("verification workflow unexpectedly contains %q", forbidden)
+		}
+	}
+
+	for _, required := range []string{
+		"core.dump",
+		"pg_restore",
+		"worktree add --detach",
+		"trusted-ci-evidence-$RESULT_COMMIT",
+		"engineering-binaries-$RESULT_COMMIT",
+		"codex-0.155.0-qualification-$RESULT_COMMIT",
+		"import-codex-evidence",
+		"import-git-change-evidence",
+		"import-ci-evidence",
+		"clients/codex-evidence.env",
+		"clients/git-evidence.env",
+		"clients/ci-evidence.env",
+		"clients/verifier.env",
+		"/api/v1/verifications",
+		"core-verification.dump",
+		"next_gate:\"INDEPENDENT_REVIEW\"",
+	} {
+		if !strings.Contains(verify, required) {
+			t.Fatalf("verification script missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"/api/v1/reviews",
+		"/api/v1/closures",
+		"clients/reviewer.env",
+		"clients/closure.env",
+		"--execute-codex",
+		"PUBLISH_TOKEN",
+	} {
+		if strings.Contains(verify, forbidden) {
+			t.Fatalf("verification script crosses independent-review boundary with %q", forbidden)
+		}
+	}
+	if strings.Index(verify, "gh run list") > strings.Index(verify, "/api/v1/runs/$RUN_ID/complete") {
+		t.Fatal("Run is completed before exact successful PR-head CI is discovered")
+	}
+	if strings.Index(verify, "import-codex-evidence") > strings.Index(verify, "/api/v1/verifications") ||
+		strings.Index(verify, "import-git-change-evidence") > strings.Index(verify, "/api/v1/verifications") ||
+		strings.Index(verify, "import-ci-evidence") > strings.Index(verify, "/api/v1/verifications") {
+		t.Fatal("Verification is requested before all three Evidence imports")
+	}
+}
+
 func readPilotActionFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)
