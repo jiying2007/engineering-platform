@@ -116,8 +116,9 @@ func TestProviderPublishesOnlyExactRetainedCodexResult(t *testing.T) {
 
 	bad := request
 	bad.ParametersDigest = digestOf("different-result")
-	if _, err := provider.Dispatch(context.Background(), bad); err == nil {
-		t.Fatal("publisher accepted an action not bound to exact Codex result digest")
+	badResult, err := provider.Dispatch(context.Background(), bad)
+	if err != nil || badResult.Outcome != action.DispatchUnknown || badResult.ObservedState != "PRECONDITION_FAILED" {
+		t.Fatalf("mismatched result was not retained as precondition failure: %#v err=%v", badResult, err)
 	}
 	if remote.publishCalls != 1 {
 		t.Fatalf("mismatched result reached GitHub remote: %d", remote.publishCalls)
@@ -167,13 +168,13 @@ func TestProviderRejectsChangedOrUnsafeBundle(t *testing.T) {
 	if err := os.WriteFile(bundle, []byte("changed"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err = provider.Dispatch(context.Background(), action.Request{
+	result, err := provider.Dispatch(context.Background(), action.Request{
 		RunID: state.run.ID, ExecutionEpoch: state.run.CurrentEpoch, Action: Action,
 		RiskClass: action.ControlledMutation, Capability: Capability,
 		ParametersDigest: state.status.Receipt.ResultDigest,
 	})
-	if err == nil {
-		t.Fatal("changed retained bundle was accepted")
+	if err != nil || result.Outcome != action.DispatchUnknown || result.ObservedState != "PRECONDITION_FAILED" {
+		t.Fatalf("changed retained bundle was not rejected deterministically: %#v err=%v", result, err)
 	}
 	if remote.publishCalls != 0 {
 		t.Fatal("unsafe bundle reached GitHub remote")
