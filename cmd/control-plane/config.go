@@ -7,23 +7,27 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/api"
+	"github.com/jiying2007/engineering-platform/internal/gateway"
+	"github.com/jiying2007/engineering-platform/internal/githubpublish"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 )
 
 type configuration struct {
-	address     string
-	databaseURL string
-	autoMigrate bool
-	development bool
-	tls         *tls.Config
-	policy      *access.Policy
+	address         string
+	databaseURL     string
+	autoMigrate     bool
+	development     bool
+	tls             *tls.Config
+	policy          *access.Policy
+	publisherConfig string
 }
 
 // Resolve security before opening a DB or running migrations. There is no
 // implicit plaintext, anonymous identity or memory-persistence fallback.
 func loadConfiguration(env func(string) string) (configuration, error) {
-	c := configuration{address: controlPlaneAddress(env("LISTEN_HOST"), env("PORT")), databaseURL: env("DATABASE_URL")}
+	c := configuration{address: controlPlaneAddress(env("LISTEN_HOST"), env("PORT")), databaseURL: env("DATABASE_URL"), publisherConfig: env("GITHUB_PUBLISHER_CONFIG_FILE")}
 	mode, migrate := env("INSECURE_DEV"), env("AUTO_MIGRATE")
 	if mode != "" && mode != "0" && mode != "1" {
 		return c, fmt.Errorf("INSECURE_DEV must be 0 or 1")
@@ -39,8 +43,8 @@ func loadConfiguration(env func(string) string) (configuration, error) {
 		if host != "" && host != "127.0.0.1" && host != "::1" {
 			return c, fmt.Errorf("INSECURE_DEV requires a literal loopback host")
 		}
-		if cert != "" || key != "" || ca != "" || policy != "" {
-			return c, fmt.Errorf("development mode cannot ignore supplied TLS/access configuration")
+		if cert != "" || key != "" || ca != "" || policy != "" || c.publisherConfig != "" {
+			return c, fmt.Errorf("development mode cannot ignore supplied TLS/access/publication configuration")
 		}
 		// Keep unauthenticated fixture writes away from any durable backend.
 		if c.databaseURL != "" || c.autoMigrate {
@@ -75,13 +79,28 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			return nil, fmt.Errorf("verified TLS transport required")
 		}
 		var err error
-		// Privileged external action providers remain intentionally absent, but
-		// durable PostgreSQL backends now provide the recovery-completion gate.
 		options := api.AuthenticatedOptions{}
 		if gate, ok := backend.(api.RecoveryCompletionGate); ok {
 			options.RecoveryCompletion = gate
 		}
-		handler, err = api.NewAuthenticatedHandler(backend, nil, c.policy, options)
+		var actions api.ActionGateway
+		if c.publisherConfig != "" {
+			state, ok := backend.(githubpublish.State)
+			if !ok {
+				return nil, fmt.Errorf("GitHub publisher requires Core-bound Codex state")
+			}
+			repository, ok := backend.(action.Repository)
+			if !ok {
+				return nil, fmt.Errorf("GitHub publisher requires durable action repository")
+			}
+			provider, loadErr := githubpublish.Load(c.publisherConfig, state)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			authority := gateway.NewAuthority(backend)
+			actions = action.NewService(authority, authority, provider, repository)
+		}
+		handler, err = api.NewAuthenticatedHandler(backend, actions, c.policy, options)
 		if err != nil {
 			return nil, err
 		}

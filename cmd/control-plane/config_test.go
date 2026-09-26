@@ -25,6 +25,7 @@ func TestStartupFailsBeforeImplicitInsecureOrDurableFallback(t *testing.T) {
 		{"INSECURE_DEV": "1", "CONTROL_AUTH_POLICY_FILE": "do-not-ignore"},
 		{"INSECURE_DEV": "1", "DATABASE_URL": "do-not-open"},
 		{"INSECURE_DEV": "1", "AUTO_MIGRATE": "1"},
+		{"INSECURE_DEV": "1", "GITHUB_PUBLISHER_CONFIG_FILE": "do-not-ignore"},
 	} {
 		if _, err := loadConfiguration(func(key string) string { return env[key] }); err == nil {
 			t.Fatalf("unsafe startup accepted: %v", env)

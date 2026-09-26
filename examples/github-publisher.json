@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "artifact_root": "/var/lib/engineering-platform/shared-codex-artifacts",
+  "git_executable": "/usr/bin/git",
+  "token_file": "/run/secrets/engineering-platform-github-token",
+  "targets": [
+    {
+      "repository": "jiying2007/engineering-platform",
+      "base_ref": "main",
+      "branch_prefix": "engineering-platform/"
+    }
+  ]
+}
