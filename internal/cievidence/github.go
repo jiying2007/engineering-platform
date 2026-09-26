@@ -123,14 +123,16 @@ func (c *GitHubClient) FetchLiveFacts(ctx context.Context, repository string, ru
 		facts.Run.PullBaseRef = pr.Base.Ref
 		facts.Run.PullBaseSHA = pr.Base.SHA
 		facts.Run.PullBaseRepositoryID = pr.Base.Repo.ID
-		facts.Run.WorkflowHeadBlobSHA, err = c.fetchWorkflowBlob(ctx, pr.Head.SHA)
+		headBlob, err := c.fetchWorkflowBlob(ctx, pr.Head.SHA)
 		if err != nil {
 			return facts, err
 		}
-		facts.Run.WorkflowBaseBlobSHA, err = c.fetchWorkflowBlob(ctx, pr.Base.SHA)
+		baseBlob, err := c.fetchWorkflowBlob(ctx, pr.Base.SHA)
 		if err != nil {
 			return facts, err
 		}
+		facts.Run.WorkflowHeadBlobSHA = headBlob
+		facts.Run.WorkflowBaseBlobSHA = baseBlob
 	}
 	var jobs struct {
 		TotalCount int `json:"total_count"`
