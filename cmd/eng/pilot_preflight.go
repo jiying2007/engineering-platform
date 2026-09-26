@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -315,11 +316,53 @@ func validatePilotPreparation(path, repository string) (string, error) {
 	if err := pilotSafeExecutable(config.Git); err != nil {
 		return "", fmt.Errorf("preparation git: %w", err)
 	}
+	if err := validatePilotContextBytes(config.ContextSource, config.Approvals[0].Refs); err != nil {
+		return "", err
+	}
 	artifactRoot := filepath.Join(config.Root, "artifacts")
 	if err := pilotSafeDir(artifactRoot); err != nil {
 		return "", fmt.Errorf("retained artifact root: %w", err)
 	}
 	return config.Root, nil
+}
+
+func validatePilotContextBytes(rootPath string, refs []core.ContextRef) error {
+	if len(refs) == 0 {
+		return nil
+	}
+	root, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, ref := range refs {
+		if ref.Trust != core.ContextApproved || !canonical.ValidDigest(ref.Digest) {
+			return fmt.Errorf("invalid approved pilot ContextRef")
+		}
+		name := strings.TrimPrefix(ref.Digest, "sha256:") + ".bin"
+		before, err := root.Lstat(name)
+		if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0o222 != 0 ||
+			before.Size() < 0 || before.Size() > 4<<20 {
+			return fmt.Errorf("approved pilot context bytes are missing or unsafe")
+		}
+		file, err := root.Open(name)
+		if err != nil {
+			return err
+		}
+		opened, err := file.Stat()
+		if err != nil || !os.SameFile(before, opened) || opened.Mode().Perm()&0o222 != 0 {
+			_ = file.Close()
+			return fmt.Errorf("approved pilot context changed before read")
+		}
+		data, readErr := io.ReadAll(io.LimitReader(file, (4<<20)+1))
+		closeErr := file.Close()
+		after, afterErr := root.Lstat(name)
+		if readErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(before, after) ||
+			len(data) > 4<<20 || canonical.BytesDigest(data) != ref.Digest {
+			return fmt.Errorf("approved pilot context bytes do not match frozen digest")
+		}
+	}
+	return nil
 }
 
 func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {

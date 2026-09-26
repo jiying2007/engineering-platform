@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/run"
@@ -23,31 +24,34 @@ func TestRetainedPilotTemplatesDryRunToRunning(t *testing.T) {
 	)
 
 	for _, pilot := range []struct {
-		name      string
-		dir       string
-		workID    string
-		taskID    string
-		runID     string
-		wantType  string
-		sourceRef string
+		name          string
+		dir           string
+		workID        string
+		taskID        string
+		runID         string
+		wantType      string
+		sourceRef     string
+		contextDigest string
 	}{
 		{
-			name:      "feature",
-			dir:       "feature-routing",
-			workID:    "m1-feature-routing-work",
-			taskID:    "m1-feature-routing-task",
-			runID:     "m1-feature-routing-run",
-			wantType:  "FEATURE",
-			sourceRef: "https://github.com/jiying2007/engineering-platform/issues/54",
+			name:          "feature",
+			dir:           "feature-routing",
+			workID:        "m1-feature-routing-work",
+			taskID:        "m1-feature-routing-task",
+			runID:         "m1-feature-routing-run",
+			wantType:      "FEATURE",
+			sourceRef:     "https://github.com/jiying2007/engineering-platform/issues/54",
+			contextDigest: "sha256:033b5712bedcb2b2be1bd52946c6c600ed1641ea721e44750b6a0b44963e2d67",
 		},
 		{
-			name:      "debug",
-			dir:       "debug-firmware-identity",
-			workID:    "m1-debug-firmware-identity-work",
-			taskID:    "m1-debug-firmware-identity-task",
-			runID:     "m1-debug-firmware-identity-run",
-			wantType:  "DEBUG",
-			sourceRef: "https://github.com/jiying2007/engineering-platform/issues/55",
+			name:          "debug",
+			dir:           "debug-firmware-identity",
+			workID:        "m1-debug-firmware-identity-work",
+			taskID:        "m1-debug-firmware-identity-task",
+			runID:         "m1-debug-firmware-identity-run",
+			wantType:      "DEBUG",
+			sourceRef:     "https://github.com/jiying2007/engineering-platform/issues/55",
+			contextDigest: "sha256:09c30086243173ae7cbf946de841d506b9620e929463e9b61fc1eb6583d73230",
 		},
 	} {
 		t.Run(pilot.name, func(t *testing.T) {
@@ -97,6 +101,21 @@ func TestRetainedPilotTemplatesDryRunToRunning(t *testing.T) {
 				runResponse.RunInput.ToolProfile != "codex/"+profileDigest ||
 				runResponse.RunInput.WorkerProfile != workerProfile {
 				t.Fatalf("unexpected pilot Run: %#v input=%#v", runResponse.Run, runResponse.RunInput)
+			}
+			if len(runResponse.RunInput.ContextRefs) != 1 {
+				t.Fatalf("expected one frozen requirement ContextRef, got %#v", runResponse.RunInput.ContextRefs)
+			}
+			ref := runResponse.RunInput.ContextRefs[0]
+			if ref.Source != "m1-pilot-requirement" || ref.Type != "DOCUMENT" || ref.Version != "v1" ||
+				ref.Trust != core.ContextApproved || ref.Digest != pilot.contextDigest {
+				t.Fatalf("unexpected pilot ContextRef: %#v", ref)
+			}
+			requirement, err := os.ReadFile(filepath.Join("..", "..", "examples", "pilots", pilot.dir, "requirement.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if digest := canonical.BytesDigest(requirement); digest != pilot.contextDigest {
+				t.Fatalf("requirement bytes digest %s want %s", digest, pilot.contextDigest)
 			}
 
 			workBody := mustRequest(t, h, http.MethodGet, "/api/v1/work-items/"+pilot.workID, nil, http.StatusOK)
