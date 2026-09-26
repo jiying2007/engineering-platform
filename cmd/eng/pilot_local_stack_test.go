@@ -62,7 +62,7 @@ func TestLocalPilotStackBootstrapGeneratesUsableMTLSAndPolicy(t *testing.T) {
 		t.Fatalf("unexpected server certificate identity: %#v", server)
 	}
 	if _, err := server.Verify(x509.VerifyOptions{
-		Roots: roots,
+		Roots:     roots,
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}); err != nil {
 		t.Fatalf("server certificate does not verify: %v", err)
@@ -87,7 +87,7 @@ func TestLocalPilotStackBootstrapGeneratesUsableMTLSAndPolicy(t *testing.T) {
 			t.Fatalf("%s client identity mismatch: %#v", slug, cert)
 		}
 		if _, err := cert.Verify(x509.VerifyOptions{
-			Roots: roots,
+			Roots:     roots,
 			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 		}); err != nil {
 			t.Fatalf("%s certificate does not verify: %v", slug, err)
