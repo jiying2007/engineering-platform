@@ -55,7 +55,7 @@ case "$mode:$count" in
       .audience=="aud-pilot" and
       .max_assertion_lifetime_seconds==600 and
       .check_jti==true and
-      .enabled==true
+      (has("enabled") | not)
     ' "$data" >/dev/null
     printf '%s\n' "$provider_exact"
     ;;
