@@ -226,6 +226,20 @@ jq -e '.state=="FINISHED" and .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION"' 
 stop_control
 trap - EXIT
 
+EXECUTION_ID="$(jq -er .token.execution_id "$STATE_ROOT/codex-status.json")"
+BUNDLE_DIGEST="$(jq -er .receipt.result.change.bundle_digest "$STATE_ROOT/codex-status.json")"
+BUNDLE_SIZE="$(jq -er .receipt.result.change.bundle_size "$STATE_ROOT/codex-status.json")"
+BUNDLE_SOURCE="$STACK_ROOT/preparation-root/artifacts/$EXECUTION_ID.bundle"
+test -f "$BUNDLE_SOURCE"
+test "sha256:$(sha256sum "$BUNDLE_SOURCE" | awk '{print $1}')" = "$BUNDLE_DIGEST"
+test "$(stat -c%s "$BUNDLE_SOURCE")" = "$BUNDLE_SIZE"
+install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
+
+# Persist the non-replayable FINISHED model state before publication. A later
+# publisher failure must not destroy the only real model result.
+docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state"   postgres:17-alpine   pg_dump -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     -Fc -f /state/core-pre-publication.dump
+test -s "$STATE_ROOT/core-pre-publication.dump"
+
 jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
     pilot:$pilot,
     run_id:$run_id,
