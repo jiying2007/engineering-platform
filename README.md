@@ -57,10 +57,14 @@ Current canonical documents:
 - [Core Architecture v1](docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md)
 - [Embedded Domain Capability Model v1](docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md)
 - [Core M0 / M1 Vertical Slice Plan v1](docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md)
+- [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md)
 - [Extension Catalog v1](docs/extensions/EXTENSION_CATALOG_V1.md)
 - [ADR-001 — Clean-Slate Embedded Platform Scope](docs/adr/ADR-001-clean-slate-embedded-platform-scope.md)
 
-Historical architecture profiles and the 43-round research archive remain design evidence, not the current M0 implementation checklist.
+Superseded implementation profiles, adoption-plan revisions and transient CI
+checkpoint markers are retained by Git history rather than kept beside current
+authority-bearing documents. Explicit architecture reviews and research remain
+design evidence, not the current M0/M1 implementation checklist.
 
 ## Core product principles
 
@@ -240,9 +244,11 @@ These are not inherited into Core automatically.
 
 Current stage:
 
-> **implementation-bootstrap**
+> **retained-pilot-ready (external WIF-gated)**
 
-The next maturity milestone is not another architecture profile. It is:
+Internal M1 execution mechanics are assembled, but M1 is not claimed until the
+real retained Feature and Debug pilots complete. The next maturity milestone is
+not another architecture profile. It is:
 
 > **one real Feature pilot and one real Debug pilot completed through the new Core with exact Evidence and Verification.**
 
