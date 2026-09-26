@@ -103,6 +103,13 @@ func TestWIFAdminAPIHelperRejectsExistingTrustDrift(t *testing.T) {
 	}
 }
 
+func TestWIFAdminAPIHelperRejectsProviderVerificationModeDrift(t *testing.T) {
+	_, _, errText := runWIFAdminHelper(t, "trust-drift", false)
+	if errText == "" || !strings.Contains(errText, "does not match required trust policy") {
+		t.Fatalf("provider verification-mode drift was not rejected: %s", errText)
+	}
+}
+
 func TestWIFAdminAPIHelperShellSyntax(t *testing.T) {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
