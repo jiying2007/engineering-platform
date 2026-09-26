@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"flag"
-	"io"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
