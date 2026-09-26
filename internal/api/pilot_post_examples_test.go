@@ -13,47 +13,47 @@ import (
 
 func TestRetainedPilotPostModelTemplatesReachClosure(t *testing.T) {
 	const (
-		baseCommit = "0123456789abcdef0123456789abcdef01234567"
-		resultCommit = "cccccccccccccccccccccccccccccccccccccccc"
-		profileDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		workerProfile = "worker/codex-pilot"
-		humanOwner = "urn:engineering-platform:operator:pilot-owner"
-		codexResultDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+		baseCommit         = "0123456789abcdef0123456789abcdef01234567"
+		resultCommit       = "cccccccccccccccccccccccccccccccccccccccc"
+		profileDigest      = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		workerProfile      = "worker/codex-pilot"
+		humanOwner         = "urn:engineering-platform:operator:pilot-owner"
+		codexResultDigest  = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 		codexReceiptDigest = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
-		bundleDigest = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
-		gitManifestDigest = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
-		ciEnvelopeDigest = "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+		bundleDigest       = "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+		gitManifestDigest  = "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+		ciEnvelopeDigest   = "sha256:4444444444444444444444444444444444444444444444444444444444444444"
 	)
 
 	for _, pilot := range []struct {
-		name string
-		dir string
-		prefix string
-		workID string
-		runID string
+		name     string
+		dir      string
+		prefix   string
+		workID   string
+		runID    string
 		reqCodex string
-		reqGit string
-		reqCI string
+		reqGit   string
+		reqCI    string
 	}{
 		{
-			name: "feature",
-			dir: "feature-routing",
-			prefix: "feature",
-			workID: "m1-feature-routing-work",
-			runID: "m1-feature-routing-run",
+			name:     "feature",
+			dir:      "feature-routing",
+			prefix:   "feature",
+			workID:   "m1-feature-routing-work",
+			runID:    "m1-feature-routing-run",
 			reqCodex: "feature-codex",
-			reqGit: "feature-git",
-			reqCI: "feature-ci",
+			reqGit:   "feature-git",
+			reqCI:    "feature-ci",
 		},
 		{
-			name: "debug",
-			dir: "debug-firmware-identity",
-			prefix: "debug",
-			workID: "m1-debug-firmware-identity-work",
-			runID: "m1-debug-firmware-identity-run",
+			name:     "debug",
+			dir:      "debug-firmware-identity",
+			prefix:   "debug",
+			workID:   "m1-debug-firmware-identity-work",
+			runID:    "m1-debug-firmware-identity-run",
 			reqCodex: "debug-codex",
-			reqGit: "debug-git",
-			reqCI: "debug-ci",
+			reqGit:   "debug-git",
+			reqCI:    "debug-ci",
 		},
 	} {
 		t.Run(pilot.name, func(t *testing.T) {
@@ -75,15 +75,15 @@ func TestRetainedPilotPostModelTemplatesReachClosure(t *testing.T) {
 			mustJSON(t, taskBody, &taskResponse)
 
 			runRequest := decodePilotTemplate(t, pilot.dir, "run.json.tmpl", map[string]string{
-				"__TASK_DIGEST__": taskResponse.Digest,
+				"__TASK_DIGEST__":    taskResponse.Digest,
 				"__PROFILE_DIGEST__": profileDigest,
 				"__WORKER_PROFILE__": workerProfile,
 			})
 			mustRequest(t, h, http.MethodPost, "/api/v1/runs", runRequest, http.StatusCreated)
 
 			publish := decodePilotTemplate(t, pilot.dir, "publish.json.tmpl", map[string]string{
-				"__EXECUTION_EPOCH__": "1",
-				"__RECOVERY_EPOCH__": "0",
+				"__EXECUTION_EPOCH__":     "1",
+				"__RECOVERY_EPOCH__":      "0",
 				"__CODEX_RESULT_DIGEST__": codexResultDigest,
 			})
 			publishBytes, err := json.Marshal(publish)
@@ -107,11 +107,11 @@ func TestRetainedPilotPostModelTemplatesReachClosure(t *testing.T) {
 			mustRequest(t, h, http.MethodPost, "/api/v1/runs/"+pilot.runID+"/complete", complete, http.StatusOK)
 
 			deliveryRequest := decodePilotTemplate(t, pilot.dir, "delivery.json.tmpl", map[string]string{
-				"__RESULT_COMMIT__": resultCommit,
+				"__RESULT_COMMIT__":        resultCommit,
 				"__CODEX_RECEIPT_DIGEST__": codexReceiptDigest,
-				"__BUNDLE_DIGEST__": bundleDigest,
-				"__GIT_MANIFEST_DIGEST__": gitManifestDigest,
-				"__CI_ENVELOPE_DIGEST__": ciEnvelopeDigest,
+				"__BUNDLE_DIGEST__":        bundleDigest,
+				"__GIT_MANIFEST_DIGEST__":  gitManifestDigest,
+				"__CI_ENVELOPE_DIGEST__":   ciEnvelopeDigest,
 			})
 			deliveryBody := mustRequest(t, h, http.MethodPost, "/api/v1/deliveries", deliveryRequest, http.StatusCreated)
 			var delivery core.DeliveryReceipt
@@ -134,8 +134,8 @@ func TestRetainedPilotPostModelTemplatesReachClosure(t *testing.T) {
 			verification := decodePilotTemplate(t, pilot.dir, "verification.json", nil)
 			verificationBody := mustRequest(t, h, http.MethodPost, "/api/v1/verifications", verification, http.StatusCreated)
 			var verificationReport struct {
-				ID string `json:"verification_report_id"`
-				Result string `json:"result"`
+				ID            string `json:"verification_report_id"`
+				Result        string `json:"result"`
 				SubjectDigest string `json:"subject_digest"`
 			}
 			mustJSON(t, verificationBody, &verificationReport)
@@ -145,16 +145,16 @@ func TestRetainedPilotPostModelTemplatesReachClosure(t *testing.T) {
 
 			reviewID := strings.Replace(pilot.runID, "-run", "-review", 1)
 			reviewBody := mustRequest(t, h, http.MethodPost, "/api/v1/reviews", map[string]any{
-				"review_report_id": reviewID,
-				"delivery_receipt_id": delivery.ID,
+				"review_report_id":       reviewID,
+				"delivery_receipt_id":    delivery.ID,
 				"verification_report_id": verificationReport.ID,
-				"reviewer": "urn:engineering-platform:reviewer:pilot",
-				"result": review.ResultPass,
+				"reviewer":               "urn:engineering-platform:reviewer:pilot",
+				"result":                 review.ResultPass,
 				"findings": []any{
 					map[string]any{
 						"finding_id": pilot.prefix + "-review-info",
-						"severity": review.SeverityInfo,
-						"summary": "dry-run only: real pilot reviewer must independently inspect the retained subject",
+						"severity":   review.SeverityInfo,
+						"summary":    "dry-run only: real pilot reviewer must independently inspect the retained subject",
 					},
 				},
 			}, http.StatusCreated)
@@ -182,13 +182,13 @@ func registerPilotEvidence(t *testing.T, h http.Handler, deliveryID, evidenceID,
 	mustRequest(t, h, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": deliveryID,
 		"evidence": map[string]any{
-			"evidence_id": evidenceID,
+			"evidence_id":    evidenceID,
 			"requirement_id": requirementID,
-			"issuer": issuer,
-			"procedure": procedure,
-			"result": "PASS",
-			"artifact_refs": artifacts,
-			"applicable": true,
+			"issuer":         issuer,
+			"procedure":      procedure,
+			"result":         "PASS",
+			"artifact_refs":  artifacts,
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 }
