@@ -64,11 +64,18 @@ func buildCodexProfile(executable, model string) (codexProfileOutput, error) {
 	if err != nil {
 		return output, err
 	}
+	opened, statErr := file.Stat()
+	if statErr != nil || !os.SameFile(info, opened) {
+		_ = file.Close()
+		return output, fmt.Errorf("Codex binary changed before hash read")
+	}
 	hash := sha256.New()
 	n, copyErr := io.Copy(hash, io.LimitReader(file, (1<<30)+1))
 	closeErr := file.Close()
-	if copyErr != nil || closeErr != nil || n <= 0 || n > 1<<30 || n != info.Size() {
-		return output, fmt.Errorf("Codex binary hash read failed or exceeds limit")
+	after, afterErr := os.Lstat(resolved)
+	if copyErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(info, after) ||
+		n <= 0 || n > 1<<30 || n != info.Size() || after.Size() != info.Size() {
+		return output, fmt.Errorf("Codex binary changed during hash read or exceeds limit")
 	}
 	binaryDigest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
 
