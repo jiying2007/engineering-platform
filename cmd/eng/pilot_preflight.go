@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
@@ -294,7 +295,11 @@ func validatePilotPreparation(path, repository string) error {
 		return err
 	}
 	if config.Version != 1 || config.Worker != "urn:engineering-platform:worker:codex-pilot" ||
-		len(config.Approvals) != 1 || config.Approvals[0].Repository != "jiying2007/engineering-platform" ||
+		len(config.Approvals) != 1 || config.Approvals[0].RunID == "" ||
+		!canonical.ValidDigest(config.Approvals[0].TaskDigest) ||
+		!canonical.ValidDigest(config.Approvals[0].InputDigest) ||
+		config.Approvals[0].Repository != "jiying2007/engineering-platform" ||
+		core.ValidateContextRefs(config.Approvals[0].Refs) != nil ||
 		filepath.Clean(config.Approvals[0].RepositoryPath) != filepath.Clean(repository) {
 		return fmt.Errorf("pilot preparation config identity mismatch")
 	}
