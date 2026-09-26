@@ -24,15 +24,15 @@ import (
 )
 
 type pilotPreflightOptions struct {
-	Repository        string
-	Base              string
-	ProfileFile       string
-	PolicyFile        string
-	PreparationFile   string
-	WorkerProfile     string
-	WorkerCodexFile   string
-	PublisherFile     string
-	WIFReceiptFile    string
+	Repository      string
+	Base            string
+	ProfileFile     string
+	PolicyFile      string
+	PreparationFile string
+	WorkerProfile   string
+	WorkerCodexFile string
+	PublisherFile   string
+	WIFReceiptFile  string
 }
 
 type pilotPreflightResult struct {
@@ -235,15 +235,15 @@ func readPilotAccessPolicy(path string) (access.Document, error) {
 
 func validatePilotPolicy(doc access.Document, workerProfile, profileDigest string) error {
 	required := map[string]bool{
-		"urn:engineering-platform:operator:pilot-owner": false,
-		"urn:engineering-platform:worker:codex-pilot": false,
+		"urn:engineering-platform:operator:pilot-owner":     false,
+		"urn:engineering-platform:worker:codex-pilot":       false,
 		"urn:engineering-platform:operator:pilot-publisher": false,
-		access.CodexEvidenceImporterSubject: false,
-		access.GitEvidenceImporterSubject: false,
-		access.TrustedCIImporterSubject: false,
-		"urn:engineering-platform:verifier:pilot": false,
-		"urn:engineering-platform:reviewer:pilot": false,
-		"urn:engineering-platform:closure:pilot": false,
+		access.CodexEvidenceImporterSubject:                 false,
+		access.GitEvidenceImporterSubject:                   false,
+		access.TrustedCIImporterSubject:                     false,
+		"urn:engineering-platform:verifier:pilot":           false,
+		"urn:engineering-platform:reviewer:pilot":           false,
+		"urn:engineering-platform:closure:pilot":            false,
 	}
 	var workerOK, publisherOK bool
 	for _, principal := range doc.Principals {
