@@ -248,6 +248,7 @@ func TestEngineeringEvidenceAuthoritiesAreDedicatedAndSeparated(t *testing.T) {
 	}{
 		{WorkerEvidenceImporterSubject, WorkerEvidenceIssuer, WorkerEvidenceProcedure},
 		{GitEvidenceImporterSubject, GitEvidenceIssuer, GitEvidenceProcedure},
+		{CodexEvidenceImporterSubject, CodexEvidenceIssuer, CodexEvidenceProcedure},
 	} {
 		valid := PrincipalSpec{
 			Subject:            tc.subject,
