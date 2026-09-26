@@ -54,6 +54,63 @@ eng api POST /api/v1/runs /tmp/feature-run.json
 Repeat with `examples/pilots/debug-firmware-identity` after the Feature pilot
 has closed. Re-read `main` and freeze a new base for Debug.
 
+
+## Worker configuration after Run creation
+
+Capture the Run response instead of discarding it:
+
+```sh
+RUN_RESPONSE="$(eng api POST /api/v1/runs /tmp/feature-run.json)"
+RUN_INPUT_DIGEST="$(printf '%s\n' "$RUN_RESPONSE" | jq -er .run.run_input_manifest_digest)"
+```
+
+Render the preparation snapshot only after both Task and Run identities are
+frozen:
+
+```sh
+RUN_ID='m1-feature-routing-run'
+REPOSITORY_PATH='/absolute/operator/checkout/engineering-platform'
+PREPARATION_ROOT='/var/lib/engineering-platform/codex-pilot'
+CONTEXT_SOURCE='/var/lib/engineering-platform/context-source'
+GIT_EXECUTABLE='/usr/bin/git'
+
+sed \
+  -e "s#__PREPARATION_ROOT__#$PREPARATION_ROOT#g" \
+  -e "s#__GIT_EXECUTABLE__#$GIT_EXECUTABLE#g" \
+  -e "s#__CONTEXT_SOURCE__#$CONTEXT_SOURCE#g" \
+  -e "s#__RUN_ID__#$RUN_ID#g" \
+  -e "s#__TASK_DIGEST__#$TASK_DIGEST#g" \
+  -e "s#__RUN_INPUT_DIGEST__#$RUN_INPUT_DIGEST#g" \
+  -e "s#__REPOSITORY_PATH__#$REPOSITORY_PATH#g" \
+  examples/pilots/worker-preparation.json.tmpl \
+  > /operator/worker-preparation.json
+```
+
+The current pilot templates intentionally use no external ContextRefs, so the
+operator-owned context-source directory may be empty but must still be a
+canonical, non-group/world-writable absolute directory.
+
+Generate the Worker Codex configuration from the exact output of
+`eng codex-profile`; do not retype the profile object:
+
+```sh
+FEDERATION_RULE_ID='<administrator-provided-rule-id>'
+
+jq --arg rule "$FEDERATION_RULE_ID" \
+  '{
+    version: 1,
+    codex_executable: .codex_executable,
+    federation_rule_id: $rule,
+    profile: .profile
+  }' \
+  codex-profile.json \
+  > /operator/worker-codex.json
+```
+
+At execution time the only WIF secret input is the short-lived
+`OPENAI_IDENTITY_TOKEN_FILE`; it is not written into either configuration
+file.
+
 ## Stop conditions
 
 Stop rather than patching the templates when:
