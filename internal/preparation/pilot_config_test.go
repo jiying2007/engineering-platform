@@ -25,13 +25,13 @@ func TestRetainedPilotPreparationTemplateLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 	replacements := map[string]string{
-		"__PREPARATION_ROOT__":  t.TempDir(),
-		"__GIT_EXECUTABLE__":    git,
-		"__CONTEXT_SOURCE__":    t.TempDir(),
-		"__RUN_ID__":            "m1-feature-routing-run",
-		"__TASK_DIGEST__":       "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		"__RUN_INPUT_DIGEST__":  "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-		"__REPOSITORY_PATH__":   t.TempDir(),
+		"__PREPARATION_ROOT__": t.TempDir(),
+		"__GIT_EXECUTABLE__":   git,
+		"__CONTEXT_SOURCE__":   t.TempDir(),
+		"__RUN_ID__":           "m1-feature-routing-run",
+		"__TASK_DIGEST__":      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"__RUN_INPUT_DIGEST__": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"__REPOSITORY_PATH__":  t.TempDir(),
 	}
 	rendered := string(data)
 	for key, value := range replacements {
