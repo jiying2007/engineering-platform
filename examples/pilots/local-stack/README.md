@@ -9,7 +9,7 @@ It creates only:
 - one TLS server certificate for loopback control-plane;
 - one separate client certificate per existing pilot principal;
 - rendered least-privilege access policy;
-- local publisher config;
+- local publisher config bound to the Worker's retained `preparation-root/artifacts` view;
 - local PostgreSQL 17 helper;
 - shell environment files for control-plane and each client identity.
 
@@ -109,6 +109,10 @@ exec /operator/bin/control-plane
 ```
 
 This preserves Task/Run/Codex state while enabling the independent publisher.
+The publisher reads the exact retained Git bundle from
+`preparation-root/artifacts/<codex-execution-id>.bundle`; there is no second
+copy/staging directory. `eng pilot-preflight` rejects a publisher config whose
+artifact root is not exactly this retained Worker artifact view.
 
 ## WIF boundary
 
