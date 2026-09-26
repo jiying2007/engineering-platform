@@ -47,7 +47,6 @@ PATH = "/usr/local/bin:/usr/bin:/bin"
 LANG = "C.UTF-8"
 LC_ALL = "C.UTF-8"
 TZ = "UTC"
-HOME = "/tmp/engineering-platform-home"
 `
 
 func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
