@@ -1,3 +1,8 @@
+> **Historical review checkpoint.** Findings below describe the exact
+`c4c93c1...` baseline on 2026-09-24. They are not the current unresolved
+backlog. Use [Implementation Status](IMPLEMENTATION_STATUS.md) for live
+readiness and Git/Actions/Evidence for current proof.
+
 # Core review — 2026-09-24
 
 Reviewed baseline: `c4c93c1880e9f7dd648b1e6e736e0612e96a384a`.

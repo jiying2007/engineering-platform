@@ -2,12 +2,13 @@
 
 # AI Native Engineering Platform v1.2 — Final Architecture Baseline
 
-Status: **FINAL ARCHITECTURE BASELINE / M0 INPUT**
+Status: **HISTORICAL FINAL ARCHITECTURE FOUNDATION — not current implementation authority**
 Date: 2026-09-23
 Repository: `jiying2007/engineering-platform`
 
-> This document supersedes v1.0/v1.1 as the canonical target architecture.
-> Round 2–9 reviews remain historical design evidence; unresolved items are now implementation contracts for M0, not open top-level architecture questions.
+> At the 2026-09-23 review checkpoint this document superseded v1.0/v1.1.
+> It is now historical design evidence. Current Core scope, execution plan and
+> readiness are defined by the embedded Core documents and Implementation Status.
 
 ---
 

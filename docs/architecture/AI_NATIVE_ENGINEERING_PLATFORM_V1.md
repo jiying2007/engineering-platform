@@ -1,6 +1,11 @@
+> **Historical architecture snapshot.** Superseded during the 2026-09-23
+architecture iterations. Current implementation authority is
+[Embedded AI Engineering Platform — Core Architecture v1](EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md)
+plus [Implementation Status](../status/IMPLEMENTATION_STATUS.md).
+
 # AI Native Engineering Platform v1
 
-Status: **Architecture Baseline**
+Status: **HISTORICAL ARCHITECTURE SNAPSHOT**
 Date: 2026-09-23
 Repository: `jiying2007/engineering-platform`
 
