@@ -37,6 +37,7 @@ mapping_url="https://api.openai.com/v1/organization/workload_identity/providers/
 
 provider_exact='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"aud-pilot","description":"engineering-platform protected-main Codex retained pilots","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true}'
 provider_drift='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"wrong-audience","description":"drift","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true}'
+provider_key_drift='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"aud-pilot","description":"drift","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true,"jwks_uri":"https://attacker.invalid/jwks.json"}'
 rule_exact='{"id":"idpm_test","name":"engineering-platform-retained-pilot-main","description":"engineering-platform protected-main live qualification and retained engineering","workspace_id":"ws_test","principal_id":"usr_test","claims":{"repository":"jiying2007/engineering-platform","ref":"refs/heads/main"},"audiences":["aud-pilot"],"condition":"assertion.workflow_ref in [\"jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main\", \"jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main\"]","access_token_lifetime_seconds":600,"enabled":true}'
 
 case "$mode:$count" in
@@ -89,6 +90,9 @@ case "$mode:$count" in
     ;;
   drift:1)
     printf '{"object":"list","data":[%s]}\n' "$provider_drift"
+    ;;
+  trust-drift:1)
+    printf '{"object":"list","data":[%s]}\n' "$provider_key_drift"
     ;;
   *)
     echo "unexpected fake curl call mode=$mode count=$count url=$url data=$data" >&2
