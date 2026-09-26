@@ -1,6 +1,6 @@
 # Implementation Status
 
-Reviewed base: `713aa1f25f0e6ea513674d53343b9fc1c9787843` (#49).
+Reviewed base: `316bba9fab02f9cdbbf0278cf89a21a25eea10fd` (#51).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
 Core-bound Codex engineering execution + retained result commit/Git bundle +
 trusted Git/CI/artifact provenance + exact requirement-bound Evidence +
@@ -96,10 +96,17 @@ locators are not accepted.
   fresh-main `36213786919` passed all five gates. This establishes the
   execution/result-bundle chain, not a retained real managed-workspace model
   proof because WIF administrator configuration is still external.
-- #50 independent Git/PR publication adapter: exact-head run `36215302614`
-  passed Go/PostgreSQL/repeated regressions, real-container integration,
-  PostgreSQL 17 authority restore, Codex 0.155 qualification and trusted CI
-  artifact evidence. Fresh-main remains the post-merge verification gate.
+- #50 independent Git/PR publication adapter: final exact-head run `36215624193`
+  and fresh-main run `36215857974` passed all five gates. Main became
+  `9c3e15fffcf75b20a56576e623f29b8976381879`.
+- #51 exact PR-head trusted CI: main
+  `316bba9fab02f9cdbbf0278cf89a21a25eea10fd`; exact-head run `36219337024`
+  and fresh-main run `36219687449` passed all five gates. Pull-request CI now
+  checks out and retains artifacts for the exact PR head/result commit. The
+  trusted importer accepts that mode only for a same-repository PR on the exact
+  frozen base and only when `.github/workflows/ci.yml` has the identical Git
+  blob at base and result. Fork, merge-SHA, base, workflow and live-head drift
+  fail closed.
 
 ## Publication authority
 
@@ -134,13 +141,17 @@ The remaining M1 sequence is deliberately short:
 3. run one real **Debug** pilot through the same retained chain;
 4. only then reassess M1 from those two complete retained proofs.
 
-Do not substitute repository fake app-server evidence for step 1. Do not expand
-Runtime, Evidence or Recovery infrastructure unless one of these retained pilots
-exposes a concrete missing authority or failure mode.
+Do not substitute repository fake app-server evidence for step 1. The first real
+pilot should follow `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`; use
+`eng codex-profile` to derive the exact Worker profile/tool grant from the
+installed qualified native binary. Do not expand Runtime, Evidence or Recovery
+infrastructure unless one of these retained pilots exposes a concrete missing
+authority or failure mode.
 
 **M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`
 - `docs/implementation/GITHUB_PR_PUBLICATION_V1.md`
 - `docs/implementation/CORE_BOUND_CODEX_EXECUTION_V1.md`
 - `docs/implementation/ENGINEERING_EVIDENCE_BRIDGE_V1.md`
