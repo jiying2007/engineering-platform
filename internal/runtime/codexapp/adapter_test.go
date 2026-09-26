@@ -16,7 +16,7 @@ import (
 // provider key, model or shell execution; this proves protocol wiring, not Codex.
 func TestMain(m *testing.M) {
 	if len(os.Args) == 2 && os.Args[1] == "--version" {
-		_, _ = os.Stdout.WriteString("codex-cli "+QualifiedCodexVersion+"\n")
+		_, _ = os.Stdout.WriteString("codex-cli " + QualifiedCodexVersion + "\n")
 		os.Exit(0)
 	}
 	if len(os.Args) > 1 && os.Args[1] == "app-server" {
