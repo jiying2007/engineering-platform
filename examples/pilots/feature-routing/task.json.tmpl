@@ -1,0 +1,65 @@
+{
+  "contract": {
+    "task_contract_id": "m1-feature-routing-task",
+    "work_item_id": "m1-feature-routing-work",
+    "task_type": "FEATURE",
+    "allowed_actions": [
+      "worker.codex-execute",
+      "github.publish-pr"
+    ],
+    "expected_outputs": [
+      "subsystem-aware FEATURE/BRINGUP/COMPATIBILITY routing",
+      "integration-appropriate Linux/BSP and MCU/RTOS skills in the existing embedded catalog",
+      "focused routing regression tests"
+    ]
+  },
+  "material": {
+    "repository": "jiying2007/engineering-platform",
+    "base_commit": "__BASE_COMMIT__",
+    "target_id": "engineering-platform-routing",
+    "acceptance_criteria": [
+      "FEATURE, BRINGUP and COMPATIBILITY routing adds the matching existing Linux/BSP or MCU/RTOS capability and integration skill while preserving the generic architecture and driver/component route and existing DEBUG behavior.",
+      "The retained result is produced by one authorized Core-bound Codex engineering execution from the exact frozen Task base.",
+      "The retained Git changed-tree evidence binds the exact frozen base and Codex result commit used for Delivery."
+    ]
+  },
+  "subsystem": "embedded routing Linux BSP storage MCU RTOS motor",
+  "verification_plan": {
+    "verification_plan_id": "m1-feature-routing-vp",
+    "criteria": [
+      {
+        "criterion_id": "feature-behavior",
+        "statement": "FEATURE, BRINGUP and COMPATIBILITY routing adds the matching existing Linux/BSP or MCU/RTOS capability and integration skill while preserving the generic architecture and driver/component route and existing DEBUG behavior.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "feature-ci",
+            "procedure": "github.actions.trusted-ci.v1",
+            "issuer": "github-actions-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "feature-codex-execution",
+        "statement": "The retained result is produced by one authorized Core-bound Codex engineering execution from the exact frozen Task base.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "feature-codex",
+            "procedure": "codex.core.execution.v1",
+            "issuer": "codex-execution-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "feature-git-lineage",
+        "statement": "The retained Git changed-tree evidence binds the exact frozen base and Codex result commit used for Delivery.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "feature-git",
+            "procedure": "git.changed-tree.v1",
+            "issuer": "git-change-importer"
+          }
+        ]
+      }
+    ]
+  }
+}

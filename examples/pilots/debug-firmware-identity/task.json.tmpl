@@ -1,0 +1,66 @@
+{
+  "contract": {
+    "task_contract_id": "m1-debug-firmware-identity-task",
+    "work_item_id": "m1-debug-firmware-identity-work",
+    "task_type": "DEBUG",
+    "allowed_actions": [
+      "worker.codex-execute",
+      "github.publish-pr"
+    ],
+    "expected_outputs": [
+      "canonical firmware identity validation for DEVICE_TEST material readiness",
+      "regression tests for empty, arbitrary, truncated and canonical firmware identities",
+      "no change to unrelated DEBUG/FEATURE material readiness semantics"
+    ]
+  },
+  "material": {
+    "repository": "jiying2007/engineering-platform",
+    "base_commit": "__BASE_COMMIT__",
+    "target_id": "material-readiness-device-test",
+    "acceptance_criteria": [
+      "DEVICE_TEST material readiness blocks empty, arbitrary and truncated firmware identities, accepts a canonical sha256 identity when other material is valid, and does not allow degradation approval to bypass invalid exact firmware identity.",
+      "The retained fix is produced by one authorized Core-bound Codex engineering execution from the exact frozen Task base and the Debug Task retains has_reproduction=true.",
+      "The retained Git changed-tree evidence binds the exact frozen base and Codex result commit used for Delivery."
+    ],
+    "has_reproduction": true
+  },
+  "subsystem": "material readiness verification",
+  "verification_plan": {
+    "verification_plan_id": "m1-debug-firmware-identity-vp",
+    "criteria": [
+      {
+        "criterion_id": "debug-regression",
+        "statement": "DEVICE_TEST material readiness blocks empty, arbitrary and truncated firmware identities, accepts a canonical sha256 identity when other material is valid, and does not allow degradation approval to bypass invalid exact firmware identity.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "debug-ci",
+            "procedure": "github.actions.trusted-ci.v1",
+            "issuer": "github-actions-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "debug-codex-execution",
+        "statement": "The retained fix is produced by one authorized Core-bound Codex engineering execution from the exact frozen Task base and the Debug Task retains has_reproduction=true.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "debug-codex",
+            "procedure": "codex.core.execution.v1",
+            "issuer": "codex-execution-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "debug-git-lineage",
+        "statement": "The retained Git changed-tree evidence binds the exact frozen base and Codex result commit used for Delivery.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "debug-git",
+            "procedure": "git.changed-tree.v1",
+            "issuer": "git-change-importer"
+          }
+        ]
+      }
+    ]
+  }
+}
