@@ -109,39 +109,28 @@ Automatic Planner comes later. Explicit Skill routing is enough for M1.
 
 ## Current implementation status
 
-The repository has now moved from architecture-only research into implementation.
+The platform is past bootstrap and is now **retained-pilot-ready, externally WIF-gated**.
 
-Initial Go skeleton:
+The authoritative live status is
+[Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). In summary, the
+repository now contains the authenticated Core, PostgreSQL authority, Worker
+admission/preparation, isolated workspace execution, exact Codex qualification,
+Core-bound WIF engineering, credential-separated Git/PR publication, exact
+PR-head CI evidence, requirement-bound Evidence/Verification, independent
+Review, recovery drills, and retained Feature/Debug pilot workflows.
 
-~~~text
-cmd/
-  control-plane/
-  eng/
-  worker/
+Current boundary:
 
-internal/
-  canonical/
-  core/
-  embedded/
-  material/
-  run/
-  action/
-  debug/
-~~~
+- source code and internal execution mechanics are assembled;
+- fresh-main CI has passed all five authority/qualification gates through #68;
+- managed-workspace Codex WIF still requires the external administrator
+  enablement/provider/rule step;
+- Feature #54 and Debug #55 must then run as real retained pilots;
+- M1 and production readiness remain unclaimed until those retained proofs
+  complete.
 
-Implemented first invariants:
-- deterministic content digest helper;
-- core WorkItem / TaskContract / RunInput / Artifact / Evidence records;
-- embedded capability/Skill registry;
-- fail-closed Material Readiness;
-- RunAttempt / execution_epoch fencing;
-- Human Takeover revokes old Runtime epoch;
-- External Operation Ledger with UNKNOWN → RECONCILING before retry;
-- Debug Hypothesis confirmation requires Evidence;
-- initial Control Plane / CLI / Worker entrypoints;
-- Go CI: format, test, vet, build.
-
-This is an implementation starting point, not a production-ready system.
+Do not infer maturity from files, schemas, mocks or green CI alone. Real retained
+engineering Evidence is the maturity boundary.
 
 ## M0
 
