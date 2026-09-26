@@ -46,10 +46,10 @@ type Plan struct {
 }
 
 type PublicationReceipt struct {
-	Version           int    `json:"version"`
-	Repository        string `json:"repository"`
-	BaseRef           string `json:"base_ref"`
-	BaseCommit        string `json:"base_commit"`
+	Version            int    `json:"version"`
+	Repository         string `json:"repository"`
+	BaseRef            string `json:"base_ref"`
+	BaseCommit         string `json:"base_commit"`
 	Branch             string `json:"branch"`
 	ResultCommit       string `json:"result_commit"`
 	PullRequestNumber  int    `json:"pull_request_number"`
