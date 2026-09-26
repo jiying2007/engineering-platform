@@ -238,3 +238,66 @@ The repository test `TestRetainedPilotPostModelTemplatesReachClosure` exercises
 the post-model JSON/state-machine path with synthetic in-memory evidence. It is a
 schema/lifecycle dry-run only; it is not retained model, GitHub, Evidence, Review
 or M1 proof.
+
+
+## Local readiness preflight
+
+After the pilot Work/Task/Run inputs and operator configuration have been
+rendered, use one command to clear local/deployment mistakes before consuming a
+real model turn:
+
+```sh
+eng pilot-preflight \
+  --repository /absolute/operator/checkout/engineering-platform \
+  --base "$BASE_COMMIT" \
+  --codex-profile codex-profile.json \
+  --access-policy /operator/access-policy.json \
+  --preparation /operator/worker-preparation.json \
+  --worker-profile worker/codex-pilot
+```
+
+Before the workspace administrator has completed WIF and before the publisher
+credential is provisioned, a successful internal preflight intentionally reports:
+
+- `internal: READY`;
+- `model_execution: BLOCKED_EXTERNAL_WIF`;
+- `publication: BLOCKED_EXTERNAL_PUBLISHER`;
+- explicit `external_blockers`.
+
+That is not an error and is not model Evidence. It means the remaining blockers
+are external rather than hidden local configuration drift.
+
+When the administrator has provided the federation rule, add the rendered Worker
+Codex config:
+
+```sh
+  --worker-codex /operator/worker-codex.json
+```
+
+After one successful real `codex-wif-live.yml` qualification, download/extract
+its JSON receipt and add:
+
+```sh
+  --wif-receipt /operator/codex-wif-live-receipt.json
+```
+
+After the publisher credential/artifact view are provisioned, also add:
+
+```sh
+  --publisher /operator/github-publisher.json
+```
+
+The final expected state before consuming the retained engineering turn is:
+
+```text
+internal        READY
+model_execution READY
+publication     READY
+```
+
+The preflight rechecks current repository `main` against the frozen base,
+rehashes/re-probes the installed Codex binary/profile, validates the rendered
+least-privilege access policy and preparation identities, validates the real WIF
+receipt against the exact model/binary/federation rule, and runs the publisher's
+real configuration/path/token validator. It performs no model turn and no GitHub
+write.
