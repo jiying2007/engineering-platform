@@ -82,7 +82,7 @@ func NewPinnedWIFEngineeringProvider(executable, digest string) (*Provider, erro
 }
 
 func EngineeringConfigDigest() string { return canonical.BytesDigest([]byte(engineeringConfig)) }
-func (p *Provider) Name() string { return "codex-app-server" }
+func (p *Provider) Name() string      { return "codex-app-server" }
 
 // Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
 // paths, separate identities/read-only mounts and resource limits remain required.
