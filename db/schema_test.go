@@ -50,3 +50,26 @@ func TestRecoveryReconciliationMigrationIsAdditiveAndOrdered(t *testing.T) {
 		t.Fatal("recovery proof migration is not ordered after review migration")
 	}
 }
+
+
+func TestCodexExecutionMigrationIsAdditiveAndOrdered(t *testing.T) {
+	for _, required := range []string{
+		"CREATE TABLE worker_codex_executions",
+		"run_id text NOT NULL UNIQUE REFERENCES runs(run_id)",
+		"state text NOT NULL CHECK(state IN ('AUTHORIZED','FINISHED','UNKNOWN'))",
+		"INSERT INTO core_schema_migrations(version) VALUES(8)",
+	} {
+		if !strings.Contains(codexExecutionMigration, required) {
+			t.Fatalf("Codex execution migration missing %q", required)
+		}
+	}
+	lower := strings.ToLower(codexExecutionMigration)
+	if strings.Contains(lower, "insert into worker_codex_executions") {
+		t.Fatal("migration must not synthesize Codex execution rows")
+	}
+	core := CoreMigration()
+	if strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(7)") >
+		strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(8)") {
+		t.Fatal("Codex execution migration is not ordered after recovery proof migration")
+	}
+}
