@@ -20,6 +20,10 @@ Render only these deployment-time values:
 - `__WORKER_PROFILE__`: exact WorkerProfile granted to the Core-bound Codex Worker.
 - `__TASK_DIGEST__`: exact digest returned by Task creation.
 
+The requirement Context digest is **not** a free runtime value. Each pilot Run
+template pins the raw-byte SHA-256 of its sibling `requirement.md`. Recompute
+it before execution and stop on mismatch.
+
 Do not edit acceptance criteria, requirement IDs, procedures, issuers, action
 allow-list, repository identity or pilot IDs after Task creation.
 
@@ -35,6 +39,11 @@ BASE_COMMIT="$(git rev-parse main)"
 PROFILE_DIGEST="$(jq -er .profile_digest codex-profile.json)"
 HUMAN_OWNER='urn:engineering-platform:operator:pilot-owner'
 WORKER_PROFILE='worker/codex-pilot'
+CONTEXT_DIGEST="sha256:$(sha256sum "$PILOT/requirement.md" | awk '{print $1}')"
+EXPECTED_CONTEXT_DIGEST="$(
+  jq -er '.run_input.context_refs[0].digest' "$PILOT/run.json.tmpl"
+)"
+test "$CONTEXT_DIGEST" = "$EXPECTED_CONTEXT_DIGEST"
 
 sed   -e "s/__HUMAN_OWNER__/$HUMAN_OWNER/g"   "$PILOT/work.json.tmpl" > /tmp/feature-work.json
 
@@ -74,6 +83,10 @@ PREPARATION_ROOT='/var/lib/engineering-platform/codex-pilot'
 CONTEXT_SOURCE='/var/lib/engineering-platform/context-source'
 GIT_EXECUTABLE='/usr/bin/git'
 
+install -d -m 0700 "$CONTEXT_SOURCE"
+context_hex="${CONTEXT_DIGEST#sha256:}"
+install -m 0400 "$PILOT/requirement.md" "$CONTEXT_SOURCE/$context_hex.bin"
+
 sed \
   -e "s#__PREPARATION_ROOT__#$PREPARATION_ROOT#g" \
   -e "s#__GIT_EXECUTABLE__#$GIT_EXECUTABLE#g" \
@@ -82,13 +95,18 @@ sed \
   -e "s#__TASK_DIGEST__#$TASK_DIGEST#g" \
   -e "s#__RUN_INPUT_DIGEST__#$RUN_INPUT_DIGEST#g" \
   -e "s#__REPOSITORY_PATH__#$REPOSITORY_PATH#g" \
+  -e "s#__CONTEXT_DIGEST__#$CONTEXT_DIGEST#g" \
   examples/pilots/worker-preparation.json.tmpl \
   > /operator/worker-preparation.json
 ```
 
-The current pilot templates intentionally use no external ContextRefs, so the
-operator-owned context-source directory may be empty but must still be a
-canonical, non-group/world-writable absolute directory.
+Each pilot has exactly one approved DOCUMENT ContextRef named
+`m1-pilot-requirement`. Its bytes are the frozen GitHub requirement/reproduction
+snapshot committed beside the Run template. The Worker reads those bytes from
+the operator-owned content-addressed ContextSource; Codex receives only the
+materialized approved context bundle path and does not need GitHub/network
+access. The ContextSource directory must be canonical and non-group/world
+writable; the `<digest>.bin` requirement file must be read-only.
 
 Generate the Worker Codex configuration from the exact output of
 `eng codex-profile`; do not retype the profile object:
@@ -126,8 +144,11 @@ Stop rather than patching the templates when:
 - Verification or independent Review is not PASS.
 
 The repository test `TestRetainedPilotTemplatesDryRunToRunning` renders both
-templates with deterministic placeholder values and proves the existing Core API
-accepts Work -> Task -> Run before any external WIF or GitHub mutation is needed.
+templates with deterministic placeholder values, verifies the committed
+`requirement.md` raw-byte digest against the frozen ContextRef, and proves the
+existing Core API accepts Work -> Task -> Run before any external WIF or GitHub
+mutation is needed. `TestRetainedPilotPreparationTemplateLoads` additionally
+opens the approved read-only content-addressed ContextSource bytes.
 
 
 ## After the real Codex execution FINISHES
