@@ -110,7 +110,8 @@ printf '%s' "$provider" |
       .issuer==$issuer and
       .audience==$audience and
       .enabled==true and
-      .check_jti==true
+      .check_jti==true and
+      .max_assertion_lifetime_seconds==600
     ' >/dev/null || {
       echo "existing/created provider does not match required trust policy" >&2
       exit 1
