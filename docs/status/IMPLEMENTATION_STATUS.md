@@ -1,13 +1,14 @@
 # Implementation Status
 
-Reviewed base: `9c385ac415e063c9c16e1b8b8e882a9c79bdcb9c` (#66).
+Reviewed base: `973bf27daad5b546fe4fdd4d6c62d2d6cce17443` (#68).
 Stage: **Retained M1 execution mechanics are assembled end-to-end:
 authenticated Core + frozen approved requirement context + real managed-workspace
 WIF Codex engineering + retained result commit/Git bundle + credential-separated
 Git/PR publication + exact PR-head CI + requirement-bound Evidence + Verification
 + independent human Review + conditional Closure. The external managed-workspace
-WIF administrator configuration and two real retained Feature/Debug executions
-still gate M1. No real retained pilot has run yet.**
+WIF workspace enablement/provider-rule provisioning and two real retained
+Feature/Debug executions still gate M1. The Admin API provisioning helper is
+implemented and tested, but no real retained pilot has run yet.**
 
 ## Canonical scope
 
@@ -15,6 +16,14 @@ Embedded Core architecture, capability model, M0/M1 plan and ADR-001/002/003
 remain canonical. This repository is independent of digital-worker. No new
 extension domain, Runtime lane, Evidence family or Recovery mechanism is being
 added for the publication slice.
+
+## Status authority
+
+This file is the single live implementation-status document. Superseded
+architecture-profile revisions, M0 adoption-plan revisions and transient
+`CI_VALIDATION_*` checkpoint markers are retained in Git history instead of the
+working tree. GitHub Actions runs/artifacts remain the authority for CI evidence;
+this document summarizes them and does not replace retained receipts.
 
 ## Current assembled path
 
@@ -70,7 +79,7 @@ to create ClosureReceipt.
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
-| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff helper; resumable GitHub-hosted execution artifacts | Managed-workspace WIF admin rule must be configured; real runs have not yet occurred |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff + Admin API provisioning helpers; resumable GitHub-hosted execution artifacts | Managed-workspace WIF beta/provider/rule must be enabled/configured by an administrator; real runs have not yet occurred |
 
 ## Retained evidence
 
@@ -155,6 +164,13 @@ to create ClosureReceipt.
   passed all five gates. Review result remains explicit human PASS/FAIL input,
   the reviewer GitHub actor must differ from the engineering dispatcher, and
   only PASS permits the separate closure identity to close Work.
+- #67 aligned the canonical implementation status with the complete retained
+  execution workflow set.
+- #68 managed-workspace WIF Admin API provisioning helper: PR exact-head
+  `36252504615` and fresh-main `36252808263` passed all five gates. Current
+  main is `973bf27daad5b546fe4fdd4d6c62d2d6cce17443`. The helper creates/reuses
+  exact GitHub OIDC provider/rule policy and can hand off the two non-secret
+  repository variables without exposing the Admin API key to Runtime/Worker.
 
 ## Publication authority
 
