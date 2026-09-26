@@ -65,7 +65,12 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 	work.ActiveRunID = value.ID
 	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, version, work))
 	relayWorkerFixture(t, s)
-	assignment := *claimWorkerFixture(t, s, "codex-worker")
+	claimed, err := s.ClaimInput(ctx, "codex-worker", "worker/codex")
+	workerOK(t, err)
+	if claimed == nil {
+		t.Fatal("expected Codex assignment")
+	}
+	assignment := *claimed
 	inputReport, err := workerqueue.NewReport(assignment)
 	workerOK(t, err)
 	manifest := contextbundle.Manifest{SchemaVersion: 1, RunInputDigest: inputDigest, Entries: []contextbundle.Entry{}}
