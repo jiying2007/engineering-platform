@@ -89,8 +89,7 @@ jq -n   --arg name "$PROVIDER_NAME"   --arg issuer "$ISSUER"   --arg audience "$
     audience:$audience,
     description:"engineering-platform protected-main Codex retained pilots",
     max_assertion_lifetime_seconds:600,
-    check_jti:true,
-    enabled:true
+    check_jti:true
   }' > "$PROVIDER_REQUEST"
 chmod 600 "$PROVIDER_REQUEST"
 
