@@ -16,21 +16,21 @@ import (
 )
 
 const (
-	CodexIssuer             = access.CodexEvidenceIssuer
-	CodexProcedure          = access.CodexEvidenceProcedure
-	CodexImporter           = access.CodexEvidenceImporterSubject
+	CodexIssuer              = access.CodexEvidenceIssuer
+	CodexProcedure           = access.CodexEvidenceProcedure
+	CodexImporter            = access.CodexEvidenceImporterSubject
 	CodexReceiptArtifactType = "application/vnd.engineering-platform.codex-execution+json"
 	CodexBundleArtifactType  = "application/vnd.git.bundle"
 )
 
 type CodexImportRequest struct {
-	EvidenceID       string
-	RequirementID    string
+	EvidenceID        string
+	RequirementID     string
 	ReceiptArtifactID string
 	BundleArtifactID  string
-	Delivery         core.DeliveryReceipt
-	Execution        codexexec.Status
-	BundlePath       string
+	Delivery          core.DeliveryReceipt
+	Execution         codexexec.Status
+	BundlePath        string
 }
 
 func CodexReceiptDigest(receipt codexexec.Receipt) (string, error) {
