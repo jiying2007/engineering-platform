@@ -106,7 +106,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID+":turn"))[7:], codexReceipt); err != nil {
+	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":turn"))[7:], codexReceipt); err != nil {
 		return receipt, err
 	}
 	if cause := context.Cause(runCtx); cause != nil {
@@ -124,7 +124,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		Result     codexexec.Result `json:"result"`
 		BundlePath string           `json:"bundle_path"`
 	}{Result: result, BundlePath: finalized.BundlePath}
-	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID+":result"))[7:], local); err != nil {
+	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":result"))[7:], local); err != nil {
 		return receipt, err
 	}
 	stopRun(nil)
