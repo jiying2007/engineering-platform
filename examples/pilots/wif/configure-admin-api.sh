@@ -110,7 +110,13 @@ printf '%s' "$provider" |
       .audience==$audience and
       .enabled==true and
       .check_jti==true and
-      .max_assertion_lifetime_seconds==600
+      .max_assertion_lifetime_seconds==600 and
+      ((.custom_url // "") == "") and
+      ((.jwks_uri // "") == "") and
+      ((.jwks_local // false) == false) and
+      ((.jwks // null) == null) and
+      ((.custom_ca_certificate // "") == "") and
+      ((.attribute_conditions // "") == "")
     ' >/dev/null || {
       echo "existing/created provider does not match required trust policy" >&2
       exit 1
