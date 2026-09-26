@@ -1,12 +1,13 @@
 # Implementation Status
 
-Reviewed base: `316bba9fab02f9cdbbf0278cf89a21a25eea10fd` (#51).
-Stage: **Authenticated Core + actual preparation + bounded offline execution +
-Core-bound Codex engineering execution + retained result commit/Git bundle +
-trusted Git/CI/artifact provenance + exact requirement-bound Evidence +
-independent Review + recovery/restore authority + independently authorized Git/PR
-publication; external managed-workspace WIF administrator setup and retained
-Feature/Debug pilots still gate M1.**
+Reviewed base: `9c385ac415e063c9c16e1b8b8e882a9c79bdcb9c` (#66).
+Stage: **Retained M1 execution mechanics are assembled end-to-end:
+authenticated Core + frozen approved requirement context + real managed-workspace
+WIF Codex engineering + retained result commit/Git bundle + credential-separated
+Git/PR publication + exact PR-head CI + requirement-bound Evidence + Verification
++ independent human Review + conditional Closure. The external managed-workspace
+WIF administrator configuration and two real retained Feature/Debug executions
+still gate M1. No real retained pilot has run yet.**
 
 ## Canonical scope
 
@@ -27,11 +28,11 @@ Requirement / Work / frozen Task
   -> Action Gateway publication authority
   -> independent GitHub publisher
   -> target-policy check + non-force branch + PR
-  -> trusted CI
-  -> requirement-bound Evidence
+  -> exact PR-head trusted CI
+  -> Delivery + Codex/Git/CI Evidence
   -> Verification
-  -> independent Review
-  -> Closure
+  -> independent human Review
+  -> conditional Closure
 ```
 
 #49 moved Codex beyond compatibility qualification: the existing Core
@@ -46,6 +47,16 @@ is derived from the FINISHED Codex receipt, frozen Task repository/base and
 operator-owned target policy; caller-supplied repository/ref/commit/bundle
 locators are not accepted.
 
+#64-#66 assemble the real retained-pilot operator path without creating a second
+authority model. The protected-main engineer workflow performs one real WIF
+qualification and one Core-bound engineering turn, snapshots the non-replayable
+FINISHED model state, and only then exposes a separately scoped GitHub
+publication token. The verification workflow resumes the exact frozen Core and
+imports Codex/Git/CI Evidence before Core computes Verification. The final
+workflow requires an explicit PASS/FAIL decision from a GitHub actor different
+from the engineering dispatcher; only PASS allows the separate closure identity
+to create ClosureReceipt.
+
 ## Capabilities and remaining limits
 
 | Area | Implemented | Remaining boundary |
@@ -58,7 +69,8 @@ locators are not accepted.
 | Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained | ChatGPT workspace administrator must configure the real WIF provider/rule before a retained real model claim |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
-| Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; trusted-CI, Worker, Git and Codex evidence importers; authenticated independent Review; Closure requires exact PASS Verification + PASS Review | One retained real Feature pilot and one retained real Debug pilot are still required |
+| Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff helper; resumable GitHub-hosted execution artifacts | Managed-workspace WIF admin rule must be configured; real runs have not yet occurred |
 
 ## Retained evidence
 
@@ -107,6 +119,42 @@ locators are not accepted.
   frozen base and only when `.github/workflows/ci.yml` has the identical Git
   blob at base and result. Fork, merge-SHA, base, workflow and live-head drift
   fail closed.
+- #52 retained-pilot readiness: exact-head `36226872470`, fresh-main
+  `36227173710` passed all five gates; exact Codex profile generation and
+  Feature/Debug runbook are retained.
+- #56 pre-WIF pilot pack: fresh-main `36235946636` passed; Work/Task/Run,
+  least-privilege access policy and Worker preparation inputs dry-run to RUNNING.
+- #58 post-model pack: exact-head `36237460187`, fresh-main `36237727348`
+  passed; publication/Delivery/Verification/Closure request shapes dry-run
+  through Core while PASS Review remains intentionally untamplated.
+- #59 local/deployment preflight: exact-head `36240815798`, fresh-main
+  `36241078607` passed; `eng pilot-preflight` separates internal readiness
+  from external WIF/publisher blockers.
+- #60 local pilot stack plus #61 WIF handoff: local mTLS identities/PKI,
+  PostgreSQL helper, admin-to-live qualification helper and receipt/config
+  rendering are tested; fresh-main through `36243410207` passed.
+- #62 publisher artifact-view binding: main
+  `34f3be138f8fe709099cb6caa3150305adb97671`, fresh-main `36245881737`
+  passed. Publisher must consume the Worker's exact retained
+  `preparation-root/artifacts` view.
+- #63 frozen real requirement context: main
+  `8741a6e818a767f818348ab9082c13315f8faf23`, fresh-main `36246559361`
+  passed. Feature #54 and Debug #55 requirement/reproduction bytes are approved
+  content-addressed ContextRefs available to no-network Codex.
+- #64 protected-main retained engineering: main
+  `4c2254bd2ff3b1c72fd7819743457bcced8ff109`, exact-head `36247408099`,
+  fresh-main `36248358841` passed. Model/WIF phase is credential-separated
+  from the later Action Gateway publisher.
+- #65 retained verification: main
+  `a710bcf0662e4281ec887314b0f28950db8465b7`, exact-head `36248775774`
+  passed all five gates; post-merge `36249081304` passed. It restores frozen
+  Core, verifies exact PR-head CI artifacts/live facts and creates
+  requirement-bound Codex/Git/CI Evidence plus Verification without Review.
+- #66 independent Review/conditional Closure: main
+  `9c385ac415e063c9c16e1b8b8e882a9c79bdcb9c`; exact-head `36249306005`
+  passed all five gates. Review result remains explicit human PASS/FAIL input,
+  the reviewer GitHub actor must differ from the engineering dispatcher, and
+  only PASS permits the separate closure identity to close Work.
 
 ## Publication authority
 
@@ -131,15 +179,22 @@ push or PR mutation.
 Source merge does not provision WIF, GitHub credentials, services or production
 Codex binaries. Operators still own those deployment boundaries.
 
-The remaining M1 sequence is deliberately short:
+The remaining M1 sequence is now execution-only:
 
-1. ChatGPT workspace administrator enables/configures the managed-workspace WIF
-   provider/rule and retain one real authenticated Core-bound Codex execution;
-2. run one real **Feature** pilot end-to-end:
-   Requirement -> Codex engineering -> result commit/bundle -> Git/PR -> trusted
-   CI -> Evidence -> Verification -> independent Review -> Closure;
-3. run one real **Debug** pilot through the same retained chain;
-4. only then reassess M1 from those two complete retained proofs.
+1. ChatGPT workspace administrator enables/configures the managed-workspace Codex
+   WIF provider/rule for the exact protected-main workflow refs.
+2. Dispatch `retained-pilot-engineer.yml` for Feature #54. This performs the
+   real WIF qualification + one retained engineering turn and publishes the exact
+   result only after the model process exits.
+3. Approve the generated PR workflow run when GitHub marks the
+   `GITHUB_TOKEN`-created PR approval-required; require exact PR-head CI PASS.
+4. Dispatch `retained-pilot-verify.yml` with the engineering run ID; require
+   exact PASS Verification backed by Codex/Git/CI Evidence.
+5. A different GitHub account from the engineering dispatcher performs the
+   explicit PASS/FAIL decision through `retained-pilot-review.yml`. PASS alone
+   permits Closure; FAIL remains retained and non-CLOSED.
+6. Repeat steps 2-5 for Debug #55 using the then-current main.
+7. Only after both ClosureReceipts exist should M1 be reassessed.
 
 Do not substitute repository fake app-server evidence for step 1. The first real
 pilot should follow `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`; use
@@ -147,6 +202,11 @@ pilot should follow `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`; use
 installed qualified native binary. Do not expand Runtime, Evidence or Recovery
 infrastructure unless one of these retained pilots exposes a concrete missing
 authority or failure mode.
+
+At the reviewed checkpoint there are **no real `codex-wif-live`,
+`retained-pilot-engineer`, `retained-pilot-verify` or
+`retained-pilot-review` runs**. Repository fake app-server/CI evidence is not a
+substitute.
 
 **M1 and production readiness remain unclaimed.**
 
