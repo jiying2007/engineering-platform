@@ -32,7 +32,7 @@ PROFILE_DIGEST="$(jq -er .profile_digest /operator/codex-profile.json)"
 Then bootstrap the local stack:
 
 ```sh
-examples/pilots/local-stack/bootstrap.sh \
+bash examples/pilots/local-stack/bootstrap.sh \
   /var/lib/engineering-platform/pilot \
   "$PROFILE_DIGEST" \
   worker/codex-pilot
@@ -41,7 +41,7 @@ examples/pilots/local-stack/bootstrap.sh \
 Start PostgreSQL:
 
 ```sh
-examples/pilots/local-stack/postgres.sh /var/lib/engineering-platform/pilot
+bash examples/pilots/local-stack/postgres.sh /var/lib/engineering-platform/pilot
 ```
 
 Build the binaries:
@@ -64,7 +64,7 @@ exec /operator/bin/control-plane
 Health check:
 
 ```sh
-examples/pilots/local-stack/status.sh /var/lib/engineering-platform/pilot
+bash examples/pilots/local-stack/status.sh /var/lib/engineering-platform/pilot
 ```
 
 Use the owner identity for Work/Task/Run:
