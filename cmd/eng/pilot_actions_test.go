@@ -183,7 +183,6 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 	}
 }
 
-
 func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-pilot-review.yml"))
