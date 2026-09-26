@@ -1,97 +1,147 @@
 # Implementation Status
 
-Reviewed base: `f5af0ee88bf283213424839b6a28db961a4478db` (#48).
+Reviewed base: `713aa1f25f0e6ea513674d53343b9fc1c9787843` (#49).
 Stage: **Authenticated Core + actual preparation + bounded offline execution +
-real Codex 0.155 qualification + retained Git/CI/artifact provenance + exact requirement-bound trusted CI import + mandatory independent Review + database-generated recovery proof/restore drill + Worker/Git evidence bridge + Core-bound Codex execution/evidence lane; external WIF administrator setup still required for retained real model proof**.
+Core-bound Codex engineering execution + retained result commit/Git bundle +
+trusted Git/CI/artifact provenance + exact requirement-bound Evidence +
+independent Review + recovery/restore authority + independently authorized Git/PR
+publication; external managed-workspace WIF administrator setup and retained
+Feature/Debug pilots still gate M1.**
 
 ## Canonical scope
 
-Embedded Core architecture, capability model, M0/M1 plan and ADR-001/002/003 remain
-canonical. Independent of digital-worker; no service/domain catalogue expansion.
+Embedded Core architecture, capability model, M0/M1 plan and ADR-001/002/003
+remain canonical. This repository is independent of digital-worker. No new
+extension domain, Runtime lane, Evidence family or Recovery mechanism is being
+added for the publication slice.
 
 ## Current assembled path
 
-Work/Task/frozen Run -> atomic outbox/inbox relay -> mTLS preparation Worker ->
-approved Context bytes and independent Git snapshot -> exact Core execution
-authorization -> inspected bounded offline container -> retained execution receipt.
+```
+Requirement / Work / frozen Task
+  -> frozen Run + approved Context
+  -> mTLS Worker admission/preparation
+  -> independent exact-base workspace
+  -> Core-bound Codex WIF engineering execution
+  -> retained result commit + verified Git bundle
+  -> Action Gateway publication authority
+  -> independent GitHub publisher
+  -> target-policy check + non-force branch + PR
+  -> trusted CI
+  -> requirement-bound Evidence
+  -> Verification
+  -> independent Review
+  -> Closure
+```
 
-This change adds the real Codex compatibility gate beside that path: exact native
-0.155.0 binary -> raw-byte pin -> generated stable/experimental schema checks ->
-fresh stdio app-server -> real initialize + ephemeral thread/start. It does NOT
-yet route a Worker Run into a model turn.
+#49 moved Codex beyond compatibility qualification: the existing Core
+reservation now authorizes one bounded engineering turn and retains
+`WORKER_ATTESTED_CODEX_EXECUTION` plus exact changed-tree and Git-bundle facts.
+Repository fake app-server tests prove protocol/filesystem behavior only. They
+remain explicitly non-authoritative for a live managed-workspace model claim.
 
-All receipt kinds retain separate meanings: INPUT_VALIDATED,
-WORKER_ATTESTED_PREPARATION and WORKER_ATTESTED_OFFLINE_EXECUTION. A process exit
-or Codex protocol qualification does not complete an engineering Run or create
-Evidence/Verification/Delivery/Closure automatically.
+#50 adds the Git/PR publication adapter under the existing Action Gateway. The
+Worker and model process still receive no GitHub write credential. Publication
+is derived from the FINISHED Codex receipt, frozen Task repository/base and
+operator-owned target policy; caller-supplied repository/ref/commit/bundle
+locators are not accepted.
 
 ## Capabilities and remaining limits
 
 | Area | Implemented | Remaining boundary |
 | --- | --- | --- |
-| Core persistence | Immutable Task/RunInput identities, Run/Session epochs, PostgreSQL business/audit/outbox, durable Worker receipts and persisted ReviewReport authority | Broader memory-store deep-copy/conformance |
-| Worker admission/preparation | Real relay, mTLS identities/profiles and leases; approved source/context preparation | Approval snapshots require restart; no online enrollment/tenant ACL |
-| Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots and byte checks | Trusted source metadata/host parents; quota/retention |
-| Offline execution | Exact one-shot authorization; live Run/recovery/lease checks; pinned image+guard; real constrained container; bounded output and retained result | Offline/read-only only; trusted Worker/daemon/kernel; no VM/rootless qualification |
-| Codex protocol | Bounded JSONL client and typed lifecycle; current stable wire values; deny-only approvals | Interactive Action-Gateway approval lane not yet assembled |
-| Codex qualification | Exact `codex-cli 0.155.0`; native binary hash; stable+experimental generated schema digests; real fresh-process initialize/thread-start; retained CI artifact | Production/runtime pin lifecycle remains operator-owned |
-| Codex WIF live lane | Fail-closed WIF env/token-file boundary; authenticated prewarm exchange; upstream assertion must be deleted before thread/start; GitHub OIDC manual workflow; exact read-only one-turn observer and deterministic receipt | Workspace admin must enable/configure Codex WIF and a real manual run must succeed before any live-model proof claim |
-| Action/recovery | Durable action ledger; UNKNOWN reconciliation states; dedicated reconciler/completer identities; database-generated epoch proof; production RecoveryCompletionGate; transaction revalidation; mandatory PG17 dump/restore authority drill | Real privileged provider/effect observer/reconciler remains provider-specific |
-| Engineering delivery | Frozen requirement-bound Evidence/Verification/Delivery; trusted-CI, Worker, Git and Core-bound Codex evidence importers; authenticated ReviewReport; Closure requires exact PASS Verification + PASS Review | Retained real Feature/Debug pilots and independently authorized Git/PR publication |
+| Core persistence | Immutable Task/RunInput identities, Run/Session epochs, PostgreSQL business/audit/outbox, durable Worker/Codex receipts and persisted Review authority | Broader memory-store deep-copy/conformance is non-M1 infrastructure work |
+| Worker admission/preparation | Real relay, mTLS identities/profiles and leases; approved source/context preparation | Approval snapshots remain operator-managed |
+| Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
+| Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
+| Codex qualification | Exact `codex-cli 0.155.0`, native hash, generated schema digests, real app-server protocol qualification | Production binary installation/pin remains operator-owned |
+| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained | ChatGPT workspace administrator must configure the real WIF provider/rule before a retained real model claim |
+| Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
+| Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
+| Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; trusted-CI, Worker, Git and Codex evidence importers; authenticated independent Review; Closure requires exact PASS Verification + PASS Review | One retained real Feature pilot and one retained real Debug pilot are still required |
 
 ## Retained evidence
 
 - #33 admission: main `71a4877e2eb4973196cd612852fba19277919197`, PR
-  `36031414023`, fresh main `36031860646` passed.
+  `36031414023`, fresh-main `36031860646` passed.
 - #34 preparation: main `2ff3de8d0520a84573a59d72cd460bf0492534af`, PR
-  `36075559599`, fresh main `36075797271` passed.
+  `36075559599`, fresh-main `36075797271` passed.
 - #35 offline execution: main `df5d69d2d2f822d90571c44526b313eb9a872090`;
-  PR `36084019664` and fresh main `36084270695` passed both normal Go/PG
-  regression and mandatory real-container jobs.
-- #36 real Codex qualification: main `810d01c7e1c89efe22aa7c3c99bcbd2398b35380`; PR run `36088616108` and fresh-main run `36093348940` passed `go`, real container and real Codex qualification jobs. PR qualification artifact `10844861935` retained exact native/schema digests.
-- #37 trusted CI provenance: main `c817876c8c10fddebe21fc38d394fee944f66c47`; PR run `36095060443` and fresh-main run `36095388934` passed `go`, real container, real Codex and `trusted-ci-artifact-evidence`. Main retained binary artifact `10847815571`, Codex qualification `10847795311`, trusted evidence `10847531493`; main receipt digest `sha256:9db9637b40c0ce09c71348a9d17d7681fba1c8cdcb48e95b26b2b101cb6c6c01`.
-- #38 WIF-ready lane merged as main `0d786e73f952412dda5853dc8be675451db6d549`; its first fresh-main run `36099892960` exposed a Docker cold-start timeout while Go and real Codex qualification passed.
-- #40 bounded Docker cold-start hotfix merged as main `d3bb6d591ee4b8b70e137d62d85fa3384109325e`; exact-head run `36101425449` and fresh-main run `36101773459` passed Go/PostgreSQL, 3x real-container, real Codex and trusted CI evidence.
-- #42 WIF assertion-removal hardening merged into main `f8e9e60a517fed752d573dd7b27ed38a49175e33`; fresh-main run `36102881734` passed all four standard gates. Upstream assertion exchange is completed before thread/start and the assertion file is removed before any model-reachable turn.
-- #43 exact Evidence requirement binding merged as main `e895fc6dddb509a51897b5fe32b21216312ebb9d`; exact-head run `36108017341` and fresh-main run `36108399745` passed Go/PostgreSQL, real container, real Codex and trusted CI evidence. Evidence now requires exact frozen requirement ID and exact-delivery artifact binding.
-- #44 trusted CI import merged as main `34ff7d82316d1d095040ce6f62522fe5397dee86`; exact-head run `36112719171` and fresh-main run `36113188028` passed all four standard gates. The dedicated importer revalidates live GitHub run/jobs/artifacts and downloaded ZIP/binary/Codex bytes before registering one exact requirement-bound PASS Evidence item.
-- #46 independent Review merged as main `747114948bfa35cf07cafcebdf1e32b7e0341047`; exact-head run `36129118788` and fresh-main run `36129501979` passed Go/PostgreSQL, real container, real Codex and trusted CI evidence. Closure now requires an exact PASS ReviewReport from a certificate-separated reviewer.
-- #47 recovery/restore authority merged as main `e66cb4bee39ab9b876da6e2e420ebb3085b02ba0`; exact-head run `36135297468` and fresh-main run `36135713586` passed all five gates: Go/PostgreSQL/race, real container, PostgreSQL 17 authority dump/restore, real Codex qualification and trusted CI evidence. Recovery completion now requires database-generated proof plus separate reconciler/completer identities.
-- #48 engineering evidence bridge merged as main `f5af0ee88bf283213424839b6a28db961a4478db`; exact-head run `36200540315` and fresh-main run `36200839712` passed all five gates. Worker offline results and exact Git changed trees now have dedicated requirement-bound Evidence procedures and isolated importer principals.
-- This WIF assertion-removal follow-up is implementation hardening only. A real authenticated-model claim still requires a successful manual `Codex WIF live qualification` receipt after managed-workspace WIF enablement/configuration.
+  PR `36084019664`, fresh-main `36084270695` passed.
+- #36 real Codex qualification: main `810d01c7e1c89efe22aa7c3c99bcbd2398b35380`;
+  PR `36088616108`, fresh-main `36093348940` passed.
+- #37 trusted CI provenance: main `c817876c8c10fddebe21fc38d394fee944f66c47`;
+  PR `36095060443`, fresh-main `36095388934` passed.
+- #40 bounded container cold-start hardening: main
+  `d3bb6d591ee4b8b70e137d62d85fa3384109325e`; exact-head `36101425449`,
+  fresh-main `36101773459` passed.
+- #42 WIF assertion-removal hardening: main
+  `f8e9e60a517fed752d573dd7b27ed38a49175e33`; fresh-main `36102881734`
+  passed.
+- #43 exact Evidence requirement binding: main
+  `e895fc6dddb509a51897b5fe32b21216312ebb9d`; exact-head `36108017341`,
+  fresh-main `36108399745` passed.
+- #44 trusted CI import: main `34ff7d82316d1d095040ce6f62522fe5397dee86`;
+  exact-head `36112719171`, fresh-main `36113188028` passed.
+- #46 independent Review: main `747114948bfa35cf07cafcebdf1e32b7e0341047`;
+  exact-head `36129118788`, fresh-main `36129501979` passed.
+- #47 recovery/restore authority: main
+  `e66cb4bee39ab9b876da6e2e420ebb3085b02ba0`; exact-head `36135297468`,
+  fresh-main `36135713586` passed all five gates.
+- #48 engineering evidence bridge: main
+  `f5af0ee88bf283213424839b6a28db961a4478db`; exact-head `36200540315`,
+  fresh-main `36200839712` passed all five gates.
+- #49 Core-bound Codex engineering execution: main
+  `713aa1f25f0e6ea513674d53343b9fc1c9787843`; exact-head `36213531198`,
+  fresh-main `36213786919` passed all five gates. This establishes the
+  execution/result-bundle chain, not a retained real managed-workspace model
+  proof because WIF administrator configuration is still external.
+- #50 independent Git/PR publication adapter: exact-head run `36215302614`
+  passed Go/PostgreSQL/repeated regressions, real-container integration,
+  PostgreSQL 17 authority restore, Codex 0.155 qualification and trusted CI
+  artifact evidence. Fresh-main remains the post-merge verification gate.
 
-The real Codex job installs exactly `@openai/codex@0.155.0`, locates its native
-platform executable, verifies the reported version, hashes the executable,
-generates both stable and experimental app-server JSON schemas, validates the
-stable protocol fields used by this repository, and runs a fresh no-credential
-stdio app-server through initialize and ephemeral thread/start. It uploads the
-machine-readable qualification receipt and npm integrity value.
+## Publication authority
 
-The adapter no longer depends on stale helper-only values: thread/start uses
-`sandbox=read-only`, `approvalPolicy=never`, `ephemeral=true`; provider launch
-uses `app-server --stdio`. Managed daemon/proxy and per-thread config overrides
-are intentionally excluded from this path.
+The publication contract is `docs/implementation/GITHUB_PR_PUBLICATION_V1.md`.
+A publication request must be authorized by all of:
+
+1. frozen Task `allowed_actions` contains `github.publish-pr`;
+2. the requesting authenticated principal has the exact
+   `github.publish-pr / CONTROLLED_MUTATION / github.publish-pr` grant;
+3. operator publisher policy permits the exact Task repository/base ref; and
+4. action `parameters_digest` equals the retained FINISHED Codex
+   `result_digest`.
+
+The publisher re-hashes the retained bundle, verifies the frozen target base,
+validates the bundle/result commit and ancestry in an isolated Git repository,
+uses a deterministic non-force branch, and retains a structured PR operation
+receipt. UNKNOWN reconciliation observes GitHub state only and never replays a
+push or PR mutation.
 
 ## Deployment and next acceptance gates
 
-No source merge deploys a service, changes production data, provisions credentials
-or installs a production Codex binary. Operators must install and review the
-qualified native binary and bind the exact raw-byte digest before launch.
+Source merge does not provision WIF, GitHub credentials, services or production
+Codex binaries. Operators still own those deployment boundaries.
 
-Next implementation sequence:
+The remaining M1 sequence is deliberately short:
 
-1. administrator enables/configures Codex WIF and repository non-secret variables,
-   then retain one successful manual WIF read-only model-turn receipt;
-2. consume that qualified WIF/binary boundary inside the existing Worker/Core
-   execution reservation instead of workflow-only qualification;
-3. route every command/file/network approval through Action Gateway authority;
-4. Core-bound Codex execution/evidence is assembled; external WIF admin setup and one retained real model turn remain before model evidence can be claimed;
-5. add an independently authorized Git/PR publication adapter for retained result bundles/commits;
-6. retain one real Feature pilot and one real Debug pilot through Delivery + Evidence + Verification + Review + Closure before assessing M1.
+1. ChatGPT workspace administrator enables/configures the managed-workspace WIF
+   provider/rule and retain one real authenticated Core-bound Codex execution;
+2. run one real **Feature** pilot end-to-end:
+   Requirement -> Codex engineering -> result commit/bundle -> Git/PR -> trusted
+   CI -> Evidence -> Verification -> independent Review -> Closure;
+3. run one real **Debug** pilot through the same retained chain;
+4. only then reassess M1 from those two complete retained proofs.
 
-No new extension domains. **M1 and production readiness remain unclaimed.**
+Do not substitute repository fake app-server evidence for step 1. Do not expand
+Runtime, Evidence or Recovery infrastructure unless one of these retained pilots
+exposes a concrete missing authority or failure mode.
+
+**M1 and production readiness remain unclaimed.**
 
 Contracts:
+- `docs/implementation/GITHUB_PR_PUBLICATION_V1.md`
 - `docs/implementation/CORE_BOUND_CODEX_EXECUTION_V1.md`
 - `docs/implementation/ENGINEERING_EVIDENCE_BRIDGE_V1.md`
 - `docs/implementation/RECOVERY_RESTORE_V1.md`
