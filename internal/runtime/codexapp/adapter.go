@@ -106,6 +106,14 @@ func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
 }
 
 func (a *Adapter) StartThread(ctx context.Context, model string) (string, error) {
+	return a.startThread(ctx, model, "read-only")
+}
+
+func (a *Adapter) StartEngineeringThread(ctx context.Context, model string) (string, error) {
+	return a.startThread(ctx, model, "workspace-write")
+}
+
+func (a *Adapter) startThread(ctx context.Context, model, sandboxMode string) (string, error) {
 	if err := a.enter(ctx); err != nil {
 		return "", err
 	}
@@ -113,7 +121,8 @@ func (a *Adapter) StartThread(ctx context.Context, model string) (string, error)
 	a.mu.Lock()
 	ready, thread := a.initialized, a.thread
 	a.mu.Unlock()
-	if !ready || thread != "" || strings.TrimSpace(model) == "" || len(model) > 128 {
+	if !ready || thread != "" || strings.TrimSpace(model) == "" || len(model) > 128 ||
+		(sandboxMode != "read-only" && sandboxMode != "workspace-write") {
 		return "", ErrLifecycle
 	}
 	work, err := canonicalPath(a.worktree, true)
@@ -125,7 +134,10 @@ func (a *Adapter) StartThread(ctx context.Context, model string) (string, error)
 			ID string `json:"id"`
 		} `json:"thread"`
 	}
-	if err = a.client.Call(ctx, "thread/start", map[string]any{"cwd": work, "model": model, "approvalPolicy": "never", "sandbox": "read-only", "ephemeral": true}, &result); err != nil {
+	if err = a.client.Call(ctx, "thread/start", map[string]any{
+		"cwd": work, "model": model, "approvalPolicy": "never",
+		"sandbox": sandboxMode, "ephemeral": true,
+	}, &result); err != nil {
 		return "", err
 	}
 	if !remoteID(result.Thread.ID) {
@@ -137,6 +149,7 @@ func (a *Adapter) StartThread(ctx context.Context, model string) (string, error)
 	a.mu.Unlock()
 	return result.Thread.ID, nil
 }
+
 func textInput(text string) ([]map[string]string, error) {
 	if strings.TrimSpace(text) == "" || !utf8.ValidString(text) || len(text) > 64<<10 {
 		return nil, fmt.Errorf("bounded nonempty UTF-8 input required")

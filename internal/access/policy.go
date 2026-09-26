@@ -48,6 +48,10 @@ const (
 	GitEvidenceImporterSubject = "urn:engineering-platform:git-evidence-importer"
 	GitEvidenceIssuer          = "git-change-importer"
 	GitEvidenceProcedure       = "git.changed-tree.v1"
+
+	CodexEvidenceImporterSubject = "urn:engineering-platform:codex-evidence-importer"
+	CodexEvidenceIssuer          = "codex-execution-importer"
+	CodexEvidenceProcedure       = "codex.core.execution.v1"
 )
 
 var capabilities = map[string]bool{
@@ -166,6 +170,9 @@ func New(doc Document) (*Policy, error) {
 			return nil, err
 		}
 		if err := validateReservedEvidenceAuthority(id, GitEvidenceImporterSubject, GitEvidenceIssuer, GitEvidenceProcedure); err != nil {
+			return nil, err
+		}
+		if err := validateReservedEvidenceAuthority(id, CodexEvidenceImporterSubject, CodexEvidenceIssuer, CodexEvidenceProcedure); err != nil {
 			return nil, err
 		}
 		if err := configureWorkerProfiles(spec, &id); err != nil {

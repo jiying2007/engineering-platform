@@ -95,7 +95,7 @@ func New(c Configuration) (*Preparer, error) {
 		return nil, err
 	}
 	defer root.Close()
-	for _, dir := range []string{"workspaces", "bundles"} {
+	for _, dir := range []string{"workspaces", "bundles", "artifacts"} {
 		if err := root.Mkdir(dir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
 			_ = p.source.Close()
 			return nil, err

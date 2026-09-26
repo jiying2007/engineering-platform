@@ -28,17 +28,20 @@ func serveWorker() error {
 	admission := flag.Bool("admission-only", false, "validate frozen input identities only")
 	prepare := flag.Bool("prepare-only", false, "prepare approved bytes without executing Runtime")
 	execute := flag.Bool("execute-offline", false, "execute a pinned offline profile for one previously prepared Run")
-	runID := flag.String("run", "", "exact prepared Run for offline execution")
+	executeCodexMode := flag.Bool("execute-codex", false, "execute one Core-bound WIF Codex engineering turn")
+	runID := flag.String("run", "", "exact prepared Run for execution")
 	once := flag.Bool("once", false, "perform one cycle then exit")
 	flag.Parse()
 	modes := 0
-	for _, v := range []bool{*admission, *prepare, *execute} {
+	for _, v := range []bool{*admission, *prepare, *execute, *executeCodexMode} {
 		if v {
 			modes++
 		}
 	}
-	if modes != 1 || *profile == "" || flag.NArg() != 0 || (*execute && (!*once || *runID == "")) || (!*execute && *runID != "") {
-		return fmt.Errorf("worker requires exactly one mode and profile; execute-offline also requires --run <id> --once")
+	executionMode := *execute || *executeCodexMode
+	if modes != 1 || *profile == "" || flag.NArg() != 0 ||
+		(executionMode && (!*once || *runID == "")) || (!executionMode && *runID != "") {
+		return fmt.Errorf("worker requires exactly one mode and profile; execution modes also require --run <id> --once")
 	}
 	if os.Getenv("DATABASE_URL") != "" {
 		return fmt.Errorf("Worker must not carry DATABASE_URL; use the mTLS Control API")
@@ -48,11 +51,20 @@ func serveWorker() error {
 		return fmt.Errorf("admission-only cannot ignore preparation configuration")
 	}
 	if !*execute && os.Getenv("WORKER_OFFLINE_CONFIG") != "" {
-		return fmt.Errorf("non-execution mode cannot ignore offline configuration")
+		return fmt.Errorf("non-offline mode cannot ignore WORKER_OFFLINE_CONFIG")
+	}
+	if !*executeCodexMode && os.Getenv("WORKER_CODEX_CONFIG") != "" {
+		return fmt.Errorf("non-Codex mode cannot ignore WORKER_CODEX_CONFIG")
+	}
+	if *execute && os.Getenv("WORKER_CODEX_CONFIG") != "" {
+		return fmt.Errorf("offline execution cannot carry Codex configuration")
+	}
+	if *executeCodexMode && os.Getenv("WORKER_OFFLINE_CONFIG") != "" {
+		return fmt.Errorf("Codex execution cannot carry offline configuration")
 	}
 	var p *preparation.Preparer
 	var err error
-	if *prepare || *execute {
+	if *prepare || executionMode {
 		if config == "" {
 			return fmt.Errorf("WORKER_PREPARATION_CONFIG required")
 		}
@@ -74,6 +86,9 @@ func serveWorker() error {
 	defer stop()
 	if *execute {
 		return executeOffline(ctx, client, p, *profile, *runID)
+	}
+	if *executeCodexMode {
+		return executeCodex(ctx, client, p, *profile, *runID)
 	}
 	step := func(ctx context.Context) error {
 		if p != nil {

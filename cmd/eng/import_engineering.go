@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/engineeringevidence"
@@ -90,6 +91,88 @@ func importOfflineEvidence(args []string) error {
 	evidence, err := engineeringevidence.VerifyOfflineImport(engineeringevidence.OfflineImportRequest{
 		EvidenceID: *evidenceID, RequirementID: *requirementID, EvidenceArtifactID: *artifactID,
 		Delivery: delivery, Preparation: prep, Execution: status,
+	})
+	if err != nil {
+		return err
+	}
+	return registerEngineeringEvidence(ctx, control, delivery.ID, evidence)
+}
+
+func codexReceiptDigest(args []string) error {
+	fs := flag.NewFlagSet("codex-receipt-digest", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	runID := fs.String("run", "", "exact Run ID")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || strings.TrimSpace(*runID) == "" {
+		return fmt.Errorf("usage: eng codex-receipt-digest --run ID")
+	}
+	control, err := controlclient.FromEnvironment(os.Getenv)
+	if err != nil {
+		return err
+	}
+	defer control.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	var status codexexec.Status
+	if err := control.Call(ctx, "GET", "/api/v1/runs/"+*runID+"/codex", nil, &status); err != nil {
+		return err
+	}
+	if status.State != codexexec.Finished || status.Receipt == nil {
+		return fmt.Errorf("Run has no finished Core-bound Codex receipt")
+	}
+	digest, err := engineeringevidence.CodexReceiptDigest(*status.Receipt)
+	if err != nil {
+		return err
+	}
+	printJSON(map[string]any{
+		"run_id":            *runID,
+		"artifact_digest":   digest,
+		"media_type":        engineeringevidence.CodexReceiptArtifactType,
+		"bundle_digest":     status.Receipt.Result.Change.BundleDigest,
+		"bundle_size":       status.Receipt.Result.Change.BundleSize,
+		"bundle_media_type": engineeringevidence.CodexBundleArtifactType,
+	})
+	return nil
+}
+
+func importCodexEvidence(args []string) error {
+	fs := flag.NewFlagSet("import-codex-evidence", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	deliveryID := fs.String("delivery", "", "exact delivery receipt ID")
+	requirementID := fs.String("requirement", "", "exact frozen verification requirement ID")
+	evidenceID := fs.String("evidence", "", "new Evidence ID")
+	receiptArtifactID := fs.String("receipt-artifact", "", "Delivery artifact ID bound to the Codex receipt digest")
+	bundleArtifactID := fs.String("bundle-artifact", "", "Delivery artifact ID bound to the result Git bundle")
+	bundlePath := fs.String("bundle", "", "local retained result Git bundle")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
+		return fmt.Errorf("usage: eng import-codex-evidence --delivery ID --requirement ID --evidence ID --receipt-artifact ID --bundle-artifact ID --bundle FILE")
+	}
+	for _, value := range []string{*deliveryID, *requirementID, *evidenceID, *receiptArtifactID, *bundleArtifactID, *bundlePath} {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("all import-codex-evidence flags are required")
+		}
+	}
+	control, err := controlclient.FromEnvironment(os.Getenv)
+	if err != nil {
+		return err
+	}
+	defer control.Close()
+	if control.Subject() != engineeringevidence.CodexImporter {
+		return fmt.Errorf("dedicated Codex evidence importer mTLS identity required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	var delivery core.DeliveryReceipt
+	if err := control.Call(ctx, "GET", "/api/v1/deliveries/"+*deliveryID, nil, &delivery); err != nil {
+		return err
+	}
+	var status codexexec.Status
+	if err := control.Call(ctx, "GET", "/api/v1/runs/"+delivery.RunID+"/codex", nil, &status); err != nil {
+		return err
+	}
+	evidence, err := engineeringevidence.VerifyCodexImport(engineeringevidence.CodexImportRequest{
+		EvidenceID: *evidenceID, RequirementID: *requirementID,
+		ReceiptArtifactID: *receiptArtifactID, BundleArtifactID: *bundleArtifactID,
+		Delivery: delivery, Execution: status, BundlePath: *bundlePath,
 	})
 	if err != nil {
 		return err
@@ -203,9 +286,13 @@ func registerEngineeringEvidence(ctx context.Context, control *controlclient.Cli
 	if stored.ID != evidence.ID || stored.DeliveryReceiptID != evidence.DeliveryReceiptID ||
 		stored.RequirementID != evidence.RequirementID || stored.SubjectDigest != evidence.SubjectDigest ||
 		stored.Issuer != evidence.Issuer || stored.Procedure != evidence.Procedure || stored.Result != evidence.Result ||
-		stored.Applicable != evidence.Applicable || len(stored.ArtifactRefs) != 1 ||
-		len(evidence.ArtifactRefs) != 1 || stored.ArtifactRefs[0] != evidence.ArtifactRefs[0] {
+		stored.Applicable != evidence.Applicable || len(stored.ArtifactRefs) != len(evidence.ArtifactRefs) {
 		return fmt.Errorf("control plane returned a different evidence identity")
+	}
+	for i := range evidence.ArtifactRefs {
+		if stored.ArtifactRefs[i] != evidence.ArtifactRefs[i] {
+			return fmt.Errorf("control plane returned different evidence artifacts")
+		}
 	}
 	printJSON(stored)
 	return nil

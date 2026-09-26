@@ -45,6 +45,8 @@ type QualificationReceipt struct {
 	ExperimentalSurfaceChecked   bool   `json:"experimental_surface_checked"`
 	CredentialSafeConfigDigest   string `json:"credential_safe_config_digest"`
 	CredentialSafeProfileChecked bool   `json:"credential_safe_profile_checked"`
+	EngineeringConfigDigest      string `json:"engineering_config_digest"`
+	EngineeringProfileChecked    bool   `json:"engineering_profile_checked"`
 }
 
 // Qualify exercises a real Codex binary without making a model turn. It verifies
@@ -114,6 +116,9 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	}
 
 	if err := qualifyCredentialSafeProfile(ctx, executable, filepath.Join(root, "credential-safe-home")); err != nil {
+		return receipt, err
+	}
+	if err := qualifyEngineeringProfile(ctx, executable, filepath.Join(root, "engineering-home")); err != nil {
 		return receipt, err
 	}
 
@@ -190,6 +195,8 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 		ExperimentalSurfaceChecked:   true,
 		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialSafeProfileChecked: true,
+		EngineeringConfigDigest:      EngineeringConfigDigest(),
+		EngineeringProfileChecked:    true,
 	}
 	return receipt, nil
 }
@@ -226,6 +233,40 @@ func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) 
 	info, err := os.Stat(configPath)
 	if err != nil || info.Mode().Perm() != 0o600 {
 		return fmt.Errorf("credential-safe Codex config is not owner-private")
+	}
+	return nil
+}
+
+func qualifyEngineeringProfile(ctx context.Context, executable, home string) error {
+	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+	}
+	configPath := filepath.Join(home, ".codex", "config.toml")
+	if err := os.WriteFile(configPath, []byte(engineeringConfig), 0o600); err != nil {
+		return err
+	}
+	output, err := codexCommand(ctx, executable, home, "features", "list")
+	if err != nil {
+		return fmt.Errorf("engineering feature probe: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	required := map[string]string{"shell_tool": "true", "view_image": "false"}
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		if want, ok := required[fields[0]]; ok && fields[1] == "stable" && fields[2] == want {
+			delete(required, fields[0])
+		}
+	}
+	if len(required) != 0 {
+		return fmt.Errorf("engineering Codex features were not proven: %v", required)
+	}
+	info, err := os.Stat(configPath)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		return fmt.Errorf("engineering Codex config is not owner-private")
 	}
 	return nil
 }

@@ -23,6 +23,9 @@ var reviewReportsMigration string
 //go:embed migrations/0007_recovery_reconciliation.sql
 var recoveryReconciliationMigration string
 
+//go:embed migrations/0008_codex_execution.sql
+var codexExecutionMigration string
+
 func CoreMigration() string {
-	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration
+	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration + "\n" + codexExecutionMigration
 }

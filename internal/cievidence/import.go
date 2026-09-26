@@ -321,7 +321,8 @@ func verifyCodexArchive(path string) error {
 		!canonical.ValidDigest(q.ExperimentalSchemaDigest) || q.Transport != "stdio" || !q.FreshProcess ||
 		q.ManagedDaemon || q.PerThreadConfigOverride || !q.InitializePassed || !q.ThreadStartPassed ||
 		q.ThreadStartModel != "gpt-5.6-sol" || !q.StableSchemaContractChecked || !q.ExperimentalSurfaceChecked ||
-		!canonical.ValidDigest(q.CredentialSafeConfigDigest) || !q.CredentialSafeProfileChecked {
+		!canonical.ValidDigest(q.CredentialSafeConfigDigest) || !q.CredentialSafeProfileChecked ||
+		q.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() || !q.EngineeringProfileChecked {
 		return fmt.Errorf("Codex qualification receipt does not satisfy pinned contract")
 	}
 	return nil

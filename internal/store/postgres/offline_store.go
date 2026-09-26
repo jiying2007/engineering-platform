@@ -88,6 +88,18 @@ func (s *Store) StartOffline(ctx context.Context, subject string, req offline.St
 	if busy {
 		return empty, corestore.ErrConflict
 	}
+	var codexReady bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM core_schema_migrations WHERE version=8)`).Scan(&codexReady); err != nil {
+		return empty, err
+	}
+	if codexReady {
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM worker_codex_executions WHERE worker_subject=$1 AND state='AUTHORIZED')`, subject).Scan(&busy); err != nil {
+			return empty, err
+		}
+		if busy {
+			return empty, corestore.ErrConflict
+		}
+	}
 	r, err := scanInbox(tx.QueryRow(ctx, `SELECT `+inboxColumns+` FROM worker_inbox WHERE run_id=$1 FOR UPDATE`, req.RunID))
 	if err != nil {
 		return empty, mapReadError(err)

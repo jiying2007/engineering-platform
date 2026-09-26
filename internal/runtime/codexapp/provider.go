@@ -18,12 +18,36 @@ import (
 )
 
 type Provider struct {
-	executable     string
-	digest         string
-	credentialSafe bool
+	executable      string
+	digest          string
+	credentialSafe  bool
+	engineeringMode bool
 }
 
 const credentialSafeConfig = "[features]\nshell_tool = false\nview_image = false\n"
+const engineeringConfig = `approval_policy = "never"
+sandbox_mode = "workspace-write"
+web_search = "disabled"
+allow_login_shell = false
+
+[sandbox_workspace_write]
+network_access = false
+
+[features]
+shell_tool = true
+view_image = false
+standalone_web_search = false
+web_search_request = false
+
+[shell_environment_policy]
+inherit = "none"
+
+[shell_environment_policy.set]
+PATH = "/usr/local/bin:/usr/bin:/bin"
+LANG = "C.UTF-8"
+LC_ALL = "C.UTF-8"
+TZ = "UTC"
+`
 
 func NewProvider(executable string) *Provider { return &Provider{executable: executable} }
 
@@ -47,7 +71,18 @@ func NewPinnedWIFProvider(executable, digest string) (*Provider, error) {
 	p.credentialSafe = true
 	return p, nil
 }
-func (p *Provider) Name() string { return "codex-app-server" }
+
+func NewPinnedWIFEngineeringProvider(executable, digest string) (*Provider, error) {
+	p, err := NewPinnedWIFProvider(executable, digest)
+	if err != nil {
+		return nil, err
+	}
+	p.engineeringMode = true
+	return p, nil
+}
+
+func EngineeringConfigDigest() string { return canonical.BytesDigest([]byte(engineeringConfig)) }
+func (p *Provider) Name() string      { return "codex-app-server" }
 
 // Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
 // paths, separate identities/read-only mounts and resource limits remain required.
@@ -173,7 +208,11 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	}
 	if p.credentialSafe {
 		configPath := filepath.Join(home, ".codex", "config.toml")
-		if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
+		config := credentialSafeConfig
+		if p.engineeringMode {
+			config = engineeringConfig
+		}
+		if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 			return nil, fmt.Errorf("write credential-safe Codex config: %w", err)
 		}
 	}
