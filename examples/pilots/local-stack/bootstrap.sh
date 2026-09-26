@@ -31,8 +31,8 @@ PILOT_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 POLICY_TEMPLATE="$PILOT_DIR/access-policy.json.tmpl"
 GIT_EXECUTABLE="$(readlink -f "$(command -v git)")"
 
-mkdir -p "$ROOT"/{pki,clients,operator,secrets,preparation-root,context-source,publisher-artifacts}
-chmod 700 "$ROOT" "$ROOT"/{pki,clients,operator,secrets,preparation-root,context-source,publisher-artifacts}
+mkdir -p "$ROOT"/{pki,clients,operator,secrets,preparation-root/artifacts,context-source}
+chmod 700 "$ROOT" "$ROOT"/{pki,clients,operator,secrets,preparation-root,preparation-root/artifacts,context-source}
 
 sed   -e "s#__PROFILE_DIGEST__#$PROFILE_DIGEST#g"   -e "s#__WORKER_PROFILE__#$WORKER_PROFILE#g"   "$POLICY_TEMPLATE" > "$ROOT/operator/access-policy.json"
 chmod 600 "$ROOT/operator/access-policy.json"
@@ -40,7 +40,7 @@ chmod 600 "$ROOT/operator/access-policy.json"
 cat > "$ROOT/operator/github-publisher.json" <<EOF
 {
   "version": 1,
-  "artifact_root": "$ROOT/publisher-artifacts",
+  "artifact_root": "$ROOT/preparation-root/artifacts",
   "git_executable": "$GIT_EXECUTABLE",
   "token_file": "$ROOT/secrets/github-token",
   "targets": [

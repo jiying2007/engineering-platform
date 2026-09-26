@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"os"
 	"os/exec"
@@ -123,6 +124,28 @@ func TestLocalPilotStackBootstrapGeneratesUsableMTLSAndPolicy(t *testing.T) {
 		if !strings.Contains(string(controlEnv), want) {
 			t.Fatalf("control-plane env missing %q: %s", want, controlEnv)
 		}
+	}
+	publisherData, err := os.ReadFile(filepath.Join(root, "operator", "github-publisher.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var publisher struct {
+		ArtifactRoot string `json:"artifact_root"`
+		TokenFile    string `json:"token_file"`
+	}
+	if err := json.Unmarshal(publisherData, &publisher); err != nil {
+		t.Fatal(err)
+	}
+	wantArtifactRoot := filepath.Join(root, "preparation-root", "artifacts")
+	if publisher.ArtifactRoot != wantArtifactRoot {
+		t.Fatalf("publisher artifact root=%q want=%q", publisher.ArtifactRoot, wantArtifactRoot)
+	}
+	if publisher.TokenFile != filepath.Join(root, "secrets", "github-token") {
+		t.Fatalf("unexpected publisher token path %q", publisher.TokenFile)
+	}
+	requireMode(t, wantArtifactRoot, 0o700)
+	if _, err := os.Stat(filepath.Join(root, "publisher-artifacts")); !os.IsNotExist(err) {
+		t.Fatal("bootstrap must not create a second publisher artifact staging directory")
 	}
 	if _, err := os.Stat(filepath.Join(root, "secrets", "github-token")); !os.IsNotExist(err) {
 		t.Fatal("bootstrap must not manufacture a publisher credential")

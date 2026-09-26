@@ -120,7 +120,8 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 	if err := validatePilotPolicy(doc, options.WorkerProfile, profile.ProfileDigest); err != nil {
 		return empty, err
 	}
-	if err := validatePilotPreparation(options.PreparationFile, options.Repository); err != nil {
+	preparationRoot, err := validatePilotPreparation(options.PreparationFile, options.Repository)
+	if err != nil {
 		return empty, err
 	}
 
@@ -165,7 +166,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 
 	if options.PublisherFile == "" {
 		result.Blockers = append(result.Blockers, "publisher_configuration_or_credential")
-	} else if err := validatePilotPublisher(options.PublisherFile); err != nil {
+	} else if err := validatePilotPublisher(options.PublisherFile, filepath.Join(preparationRoot, "artifacts")); err != nil {
 		return empty, err
 	} else {
 		result.Publication = "READY"
@@ -284,14 +285,14 @@ func validatePilotPolicy(doc access.Document, workerProfile, profileDigest strin
 	return nil
 }
 
-func validatePilotPreparation(path, repository string) error {
+func validatePilotPreparation(path, repository string) (string, error) {
 	data, err := access.ReadConfiguration(path, false)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var config preparation.Configuration
 	if err := strictjson.Decode(data, &config); err != nil {
-		return err
+		return "", err
 	}
 	if config.Version != 1 || config.Worker != "urn:engineering-platform:worker:codex-pilot" ||
 		len(config.Approvals) != 1 || config.Approvals[0].RunID == "" ||
@@ -300,21 +301,25 @@ func validatePilotPreparation(path, repository string) error {
 		config.Approvals[0].Repository != "jiying2007/engineering-platform" ||
 		core.ValidateContextRefs(config.Approvals[0].Refs) != nil ||
 		filepath.Clean(config.Approvals[0].RepositoryPath) != filepath.Clean(repository) {
-		return fmt.Errorf("pilot preparation config identity mismatch")
+		return "", fmt.Errorf("pilot preparation config identity mismatch")
 	}
 	if err := pilotSafeDir(config.Root); err != nil {
-		return fmt.Errorf("preparation root: %w", err)
+		return "", fmt.Errorf("preparation root: %w", err)
 	}
 	if err := pilotSafeDir(config.ContextSource); err != nil {
-		return fmt.Errorf("context source: %w", err)
+		return "", fmt.Errorf("context source: %w", err)
 	}
 	if err := pilotSafeDir(config.Approvals[0].RepositoryPath); err != nil {
-		return fmt.Errorf("approved repository: %w", err)
+		return "", fmt.Errorf("approved repository: %w", err)
 	}
 	if err := pilotSafeExecutable(config.Git); err != nil {
-		return fmt.Errorf("preparation git: %w", err)
+		return "", fmt.Errorf("preparation git: %w", err)
 	}
-	return nil
+	artifactRoot := filepath.Join(config.Root, "artifacts")
+	if err := pilotSafeDir(artifactRoot); err != nil {
+		return "", fmt.Errorf("retained artifact root: %w", err)
+	}
+	return config.Root, nil
 }
 
 func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {
@@ -347,7 +352,7 @@ func readPilotWIFReceipt(path string) (codexapp.LiveReceipt, error) {
 	return receipt, nil
 }
 
-func validatePilotPublisher(path string) error {
+func validatePilotPublisher(path, expectedArtifactRoot string) error {
 	data, err := access.ReadConfiguration(path, false)
 	if err != nil {
 		return err
@@ -355,6 +360,9 @@ func validatePilotPublisher(path string) error {
 	var config githubpublish.Configuration
 	if err := strictjson.Decode(data, &config); err != nil {
 		return err
+	}
+	if filepath.Clean(config.ArtifactRoot) != filepath.Clean(expectedArtifactRoot) {
+		return fmt.Errorf("publisher artifact root must equal retained Worker artifact root")
 	}
 	found := false
 	for _, target := range config.Targets {
