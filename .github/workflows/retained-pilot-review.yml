@@ -1,0 +1,129 @@
+name: Retained M1 pilot independent review
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Retained pilot
+        required: true
+        type: choice
+        options:
+          - feature
+          - debug
+      verification_run_id:
+        description: Successful retained verification workflow run ID
+        required: true
+        type: string
+      result:
+        description: Independent review decision
+        required: true
+        type: choice
+        options:
+          - PASS
+          - FAIL
+      findings_json:
+        description: JSON array of review findings
+        required: true
+        default: '[]'
+        type: string
+      known_limits_json:
+        description: JSON array of known limits
+        required: true
+        default: '[]'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  review:
+    name: independent-review-${{ inputs.pilot }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - name: Require protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            test "$attempt" -lt 3
+            sleep $((attempt * 2))
+          done
+
+      - name: Restore verified subject and record independent review
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          VERIFICATION_RUN_ID: ${{ inputs.verification_run_id }}
+          REVIEW_RESULT: ${{ inputs.result }}
+          REVIEW_FINDINGS_JSON: ${{ inputs.findings_json }}
+          REVIEW_KNOWN_LIMITS_JSON: ${{ inputs.known_limits_json }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash examples/pilots/actions/review-close-retained.sh
+
+      - name: Retain independent review state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-pilot-review-${{ inputs.pilot }}-${{ inputs.verification_run_id }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-review
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summarize review decision
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/retained-pilot-review/review-state.json"
+          if [ ! -f "$state" ]; then
+            echo "Independent review did not produce retained state." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          result="$(jq -er .review_result "$state")"
+          closure="$(jq -er .closure "$state")"
+          {
+            echo "## Retained ${{ inputs.pilot }} independent review"
+            echo
+            echo "- Review: **$result**"
+            echo "- Closure: **$closure**"
+            if [ "$closure" = CLOSED ]; then
+              echo "- The retained pilot has a complete ClosureReceipt."
+            else
+              echo "- Closure remains blocked; retain the review and address findings."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
