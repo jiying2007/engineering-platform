@@ -1,0 +1,6 @@
+{
+  "closure_receipt_id": "m1-feature-routing-closure",
+  "delivery_receipt_id": "m1-feature-routing-delivery",
+  "verification_report_id": "m1-feature-routing-verification",
+  "review_report_id": "m1-feature-routing-review"
+}

@@ -1,0 +1,27 @@
+{
+  "delivery_receipt_id": "m1-debug-firmware-identity-delivery",
+  "run_id": "m1-debug-firmware-identity-run",
+  "result_commit": "__RESULT_COMMIT__",
+  "artifacts": [
+    {
+      "artifact_id": "codex-execution-receipt",
+      "digest": "__CODEX_RECEIPT_DIGEST__",
+      "media_type": "application/vnd.engineering-platform.codex-execution+json"
+    },
+    {
+      "artifact_id": "codex-result-bundle",
+      "digest": "__BUNDLE_DIGEST__",
+      "media_type": "application/vnd.git.bundle"
+    },
+    {
+      "artifact_id": "git-change-manifest",
+      "digest": "__GIT_MANIFEST_DIGEST__",
+      "media_type": "application/vnd.engineering-platform.git-changed-tree+json"
+    },
+    {
+      "artifact_id": "ci-provenance",
+      "digest": "__CI_ENVELOPE_DIGEST__",
+      "media_type": "application/zip"
+    }
+  ]
+}
