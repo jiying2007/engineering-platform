@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "principals": [
+    {
+      "subject": "urn:engineering-platform:operator:pilot-owner",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "work:create",
+        "task:create",
+        "run:start",
+        "run:control",
+        "run:complete",
+        "delivery:create"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:worker:codex-pilot",
+      "scope": "platform",
+      "capabilities": [
+        "worker:poll",
+        "worker:report",
+        "worker:prepare",
+        "action:execute"
+      ],
+      "worker_profiles": [
+        "__WORKER_PROFILE__"
+      ],
+      "actions": [
+        {
+          "action": "worker.codex-execute",
+          "risk_class": "CONTROLLED_MUTATION",
+          "capability": "__PROFILE_DIGEST__"
+        }
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:operator:pilot-publisher",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "action:execute",
+        "action:reconcile"
+      ],
+      "actions": [
+        {
+          "action": "github.publish-pr",
+          "risk_class": "CONTROLLED_MUTATION",
+          "capability": "github.publish-pr"
+        }
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:codex-evidence-importer",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "evidence:register"
+      ],
+      "evidence_issuer": "codex-execution-importer",
+      "evidence_procedures": [
+        "codex.core.execution.v1"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:git-evidence-importer",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "evidence:register"
+      ],
+      "evidence_issuer": "git-change-importer",
+      "evidence_procedures": [
+        "git.changed-tree.v1"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:github-ci-importer",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "evidence:register"
+      ],
+      "evidence_issuer": "github-actions-importer",
+      "evidence_procedures": [
+        "github.actions.trusted-ci.v1"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:verifier:pilot",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "verification:create"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:reviewer:pilot",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "review:create"
+      ]
+    },
+    {
+      "subject": "urn:engineering-platform:closure:pilot",
+      "scope": "platform",
+      "capabilities": [
+        "core:read",
+        "closure:create"
+      ]
+    }
+  ]
+}
