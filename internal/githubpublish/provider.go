@@ -91,7 +91,9 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 	}
 	plan, bundle, err := p.derive(ctx, req.RunID, req.ExecutionEpoch, req.ParametersDigest)
 	if err != nil {
-		return action.DispatchResult{}, err
+		return action.DispatchResult{
+			Outcome: action.DispatchUnknown, ObservedState: "PRECONDITION_FAILED",
+		}, nil
 	}
 	receipt, err := p.remote.Publish(ctx, plan, bundle)
 	if err != nil {
@@ -109,6 +111,9 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 }
 
 func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.ReconcileResult, error) {
+	if op.ObservedState == "PRECONDITION_FAILED" {
+		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: op.ObservedState}, nil
+	}
 	if op.Action != Action || op.Capability != Capability || op.RiskClass != action.ControlledMutation {
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: "publication grant mismatch"}, nil
 	}
