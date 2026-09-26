@@ -1,0 +1,10 @@
+{
+  "verification_report_id": "m1-debug-firmware-identity-verification",
+  "delivery_receipt_id": "m1-debug-firmware-identity-delivery",
+  "verifier": "urn:engineering-platform:verifier:pilot",
+  "evidence_ids": [
+    "debug-codex-evidence",
+    "debug-git-evidence",
+    "debug-ci-evidence"
+  ]
+}
