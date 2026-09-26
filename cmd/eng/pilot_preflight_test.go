@@ -24,8 +24,8 @@ func TestPilotPreflightReportsOnlyExternalBlockers(t *testing.T) {
 		t.Fatalf("unexpected partial readiness: %#v", result)
 	}
 	want := map[string]bool{
-		"worker_codex_federation_rule": true,
-		"managed_workspace_wif_qualification": true,
+		"worker_codex_federation_rule":          true,
+		"managed_workspace_wif_qualification":   true,
 		"publisher_configuration_or_credential": true,
 	}
 	if len(result.Blockers) != len(want) {
@@ -43,30 +43,30 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 	root := filepath.Dir(options.ProfileFile)
 
 	workerCodex := map[string]any{
-		"version": 1,
-		"codex_executable": profile.CodexExecutable,
+		"version":            1,
+		"codex_executable":   profile.CodexExecutable,
 		"federation_rule_id": rule,
-		"profile": profile.Profile,
+		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
 
 	wif := codexapp.LiveReceipt{
-		SchemaVersion: 1,
-		CLI: "codex-cli",
-		Version: codexapp.QualifiedCodexVersion,
-		BinaryDigest: profile.Profile.BinaryDigest,
+		SchemaVersion:              1,
+		CLI:                        "codex-cli",
+		Version:                    codexapp.QualifiedCodexVersion,
+		BinaryDigest:               profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte("[features]\nshell_tool = false\nview_image = false\n")),
-		CredentialMode: "workload_identity",
-		FederationRuleID: rule,
-		Model: profile.Profile.Model,
-		PromptDigest: canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
-		ThreadID: "thread-preflight",
-		TurnID: "turn-preflight",
-		TurnStatus: "completed",
-		Output: codexapp.LiveProbeExpected,
-		OutputDigest: canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
-		ApprovalRequests: 0,
-		UnexpectedToolUse: false,
+		CredentialMode:             "workload_identity",
+		FederationRuleID:           rule,
+		Model:                      profile.Profile.Model,
+		PromptDigest:               canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
+		ThreadID:                   "thread-preflight",
+		TurnID:                     "turn-preflight",
+		TurnStatus:                 "completed",
+		Output:                     codexapp.LiveProbeExpected,
+		OutputDigest:               canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
+		ApprovalRequests:           0,
+		UnexpectedToolUse:          false,
 		AssertionRemovedBeforeTurn: true,
 	}
 	if err := wif.Validate(); err != nil {
@@ -91,14 +91,14 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 		t.Fatal(err)
 	}
 	publisher := map[string]any{
-		"version": 1,
-		"artifact_root": artifactRoot,
+		"version":        1,
+		"artifact_root":  artifactRoot,
 		"git_executable": git,
-		"token_file": tokenFile,
+		"token_file":     tokenFile,
 		"targets": []any{
 			map[string]any{
-				"repository": "jiying2007/engineering-platform",
-				"base_ref": "main",
+				"repository":    "jiying2007/engineering-platform",
+				"base_ref":      "main",
 				"branch_prefix": "engineering-platform/",
 			},
 		},
@@ -177,12 +177,12 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 	prep := readPilotFixture(t, "worker-preparation.json.tmpl")
 	replacements := map[string]string{
 		"__PREPARATION_ROOT__": preparationRoot,
-		"__GIT_EXECUTABLE__": git,
-		"__CONTEXT_SOURCE__": contextSource,
-		"__RUN_ID__": "m1-feature-routing-run",
-		"__TASK_DIGEST__": "sha256:" + strings.Repeat("a", 64),
+		"__GIT_EXECUTABLE__":   git,
+		"__CONTEXT_SOURCE__":   contextSource,
+		"__RUN_ID__":           "m1-feature-routing-run",
+		"__TASK_DIGEST__":      "sha256:" + strings.Repeat("a", 64),
 		"__RUN_INPUT_DIGEST__": "sha256:" + strings.Repeat("b", 64),
-		"__REPOSITORY_PATH__": repository,
+		"__REPOSITORY_PATH__":  repository,
 	}
 	for key, value := range replacements {
 		prep = strings.ReplaceAll(prep, key, value)
@@ -193,12 +193,12 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 	}
 
 	return pilotPreflightOptions{
-		Repository: repository,
-		Base: base,
-		ProfileFile: profileFile,
-		PolicyFile: policyFile,
+		Repository:      repository,
+		Base:            base,
+		ProfileFile:     profileFile,
+		PolicyFile:      policyFile,
 		PreparationFile: preparationFile,
-		WorkerProfile: workerProfile,
+		WorkerProfile:   workerProfile,
 	}, profile, "rule-pilot-test"
 }
 
