@@ -239,6 +239,13 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 			t.Fatal(err)
 		}
 	}
+	contextBytes := []byte("frozen pilot requirement\n")
+	contextDigest := canonical.BytesDigest(contextBytes)
+	contextName := strings.TrimPrefix(contextDigest, "sha256:") + ".bin"
+	if err := os.WriteFile(filepath.Join(contextSource, contextName), contextBytes, 0o400); err != nil {
+		t.Fatal(err)
+	}
+
 	prep := readPilotFixture(t, "worker-preparation.json.tmpl")
 	replacements := map[string]string{
 		"__PREPARATION_ROOT__": preparationRoot,
@@ -248,6 +255,7 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 		"__TASK_DIGEST__":      "sha256:" + strings.Repeat("a", 64),
 		"__RUN_INPUT_DIGEST__": "sha256:" + strings.Repeat("b", 64),
 		"__REPOSITORY_PATH__":  repository,
+		"__CONTEXT_DIGEST__":   contextDigest,
 	}
 	for key, value := range replacements {
 		prep = strings.ReplaceAll(prep, key, value)
