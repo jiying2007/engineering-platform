@@ -33,7 +33,10 @@ The provider is bound to GitHub Actions OIDC issuer
 `https://token.actions.githubusercontent.com`, the dedicated audience,
 replay checking, and a 600-second assertion lifetime. Provider creation omits
 the Admin API's update-only `enabled` field; the returned provider is still
-required to report `enabled=true` before the helper proceeds.
+required to report `enabled=true` before the helper proceeds. Reuse also
+requires the default issuer-discovery trust mode: no custom discovery URL,
+explicit/uploaded JWKS, custom CA bundle, or provider-level CEL condition may be
+present under the same provider name.
 
 The rule requires:
 
