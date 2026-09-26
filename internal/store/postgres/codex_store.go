@@ -144,17 +144,17 @@ func (s *Store) StartCodex(ctx context.Context, subject string, req codexexec.St
 	return codexexec.Permit{Token: token, Assignment: assignment, Preparation: prep, Profile: req.Profile, LeaseUntil: until}, nil
 }
 
-func (s *Store) lockCodex(ctx context.Context, tx pgx.Tx, subject string, token codexexec.Token, live bool) (codexRow, inboxRow, error) {
+func (s *Store) lockCodex(ctx context.Context, tx pgx.Tx, subject string, token codexexec.Token, live bool) (codexRow, inboxRecord, error) {
 	if subject == "" || !token.Valid() {
-		return codexRow{}, inboxRow{}, workerqueue.ErrIdentity
+		return codexRow{}, inboxRecord{}, workerqueue.ErrIdentity
 	}
 	epoch, mode, err := lockWorkerPlatform(ctx, tx)
 	if err != nil {
-		return codexRow{}, inboxRow{}, err
+		return codexRow{}, inboxRecord{}, err
 	}
 	inbox, err := scanInbox(tx.QueryRow(ctx, `SELECT `+inboxColumns+` FROM worker_inbox WHERE run_id=$1 FOR UPDATE`, token.RunID))
 	if err != nil {
-		return codexRow{}, inboxRow{}, mapReadError(err)
+		return codexRow{}, inboxRecord{}, mapReadError(err)
 	}
 	if inbox.owner != subject || inbox.profile != token.WorkerProfile {
 		return codexRow{}, inbox, workerqueue.ErrIdentity
