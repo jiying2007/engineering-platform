@@ -1,7 +1,7 @@
 # Open Architecture Findings
 
 Date: 2026-09-23
-Status: **Absorbed into v1.2; retained as M0 implementation checklist**
+Status: **HISTORICAL REVIEW RECORD — absorbed into v1.2; not a current implementation checklist**
 Sources:
 - Architecture Review Round 2
 - Architecture Review Round 3
@@ -14,7 +14,7 @@ Sources:
 
 ## Purpose
 
-This document preserves the findings that were absorbed into `AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md`. It is no longer a list of unresolved top-level architecture decisions; unchecked items now mean the corresponding ADR/schema/protocol/test contract still needs to be implemented or frozen during M0.
+This document preserves the findings that were absorbed into `AI_NATIVE_ENGINEERING_PLATFORM_V1_2_FINAL.md` for review provenance. It is not an authority-bearing list of unresolved work. Unchecked boxes record the state of the 2026-09-23 architecture review and must not be interpreted as current blockers or current implementation status. Current execution authority is `docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md`, `docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md`, and `docs/status/IMPLEMENTATION_STATUS.md`.
 
 ---
 
@@ -304,12 +304,12 @@ M1 is NO-GO if any of these remain true:
 
 ---
 
-## Recommendation
+## Historical disposition
 
-Do not add more top-level architecture. v1.2 is now the canonical target architecture.
+The 2026-09-23 recommendation was to stop adding top-level architecture and move
+into M0 contract freeze. That transition has since occurred and the repository
+has progressed to the retained M1 pilot gate.
 
-The next work is M0 Contract Freeze:
-1. freeze ADRs and schemas;
-2. freeze state guards, policy and protocols;
-3. write invariant/property/failure-injection tests;
-4. then start the M1 vertical slice.
+Do not use this historical checklist to reopen already-implemented Core scope or
+to infer current readiness. Use `docs/status/IMPLEMENTATION_STATUS.md` for the
+live boundary and retained GitHub Actions/Evidence for implementation claims.
