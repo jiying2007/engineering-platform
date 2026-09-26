@@ -28,18 +28,21 @@ issuer, subject and delivery artifact binding introduced by #43.
 
 ## Accepted provenance
 
-v1 is intentionally narrow and self-hosted. It accepts only:
+v1 is intentionally narrow and self-hosted. It accepts only repository
+`jiying2007/engineering-platform`, workflow `CI` at
+`.github/workflows/ci.yml`, completed/successful exact GitHub run/attempt, and
+one of two strict provenance modes:
 
-- repository `jiying2007/engineering-platform`;
-- workflow name `CI`;
-- workflow path `.github/workflows/ci.yml`;
-- event `push`;
-- branch `main`;
-- `source_sha == tested_sha == DeliveryReceipt.result_commit`;
-- completed/successful exact GitHub run and run attempt.
+1. **main push** — event `push`, branch `main`, no base SHA, and
+   `source_sha == tested_sha == DeliveryReceipt.result_commit`;
+2. **exact same-repository PR head** — event `pull_request`,
+   `source_sha == tested_sha == DeliveryReceipt.result_commit`,
+   `base_sha == DeliveryReceipt.base_commit`, head/base repositories are the
+   trusted repository, base ref is `main`, and the trusted CI workflow file has
+   the identical Git blob SHA at base and result commits.
 
-PR merge commits are not accepted as final-delivery evidence. A delivery must be
-verified by the fresh main push for its exact result commit.
+GitHub synthetic PR merge SHAs are not accepted. Fork PRs, base drift and PRs
+that modify the trusted CI workflow fail closed.
 
 ## Live GitHub verification
 
@@ -51,8 +54,12 @@ regular file; the token is not accepted on the command line.
 
 The importer requires the live run to be completed/successful and rechecks:
 
-- repository, workflow name/path, event, main branch, result SHA and run attempt;
-- the exact successful `go`, `offline-container-integration`, and
+- repository, workflow name/path, event, exact source/result SHA and run attempt;
+- for push mode, exact `main` branch;
+- for PR-head mode, exact PR number/head/base refs, SHAs and repository IDs plus
+  identical base/result `.github/workflows/ci.yml` blob SHA;
+- the exact successful `go`, `offline-container-integration`,
+  `postgres-authority-restore-drill`, and
   `codex-app-server-0.155.0-qualification` jobs;
 - each job's live `head_sha`;
 - live GitHub artifact IDs, names, sizes and GitHub SHA-256 digests;
@@ -156,9 +163,11 @@ A successful import creates one ordinary `EvidenceRef`:
 - the trusted CI envelope delivery artifact reference.
 
 This PASS means only that the frozen CI provenance requirement represented by
-`github.actions.trusted-ci.v1` was satisfied. It does not by itself mean the
-whole VerificationPlan passes, the engineering change is correct, independent
-Review passed, or the Work may close.
+`github.actions.trusted-ci.v1` was satisfied for the exact Delivery result
+commit. Push and strict PR-head modes share the same procedure; the importer
+derives the mode from retained/live facts and callers cannot choose a weaker
+trust mode. It does not by itself mean the whole VerificationPlan passes, the
+engineering change is correct, independent Review passed, or the Work may close.
 
 ## Remaining closure work
 
