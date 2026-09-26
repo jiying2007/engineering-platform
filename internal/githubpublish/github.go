@@ -59,7 +59,7 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 	}
 	return &githubRemote{
 		git: canonicalGit, tokenFile: canonicalToken,
-		client: &http.Client{Timeout: 20 * time.Second},
+		client:  &http.Client{Timeout: 20 * time.Second},
 		apiBase: "https://api.github.com",
 	}, nil
 }
