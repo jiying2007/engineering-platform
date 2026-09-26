@@ -15,6 +15,18 @@ func TestWIFAdminAPIHelperCreatesExactProviderAndRule(t *testing.T) {
 		t.Fatal(errText)
 	}
 
+	providerRequestData, err := os.ReadFile(filepath.Join(output, "provider-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var providerRequest map[string]any
+	if err := json.Unmarshal(providerRequestData, &providerRequest); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := providerRequest["enabled"]; ok {
+		t.Fatal("provider create request must omit update-only enabled field")
+	}
+
 	data, err := os.ReadFile(filepath.Join(output, "wif-admin-receipt.json"))
 	if err != nil {
 		t.Fatal(err)
