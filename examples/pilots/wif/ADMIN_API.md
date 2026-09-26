@@ -38,6 +38,14 @@ requires the default issuer-discovery trust mode: no custom discovery URL,
 explicit/uploaded JWKS, custom CA bundle, or provider-level CEL condition may be
 present under the same provider name.
 
+The current retained M1 engineering turn is intentionally bounded to **8
+minutes**. The rule/provider assertion window is 600 seconds, and the upstream
+GitHub OIDC assertion is deleted before model-reachable work begins. This keeps
+the model/tool sandbox from retaining a refresh credential while leaving an
+explicit safety margin for the two bounded M1 pilot changes. Longer-running
+production turns require a separately designed host-owned refresh mechanism;
+do not extend the turn timeout past the federation window.
+
 The rule requires:
 
 - exact repository `jiying2007/engineering-platform`;
