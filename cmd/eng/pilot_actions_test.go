@@ -183,6 +183,78 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 	}
 }
 
+func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
+	root := filepath.Join("..", "..")
+	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-pilot-review.yml"))
+	reviewScript := readPilotActionFile(t, filepath.Join(root, "examples", "pilots", "actions", "review-close-retained.sh"))
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", filepath.Join(root, "examples", "pilots", "actions", "review-close-retained.sh")).CombinedOutput(); err != nil {
+		t.Fatalf("review-close-retained.sh syntax: %v: %s", err, out)
+	}
+
+	for _, required := range []string{
+		"contents: read",
+		"actions: read",
+		"result:",
+		"- PASS",
+		"- FAIL",
+		"GH_TOKEN: ${{ github.token }}",
+		"name: Restore verified subject and record independent review",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Fatalf("review workflow missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"contents: write",
+		"pull-requests: write",
+		"id-token: write",
+		"PUBLISH_TOKEN",
+		"OPENAI_IDENTITY_TOKEN_FILE",
+		"--execute-codex",
+	} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("review workflow unexpectedly contains %q", forbidden)
+		}
+	}
+
+	for _, required := range []string{
+		"independent review requires a different GitHub actor from engineering execution",
+		"clients/reviewer.env",
+		"/api/v1/reviews",
+		"if [ \"$REVIEW_RESULT\" = PASS ]",
+		"clients/closure.env",
+		"/api/v1/closures",
+		"core-review.dump",
+		"review-state.json",
+	} {
+		if !strings.Contains(reviewScript, required) {
+			t.Fatalf("review script missing %q", required)
+		}
+	}
+	if strings.Index(reviewScript, "GITHUB_ACTOR") > strings.Index(reviewScript, "/api/v1/reviews") {
+		t.Fatal("review is submitted before GitHub actor independence is checked")
+	}
+	if strings.Index(reviewScript, "if [ \"$REVIEW_RESULT\" = PASS ]") > strings.Index(reviewScript, "/api/v1/closures") {
+		t.Fatal("Closure is not guarded by PASS review")
+	}
+	for _, forbidden := range []string{
+		"worker.codex-execute",
+		"github.publish-pr",
+		"--execute-codex",
+		"import-ci-evidence",
+		"/api/v1/verifications",
+	} {
+		if strings.Contains(reviewScript, forbidden) {
+			t.Fatalf("independent review phase crosses earlier authority with %q", forbidden)
+		}
+	}
+}
+
 func readPilotActionFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

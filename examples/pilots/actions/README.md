@@ -78,3 +78,35 @@ The verification workflow:
 
 It does not create a Review or Closure. A Verification PASS is only the input to
 the next independent-review gate.
+
+## Independent Review and conditional Closure
+
+After the retained verification workflow succeeds, a different GitHub account
+from the engineering workflow dispatcher performs the independent review:
+
+```sh
+gh workflow run retained-pilot-review.yml \
+  --repo jiying2007/engineering-platform \
+  --ref main \
+  -f pilot=feature \
+  -f verification_run_id=<verification-workflow-run-id> \
+  -f result=PASS \
+  -f findings_json='[]' \
+  -f known_limits_json='[]'
+```
+
+The workflow queries the original engineering workflow actor and refuses to
+submit Review when the current `GITHUB_ACTOR` is the same account. It restores
+the PASS-verified Core state and submits Review under the dedicated
+`urn:engineering-platform:reviewer:pilot` mTLS identity.
+
+`result=PASS` is never inferred. It is explicit reviewer input. Core still
+validates the Review report; PASS cannot contain blocking findings, and FAIL
+requires at least one blocking finding.
+
+When the independent Review is PASS, the workflow changes to the separate
+closure mTLS identity and submits the frozen Closure request. When Review is
+FAIL, it retains the FAIL Review and confirms the Work is not CLOSED.
+
+The retained review artifact records the engineering GitHub actor, reviewer
+GitHub actor, review decision, closure state, and final PostgreSQL snapshot.
