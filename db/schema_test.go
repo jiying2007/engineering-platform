@@ -51,7 +51,6 @@ func TestRecoveryReconciliationMigrationIsAdditiveAndOrdered(t *testing.T) {
 	}
 }
 
-
 func TestCodexExecutionMigrationIsAdditiveAndOrdered(t *testing.T) {
 	for _, required := range []string{
 		"CREATE TABLE worker_codex_executions",
