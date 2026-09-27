@@ -19,13 +19,12 @@ func TestPilotPreflightReportsOnlyExternalBlockers(t *testing.T) {
 		t.Fatal(err)
 	}
 	if result.Internal != "READY" ||
-		result.ModelExecution != "BLOCKED_EXTERNAL_WIF" ||
+		result.ModelExecution != "BLOCKED_EXTERNAL_CODEX_AUTH" ||
 		result.Publication != "BLOCKED_EXTERNAL_PUBLISHER" {
 		t.Fatalf("unexpected partial readiness: %#v", result)
 	}
 	want := map[string]bool{
-		"worker_codex_federation_rule":          true,
-		"managed_workspace_wif_qualification":   true,
+		"worker_codex_authentication":            true,
 		"publisher_configuration_or_credential": true,
 	}
 	if len(result.Blockers) != len(want) {
@@ -45,6 +44,7 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 	workerCodex := map[string]any{
 		"version":            1,
 		"codex_executable":   profile.CodexExecutable,
+		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
 		"profile":            profile.Profile,
 	}
@@ -119,6 +119,7 @@ func TestPilotPreflightRejectsPublisherArtifactViewDrift(t *testing.T) {
 	workerCodex := map[string]any{
 		"version":            1,
 		"codex_executable":   profile.CodexExecutable,
+		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
 		"profile":            profile.Profile,
 	}
@@ -307,4 +308,77 @@ func pilotGit(t *testing.T, git, repository string, args ...string) string {
 		t.Fatalf("git %v: %v: %s", args, err, out)
 	}
 	return string(out)
+}
+
+
+func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
+	options, profile, _ := pilotPreflightFixture(t)
+	root := filepath.Dir(options.ProfileFile)
+	loginDir := filepath.Join(root, "saved-login")
+	if err := os.Mkdir(loginDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	loginFile := filepath.Join(loginDir, "auth.json")
+	if err := os.WriteFile(loginFile, []byte(`{"tokens":{"access_token":"fixture","refresh_token":"fixture"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	workerCodex := map[string]any{
+		"version":          1,
+		"codex_executable": profile.CodexExecutable,
+		"credential_mode":  "saved_chatgpt_login",
+		"saved_login_file": loginFile,
+		"profile":          profile.Profile,
+	}
+	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved.json", workerCodex)
+
+	saved := codexapp.LiveReceipt{
+		SchemaVersion: 1,
+		CLI: "codex-cli",
+		Version: codexapp.QualifiedCodexVersion,
+		BinaryDigest: profile.Profile.BinaryDigest,
+		CredentialSafeConfigDigest: canonical.BytesDigest([]byte("cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n")),
+		CredentialMode: codexapp.CredentialModeSavedChatGPTLogin,
+		Model: profile.Profile.Model,
+		PromptDigest: canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
+		ThreadID: "thread-saved-preflight",
+		TurnID: "turn-saved-preflight",
+		TurnStatus: "completed",
+		Output: codexapp.LiveProbeExpected,
+		OutputDigest: canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
+		CredentialBootstrapRemovedBeforeTurn: true,
+	}
+	if err := saved.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	options.SavedLoginReceiptFile = writePilotJSON(t, root, "saved-login-receipt.json", saved)
+
+	result, err := checkPilotPreflight(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Internal != "READY" || result.ModelExecution != "READY" ||
+		result.Publication != "BLOCKED_EXTERNAL_PUBLISHER" {
+		t.Fatalf("unexpected saved-login readiness: %#v", result)
+	}
+	if len(result.Blockers) != 1 || result.Blockers[0] != "publisher_configuration_or_credential" {
+		t.Fatalf("unexpected saved-login blockers: %#v", result.Blockers)
+	}
+}
+
+func TestPilotPreflightRejectsCrossModeCredentialReceipt(t *testing.T) {
+	options, profile, rule := pilotPreflightFixture(t)
+	root := filepath.Dir(options.ProfileFile)
+	workerCodex := map[string]any{
+		"version":            1,
+		"codex_executable":   profile.CodexExecutable,
+		"credential_mode":    "workload_identity",
+		"federation_rule_id": rule,
+		"profile":            profile.Profile,
+	}
+	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-cross-mode.json", workerCodex)
+	options.SavedLoginReceiptFile = writePilotJSON(t, root, "fake-saved.json", map[string]any{"version":1})
+	if _, err := checkPilotPreflight(options); err == nil ||
+		!strings.Contains(err.Error(), "incompatible") {
+		t.Fatalf("cross-mode receipt accepted: %v", err)
+	}
 }
