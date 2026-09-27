@@ -1,0 +1,102 @@
+name: Retained M1 pilot engineering
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Real retained pilot requirement
+        required: true
+        type: choice
+        options:
+          - feature
+          - debug
+      model:
+        description: Exact Codex model available to the trusted self-hosted ChatGPT login
+        required: true
+        default: gpt-5.6-sol
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  engineer:
+    name: trusted-self-hosted-${{ inputs.pilot }}-engineering-to-pr
+    runs-on: [self-hosted, linux, x64, engineering-platform-codex]
+    timeout-minutes: 45
+    steps:
+      - name: Require protected main on trusted self-hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          test "${{ runner.environment }}" = "self-hosted"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Require trusted host toolchain and saved ChatGPT login
+        id: host
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tool in codex go git gh docker jq curl openssl sha256sum; do
+            command -v "$tool" >/dev/null
+          done
+          codex_native="$(readlink -f "$(command -v codex)")"
+          codex_home="${CODEX_HOME:-$HOME/.codex}"
+          saved_login="$(readlink -f "$codex_home/auth.json")"
+          test -x "$codex_native"
+          test -f "$saved_login"
+          test "$("$codex_native" --version)" = "codex-cli 0.155.0"
+          test "$("$codex_native" login status 2>&1 | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
+          gh auth status >/dev/null 2>&1
+          printf 'codex_native=%s\n' "$codex_native" >> "$GITHUB_OUTPUT"
+          printf 'saved_login=%s\n' "$saved_login" >> "$GITHUB_OUTPUT"
+
+      - name: Real trusted self-hosted retained engineering and publication
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          bash examples/pilots/self-hosted/engineer-model.sh             "$PILOT"             "$RUNNER_TEMP"             "${{ steps.host.outputs.codex_native }}"             "${{ steps.host.outputs.saved_login }}"             "$MODEL"
+
+      - name: Retain resumable engineering state
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-pilot-engineering-${{ inputs.pilot }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-state
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summarize next gate
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          state="$RUNNER_TEMP/retained-pilot-state/engineering-state.json"
+          pr_url="$(jq -er .pull_request.url "$state")"
+          result_commit="$(jq -er .result_commit "$state")"
+          {
+            echo "## Retained ${{ inputs.pilot }} self-hosted engineering"
+            echo
+            echo "- Authentication: **trusted saved ChatGPT login**"
+            echo "- Model execution: **FINISHED**"
+            echo "- Credential bootstrap removed before model-reachable turn: **PASS**"
+            echo "- Independent Action Gateway publication: **CONFIRMED**"
+            echo "- Result commit: `$result_commit`"
+            echo "- PR: $pr_url"
+            echo "- Next gate: exact PR-head CI PASS, then run **Retained M1 pilot verification** with engineering run ID `$GITHUB_RUN_ID`."
+            echo "- Managed-workspace WIF remains the unattended/GitHub-hosted future path and is not claimed by this run."
+          } >> "$GITHUB_STEP_SUMMARY"
