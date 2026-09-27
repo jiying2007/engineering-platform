@@ -48,11 +48,15 @@ The Core Worker execution host must separately receive a short-lived
 rule. The Worker does not mint this assertion and refuses long-lived
 `OPENAI_API_KEY` / `OPENAI_BASE_URL` substitution.
 
-For the retained M1 lane, the model-reachable engineering turn is bounded to
-8 minutes inside the configured 600-second federation window. The host prewarms
-the workload-identity exchange and removes the upstream assertion before the
-model-reachable turn. Do not increase this timeout for M1; longer production
-turns require a separately reviewed host-owned assertion refresh design.
+For the retained M1 lane, every GitHub assertion is validated against the exact
+repository, immutable repository/owner IDs, protected-main ref and workflow ref.
+The Runtime uses the JWT's actual `iat` / `exp` to bound execution rather than
+assuming the configured 600-second provider/rule limits are the upstream token
+lifetime. Model-reachable engineering is capped at 4 minutes, keeps at least a
+30-second expiry margin, and will not start with less than 90 seconds of safe
+window. The host still prewarms the workload-identity exchange and removes the
+upstream assertion before the model-reachable turn. Longer production turns
+require a separately reviewed host-owned assertion refresh design.
 
 ### Publisher credential
 
