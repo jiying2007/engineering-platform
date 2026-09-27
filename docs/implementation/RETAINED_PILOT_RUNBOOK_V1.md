@@ -74,9 +74,12 @@ A trusted Linux execution host may use an existing Codex CLI ChatGPT login when:
 - the model tool profile remains no-network, workspace-write and
   approval-policy `never`.
 
-Use a dedicated repository-scoped GitHub self-hosted runner for the retained
-phase-1 execution. The runner must carry the custom label
-`engineering-platform-codex` and should be enabled only for the pilot window.
+Because the repository is public, use only a one-job ephemeral
+repository-scoped runner. Generate a fresh custom label
+`engineering-platform-codex-<32 lowercase hex>`, queue the intended
+`workflow_dispatch` job first, then register the runner with that label using
+`--no-default-labels --ephemeral`. Never leave a persistent runner carrying
+generic `self-hosted` / OS / architecture labels attached to this public repo.
 
 The existing saved login is readiness input; a separate model probe is optional,
 not mandatory. Verify the host before dispatch:
@@ -106,12 +109,21 @@ bash examples/pilots/self-hosted/qualify-login.sh \
 For the retained Feature execution, dispatch:
 
 ```sh
+RUNNER_LABEL="engineering-platform-codex-$(openssl rand -hex 16)"
+
 gh workflow run retained-pilot-self-hosted-engineer.yml \
   --repo jiying2007/engineering-platform \
   --ref main \
   -f pilot=feature \
-  -f model=gpt-5.6-sol
+  -f model=gpt-5.6-sol \
+  -f runner_label="$RUNNER_LABEL"
 ```
+
+The runner is registered only after that job is queued. Use the repository's
+GitHub Actions runner installation and configure it with the same
+`$RUNNER_LABEL`, `--no-default-labels`, `--ephemeral` and
+`--unattended`. GitHub automatically deregisters an ephemeral runner after its
+single job; remove the local runner directory before the next pilot.
 
 The workflow performs the saved-login Core-bound Codex turn and existing Action
 Gateway publication in one resumable GitHub engineering run, but preserves the
