@@ -58,6 +58,7 @@ issues an access token:
 - exact repository `jiying2007/engineering-platform`;
 - exact immutable repository ID `1383377268`;
 - exact immutable repository-owner ID `33591504`;
+- exact event `workflow_dispatch`;
 - exact ref `refs/heads/main`;
 - the dedicated audience;
 - a CEL allow-list containing only:
