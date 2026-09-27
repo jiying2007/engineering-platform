@@ -259,7 +259,6 @@ func TestWIFProviderWritesOnlyFixedCredentialSafeConfig(t *testing.T) {
 	}
 }
 
-
 func savedLoginFixture(t *testing.T, engineering bool) (*Provider, runtimeprovider.LaunchSpec, string) {
 	t.Helper()
 	base, spec := launchFixture(t)
