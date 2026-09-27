@@ -18,7 +18,9 @@ import (
 type codexConfiguration struct {
 	Version          int               `json:"version"`
 	Executable       string            `json:"codex_executable"`
-	FederationRuleID string            `json:"federation_rule_id"`
+	CredentialMode   string            `json:"credential_mode"`
+	FederationRuleID string            `json:"federation_rule_id,omitempty"`
+	SavedLoginFile   string            `json:"saved_login_file,omitempty"`
 	Profile          codexexec.Profile `json:"profile"`
 }
 
@@ -27,16 +29,15 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	if configFile == "" {
 		return fmt.Errorf("WORKER_CODEX_CONFIG is required")
 	}
-	if os.Getenv("OPENAI_API_KEY") != "" || os.Getenv("OPENAI_BASE_URL") != "" {
-		return fmt.Errorf("Core-bound Codex Worker refuses long-lived API key or provider endpoint override")
+	if os.Getenv("OPENAI_API_KEY") != "" || os.Getenv("OPENAI_BASE_URL") != "" ||
+		os.Getenv("CODEX_API_KEY") != "" || os.Getenv("CODEX_ACCESS_TOKEN") != "" {
+		return fmt.Errorf("Core-bound Codex Worker refuses API/access tokens or provider endpoint override")
 	}
 	if os.Getenv("OPENAI_WORKLOAD_IDENTITY_CONTEXT") != "" {
 		return fmt.Errorf("Worker owns workload identity audit context; external override is forbidden")
 	}
 	tokenFile := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE")
-	if tokenFile == "" {
-		return fmt.Errorf("OPENAI_IDENTITY_TOKEN_FILE is required")
-	}
+	federationEnv := os.Getenv("OPENAI_FEDERATION_RULE_ID")
 	data, err := access.ReadConfiguration(configFile, false)
 	if err != nil {
 		return err
@@ -45,9 +46,22 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	if err = strictjson.Decode(data, &config); err != nil {
 		return err
 	}
-	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" ||
-		strings.TrimSpace(config.FederationRuleID) == "" || config.Profile.Validate() != nil {
+	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" || config.Profile.Validate() != nil {
 		return fmt.Errorf("invalid Worker Codex configuration")
+	}
+	switch config.CredentialMode {
+	case "workload_identity":
+		if strings.TrimSpace(config.FederationRuleID) == "" || config.SavedLoginFile != "" ||
+			tokenFile == "" || federationEnv != "" {
+			return fmt.Errorf("invalid workload-identity Worker Codex configuration")
+		}
+	case "saved_chatgpt_login":
+		if config.FederationRuleID != "" || strings.TrimSpace(config.SavedLoginFile) == "" ||
+			tokenFile != "" || federationEnv != "" {
+			return fmt.Errorf("invalid saved-login Worker Codex configuration")
+		}
+	default:
+		return fmt.Errorf("unsupported Worker Codex credential mode")
 	}
 	profileDigest, err := config.Profile.Digest()
 	if err != nil {
@@ -65,8 +79,9 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	receipt, err := workeragent.ExecuteCodex(ctx, client, preparer, codexexec.Start{
 		RunID: runID, WorkerProfile: workerProfile, Profile: config.Profile,
 	}, workeragent.CodexRuntime{
-		Executable: config.Executable, FederationRuleID: config.FederationRuleID,
-		IdentityTokenFile: tokenFile, AuditContext: string(audit),
+		Executable: config.Executable, CredentialMode: config.CredentialMode,
+		FederationRuleID: config.FederationRuleID, IdentityTokenFile: tokenFile,
+		SavedLoginFile: config.SavedLoginFile, AuditContext: string(audit),
 	})
 	if err != nil {
 		return err
