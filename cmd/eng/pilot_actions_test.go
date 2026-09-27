@@ -361,4 +361,3 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		t.Fatal("self-hosted workflow must not inject job-scoped GitHub token into the saved-login chain")
 	}
 }
-
