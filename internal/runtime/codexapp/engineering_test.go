@@ -43,9 +43,9 @@ func TestBoundedEngineeringWIFTimeoutUsesActualAssertionLifetime(t *testing.T) {
 func TestBoundedEngineeringWIFTimeoutRejectsUnsafeTiming(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	for name, assertion := range map[string][]byte{
-		"too-long-upstream": unsignedTimingAssertion(t, now, now.Add(601*time.Second)),
+		"too-long-upstream":    unsignedTimingAssertion(t, now, now.Add(601*time.Second)),
 		"too-little-remaining": unsignedTimingAssertion(t, now.Add(-3*time.Minute), now.Add(100*time.Second)),
-		"invalid": []byte("not-a-jwt"),
+		"invalid":              []byte("not-a-jwt"),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := boundedEngineeringWIFTimeout(assertion, now); err == nil {

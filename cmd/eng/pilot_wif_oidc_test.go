@@ -82,13 +82,13 @@ func TestGitHubOIDCVerifierRejectsIdentityAndTimingDrift(t *testing.T) {
 		repositoryID string
 	}{
 		{
-			name: "repository-id",
-			mutate: func(map[string]any) {},
+			name:         "repository-id",
+			mutate:       func(map[string]any) {},
 			repositoryID: "999",
 		},
 		{
-			name: "missing-jti",
-			mutate: func(c map[string]any) { delete(c, "jti") },
+			name:         "missing-jti",
+			mutate:       func(c map[string]any) { delete(c, "jti") },
 			repositoryID: "1383377268",
 		},
 		{
