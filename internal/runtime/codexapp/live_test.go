@@ -201,22 +201,21 @@ func canonicalDigestText(value string) string {
 	return canonical.BytesDigest([]byte(value))
 }
 
-
 func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
 	r := LiveReceipt{
-		SchemaVersion: 1,
-		CLI: "codex-cli",
-		Version: QualifiedCodexVersion,
-		BinaryDigest: "sha256:" + strings.Repeat("a", 64),
-		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode: CredentialModeSavedChatGPTLogin,
-		Model: "gpt-5.6-sol",
-		PromptDigest: canonicalDigestText(LiveProbePrompt),
-		ThreadID: "thread-saved",
-		TurnID: "turn-saved",
-		TurnStatus: "completed",
-		Output: LiveProbeExpected,
-		OutputDigest: canonicalDigestText(LiveProbeExpected),
+		SchemaVersion:                        1,
+		CLI:                                  "codex-cli",
+		Version:                              QualifiedCodexVersion,
+		BinaryDigest:                         "sha256:" + strings.Repeat("a", 64),
+		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialMode:                       CredentialModeSavedChatGPTLogin,
+		Model:                                "gpt-5.6-sol",
+		PromptDigest:                         canonicalDigestText(LiveProbePrompt),
+		ThreadID:                             "thread-saved",
+		TurnID:                               "turn-saved",
+		TurnStatus:                           "completed",
+		Output:                               LiveProbeExpected,
+		OutputDigest:                         canonicalDigestText(LiveProbeExpected),
 		CredentialBootstrapRemovedBeforeTurn: true,
 	}
 	if err := r.Validate(); err != nil {
@@ -227,7 +226,6 @@ func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
 		t.Fatal("saved-login receipt without bootstrap-removal fence accepted")
 	}
 }
-
 
 func TestLiveSavedLoginProbeDeletesBootstrapBeforeReadOnlyTurn(t *testing.T) {
 	root := t.TempDir()
