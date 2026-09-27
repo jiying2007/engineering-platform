@@ -21,6 +21,17 @@ while [ "$#" -gt 0 ]; do
 done
 
 printf '%s\n' "${args[*]}" >> "$FAKE_CURL_LOG"
+
+github_branch_url="https://api.github.com/repos/jiying2007/engineering-platform/branches/main"
+if [ "$url" = "$github_branch_url" ]; then
+  if [ "${FAKE_WIF_MODE:-create}" = "github-unprotected" ]; then
+    printf '%s\n' '{"name":"main","protected":false,"commit":{"sha":"cc04aea21794a89e03e505bb4f129b873a63dcf9"}}'
+  else
+    printf '%s\n' '{"name":"main","protected":true,"commit":{"sha":"cc04aea21794a89e03e505bb4f129b873a63dcf9"}}'
+  fi
+  exit 0
+fi
+
 test -n "$header"
 grep -qx 'Authorization: Bearer test-admin-key' "$header"
 
