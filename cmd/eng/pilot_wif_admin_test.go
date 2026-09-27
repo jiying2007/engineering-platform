@@ -44,6 +44,7 @@ func TestWIFAdminAPIHelperCreatesExactProviderAndRule(t *testing.T) {
 		receipt["repository"] != "jiying2007/engineering-platform" ||
 		receipt["repository_id"] != "1383377268" ||
 		receipt["repository_owner_id"] != "33591504" ||
+		receipt["event_name"] != "workflow_dispatch" ||
 		receipt["ref"] != "refs/heads/main" {
 		t.Fatalf("unexpected WIF admin receipt: %#v", receipt)
 	}
