@@ -120,6 +120,16 @@ func TestWIFAdminAPIHelperRejectsProviderVerificationModeDrift(t *testing.T) {
 	}
 }
 
+func TestWIFAdminAPIHelperRejectsUnprotectedMainBeforeOpenAI(t *testing.T) {
+	root, _, errText := runWIFAdminHelper(t, "github-unprotected", false)
+	if errText == "" || !strings.Contains(errText, "GitHub main is not protected") {
+		t.Fatalf("unprotected main was not rejected: %s", errText)
+	}
+	if _, err := os.Stat(filepath.Join(root, "curl.count")); !os.IsNotExist(err) {
+		t.Fatal("OpenAI Admin API must not be called before protected-main preflight passes")
+	}
+}
+
 func TestWIFAdminAPIHelperShellSyntax(t *testing.T) {
 	bash, err := exec.LookPath("bash")
 	if err != nil {
@@ -128,6 +138,10 @@ func TestWIFAdminAPIHelperShellSyntax(t *testing.T) {
 	path := filepath.Join("..", "..", "examples", "pilots", "wif", "configure-admin-api.sh")
 	if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
 		t.Fatalf("configure-admin-api.sh syntax: %v: %s", err, out)
+	}
+	protectionPath := filepath.Join("..", "..", "examples", "pilots", "github", "configure-main-protection.sh")
+	if out, err := exec.Command(bash, "-n", protectionPath).CombinedOutput(); err != nil {
+		t.Fatalf("configure-main-protection.sh syntax: %v: %s", err, out)
 	}
 }
 
