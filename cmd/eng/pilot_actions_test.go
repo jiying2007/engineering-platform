@@ -290,8 +290,10 @@ func readPilotActionFile(t *testing.T, path string) string {
 
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
+	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-self-hosted-engineer.yml")
 	qualifyPath := filepath.Join(root, "examples", "pilots", "self-hosted", "qualify-login.sh")
 	modelPath := filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh")
+	workflow := readPilotActionFile(t, workflowPath)
 	qualify := readPilotActionFile(t, qualifyPath)
 	model := readPilotActionFile(t, modelPath)
 
@@ -306,7 +308,7 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	}
 
 	for _, required := range []string{
-		"codex login status",
+		"login status",
 		"Logged in using ChatGPT",
 		"codex-saved-login-live",
 		"credential_bootstrap_removed_before_turn==true",
@@ -317,33 +319,46 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
+		"runs-on: [self-hosted, linux, x64, engineering-platform-codex]",
+		"GITHUB_REF_PROTECTED",
+		"persist-credentials: false",
+		"Retain resumable engineering state",
+		"retained-pilot-engineering-${{ inputs.pilot }}-${{ github.run_id }}",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Fatalf("self-hosted workflow missing %q", required)
+		}
+	}
+	for _, required := range []string{
 		".protected==true",
-		"qualify-login.sh",
+		"Logged in using ChatGPT",
 		"credential_mode:\"saved_chatgpt_login\"",
-		"--saved-login-receipt",
 		"publication==\"BLOCKED_EXTERNAL_PUBLISHER\"",
 		"--execute-codex",
 		"credential_bootstrap_removed_before_turn==true",
 		"core-pre-publication.dump",
 		"result.bundle",
-		"publication:\"NOT_STARTED\"",
+		"model_phase:\"FINISHED\"",
+		"gh auth token > \"$TOKEN_FILE\"",
+		"control-plane-with-publisher.env",
+		"/api/v1/runs/$RUN_ID/actions",
+		"test \"$RESULT\" = \"CONFIRMED\"",
+		"core.dump",
+		"engineering-state.json",
 		"no model replay",
 	} {
 		if !strings.Contains(model, required) {
-			t.Fatalf("self-hosted model phase missing %q", required)
-		}
-	}
-	for _, forbidden := range []string{
-		"engineer-publish.sh",
-		"control-plane-with-publisher.env",
-		"github.publish-pr",
-		"/api/v1/runs/$RUN_ID/actions",
-	} {
-		if strings.Contains(model, forbidden) {
-			t.Fatalf("self-hosted model phase crosses publication boundary with %q", forbidden)
+			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
 		}
 	}
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("self-hosted model state is marked FINISHED before pre-publication snapshot")
 	}
+	if strings.Index(model, "gh auth token > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
+		t.Fatal("publisher token is materialized before retained model FINISHED state")
+	}
+	if strings.Contains(workflow, "${{ github.token }}") {
+		t.Fatal("self-hosted workflow must not inject job-scoped GitHub token into the saved-login chain")
+	}
 }
+
