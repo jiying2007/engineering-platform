@@ -63,6 +63,23 @@ LIVE_WORKFLOW_REF="jiying2007/engineering-platform/.github/workflows/codex-wif-l
 ENGINEER_WORKFLOW_REF="jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main"
 CONDITION="assertion.workflow_ref in [\"$LIVE_WORKFLOW_REF\", \"$ENGINEER_WORKFLOW_REF\"]"
 
+GITHUB_API_VERSION="2026-03-10"
+github_branch="$(
+  curl --fail-with-body --silent --show-error \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: $GITHUB_API_VERSION" \
+    "https://api.github.com/repos/$REPOSITORY/branches/main"
+)"
+printf '%s' "$github_branch" |
+  jq -e --arg repository "$REPOSITORY" '
+    .name == "main" and
+    .protected == true and
+    (.commit.sha | test("^[0-9a-f]{40}$"))
+  ' >/dev/null || {
+    echo "GitHub main is not protected; run examples/pilots/github/configure-main-protection.sh before provisioning WIF" >&2
+    exit 1
+  }
+
 api_get() {
   local path="$1"
   curl --fail-with-body --silent --show-error     "$API_BASE$path"     -H @"$ADMIN_HEADER_FILE"
