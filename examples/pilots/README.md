@@ -319,21 +319,20 @@ are external rather than hidden local configuration drift.
 For WIF, add the rendered WIF Worker config and real qualification receipt:
 
 ```sh
-  --worker-codex /operator/worker-codex.json
-```
-
- ```sh
   --worker-codex /operator/worker-codex-wif.json \
   --wif-receipt /operator/codex-wif-live-receipt.json
 ```
 
-For trusted self-hosted saved login, use the saved-login Worker config and
-qualification receipt:
+For trusted self-hosted saved login, the Worker config's private saved-login
+source is sufficient for readiness:
 
 ```sh
-  --worker-codex "$HOME/operator/worker-codex-saved-login.json" \
-  --saved-login-receipt "$HOME/operator/self-hosted-login/saved-login-live-receipt.json"
+  --worker-codex "$HOME/operator/worker-codex-saved-login.json"
 ```
+
+When the optional read-only saved-login diagnostic has been run, its receipt may
+also be supplied with `--saved-login-receipt`; phase-1 M1 does not require that
+extra model call.
 
 After the publisher credential/artifact view are provisioned, also add:
 
@@ -351,7 +350,7 @@ publication     READY
 
 The preflight rechecks current repository `main` against the frozen base,
 rehashes/re-probes the installed Codex binary/profile, validates the rendered
-least-privilege access policy and preparation identities, validates the selected
-real authentication receipt against the exact model/binary/configuration, and
-runs the publisher's real configuration/path/token validator. It performs no model turn and no GitHub
-write.
+least-privilege access policy and preparation identities, validates the selected authentication configuration (and WIF or optional
+saved-login receipt when applicable) against the exact model/binary, and runs
+the publisher's real configuration/path/token validator. It performs no model
+turn and no GitHub write.
