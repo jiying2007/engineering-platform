@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	engineeringWIFTurnTimeout          = 4 * time.Minute
+	engineeringWIFTurnTimeout           = 4 * time.Minute
 	engineeringWIFAssertionSafetyMargin = 30 * time.Second
 	engineeringWIFMinimumWindow         = 90 * time.Second
 	engineeringWIFProviderLifetimeLimit = 10 * time.Minute
