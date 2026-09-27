@@ -133,6 +133,7 @@ file.
 
 Stop rather than patching the templates when:
 
+- GitHub reports `main` as unprotected or `GITHUB_REF_PROTECTED` is not `true`;
 - current `main` differs from the frozen Task base;
 - the installed Codex binary/model produces a different profile digest;
 - the authenticated owner/Worker profile differs from the intended principal;
