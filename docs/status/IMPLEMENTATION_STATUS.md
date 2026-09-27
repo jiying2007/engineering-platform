@@ -1,17 +1,14 @@
 # Implementation Status
 
-Reviewed base: `cc04aea21794a89e03e505bb4f129b873a63dcf9` (#73).
-Stage: **Retained M1 execution mechanics are assembled end-to-end:
-authenticated Core + frozen approved requirement context + real managed-workspace
-WIF Codex engineering + retained result commit/Git bundle + credential-separated
-Git/PR publication + exact PR-head CI + requirement-bound Evidence + Verification
-+ independent human Review + conditional Closure. GitHub main protection,
-managed-workspace WIF workspace enablement, administrator execution of the
-hardened provider/rule provisioning and two real retained Feature/Debug
-executions still gate M1. The repository currently has no branch protection or
-ruleset on main; this must be corrected before WIF is provisioned. The Admin API
-helper is aligned to current OpenAI/GitHub WIF contracts and now fails closed
-when main is not protected, but no real retained pilot has run yet.**
+Reviewed base: `6f29464ab0cad9261fe6d3827c283339b51cd72b` (#74).
+Stage: **Retained M1 execution mechanics remain one authority chain, but Codex
+authentication is no longer WIF-only. M1 phase 1 supports trusted self-hosted
+ChatGPT-authenticated Codex on an explicitly trusted Linux host, with the saved
+login copied only into a fresh isolated Codex HOME for auth prewarm and deleted
+before model-reachable work. Managed-workspace WIF remains the preferred
+GitHub-hosted/unattended authentication lane. GitHub main protection is now
+actually active. No real retained Feature/Debug Closure chain has completed, so
+M1 and production readiness remain unclaimed.**
 
 ## Canonical scope
 
@@ -35,7 +32,8 @@ Requirement / Work / frozen Task
   -> frozen Run + approved Context
   -> mTLS Worker admission/preparation
   -> independent exact-base workspace
-  -> Core-bound Codex WIF engineering execution
+  -> Core-bound Codex engineering execution
+       (trusted self-hosted saved login OR managed-workspace WIF)
   -> retained result commit + verified Git bundle
   -> Action Gateway publication authority
   -> independent GitHub publisher
@@ -78,11 +76,11 @@ to create ClosureReceipt.
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
 | Codex qualification | Exact `codex-cli 0.155.0`, native hash, generated schema digests, real app-server protocol qualification | Production binary installation/pin remains operator-owned |
-| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained; GitHub immutable repository identity validated; execution deadline bounded by actual upstream JWT lifetime | GitHub main must first be protected; then the ChatGPT workspace administrator must enable WIF and execute the hardened real provider/rule provisioning before a retained real model claim |
+| Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential mode is explicit and mutually exclusive: trusted self-hosted saved ChatGPT login or managed-workspace WIF. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the M1 phase-1 lane; WIF remains the preferred unattended/GitHub-hosted upgrade. |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
-| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff + Admin API provisioning helpers; resumable GitHub-hosted execution artifacts | Managed-workspace WIF beta must be enabled and the #72-hardened provider/rule must be provisioned by an administrator; real runs have not yet occurred |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; trusted self-hosted saved-login and managed WIF authentication variants; resumable engineering artifacts consumed by the same Verification/Review/Closure chain | M1 phase 1 requires one dedicated repository-scoped self-hosted runner plus real Feature/Debug retained Closure chains; managed-workspace WIF remains a future unattended-path prerequisite, not a phase-1 blocker |
 
 ## Retained evidence
 
@@ -215,44 +213,51 @@ push or PR mutation.
 
 ## Deployment and next acceptance gates
 
-Source merge does not provision WIF, GitHub credentials, services or production
-Codex binaries. Operators still own those deployment boundaries.
+GitHub main protection is now a live external fact: main is protected and the
+five canonical CI checks are required. Source merge still does not provision a
+publisher credential, a managed-workspace WIF rule, or a production service.
 
-The remaining M1 sequence is now execution-only:
+M1 phase 1 no longer requires WIF. The next retained proof sequence is:
 
-1. Repository administrator runs
-   `examples/pilots/github/configure-main-protection.sh` and retains the
-   protection receipt. Main must be pull-request-only, admin-enforced, strict on
-   all five canonical CI checks, linear-history, and non-force/non-deletable.
-2. ChatGPT workspace administrator enables managed-workspace Codex WIF and runs
-   the hardened Admin API provisioning helper. The OpenAI rule must bind the
-   repository name, immutable repository/owner IDs, `workflow_dispatch`,
-   exact `refs/heads/main`, dedicated audience and the exact approved workflow
-   refs. The helper refuses to provision while GitHub reports main unprotected.
-3. Dispatch `retained-pilot-engineer.yml` for Feature #54. This performs the
-   real WIF qualification + one retained engineering turn and publishes the exact
-   result only after the model process exits.
-4. Approve the generated PR workflow run when GitHub marks the
-   `GITHUB_TOKEN`-created PR approval-required; require exact PR-head CI PASS.
-5. Dispatch `retained-pilot-verify.yml` with the engineering run ID; require
-   exact PASS Verification backed by Codex/Git/CI Evidence.
-6. A different GitHub account from the engineering dispatcher performs the
-   explicit PASS/FAIL decision through `retained-pilot-review.yml`. PASS alone
-   permits Closure; FAIL remains retained and non-CLOSED.
-7. Repeat steps 3-6 for Debug #55 using the then-current main.
-8. Only after both ClosureReceipts exist should M1 be reassessed.
+1. Register/enable a repository-scoped trusted self-hosted Linux runner for
+   `jiying2007/engineering-platform` with label
+   `engineering-platform-codex`. Require exact `codex-cli 0.155.0`,
+   `codex login status` = `Logged in using ChatGPT`, working Docker/Go, and
+   an authenticated host `gh` publisher credential.
+2. Dispatch `retained-pilot-self-hosted-engineer.yml` for Feature #54 from
+   protected main. The workflow must freeze the exact base, execute one
+   Core-bound saved-login Codex turn, retain FINISHED state/result bundle, stop
+   the model process, and only then materialize the host GitHub publisher token
+   for the existing Action Gateway.
+3. Require publication CONFIRMED and exact PR-head CI PASS.
+4. Dispatch `retained-pilot-verify.yml` with the self-hosted engineering run
+   ID; require exact Codex/Git/CI Evidence plus PASS Verification.
+5. A GitHub actor different from the engineering dispatcher performs the
+   existing independent Review. PASS alone permits Closure.
+6. Disable/remove the dedicated runner after the pilot window.
+7. Repeat the complete chain for Debug #55 from the then-current protected main
+   with new Work/Task/Run/Evidence/Review/Closure identities.
+8. Only after both real ClosureReceipts exist should M1 be reassessed.
 
-Do not substitute repository fake app-server evidence for step 1. The first real
-pilot should follow `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`; use
-`eng codex-profile` to derive the exact Worker profile/tool grant from the
-installed qualified native binary. Do not expand Runtime, Evidence or Recovery
-infrastructure unless one of these retained pilots exposes a concrete missing
-authority or failure mode.
+`examples/pilots/self-hosted/qualify-login.sh` remains an optional diagnostic
+read-only model probe. It is not a prerequisite for phase-1 retained engineering,
+so the saved ChatGPT login does not need to be consumed/refreshed twice before
+the non-replayable retained turn.
 
-At the reviewed checkpoint there are **no real `codex-wif-live`,
-`retained-pilot-engineer`, `retained-pilot-verify` or
-`retained-pilot-review` runs**. Repository fake app-server/CI evidence is not a
-substitute.
+The existing managed-workspace WIF/Admin API/GitHub-hosted workflow remains
+supported as the unattended execution lane. It is no longer an M1 phase-1 hard
+blocker and must not be represented as qualified until a real WIF turn exists.
+
+Trusted self-hosted mode has an explicit known limit: the host/account itself is
+trusted, so unrelated credentials elsewhere on that account are outside the
+Codex child-process isolation boundary. The model process receives neither the
+operator HOME nor publisher/API/WIF credential environment, and the isolated
+saved-login bootstrap is deleted before thread/start. Production/unattended
+claims should prefer WIF or a separately reviewed stronger host-isolation design.
+
+At this checkpoint there are still **no real retained Feature or Debug Closure
+chains**. Repository fixtures/fake app-server tests remain protocol/filesystem
+evidence only.
 
 **M1 and production readiness remain unclaimed.**
 

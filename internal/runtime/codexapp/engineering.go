@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,6 +18,7 @@ import (
 
 const (
 	engineeringWIFTurnTimeout           = 4 * time.Minute
+	engineeringSavedLoginTurnTimeout    = 12 * time.Minute
 	engineeringWIFAssertionSafetyMargin = 30 * time.Second
 	engineeringWIFMinimumWindow         = 90 * time.Second
 	engineeringWIFProviderLifetimeLimit = 10 * time.Minute
@@ -65,25 +67,26 @@ type EngineeringObservation struct {
 }
 
 type EngineeringReceipt struct {
-	SchemaVersion              int    `json:"schema_version"`
-	CLI                        string `json:"cli"`
-	Version                    string `json:"version"`
-	BinaryDigest               string `json:"binary_digest"`
-	EngineeringConfigDigest    string `json:"engineering_config_digest"`
-	CredentialMode             string `json:"credential_mode"`
-	FederationRuleID           string `json:"federation_rule_id"`
-	Model                      string `json:"model"`
-	PromptDigest               string `json:"prompt_digest"`
-	ThreadID                   string `json:"thread_id"`
-	TurnID                     string `json:"turn_id"`
-	TurnStatus                 string `json:"turn_status"`
-	Output                     string `json:"output"`
-	OutputDigest               string `json:"output_digest"`
-	CommandCount               int    `json:"command_count"`
-	FailedCommands             int    `json:"failed_commands"`
-	FileChangeCount            int    `json:"file_change_count"`
-	ApprovalRequests           int    `json:"approval_requests"`
-	AssertionRemovedBeforeTurn bool   `json:"assertion_removed_before_turn"`
+	SchemaVersion                        int    `json:"schema_version"`
+	CLI                                  string `json:"cli"`
+	Version                              string `json:"version"`
+	BinaryDigest                         string `json:"binary_digest"`
+	EngineeringConfigDigest              string `json:"engineering_config_digest"`
+	CredentialMode                       string `json:"credential_mode"`
+	FederationRuleID                     string `json:"federation_rule_id"`
+	Model                                string `json:"model"`
+	PromptDigest                         string `json:"prompt_digest"`
+	ThreadID                             string `json:"thread_id"`
+	TurnID                               string `json:"turn_id"`
+	TurnStatus                           string `json:"turn_status"`
+	Output                               string `json:"output"`
+	OutputDigest                         string `json:"output_digest"`
+	CommandCount                         int    `json:"command_count"`
+	FailedCommands                       int    `json:"failed_commands"`
+	FileChangeCount                      int    `json:"file_change_count"`
+	ApprovalRequests                     int    `json:"approval_requests"`
+	AssertionRemovedBeforeTurn           bool   `json:"assertion_removed_before_turn"`
+	CredentialBootstrapRemovedBeforeTurn bool   `json:"credential_bootstrap_removed_before_turn"`
 }
 
 func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, turnID string) (EngineeringObservation, error) {
@@ -284,13 +287,123 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 	receipt = EngineeringReceipt{
 		SchemaVersion: 1, CLI: "codex-cli", Version: QualifiedCodexVersion,
 		BinaryDigest: binaryDigest, EngineeringConfigDigest: EngineeringConfigDigest(),
-		CredentialMode: "workload_identity", FederationRuleID: ruleID, Model: model,
+		CredentialMode: CredentialModeWorkloadIdentity, FederationRuleID: ruleID, Model: model,
 		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
 		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
 		FileChangeCount: observation.FileChangeCount, ApprovalRequests: observation.ApprovalRequests,
-		AssertionRemovedBeforeTurn: true,
+		AssertionRemovedBeforeTurn:           true,
+		CredentialBootstrapRemovedBeforeTurn: false,
+	}
+	return receipt, receipt.Validate()
+}
+
+func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model, prompt string) (EngineeringReceipt, error) {
+	var receipt EngineeringReceipt
+	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
+		strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > 64<<10 {
+		return receipt, fmt.Errorf("qualified binary, bounded model and prompt required")
+	}
+	provider, err := NewPinnedSavedLoginEngineeringProvider(executable, binaryDigest, savedLoginFile)
+	if err != nil {
+		return receipt, err
+	}
+	versionHome, err := os.MkdirTemp("", "engineering-platform-codex-engineering-version-")
+	if err != nil {
+		return receipt, err
+	}
+	defer os.RemoveAll(versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
+		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	}
+	runCtx, cancel := context.WithTimeout(ctx, engineeringSavedLoginTurnTimeout)
+	defer cancel()
+	cmd, err := provider.Command(runCtx, runtimeprovider.LaunchSpec{Dir: work, Env: []string{"HOME=" + home}})
+	if err != nil {
+		return receipt, err
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return receipt, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return receipt, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
+	if err := cmd.Start(); err != nil {
+		return receipt, err
+	}
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- cmd.Wait() }()
+	client := NewClient(stdout, stdin)
+	processJoined := false
+	defer func() {
+		_ = client.Close()
+		cancel()
+		if !processJoined {
+			select {
+			case <-waitDone:
+			case <-time.After(5 * time.Second):
+				_ = cmd.Process.Kill()
+				<-waitDone
+			}
+		}
+	}()
+	adapter, err := NewAdapter(client, work)
+	if err != nil {
+		return receipt, err
+	}
+	if err := adapter.Initialize(runCtx, "engineering-platform-codex-core-saved-login-v1"); err != nil {
+		return receipt, fmt.Errorf("initialize: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	if err := adapter.WarmCredential(runCtx); err != nil {
+		return receipt, fmt.Errorf("saved ChatGPT login prewarm: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	bootstrap := filepath.Join(home, ".codex", "auth.json")
+	if err := os.Remove(bootstrap); err != nil {
+		return receipt, fmt.Errorf("remove saved ChatGPT login bootstrap before engineering turn: %w", err)
+	}
+	if _, err := os.Stat(bootstrap); !os.IsNotExist(err) {
+		return receipt, fmt.Errorf("saved ChatGPT login bootstrap remained reachable before engineering turn")
+	}
+	threadID, err := adapter.StartEngineeringThread(runCtx, model)
+	if err != nil {
+		return receipt, fmt.Errorf("thread/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	turnID, err := adapter.StartTurn(runCtx, prompt)
+	if err != nil {
+		return receipt, fmt.Errorf("turn/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	observation, err := ObserveEngineeringTurn(runCtx, adapter, threadID, turnID)
+	if err != nil {
+		return receipt, err
+	}
+	_ = client.Close()
+	select {
+	case <-time.After(5 * time.Second):
+		cancel()
+		return receipt, fmt.Errorf("app-server did not stop after engineering turn")
+	case waitErr := <-waitDone:
+		processJoined = true
+		if waitErr != nil {
+			return receipt, fmt.Errorf("app-server exited after engineering turn: %w", waitErr)
+		}
+	}
+	receipt = EngineeringReceipt{
+		SchemaVersion: 1, CLI: "codex-cli", Version: QualifiedCodexVersion,
+		BinaryDigest: binaryDigest, EngineeringConfigDigest: EngineeringConfigDigest(),
+		CredentialMode: CredentialModeSavedChatGPTLogin, FederationRuleID: "", Model: model,
+		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
+		TurnStatus: observation.Status, Output: observation.Output,
+		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
+		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
+		FileChangeCount: observation.FileChangeCount, ApprovalRequests: observation.ApprovalRequests,
+		AssertionRemovedBeforeTurn:           false,
+		CredentialBootstrapRemovedBeforeTurn: true,
 	}
 	return receipt, receipt.Validate()
 }
@@ -298,14 +411,27 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 func (r EngineeringReceipt) Validate() error {
 	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion ||
 		!canonical.ValidDigest(r.BinaryDigest) || r.EngineeringConfigDigest != EngineeringConfigDigest() ||
-		r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
 		strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 ||
 		r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.CommandCount < 0 ||
 		r.FailedCommands < 0 || r.FailedCommands > r.CommandCount || r.FileChangeCount < 0 ||
-		r.ApprovalRequests != 0 || !r.AssertionRemovedBeforeTurn {
+		r.ApprovalRequests != 0 {
 		return fmt.Errorf("invalid engineering Codex receipt")
+	}
+	switch r.CredentialMode {
+	case CredentialModeWorkloadIdentity:
+		if !validFederationRuleID(r.FederationRuleID) || !r.AssertionRemovedBeforeTurn ||
+			r.CredentialBootstrapRemovedBeforeTurn {
+			return fmt.Errorf("invalid engineering workload-identity receipt")
+		}
+	case CredentialModeSavedChatGPTLogin:
+		if r.FederationRuleID != "" || r.AssertionRemovedBeforeTurn ||
+			!r.CredentialBootstrapRemovedBeforeTurn {
+			return fmt.Errorf("invalid engineering saved-login receipt")
+		}
+	default:
+		return fmt.Errorf("invalid engineering credential mode")
 	}
 	return nil
 }

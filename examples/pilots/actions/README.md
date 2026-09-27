@@ -1,7 +1,10 @@
 # GitHub-hosted retained pilot execution
 
-The GitHub-hosted path is an operator shortcut for the same Core authorities.
-It does not create a second Runtime or Evidence path.
+The GitHub-hosted path is the managed-workspace WIF authentication variant of
+the same Core authorities. It does not create a second Runtime or Evidence path.
+M1 phase 1 may alternatively use the trusted self-hosted saved-ChatGPT-login
+model phase documented under `examples/pilots/self-hosted/`; publication,
+trusted CI, Evidence, Verification, Review and Closure remain the same.
 
 ## Engineer workflow
 

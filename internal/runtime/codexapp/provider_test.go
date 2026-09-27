@@ -258,3 +258,77 @@ func TestWIFProviderWritesOnlyFixedCredentialSafeConfig(t *testing.T) {
 		t.Fatal("credential data leaked into Codex config")
 	}
 }
+
+func savedLoginFixture(t *testing.T, engineering bool) (*Provider, runtimeprovider.LaunchSpec, string) {
+	t.Helper()
+	base, spec := launchFixture(t)
+	digest, err := executableDigest(base.executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secretDir := filepath.Join(filepath.Dir(strings.TrimPrefix(spec.Env[0], "HOME=")), "saved-login")
+	if err := os.Mkdir(secretDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(secretDir, "auth.json")
+	if err := os.WriteFile(source, []byte(`{"tokens":{"access_token":"fixture","refresh_token":"fixture"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var provider *Provider
+	if engineering {
+		provider, err = NewPinnedSavedLoginEngineeringProvider(base.executable, digest, source)
+	} else {
+		provider, err = NewPinnedSavedLoginProvider(base.executable, digest, source)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return provider, spec, source
+}
+
+func TestSavedLoginProviderBootstrapsOnlyIsolatedAuthFile(t *testing.T) {
+	p, spec, source := savedLoginFixture(t, true)
+	cmd, err := p.Command(context.Background(), spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	home := strings.TrimPrefix(spec.Env[0], "HOME=")
+	data, err := os.ReadFile(filepath.Join(home, ".codex", "auth.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "refresh_token") {
+		t.Fatal("saved login bootstrap missing")
+	}
+	joined := strings.Join(cmd.Env, "\n")
+	if strings.Contains(joined, source) || strings.Contains(joined, "fixture") {
+		t.Fatal("saved login source or bytes leaked into child environment")
+	}
+	config, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(config) != engineeringConfig || !strings.Contains(string(config), `cli_auth_credentials_store = "file"`) {
+		t.Fatalf("unexpected saved-login engineering config: %q", config)
+	}
+}
+
+func TestSavedLoginProviderRejectsUnsafeSource(t *testing.T) {
+	for _, kind := range []string{"public-file", "public-parent"} {
+		t.Run(kind, func(t *testing.T) {
+			p, spec, source := savedLoginFixture(t, false)
+			if kind == "public-file" {
+				if err := os.Chmod(source, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.Chmod(filepath.Dir(source), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := p.Command(context.Background(), spec); err == nil {
+				t.Fatal("unsafe saved login accepted")
+			}
+		})
+	}
+}

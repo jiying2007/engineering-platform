@@ -42,6 +42,7 @@ func helperServer() error {
 	thread := false
 	active := false
 	engineering := false
+	credentialSafeReadOnly := false
 	var worktree string
 	send := func(id json.RawMessage, result any) error {
 		return out.Encode(map[string]any{"id": id, "result": result})
@@ -79,11 +80,15 @@ func helperServer() error {
 			ready = true
 		case "account/rateLimits/read":
 			token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE")
-			if token == "" {
-				return errors.New("WIF token path missing during prewarm")
-			}
-			if _, err := os.Stat(token); err != nil {
-				return errors.New("WIF assertion unavailable during prewarm")
+			if token != "" {
+				if _, err := os.Stat(token); err != nil {
+					return errors.New("WIF assertion unavailable during prewarm")
+				}
+			} else {
+				auth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
+				if _, err := os.Stat(auth); err != nil {
+					return errors.New("saved ChatGPT login unavailable during prewarm")
+				}
 			}
 			if err := send(m.ID, map[string]any{"rateLimits": map[string]any{"primary": nil}}); err != nil {
 				return err
@@ -107,16 +112,22 @@ func helperServer() error {
 			}
 			engineering = p.Sandbox == "workspace-write"
 			worktree = p.CWD
-			if engineering {
-				if token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE"); token == "" {
-					return errors.New("engineering launch lost token locator")
-				} else if _, err := os.Stat(token); !os.IsNotExist(err) {
-					return errors.New("WIF assertion remained reachable at engineering thread/start")
+			configPath := filepath.Join(os.Getenv("CODEX_HOME"), "config.toml")
+			config, configErr := os.ReadFile(configPath)
+			credentialSafeReadOnly = !engineering && configErr == nil && string(config) == credentialSafeConfig
+			token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE")
+			if token != "" {
+				if _, err := os.Stat(token); !os.IsNotExist(err) {
+					return errors.New("WIF assertion remained reachable at thread/start")
 				}
-				config, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
-				if err != nil || string(config) != engineeringConfig {
-					return errors.New("engineering config was not the fixed qualified profile")
+			} else if credentialSafeReadOnly || engineering {
+				auth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
+				if _, err := os.Stat(auth); !os.IsNotExist(err) {
+					return errors.New("saved ChatGPT login bootstrap remained reachable at thread/start")
 				}
+			}
+			if engineering && (configErr != nil || string(config) != engineeringConfig) {
+				return errors.New("engineering config was not the fixed qualified profile")
 			}
 			thread = true
 			if err := send(m.ID, map[string]any{"thread": map[string]string{"id": "thread-1"}}); err != nil {
@@ -141,6 +152,14 @@ func helperServer() error {
 					return err
 				}
 				if err := event("item/completed", map[string]any{"threadId": "thread-1", "turnId": "turn-1", "item": map[string]any{"type": "agentMessage", "id": "message-1", "text": "fixture engineering change complete"}}); err != nil {
+					return err
+				}
+				if err := event("turn/completed", map[string]any{"threadId": "thread-1", "turn": map[string]string{"id": "turn-1", "status": "completed"}}); err != nil {
+					return err
+				}
+				active = false
+			} else if credentialSafeReadOnly {
+				if err := event("item/completed", map[string]any{"threadId": "thread-1", "turnId": "turn-1", "item": map[string]any{"type": "agentMessage", "id": "message-1", "text": LiveProbeExpected}}); err != nil {
 					return err
 				}
 				if err := event("turn/completed", map[string]any{"threadId": "thread-1", "turn": map[string]string{"id": "turn-1", "status": "completed"}}); err != nil {

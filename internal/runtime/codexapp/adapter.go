@@ -74,7 +74,7 @@ func (a *Adapter) Initialize(ctx context.Context, version string) error {
 	a.mu.Unlock()
 	return nil
 }
-func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
+func (a *Adapter) WarmCredential(ctx context.Context) error {
 	if err := a.enter(ctx); err != nil {
 		return err
 	}
@@ -85,10 +85,11 @@ func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
 	if !ready || thread != "" || turn != "" {
 		return ErrLifecycle
 	}
-	// account/rateLimits/read resolves AuthManager::auth().await in Codex 0.155.0.
-	// For workload identity this performs the assertion exchange without starting
-	// a thread, model turn, tool, or approval flow. Success is the deletion fence:
-	// the host may remove the upstream assertion before any model-reachable work.
+	// account/rateLimits/read resolves AuthManager::auth().await in Codex 0.155.0
+	// without starting a thread, model turn, tool, or approval flow. For WIF this
+	// performs the assertion exchange; for saved ChatGPT login it loads/refreshes
+	// the isolated bootstrap credential into the app-server process. Success is
+	// the host deletion fence before any model-reachable work.
 	var result struct {
 		RateLimits json.RawMessage `json:"rateLimits"`
 	}
@@ -103,6 +104,10 @@ func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
 		return ErrProtocol
 	}
 	return nil
+}
+
+func (a *Adapter) WarmWorkloadIdentity(ctx context.Context) error {
+	return a.WarmCredential(ctx)
 }
 
 func (a *Adapter) StartThread(ctx context.Context, model string) (string, error) {

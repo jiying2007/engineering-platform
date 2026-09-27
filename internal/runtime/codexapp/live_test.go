@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -197,4 +199,76 @@ func TestLiveReceiptRequiresAssertionRemovalFence(t *testing.T) {
 
 func canonicalDigestText(value string) string {
 	return canonical.BytesDigest([]byte(value))
+}
+
+func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
+	r := LiveReceipt{
+		SchemaVersion:                        1,
+		CLI:                                  "codex-cli",
+		Version:                              QualifiedCodexVersion,
+		BinaryDigest:                         "sha256:" + strings.Repeat("a", 64),
+		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialMode:                       CredentialModeSavedChatGPTLogin,
+		Model:                                "gpt-5.6-sol",
+		PromptDigest:                         canonicalDigestText(LiveProbePrompt),
+		ThreadID:                             "thread-saved",
+		TurnID:                               "turn-saved",
+		TurnStatus:                           "completed",
+		Output:                               LiveProbeExpected,
+		OutputDigest:                         canonicalDigestText(LiveProbeExpected),
+		CredentialBootstrapRemovedBeforeTurn: true,
+	}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.CredentialBootstrapRemovedBeforeTurn = false
+	if err := r.Validate(); err == nil {
+		t.Fatal("saved-login receipt without bootstrap-removal fence accepted")
+	}
+}
+
+func TestLiveSavedLoginProbeDeletesBootstrapBeforeReadOnlyTurn(t *testing.T) {
+	root := t.TempDir()
+	work := filepath.Join(root, "work")
+	home := filepath.Join(root, "home")
+	loginDir := filepath.Join(root, "saved-login")
+	for _, dir := range []string{work, home, loginDir} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	login := filepath.Join(loginDir, "auth.json")
+	if err := os.WriteFile(login, []byte(`{"tokens":{"access_token":"fixture","refresh_token":"fixture"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable, err = filepath.EvalSymlinks(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := executableDigest(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	receipt, err := LiveSavedLoginProbe(ctx, executable, digest, work, home, login, "gpt-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.CredentialMode != CredentialModeSavedChatGPTLogin ||
+		!receipt.CredentialBootstrapRemovedBeforeTurn ||
+		receipt.AssertionRemovedBeforeTurn ||
+		receipt.Output != LiveProbeExpected {
+		t.Fatalf("unexpected saved-login live receipt: %#v", receipt)
+	}
+	if _, err := os.Stat(filepath.Join(home, ".codex", "auth.json")); !os.IsNotExist(err) {
+		t.Fatal("saved login bootstrap still exists after live probe")
+	}
+	if _, err := os.Stat(login); err != nil {
+		t.Fatal("operator saved login source was modified")
+	}
 }

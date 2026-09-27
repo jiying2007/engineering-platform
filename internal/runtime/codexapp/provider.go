@@ -18,14 +18,22 @@ import (
 )
 
 type Provider struct {
-	executable      string
-	digest          string
-	credentialSafe  bool
-	engineeringMode bool
+	executable       string
+	digest           string
+	credentialSafe   bool
+	engineeringMode  bool
+	savedLoginSource string
 }
 
-const credentialSafeConfig = "[features]\nshell_tool = false\nview_image = false\n"
-const engineeringConfig = `approval_policy = "never"
+const (
+	CredentialModeWorkloadIdentity  = "workload_identity"
+	CredentialModeSavedChatGPTLogin = "saved_chatgpt_login"
+)
+
+const credentialSafeConfig = "cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n"
+const engineeringConfig = `cli_auth_credentials_store = "file"
+
+approval_policy = "never"
 sandbox_mode = "workspace-write"
 web_search = "disabled"
 allow_login_shell = false
@@ -81,8 +89,31 @@ func NewPinnedWIFEngineeringProvider(executable, digest string) (*Provider, erro
 	return p, nil
 }
 
-func EngineeringConfigDigest() string { return canonical.BytesDigest([]byte(engineeringConfig)) }
-func (p *Provider) Name() string      { return "codex-app-server" }
+func NewPinnedSavedLoginProvider(executable, digest, savedLoginSource string) (*Provider, error) {
+	p, err := NewPinnedWIFProvider(executable, digest)
+	if err != nil {
+		return nil, err
+	}
+	source, err := privateSavedLogin(savedLoginSource)
+	if err != nil {
+		return nil, err
+	}
+	p.savedLoginSource = source
+	return p, nil
+}
+
+func NewPinnedSavedLoginEngineeringProvider(executable, digest, savedLoginSource string) (*Provider, error) {
+	p, err := NewPinnedSavedLoginProvider(executable, digest, savedLoginSource)
+	if err != nil {
+		return nil, err
+	}
+	p.engineeringMode = true
+	return p, nil
+}
+
+func CredentialSafeConfigDigest() string { return canonical.BytesDigest([]byte(credentialSafeConfig)) }
+func EngineeringConfigDigest() string    { return canonical.BytesDigest([]byte(engineeringConfig)) }
+func (p *Provider) Name() string         { return "codex-app-server" }
 
 // Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
 // paths, separate identities/read-only mounts and resource limits remain required.
@@ -149,14 +180,18 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	wifToken, hasToken := values["OPENAI_IDENTITY_TOKEN_FILE"]
 	wifContext, hasContext := values["OPENAI_WORKLOAD_IDENTITY_CONTEXT"]
 	baseURL, hasBaseURL := values["OPENAI_BASE_URL"]
+	savedLogin := p.savedLoginSource != ""
 	if hasRule != hasToken {
 		return nil, fmt.Errorf("workload identity requires both federation rule and identity token file")
 	}
 	if hasRule && !p.credentialSafe {
 		return nil, fmt.Errorf("workload identity requires the credential-safe provider")
 	}
-	if p.credentialSafe && !hasRule {
-		return nil, fmt.Errorf("credential-safe Codex profile requires workload identity")
+	if savedLogin && hasRule {
+		return nil, fmt.Errorf("saved ChatGPT login and workload identity are mutually exclusive")
+	}
+	if p.credentialSafe && !hasRule && !savedLogin {
+		return nil, fmt.Errorf("credential-safe Codex profile requires workload identity or saved ChatGPT login")
 	}
 	if hasContext && !hasRule {
 		return nil, fmt.Errorf("workload identity context requires workload identity")
@@ -191,6 +226,19 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 			}
 		}
 	}
+	if savedLogin {
+		if _, hasAPIKey := values["OPENAI_API_KEY"]; hasAPIKey || hasBaseURL || hasContext {
+			return nil, fmt.Errorf("saved ChatGPT login cannot carry provider overrides")
+		}
+		source, err := privateSavedLogin(p.savedLoginSource)
+		if err != nil {
+			return nil, err
+		}
+		if inside(work, source) || inside(home, source) {
+			return nil, fmt.Errorf("saved ChatGPT login source must be outside runtime workspace and HOME")
+		}
+		p.savedLoginSource = source
+	}
 	// No filesystem mutation occurs until every credential and endpoint input has
 	// passed validation. A rejected launch must leave a fresh HOME reusable.
 	entries, err := os.ReadDir(home)
@@ -214,6 +262,15 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 		}
 		if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 			return nil, fmt.Errorf("write credential-safe Codex config: %w", err)
+		}
+	}
+	if savedLogin {
+		data, err := os.ReadFile(p.savedLoginSource)
+		if err != nil || len(data) < 16 || len(data) > 1<<20 || strictjson.ValidateObject(data) != nil {
+			return nil, fmt.Errorf("saved ChatGPT login source must be a bounded JSON object")
+		}
+		if err := os.WriteFile(filepath.Join(home, ".codex", "auth.json"), data, 0o600); err != nil {
+			return nil, fmt.Errorf("bootstrap isolated saved ChatGPT login: %w", err)
 		}
 	}
 
@@ -265,6 +322,28 @@ func privateIdentityToken(path string) (string, error) {
 		return "", fmt.Errorf("identity token parent must be owner-private")
 	}
 	return resolved, nil
+}
+
+func privateSavedLogin(path string) (string, error) {
+	resolved, err := canonicalPath(path, false)
+	if err != nil {
+		return "", fmt.Errorf("saved ChatGPT login path: %w", err)
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 || info.Size() < 16 || info.Size() > 1<<20 {
+		return "", fmt.Errorf("saved ChatGPT login must be a bounded owner-private regular file")
+	}
+	parent := filepath.Dir(resolved)
+	parentInfo, err := os.Stat(parent)
+	if err != nil || !parentInfo.IsDir() || parentInfo.Mode().Perm()&0o077 != 0 {
+		return "", fmt.Errorf("saved ChatGPT login parent must be owner-private")
+	}
+	return resolved, nil
+}
+
+func ValidateSavedLoginFile(path string) error {
+	_, err := privateSavedLogin(path)
+	return err
 }
 
 func executableDigest(path string) (string, error) {

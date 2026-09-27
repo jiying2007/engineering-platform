@@ -6,9 +6,10 @@ M1 pilots:
 - Feature requirement: GitHub issue #54
 - Debug requirement: GitHub issue #55
 
-They are **pre-WIF readiness material only**. Rendering or dry-running them does
-not create model Evidence and does not replace the real managed-workspace WIF
-turn.
+They are **pre-model readiness material only**. Rendering or dry-running them
+does not create model Evidence and does not replace a real retained Codex turn,
+whether authenticated by trusted self-hosted saved ChatGPT login or managed
+workspace WIF.
 
 ## Runtime values
 
@@ -109,7 +110,10 @@ access. The ContextSource directory must be canonical and non-group/world
 writable; the `<digest>.bin` requirement file must be read-only.
 
 Generate the Worker Codex configuration from the exact output of
-`eng codex-profile`; do not retype the profile object:
+`eng codex-profile`; do not retype the profile object. Choose exactly one
+credential mode.
+
+Managed-workspace WIF:
 
 ```sh
 FEDERATION_RULE_ID='<administrator-provided-rule-id>'
@@ -118,6 +122,7 @@ jq --arg rule "$FEDERATION_RULE_ID" \
   '{
     version: 1,
     codex_executable: .codex_executable,
+    credential_mode: "workload_identity",
     federation_rule_id: $rule,
     profile: .profile
   }' \
@@ -129,6 +134,27 @@ At execution time the only WIF secret input is the short-lived
 `OPENAI_IDENTITY_TOKEN_FILE`; it is not written into either configuration
 file.
 
+Trusted self-hosted saved ChatGPT login:
+
+```sh
+SAVED_LOGIN_FILE="$(readlink -f "$HOME/.codex/auth.json")"
+
+jq --arg login "$SAVED_LOGIN_FILE" \
+  '{
+    version: 1,
+    codex_executable: .codex_executable,
+    credential_mode: "saved_chatgpt_login",
+    saved_login_file: $login,
+    profile: .profile
+  }' \
+  codex-profile.json \
+  > "$HOME/operator/worker-codex-saved-login.json"
+```
+
+The saved login source remains operator-owned. Runtime copies it only into a
+fresh isolated Codex HOME for authentication prewarm and deletes that copy
+before any model turn.
+
 ## Stop conditions
 
 Stop rather than patching the templates when:
@@ -137,7 +163,8 @@ Stop rather than patching the templates when:
 - current `main` differs from the frozen Task base;
 - the installed Codex binary/model produces a different profile digest;
 - the authenticated owner/Worker profile differs from the intended principal;
-- WIF/publisher prerequisites are absent;
+- the selected real Codex authentication qualification or publisher
+  prerequisites are absent;
 - Task material is not READY;
 - the real Codex result is not FINISHED;
 - publication is not CONFIRMED;
@@ -278,30 +305,34 @@ eng pilot-preflight \
   --worker-profile worker/codex-pilot
 ```
 
-Before the workspace administrator has completed WIF and before the publisher
-credential is provisioned, a successful internal preflight intentionally reports:
+Before either real Codex authentication mode is qualified and before the
+publisher credential is provisioned, a successful internal preflight reports:
 
 - `internal: READY`;
-- `model_execution: BLOCKED_EXTERNAL_WIF`;
+- `model_execution: BLOCKED_EXTERNAL_CODEX_AUTH`;
 - `publication: BLOCKED_EXTERNAL_PUBLISHER`;
 - explicit `external_blockers`.
 
 That is not an error and is not model Evidence. It means the remaining blockers
 are external rather than hidden local configuration drift.
 
-When the administrator has provided the federation rule, add the rendered Worker
-Codex config:
+For WIF, add the rendered WIF Worker config and real qualification receipt:
 
 ```sh
-  --worker-codex /operator/worker-codex.json
-```
-
-After one successful real `codex-wif-live.yml` qualification, download/extract
-its JSON receipt and add:
-
-```sh
+  --worker-codex /operator/worker-codex-wif.json \
   --wif-receipt /operator/codex-wif-live-receipt.json
 ```
+
+For trusted self-hosted saved login, the Worker config's private saved-login
+source is sufficient for readiness:
+
+```sh
+  --worker-codex "$HOME/operator/worker-codex-saved-login.json"
+```
+
+When the optional read-only saved-login diagnostic has been run, its receipt may
+also be supplied with `--saved-login-receipt`; phase-1 M1 does not require that
+extra model call.
 
 After the publisher credential/artifact view are provisioned, also add:
 
@@ -319,7 +350,7 @@ publication     READY
 
 The preflight rechecks current repository `main` against the frozen base,
 rehashes/re-probes the installed Codex binary/profile, validates the rendered
-least-privilege access policy and preparation identities, validates the real WIF
-receipt against the exact model/binary/federation rule, and runs the publisher's
-real configuration/path/token validator. It performs no model turn and no GitHub
-write.
+least-privilege access policy and preparation identities, validates the selected authentication configuration (and WIF or optional
+saved-login receipt when applicable) against the exact model/binary, and runs
+the publisher's real configuration/path/token validator. It performs no model
+turn and no GitHub write.

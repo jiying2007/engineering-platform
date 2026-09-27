@@ -115,7 +115,9 @@ func TestCredentialSafeProfileProbeRequiresDisabledStableFeatures(t *testing.T) 
 set -eu
 test "$1" = features
 test "$2" = list
-test "$(cat "$CODEX_HOME/config.toml")" = "[features]
+test "$(cat "$CODEX_HOME/config.toml")" = "cli_auth_credentials_store = \"file\"
+
+[features]
 shell_tool = false
 view_image = false"
 printf '%s

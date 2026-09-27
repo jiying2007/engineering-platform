@@ -12,7 +12,8 @@ A pilot is retained only when the exact chain reaches Closure:
 ```
 Requirement
   -> frozen Task / Run / approved Context
-  -> real managed-workspace WIF Codex engineering
+  -> real Core-bound Codex engineering
+       (trusted self-hosted saved ChatGPT login OR managed-workspace WIF)
   -> retained result commit + Git bundle
   -> independently authorized GitHub PR publication
   -> exact PR-head trusted CI
@@ -51,7 +52,80 @@ GitHub's own `GITHUB_REF_PROTECTED=true` runtime fact. If branch protection is
 removed after setup, the retained chain fails closed before model execution or
 evidence/review mutation.
 
-### Managed-workspace WIF
+### Codex authentication modes
+
+M1 accepts exactly one of two explicit authentication modes for a retained
+engineering execution. The Core Task/Run, Worker preparation, prompt identity,
+result bundle, publication, CI, Evidence, Verification, Review and Closure
+authorities are identical in both modes.
+
+#### Trusted self-hosted saved ChatGPT login — M1 phase 1
+
+A trusted Linux execution host may use an existing Codex CLI ChatGPT login when:
+
+- the exact qualified native Codex binary is pinned and hashed;
+- `codex login status` reports `Logged in using ChatGPT`;
+- the operator saved login file is an owner-private regular file;
+- the Worker receives a fresh isolated HOME rather than the operator HOME;
+- the saved login is copied only into that isolated HOME for authentication
+  prewarm and the copied `auth.json` is deleted before `thread/start`;
+- `OPENAI_API_KEY`, `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN`, WIF inputs and
+  all publisher credentials are absent from the model-phase environment;
+- the model tool profile remains no-network, workspace-write and
+  approval-policy `never`.
+
+Use a dedicated repository-scoped GitHub self-hosted runner for the retained
+phase-1 execution. The runner must carry the custom label
+`engineering-platform-codex` and should be enabled only for the pilot window.
+
+The existing saved login is readiness input; a separate model probe is optional,
+not mandatory. Verify the host before dispatch:
+
+```sh
+CODEX_NATIVE="$(readlink -f "$(command -v codex)")"
+"$CODEX_NATIVE" --version
+"$CODEX_NATIVE" login status
+gh auth status
+docker version
+```
+
+Required Codex state is exact `codex-cli 0.155.0` and
+`Logged in using ChatGPT`.
+
+When diagnosing saved-login behavior independently, the optional read-only probe
+is:
+
+```sh
+bash examples/pilots/self-hosted/qualify-login.sh \
+  "$HOME/operator/self-hosted-login" \
+  "$CODEX_NATIVE" \
+  "$(readlink -f "${CODEX_HOME:-$HOME/.codex}/auth.json")" \
+  gpt-5.6-sol
+```
+
+For the retained Feature execution, dispatch:
+
+```sh
+gh workflow run retained-pilot-self-hosted-engineer.yml \
+  --repo jiying2007/engineering-platform \
+  --ref main \
+  -f pilot=feature \
+  -f model=gpt-5.6-sol
+```
+
+The workflow performs the saved-login Core-bound Codex turn and existing Action
+Gateway publication in one resumable GitHub engineering run, but preserves the
+credential boundary: FINISHED Core state, result bundle and the stopped model
+process must exist before the host `gh` publisher token is materialized. The
+resulting engineering artifact uses the same shape consumed by
+`retained-pilot-verify.yml`.
+
+This lane deliberately treats the Linux account/host as trusted. It does not
+claim unattended or production-grade credential isolation: unrelated
+credentials may exist elsewhere in the same account. Managed WIF is the
+preferred upgrade for unattended execution.
+
+#### Managed-workspace WIF — unattended/GitHub-hosted lane
 
 The ChatGPT workspace administrator must enable/configure the Codex workload
 identity provider/rule that accepts the approved workload identity.
@@ -135,8 +209,10 @@ capabilities, the selected worker profile, `action:execute`, and only the exact
 Core-bound Codex action grant required by policy. Do not grant
 `github.publish-pr` to the Worker.
 
-The Worker Codex config also binds the exact native executable and approved
-federation rule ID.
+The Worker Codex config also binds the exact native executable and exactly one
+credential mode. WIF mode binds the approved federation rule ID. Trusted
+self-hosted mode binds the owner-private saved-login source path; the runtime
+copies it only into an isolated HOME and deletes the copy before model work.
 
 ## 3. Select a small real pilot
 
@@ -203,15 +279,29 @@ The Work/Task/Run must remain on one immutable base/result lineage.
 ## 6. Admit, prepare and execute the real Codex turn
 
 First consume the normal Worker admission/preparation flow for the exact Run.
-Then, with the prepared Run and short-lived WIF assertion available:
+Then execute exactly one configured authentication mode.
+
+WIF:
 
 ```sh
 WORKER_PREPARATION_CONFIG=/operator/preparation.json \
-WORKER_CODEX_CONFIG=/operator/codex.json \
+WORKER_CODEX_CONFIG=/operator/codex-wif.json \
 OPENAI_IDENTITY_TOKEN_FILE=/run/identity/assertion.jwt \
 eng-worker --profile <worker-profile> \
   --execute-codex --run <run-id> --once
 ```
+
+Trusted self-hosted saved login:
+
+```sh
+WORKER_PREPARATION_CONFIG=/operator/preparation.json \
+WORKER_CODEX_CONFIG=/operator/codex-saved-login.json \
+eng-worker --profile <worker-profile> \
+  --execute-codex --run <run-id> --once
+```
+
+The saved-login config points to the operator-owned private login source. It
+does not make the operator HOME the model HOME.
 
 Use the repository's built `worker` binary name/path in deployment; the example
 above names it `eng-worker` only to distinguish it from the `eng` CLI.
@@ -421,8 +511,9 @@ the fix and that the exact CI/Verification evidence covers the regression.
 
 Stop the pilot rather than weakening authority when any of these occurs:
 
-- WIF qualification has no successful retained real turn;
-- Worker assertion cannot be minted by the approved external workload identity;
+- saved-login mode cannot prove the trusted host's ChatGPT login/private
+  `auth.json` source or cannot delete the isolated bootstrap before model work;
+- WIF mode cannot mint/verify the approved workload identity assertion;
 - publisher credential or artifact view is absent;
 - main/base commit changes before publication;
 - Codex status is not FINISHED;

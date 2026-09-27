@@ -16,15 +16,29 @@ import (
 
 type CodexRuntime struct {
 	Executable        string
+	CredentialMode    string
 	FederationRuleID  string
 	IdentityTokenFile string
+	SavedLoginFile    string
 	AuditContext      string
 }
 
 func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, request codexexec.Start, runtime CodexRuntime) (receipt codexexec.Receipt, err error) {
 	if c == nil || p == nil || c.Subject() != p.Subject() || request.Profile.Validate() != nil ||
-		runtime.Executable == "" || runtime.FederationRuleID == "" || runtime.IdentityTokenFile == "" {
-		return receipt, fmt.Errorf("authenticated preparation owner, exact Codex profile and WIF runtime required")
+		runtime.Executable == "" {
+		return receipt, fmt.Errorf("authenticated preparation owner and exact Codex profile/runtime required")
+	}
+	switch runtime.CredentialMode {
+	case codexapp.CredentialModeWorkloadIdentity:
+		if runtime.FederationRuleID == "" || runtime.IdentityTokenFile == "" || runtime.SavedLoginFile != "" {
+			return receipt, fmt.Errorf("complete workload-identity Codex runtime required")
+		}
+	case codexapp.CredentialModeSavedChatGPTLogin:
+		if runtime.SavedLoginFile == "" || runtime.FederationRuleID != "" || runtime.IdentityTokenFile != "" {
+			return receipt, fmt.Errorf("isolated saved ChatGPT login Codex runtime required")
+		}
+	default:
+		return receipt, fmt.Errorf("unsupported Codex credential mode")
 	}
 	var permit codexexec.Permit
 	if err = c.Call(ctx, http.MethodPost, "/api/v1/worker/codex/start", request, &permit); err != nil {
@@ -91,18 +105,33 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	codexReceipt, err := codexapp.EngineeringWIFTurn(
-		runCtx,
-		runtime.Executable,
-		request.Profile.BinaryDigest,
-		prepared.Workspace.WorktreePath,
-		prepared.Workspace.HomePath,
-		runtime.FederationRuleID,
-		runtime.IdentityTokenFile,
-		runtime.AuditContext,
-		request.Profile.Model,
-		prompt,
-	)
+	var codexReceipt codexapp.EngineeringReceipt
+	switch runtime.CredentialMode {
+	case codexapp.CredentialModeWorkloadIdentity:
+		codexReceipt, err = codexapp.EngineeringWIFTurn(
+			runCtx,
+			runtime.Executable,
+			request.Profile.BinaryDigest,
+			prepared.Workspace.WorktreePath,
+			prepared.Workspace.HomePath,
+			runtime.FederationRuleID,
+			runtime.IdentityTokenFile,
+			runtime.AuditContext,
+			request.Profile.Model,
+			prompt,
+		)
+	case codexapp.CredentialModeSavedChatGPTLogin:
+		codexReceipt, err = codexapp.EngineeringSavedLoginTurn(
+			runCtx,
+			runtime.Executable,
+			request.Profile.BinaryDigest,
+			prepared.Workspace.WorktreePath,
+			prepared.Workspace.HomePath,
+			runtime.SavedLoginFile,
+			request.Profile.Model,
+			prompt,
+		)
+	}
 	if err != nil {
 		return receipt, err
 	}

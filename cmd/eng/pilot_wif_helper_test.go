@@ -56,7 +56,7 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 		CLI:                        "codex-cli",
 		Version:                    codexapp.QualifiedCodexVersion,
 		BinaryDigest:               profile.Profile.BinaryDigest,
-		CredentialSafeConfigDigest: canonical.BytesDigest([]byte("[features]\nshell_tool = false\nview_image = false\n")),
+		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
 		CredentialMode:             "workload_identity",
 		FederationRuleID:           rule,
 		Model:                      profile.Profile.Model,

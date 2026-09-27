@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,23 +21,24 @@ const (
 )
 
 type LiveReceipt struct {
-	SchemaVersion              int    `json:"schema_version"`
-	CLI                        string `json:"cli"`
-	Version                    string `json:"version"`
-	BinaryDigest               string `json:"binary_digest"`
-	CredentialSafeConfigDigest string `json:"credential_safe_config_digest"`
-	CredentialMode             string `json:"credential_mode"`
-	FederationRuleID           string `json:"federation_rule_id"`
-	Model                      string `json:"model"`
-	PromptDigest               string `json:"prompt_digest"`
-	ThreadID                   string `json:"thread_id"`
-	TurnID                     string `json:"turn_id"`
-	TurnStatus                 string `json:"turn_status"`
-	Output                     string `json:"output"`
-	OutputDigest               string `json:"output_digest"`
-	ApprovalRequests           int    `json:"approval_requests"`
-	UnexpectedToolUse          bool   `json:"unexpected_tool_use"`
-	AssertionRemovedBeforeTurn bool   `json:"assertion_removed_before_turn"`
+	SchemaVersion                        int    `json:"schema_version"`
+	CLI                                  string `json:"cli"`
+	Version                              string `json:"version"`
+	BinaryDigest                         string `json:"binary_digest"`
+	CredentialSafeConfigDigest           string `json:"credential_safe_config_digest"`
+	CredentialMode                       string `json:"credential_mode"`
+	FederationRuleID                     string `json:"federation_rule_id"`
+	Model                                string `json:"model"`
+	PromptDigest                         string `json:"prompt_digest"`
+	ThreadID                             string `json:"thread_id"`
+	TurnID                               string `json:"turn_id"`
+	TurnStatus                           string `json:"turn_status"`
+	Output                               string `json:"output"`
+	OutputDigest                         string `json:"output_digest"`
+	ApprovalRequests                     int    `json:"approval_requests"`
+	UnexpectedToolUse                    bool   `json:"unexpected_tool_use"`
+	AssertionRemovedBeforeTurn           bool   `json:"assertion_removed_before_turn"`
+	CredentialBootstrapRemovedBeforeTurn bool   `json:"credential_bootstrap_removed_before_turn"`
 }
 
 type TurnObservation struct {
@@ -230,30 +232,168 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		}
 	}
 	receipt = LiveReceipt{
-		SchemaVersion:              1,
-		CLI:                        "codex-cli",
-		Version:                    QualifiedCodexVersion,
-		BinaryDigest:               binaryDigest,
-		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:             "workload_identity",
-		FederationRuleID:           ruleID,
-		Model:                      model,
-		PromptDigest:               canonical.BytesDigest([]byte(LiveProbePrompt)),
-		ThreadID:                   threadID,
-		TurnID:                     turnID,
-		TurnStatus:                 observation.Status,
-		Output:                     observation.Output,
-		OutputDigest:               canonical.BytesDigest([]byte(observation.Output)),
-		ApprovalRequests:           observation.ApprovalRequests,
-		UnexpectedToolUse:          observation.UnexpectedToolUse,
-		AssertionRemovedBeforeTurn: assertionRemoved,
+		SchemaVersion:                        1,
+		CLI:                                  "codex-cli",
+		Version:                              QualifiedCodexVersion,
+		BinaryDigest:                         binaryDigest,
+		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialMode:                       CredentialModeWorkloadIdentity,
+		FederationRuleID:                     ruleID,
+		Model:                                model,
+		PromptDigest:                         canonical.BytesDigest([]byte(LiveProbePrompt)),
+		ThreadID:                             threadID,
+		TurnID:                               turnID,
+		TurnStatus:                           observation.Status,
+		Output:                               observation.Output,
+		OutputDigest:                         canonical.BytesDigest([]byte(observation.Output)),
+		ApprovalRequests:                     observation.ApprovalRequests,
+		UnexpectedToolUse:                    observation.UnexpectedToolUse,
+		AssertionRemovedBeforeTurn:           assertionRemoved,
+		CredentialBootstrapRemovedBeforeTurn: false,
+	}
+	return receipt, receipt.Validate()
+}
+
+func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model string) (LiveReceipt, error) {
+	var receipt LiveReceipt
+	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
+		return receipt, fmt.Errorf("qualified binary digest and bounded model required")
+	}
+	provider, err := NewPinnedSavedLoginProvider(executable, binaryDigest, savedLoginFile)
+	if err != nil {
+		return receipt, err
+	}
+	versionHome, err := os.MkdirTemp("", "engineering-platform-codex-live-version-")
+	if err != nil {
+		return receipt, err
+	}
+	defer os.RemoveAll(versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
+		return receipt, fmt.Errorf("live qualification requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	cmd, err := provider.Command(probeCtx, runtimeprovider.LaunchSpec{Dir: work, Env: []string{"HOME=" + home}})
+	if err != nil {
+		return receipt, err
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return receipt, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return receipt, err
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
+	if err := cmd.Start(); err != nil {
+		return receipt, err
+	}
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- cmd.Wait() }()
+	client := NewClient(stdout, stdin)
+	processJoined := false
+	defer func() {
+		_ = client.Close()
+		cancel()
+		if !processJoined {
+			select {
+			case <-waitDone:
+			case <-time.After(5 * time.Second):
+				_ = cmd.Process.Kill()
+				<-waitDone
+			}
+		}
+	}()
+	adapter, err := NewAdapter(client, work)
+	if err != nil {
+		return receipt, err
+	}
+	if err := adapter.Initialize(probeCtx, "engineering-platform-codex-live-saved-login-v1"); err != nil {
+		return receipt, fmt.Errorf("initialize: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	if err := adapter.WarmCredential(probeCtx); err != nil {
+		return receipt, fmt.Errorf("saved ChatGPT login prewarm: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	bootstrap := filepath.Join(home, ".codex", "auth.json")
+	if err := os.Remove(bootstrap); err != nil {
+		return receipt, fmt.Errorf("remove saved ChatGPT login bootstrap before model turn: %w", err)
+	}
+	if _, err := os.Stat(bootstrap); !os.IsNotExist(err) {
+		return receipt, fmt.Errorf("saved ChatGPT login bootstrap remained reachable before model turn")
+	}
+	threadID, err := adapter.StartThread(probeCtx, model)
+	if err != nil {
+		return receipt, fmt.Errorf("thread/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	turnID, err := adapter.StartTurn(probeCtx, LiveProbePrompt)
+	if err != nil {
+		return receipt, fmt.Errorf("turn/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
+	}
+	observation, err := ObserveTurn(probeCtx, adapter, threadID, turnID)
+	if err != nil {
+		return receipt, err
+	}
+	_ = client.Close()
+	select {
+	case <-time.After(5 * time.Second):
+		cancel()
+		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
+	case waitErr := <-waitDone:
+		processJoined = true
+		if waitErr != nil {
+			return receipt, fmt.Errorf("app-server exited after live qualification: %w", waitErr)
+		}
+	}
+	receipt = LiveReceipt{
+		SchemaVersion:                        1,
+		CLI:                                  "codex-cli",
+		Version:                              QualifiedCodexVersion,
+		BinaryDigest:                         binaryDigest,
+		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialMode:                       CredentialModeSavedChatGPTLogin,
+		FederationRuleID:                     "",
+		Model:                                model,
+		PromptDigest:                         canonical.BytesDigest([]byte(LiveProbePrompt)),
+		ThreadID:                             threadID,
+		TurnID:                               turnID,
+		TurnStatus:                           observation.Status,
+		Output:                               observation.Output,
+		OutputDigest:                         canonical.BytesDigest([]byte(observation.Output)),
+		ApprovalRequests:                     observation.ApprovalRequests,
+		UnexpectedToolUse:                    observation.UnexpectedToolUse,
+		AssertionRemovedBeforeTurn:           false,
+		CredentialBootstrapRemovedBeforeTurn: true,
 	}
 	return receipt, receipt.Validate()
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion || !canonical.ValidDigest(r.BinaryDigest) || r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) || r.CredentialMode != "workload_identity" || !validFederationRuleID(r.FederationRuleID) || strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) || !remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" || r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.ApprovalRequests != 0 || r.UnexpectedToolUse || !r.AssertionRemovedBeforeTurn {
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion ||
+		!canonical.ValidDigest(r.BinaryDigest) ||
+		r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) ||
+		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 ||
+		r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) ||
+		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
+		r.Output != LiveProbeExpected || r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) ||
+		r.ApprovalRequests != 0 || r.UnexpectedToolUse {
 		return fmt.Errorf("invalid live qualification receipt")
+	}
+	switch r.CredentialMode {
+	case CredentialModeWorkloadIdentity:
+		if !validFederationRuleID(r.FederationRuleID) || !r.AssertionRemovedBeforeTurn ||
+			r.CredentialBootstrapRemovedBeforeTurn {
+			return fmt.Errorf("invalid live workload-identity receipt")
+		}
+	case CredentialModeSavedChatGPTLogin:
+		if r.FederationRuleID != "" || r.AssertionRemovedBeforeTurn ||
+			!r.CredentialBootstrapRemovedBeforeTurn {
+			return fmt.Errorf("invalid live saved-login receipt")
+		}
+	default:
+		return fmt.Errorf("invalid live credential mode")
 	}
 	return nil
 }
