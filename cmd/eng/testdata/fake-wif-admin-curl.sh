@@ -38,7 +38,8 @@ mapping_url="https://api.openai.com/v1/organization/workload_identity/providers/
 provider_exact='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"aud-pilot","description":"engineering-platform protected-main Codex retained pilots","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true}'
 provider_drift='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"wrong-audience","description":"drift","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true}'
 provider_key_drift='{"id":"idp_test","name":"engineering-platform-github-actions-codex","type":"oidc","issuer":"https://token.actions.githubusercontent.com","audience":"aud-pilot","description":"drift","max_assertion_lifetime_seconds":600,"check_jti":true,"enabled":true,"jwks_uri":"https://attacker.invalid/jwks.json"}'
-rule_exact='{"id":"idpm_test","name":"engineering-platform-retained-pilot-main","description":"engineering-platform protected-main live qualification and retained engineering","workspace_id":"ws_test","principal_id":"usr_test","claims":{"repository":"jiying2007/engineering-platform","ref":"refs/heads/main"},"audiences":["aud-pilot"],"condition":"assertion.workflow_ref in [\"jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main\", \"jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main\"]","access_token_lifetime_seconds":600,"enabled":true}'
+rule_exact='{"id":"idpm_test","name":"engineering-platform-retained-pilot-main","description":"engineering-platform protected-main live qualification and retained engineering","workspace_id":"ws_test","principal_id":"usr_test","claims":{"repository":"jiying2007/engineering-platform","repository_id":"1383377268","repository_owner_id":"33591504","event_name":"workflow_dispatch","ref":"refs/heads/main"},"audiences":["aud-pilot"],"condition":"assertion.workflow_ref in [\"jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main\", \"jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main\"]","access_token_lifetime_seconds":600,"enabled":true}'
+rule_identity_drift='{"id":"idpm_test","name":"engineering-platform-retained-pilot-main","description":"drift","workspace_id":"ws_test","principal_id":"usr_test","claims":{"repository":"jiying2007/engineering-platform","repository_id":"999","repository_owner_id":"33591504","event_name":"workflow_dispatch","ref":"refs/heads/main"},"audiences":["aud-pilot"],"condition":"assertion.workflow_ref in [\"jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main\", \"jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main\"]","access_token_lifetime_seconds":600,"enabled":true}'
 
 case "$mode:$count" in
   create:1)
@@ -73,6 +74,9 @@ case "$mode:$count" in
       .workspace_id=="ws_test" and
       .principal_id=="usr_test" and
       .claims.repository=="jiying2007/engineering-platform" and
+      .claims.repository_id=="1383377268" and
+      .claims.repository_owner_id=="33591504" and
+      .claims.event_name=="workflow_dispatch" and
       .claims.ref=="refs/heads/main" and
       .audiences==["aud-pilot"] and
       .condition=="assertion.workflow_ref in [\"jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main\", \"jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main\"]" and
@@ -87,6 +91,13 @@ case "$mode:$count" in
   existing:2)
     test "$url" = "$mapping_url"
     printf '{"object":"list","data":[%s]}\n' "$rule_exact"
+    ;;
+  rule-identity-drift:1)
+    printf '{"object":"list","data":[%s]}\n' "$provider_exact"
+    ;;
+  rule-identity-drift:2)
+    test "$url" = "$mapping_url"
+    printf '{"object":"list","data":[%s]}\n' "$rule_identity_drift"
     ;;
   drift:1)
     printf '{"object":"list","data":[%s]}\n' "$provider_drift"
