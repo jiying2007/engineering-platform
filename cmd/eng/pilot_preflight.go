@@ -24,16 +24,16 @@ import (
 )
 
 type pilotPreflightOptions struct {
-	Repository      string
-	Base            string
-	ProfileFile     string
-	PolicyFile      string
-	PreparationFile string
-	WorkerProfile   string
-	WorkerCodexFile string
-	PublisherFile          string
-	WIFReceiptFile         string
-	SavedLoginReceiptFile  string
+	Repository            string
+	Base                  string
+	ProfileFile           string
+	PolicyFile            string
+	PreparationFile       string
+	WorkerProfile         string
+	WorkerCodexFile       string
+	PublisherFile         string
+	WIFReceiptFile        string
+	SavedLoginReceiptFile string
 }
 
 type pilotPreflightResult struct {
