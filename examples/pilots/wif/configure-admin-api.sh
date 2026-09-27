@@ -188,7 +188,7 @@ printf '%s' "$rule" |
 FEDERATION_RULE_ID="$(printf '%s' "$rule" | jq -er '.id | select(test("^idpm_[A-Za-z0-9_-]+$"))')"
 
 RECEIPT="$OUTPUT_DIR/wif-admin-receipt.json"
-jq -n   --arg provider_id "$PROVIDER_ID"   --arg federation_rule_id "$FEDERATION_RULE_ID"   --arg workspace_id "$WORKSPACE_ID"   --arg principal_id "$PRINCIPAL_ID"   --arg audience "$OPENAI_WIF_AUDIENCE"   --arg repository "$REPOSITORY"   --arg repository_id "$REPOSITORY_ID"   --arg repository_owner_id "$REPOSITORY_OWNER_ID"   --arg ref "$REF"   --arg condition "$CONDITION"   '{
+jq -n   --arg provider_id "$PROVIDER_ID"   --arg federation_rule_id "$FEDERATION_RULE_ID"   --arg workspace_id "$WORKSPACE_ID"   --arg principal_id "$PRINCIPAL_ID"   --arg audience "$OPENAI_WIF_AUDIENCE"   --arg repository "$REPOSITORY"   --arg repository_id "$REPOSITORY_ID"   --arg repository_owner_id "$REPOSITORY_OWNER_ID"   --arg event_name "$EVENT_NAME"   --arg ref "$REF"   --arg condition "$CONDITION"   '{
     version:1,
     provider_id:$provider_id,
     federation_rule_id:$federation_rule_id,
