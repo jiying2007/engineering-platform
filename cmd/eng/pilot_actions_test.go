@@ -287,3 +287,64 @@ func readPilotActionFile(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+
+func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
+	root := filepath.Join("..", "..")
+	qualifyPath := filepath.Join(root, "examples", "pilots", "self-hosted", "qualify-login.sh")
+	modelPath := filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh")
+	qualify := readPilotActionFile(t, qualifyPath)
+	model := readPilotActionFile(t, modelPath)
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	for _, script := range []string{qualifyPath, modelPath} {
+		if out, err := exec.Command(bash, "-n", script).CombinedOutput(); err != nil {
+			t.Fatalf("%s syntax: %v: %s", script, err, out)
+		}
+	}
+
+	for _, required := range []string{
+		"codex login status",
+		"Logged in using ChatGPT",
+		"codex-saved-login-live",
+		"credential_bootstrap_removed_before_turn==true",
+		"test ! -e \"$HOME_DIR/.codex/auth.json\"",
+	} {
+		if !strings.Contains(qualify, required) {
+			t.Fatalf("saved-login qualification missing %q", required)
+		}
+	}
+	for _, required := range []string{
+		".protected==true",
+		"qualify-login.sh",
+		"credential_mode:\"saved_chatgpt_login\"",
+		"--saved-login-receipt",
+		"publication==\"BLOCKED_EXTERNAL_PUBLISHER\"",
+		"--execute-codex",
+		"credential_bootstrap_removed_before_turn==true",
+		"core-pre-publication.dump",
+		"result.bundle",
+		"publication:\"NOT_STARTED\"",
+		"no model replay",
+	} {
+		if !strings.Contains(model, required) {
+			t.Fatalf("self-hosted model phase missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"engineer-publish.sh",
+		"control-plane-with-publisher.env",
+		"github.publish-pr",
+		"/api/v1/runs/$RUN_ID/actions",
+	} {
+		if strings.Contains(model, forbidden) {
+			t.Fatalf("self-hosted model phase crosses publication boundary with %q", forbidden)
+		}
+	}
+	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
+		t.Fatal("self-hosted model state is marked FINISHED before pre-publication snapshot")
+	}
+}
