@@ -118,6 +118,7 @@ jq --arg rule "$FEDERATION_RULE_ID" \
   '{
     version: 1,
     codex_executable: .codex_executable,
+    credential_mode: "workload_identity",
     federation_rule_id: $rule,
     profile: .profile
   }' \
