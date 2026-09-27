@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -108,19 +107,10 @@ func TestGitHubOIDCVerifierRejectsIdentityAndTimingDrift(t *testing.T) {
 			repositoryID: "1383377268",
 		},
 	}
-	for index, tc := range tests {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			claims := githubOIDCClaims(now)
 			tc.mutate(claims)
-			claims["jti"] = func() any {
-				if tc.name == "missing-jti" {
-					return nil
-				}
-				return "fixture-jti-" + strconv.Itoa(index)
-			}()
-			if tc.name == "missing-jti" {
-				delete(claims, "jti")
-			}
 			token := writeOIDCFixture(t, t.TempDir(), claims)
 			if out, err := runOIDCVerifier(t, token, tc.repositoryID); err == nil {
 				t.Fatalf("unsafe OIDC assertion accepted: %s", out)
