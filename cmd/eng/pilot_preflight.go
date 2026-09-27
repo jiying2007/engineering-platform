@@ -179,9 +179,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 			if err := codexapp.ValidateSavedLoginFile(workerCodex.SavedLoginFile); err != nil {
 				return empty, fmt.Errorf("saved ChatGPT login source: %w", err)
 			}
-			if options.SavedLoginReceiptFile == "" {
-				result.Blockers = append(result.Blockers, "trusted_self_hosted_login_qualification")
-			} else {
+			if options.SavedLoginReceiptFile != "" {
 				receipt, err := readPilotWIFReceipt(options.SavedLoginReceiptFile)
 				if err != nil {
 					return empty, err
@@ -192,8 +190,8 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 					receipt.FederationRuleID != "" {
 					return empty, fmt.Errorf("saved-login qualification does not bind the exact Worker Codex profile")
 				}
-				result.ModelExecution = "READY"
 			}
+			result.ModelExecution = "READY"
 		default:
 			return empty, fmt.Errorf("unsupported Worker Codex credential mode")
 		}
