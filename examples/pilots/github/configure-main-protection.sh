@@ -85,13 +85,21 @@ printf '%s' "$branch_json" | jq -e '.protected == true' >/dev/null || {
 }
 
 protection_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection")"
+status_checks_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks")"
+
+printf '%s' "$status_checks_json" |
+  jq -e --argjson expected "$EXPECTED_CHECKS_JSON" '
+    . as $checks |
+    .strict == true and
+    ($expected | all(. as $name | (($checks.contexts // []) | index($name)) != null))
+  ' >/dev/null || {
+    echo "GitHub main required status-check policy does not satisfy retained-pilot minimum policy" >&2
+    exit 1
+  }
 
 printf '%s' "$protection_json" |
-  jq -e --argjson expected "$EXPECTED_CHECKS_JSON" '
-    . as $policy |
+  jq -e '
     .enforce_admins.enabled == true and
-    .required_status_checks.strict == true and
-    ($expected | all(. as $name | (($policy.required_status_checks.contexts // []) | index($name)) != null)) and
     (.required_pull_request_reviews != null) and
     ((.required_pull_request_reviews.required_approving_review_count // 0) >= 0) and
     .required_linear_history.enabled == true and
@@ -106,7 +114,8 @@ printf '%s' "$protection_json" |
 
 HEAD_SHA="$(printf '%s' "$branch_json" | jq -er '.commit.sha')"
 NORMALIZED_PROTECTION="$OUTPUT_DIR/main-protection.json"
-printf '%s' "$protection_json" | jq -S . > "$NORMALIZED_PROTECTION"
+jq -n   --argjson protection "$protection_json"   --argjson status_checks "$status_checks_json"   '{protection:$protection,status_checks:$status_checks}' |
+  jq -S . > "$NORMALIZED_PROTECTION"
 chmod 0600 "$NORMALIZED_PROTECTION"
 PROTECTION_DIGEST="sha256:$(sha256sum "$NORMALIZED_PROTECTION" | awk '{print $1}')"
 
