@@ -2,6 +2,7 @@ package codexapp
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"os"
@@ -11,13 +12,46 @@ import (
 	"time"
 )
 
-func TestEngineeringWIFTurnFitsConfiguredAssertionFreeWindow(t *testing.T) {
-	const configuredWIFWindow = 10 * time.Minute
-	const minimumRefreshMargin = time.Minute
-	if engineeringWIFTurnTimeout <= 0 ||
-		engineeringWIFTurnTimeout > configuredWIFWindow-minimumRefreshMargin {
-		t.Fatalf("engineering WIF turn timeout %s does not leave refresh margin inside %s",
-			engineeringWIFTurnTimeout, configuredWIFWindow)
+func unsignedTimingAssertion(t *testing.T, issuedAt, expiresAt time.Time) []byte {
+	t.Helper()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	payload, err := json.Marshal(map[string]int64{
+		"iat": issuedAt.Unix(),
+		"exp": expiresAt.Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []byte(header + "." + base64.RawURLEncoding.EncodeToString(payload) + ".fixture")
+}
+
+func TestBoundedEngineeringWIFTimeoutUsesActualAssertionLifetime(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	fresh := unsignedTimingAssertion(t, now, now.Add(5*time.Minute))
+	got, err := boundedEngineeringWIFTimeout(fresh, now)
+	if err != nil || got != 4*time.Minute {
+		t.Fatalf("fresh GitHub-like assertion timeout=%s err=%v", got, err)
+	}
+
+	aged := unsignedTimingAssertion(t, now.Add(-2*time.Minute), now.Add(3*time.Minute))
+	got, err = boundedEngineeringWIFTimeout(aged, now)
+	if err != nil || got != 150*time.Second {
+		t.Fatalf("aged assertion timeout=%s err=%v", got, err)
+	}
+}
+
+func TestBoundedEngineeringWIFTimeoutRejectsUnsafeTiming(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	for name, assertion := range map[string][]byte{
+		"too-long-upstream": unsignedTimingAssertion(t, now, now.Add(601*time.Second)),
+		"too-little-remaining": unsignedTimingAssertion(t, now.Add(-3*time.Minute), now.Add(100*time.Second)),
+		"invalid": []byte("not-a-jwt"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := boundedEngineeringWIFTimeout(assertion, now); err == nil {
+				t.Fatal("unsafe assertion timing accepted")
+			}
+		})
 	}
 }
 
@@ -139,7 +173,8 @@ func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T
 		}
 	}
 	token := filepath.Join(identity, "token")
-	if err := os.WriteFile(token, []byte("eyJhbGciOiJub25lIn0.fixture.signature"), 0o600); err != nil {
+	now := time.Now()
+	if err := os.WriteFile(token, unsignedTimingAssertion(t, now, now.Add(5*time.Minute)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	executable, err := os.Executable()
