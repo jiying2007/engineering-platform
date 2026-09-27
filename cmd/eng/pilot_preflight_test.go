@@ -330,6 +330,37 @@ func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved.json", workerCodex)
 
+	result, err := checkPilotPreflight(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Internal != "READY" || result.ModelExecution != "READY" ||
+		result.Publication != "BLOCKED_EXTERNAL_PUBLISHER" {
+		t.Fatalf("unexpected saved-login readiness: %#v", result)
+	}
+	if len(result.Blockers) != 1 || result.Blockers[0] != "publisher_configuration_or_credential" {
+		t.Fatalf("unexpected saved-login blockers: %#v", result.Blockers)
+	}
+}
+
+func TestPilotPreflightAcceptsOptionalTrustedSelfHostedQualificationReceipt(t *testing.T) {
+	options, profile, _ := pilotPreflightFixture(t)
+	root := filepath.Dir(options.ProfileFile)
+	loginDir := filepath.Join(root, "saved-login")
+	if err := os.Mkdir(loginDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	loginFile := filepath.Join(loginDir, "auth.json")
+	if err := os.WriteFile(loginFile, []byte(`{"tokens":{"access_token":"fixture","refresh_token":"fixture"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved-qualified.json", map[string]any{
+		"version":          1,
+		"codex_executable": profile.CodexExecutable,
+		"credential_mode":  "saved_chatgpt_login",
+		"saved_login_file": loginFile,
+		"profile":          profile.Profile,
+	})
 	saved := codexapp.LiveReceipt{
 		SchemaVersion:                        1,
 		CLI:                                  "codex-cli",
@@ -350,17 +381,12 @@ func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 	options.SavedLoginReceiptFile = writePilotJSON(t, root, "saved-login-receipt.json", saved)
-
 	result, err := checkPilotPreflight(options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Internal != "READY" || result.ModelExecution != "READY" ||
-		result.Publication != "BLOCKED_EXTERNAL_PUBLISHER" {
-		t.Fatalf("unexpected saved-login readiness: %#v", result)
-	}
-	if len(result.Blockers) != 1 || result.Blockers[0] != "publisher_configuration_or_credential" {
-		t.Fatalf("unexpected saved-login blockers: %#v", result.Blockers)
+	if result.ModelExecution != "READY" {
+		t.Fatalf("optional saved-login qualification not accepted: %#v", result)
 	}
 }
 
