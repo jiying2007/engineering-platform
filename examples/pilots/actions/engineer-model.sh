@@ -154,27 +154,16 @@ mint_oidc() {
   printf '%s' "$token" > "$output"
   unset token
   chmod 0600 "$output"
-  python3 - "$output" "$OPENAI_WIF_AUDIENCE" "$GITHUB_REPOSITORY" "$GITHUB_REF" "$expected_workflow_ref" <<'PY'
-import base64, json, pathlib, sys, time
-token = pathlib.Path(sys.argv[1]).read_text()
-parts = token.split(".")
-if len(parts) != 3:
-    raise SystemExit("OIDC token is not a compact JWT")
-payload = parts[1] + "=" * (-len(parts[1]) % 4)
-claims = json.loads(base64.urlsafe_b64decode(payload))
-audience, repository, ref, workflow_ref = sys.argv[2:]
-if claims.get("iss") != "https://token.actions.githubusercontent.com":
-    raise SystemExit("unexpected OIDC issuer")
-aud = claims.get("aud")
-if not (aud == audience or isinstance(aud, list) and audience in aud):
-    raise SystemExit("unexpected OIDC audience")
-if claims.get("repository") != repository or claims.get("ref") != ref:
-    raise SystemExit("unexpected repository/ref claims")
-if claims.get("workflow_ref") != workflow_ref:
-    raise SystemExit("unexpected workflow_ref")
-if int(claims.get("exp", 0)) <= int(time.time()):
-    raise SystemExit("expired OIDC assertion")
-PY
+  python3 "$GITHUB_WORKSPACE/examples/pilots/wif/verify-github-oidc.py" \
+    --token-file "$output" \
+    --audience "$OPENAI_WIF_AUDIENCE" \
+    --repository "$GITHUB_REPOSITORY" \
+    --repository-id "$GITHUB_REPOSITORY_ID" \
+    --repository-owner-id "$GITHUB_REPOSITORY_OWNER_ID" \
+    --ref "$GITHUB_REF" \
+    --workflow-ref "$expected_workflow_ref" \
+    --max-lifetime-seconds 600 \
+    --min-remaining-seconds 120
 }
 
 # First real WIF turn: read-only qualification. This replaces waiting for a

@@ -11,6 +11,7 @@ import (
 func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-pilot-engineer.yml"))
+	liveWorkflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "codex-wif-live.yml"))
 	model := readPilotActionFile(t, filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"))
 	publish := readPilotActionFile(t, filepath.Join(root, "examples", "pilots", "actions", "engineer-publish.sh"))
 
@@ -57,6 +58,24 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 		t.Fatal("model workflow step exposes GitHub publication credential")
 	}
 
+	for _, required := range []string{
+		"verify-github-oidc.py",
+		"GITHUB_REPOSITORY_ID",
+		"GITHUB_REPOSITORY_OWNER_ID",
+		"codex-wif-live.yml@refs/heads/main",
+	} {
+		if !strings.Contains(liveWorkflow, required) {
+			t.Fatalf("live WIF workflow missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"subject.startswith",
+	} {
+		if strings.Contains(liveWorkflow, forbidden) {
+			t.Fatalf("live WIF workflow retains legacy subject-format assumption %q", forbidden)
+		}
+	}
+
 	for _, forbidden := range []string{"GITHUB_TOKEN", "GH_TOKEN", "PUBLISH_TOKEN"} {
 		if strings.Contains(model, forbidden) {
 			t.Fatalf("model-phase script contains publisher credential name %q", forbidden)
@@ -64,6 +83,11 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	}
 	for _, required := range []string{
 		"retained-pilot-engineer.yml@refs/heads/main",
+		"verify-github-oidc.py",
+		"GITHUB_REPOSITORY_ID",
+		"GITHUB_REPOSITORY_OWNER_ID",
+		"--max-lifetime-seconds 600",
+		"--min-remaining-seconds 120",
 		"codex-wif-live",
 		"pilot-preflight",
 		"core-pre-publication.dump",

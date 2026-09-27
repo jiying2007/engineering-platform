@@ -38,13 +38,19 @@ requires the default issuer-discovery trust mode: no custom discovery URL,
 explicit/uploaded JWKS, custom CA bundle, or provider-level CEL condition may be
 present under the same provider name.
 
-The current retained M1 engineering turn is intentionally bounded to **8
-minutes**. The rule/provider assertion window is 600 seconds, and the upstream
-GitHub OIDC assertion is deleted before model-reachable work begins. This keeps
-the model/tool sandbox from retaining a refresh credential while leaving an
-explicit safety margin for the two bounded M1 pilot changes. Longer-running
-production turns require a separately designed host-owned refresh mechanism;
-do not extend the turn timeout past the federation window.
+The retained M1 lane does not assume that the 600-second provider/rule limits
+are the actual GitHub assertion lifetime. GitHub OIDC `iat` / `exp` are
+validated on every mint and the Runtime derives its deadline from the assertion's
+actual remaining lifetime. The model-reachable engineering turn has a hard
+4-minute maximum, reserves at least 30 seconds before upstream expiry, and
+refuses to start with less than 90 seconds of safe window remaining. The
+upstream assertion is still deleted before model-reachable work begins.
+
+GitHub's newer immutable OIDC subject format is intentionally supported. Trust
+is bound to the exact `repository`, immutable `repository_id` and
+`repository_owner_id`, protected-main `ref`, and exact `workflow_ref`
+rather than the legacy name-only `sub` shape. Longer-running production turns
+require a separately designed host-owned refresh mechanism.
 
 The rule requires:
 

@@ -3,6 +3,7 @@ package codexapp
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,7 +15,45 @@ import (
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
-const engineeringWIFTurnTimeout = 8 * time.Minute
+const (
+	engineeringWIFTurnTimeout           = 4 * time.Minute
+	engineeringWIFAssertionSafetyMargin = 30 * time.Second
+	engineeringWIFMinimumWindow         = 90 * time.Second
+	engineeringWIFProviderLifetimeLimit = 10 * time.Minute
+)
+
+func boundedEngineeringWIFTimeout(assertion []byte, now time.Time) (time.Duration, error) {
+	parts := strings.Split(strings.TrimSpace(string(assertion)), ".")
+	if len(parts) != 3 {
+		return 0, fmt.Errorf("workload identity assertion is not a compact JWT")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return 0, fmt.Errorf("decode workload identity assertion: %w", err)
+	}
+	var claims struct {
+		IssuedAt  int64 `json:"iat"`
+		ExpiresAt int64 `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return 0, fmt.Errorf("decode workload identity timing claims: %w", err)
+	}
+	if claims.IssuedAt <= 0 || claims.ExpiresAt <= claims.IssuedAt {
+		return 0, fmt.Errorf("valid workload identity iat/exp required")
+	}
+	lifetime := time.Duration(claims.ExpiresAt-claims.IssuedAt) * time.Second
+	if lifetime > engineeringWIFProviderLifetimeLimit {
+		return 0, fmt.Errorf("workload identity assertion lifetime exceeds provider policy")
+	}
+	remaining := time.Unix(claims.ExpiresAt, 0).Sub(now) - engineeringWIFAssertionSafetyMargin
+	if remaining < engineeringWIFMinimumWindow {
+		return 0, fmt.Errorf("insufficient workload identity lifetime for retained engineering")
+	}
+	if remaining > engineeringWIFTurnTimeout {
+		remaining = engineeringWIFTurnTimeout
+	}
+	return remaining, nil
+}
 
 type EngineeringObservation struct {
 	Status           string
@@ -152,7 +191,15 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
 		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
 	}
-	runCtx, cancel := context.WithTimeout(ctx, engineeringWIFTurnTimeout)
+	assertion, err := os.ReadFile(tokenPath)
+	if err != nil {
+		return receipt, fmt.Errorf("read workload identity assertion timing: %w", err)
+	}
+	runTimeout, err := boundedEngineeringWIFTimeout(assertion, time.Now())
+	if err != nil {
+		return receipt, err
+	}
+	runCtx, cancel := context.WithTimeout(ctx, runTimeout)
 	defer cancel()
 	env := []string{
 		"HOME=" + home,

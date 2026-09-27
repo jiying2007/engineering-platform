@@ -74,32 +74,16 @@ jobs:
           printf '%s' "$token" > "$secret_dir/identity-token"
           unset token
           chmod 0600 "$secret_dir/identity-token"
-          python3 - "$secret_dir/identity-token" "$OPENAI_WIF_AUDIENCE" "$GITHUB_REPOSITORY" "$GITHUB_REF" <<'PY'
-          import base64, json, pathlib, sys, time
-          token = pathlib.Path(sys.argv[1]).read_text()
-          parts = token.split(".")
-          if len(parts) != 3:
-              raise SystemExit("OIDC token is not a compact JWT")
-          payload = parts[1] + "=" * (-len(parts[1]) % 4)
-          claims = json.loads(base64.urlsafe_b64decode(payload))
-          audience, repository, ref = sys.argv[2:]
-          if claims.get("iss") != "https://token.actions.githubusercontent.com":
-              raise SystemExit("unexpected OIDC issuer")
-          aud = claims.get("aud")
-          if not (aud == audience or isinstance(aud, list) and audience in aud):
-              raise SystemExit("unexpected OIDC audience")
-          if claims.get("repository") != repository or claims.get("ref") != ref:
-              raise SystemExit("unexpected repository/ref claims")
-          subject = claims.get("sub", "")
-          if not subject.startswith("repo:" + repository + ":"):
-              raise SystemExit("unexpected OIDC subject")
-          workflow_ref = claims.get("workflow_ref", "")
-          expected = repository + "/.github/workflows/codex-wif-live.yml@refs/heads/main"
-          if workflow_ref != expected:
-              raise SystemExit("unexpected workflow_ref")
-          if int(claims.get("exp", 0)) <= int(time.time()):
-              raise SystemExit("expired OIDC assertion")
-          PY
+          python3 examples/pilots/wif/verify-github-oidc.py \
+            --token-file "$secret_dir/identity-token" \
+            --audience "$OPENAI_WIF_AUDIENCE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --repository-id "$GITHUB_REPOSITORY_ID" \
+            --repository-owner-id "$GITHUB_REPOSITORY_OWNER_ID" \
+            --ref "$GITHUB_REF" \
+            --workflow-ref "$GITHUB_REPOSITORY/.github/workflows/codex-wif-live.yml@refs/heads/main" \
+            --max-lifetime-seconds 600 \
+            --min-remaining-seconds 120
           printf 'OPENAI_IDENTITY_TOKEN_FILE=%s\n' "$secret_dir/identity-token" >> "$GITHUB_ENV"
       - name: Perform exactly one WIF read-only model turn
         shell: bash
