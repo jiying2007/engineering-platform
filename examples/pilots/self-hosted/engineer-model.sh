@@ -270,6 +270,7 @@ echo "trusted self-hosted retained pilot model phase: FINISHED"
 echo "pilot=$PILOT"
 echo "base_commit=$BASE_COMMIT"
 echo "credential_mode=saved_chatgpt_login"
+echo "retained_policy=no model replay after FINISHED; publication failures must reconcile the retained result"
 
 # Only after the model process has exited and the FINISHED Core state/result
 # bundle have been retained may the trusted host materialize a publisher token.
