@@ -42,6 +42,8 @@ func TestWIFAdminAPIHelperCreatesExactProviderAndRule(t *testing.T) {
 		receipt["principal_id"] != "usr_test" ||
 		receipt["audience"] != "aud-pilot" ||
 		receipt["repository"] != "jiying2007/engineering-platform" ||
+		receipt["repository_id"] != "1383377268" ||
+		receipt["repository_owner_id"] != "33591504" ||
 		receipt["ref"] != "refs/heads/main" {
 		t.Fatalf("unexpected WIF admin receipt: %#v", receipt)
 	}
@@ -100,6 +102,13 @@ func TestWIFAdminAPIHelperRejectsExistingTrustDrift(t *testing.T) {
 	_, _, errText := runWIFAdminHelper(t, "drift", false)
 	if errText == "" || !strings.Contains(errText, "does not match required trust policy") {
 		t.Fatalf("existing trust drift was not rejected: %s", errText)
+	}
+}
+
+func TestWIFAdminAPIHelperRejectsFederationRuleImmutableIdentityDrift(t *testing.T) {
+	_, _, errText := runWIFAdminHelper(t, "rule-identity-drift", false)
+	if errText == "" || !strings.Contains(errText, "does not match required pilot policy") {
+		t.Fatalf("federation rule immutable identity drift was not rejected: %s", errText)
 	}
 }
 
