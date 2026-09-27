@@ -29,22 +29,32 @@ Only then may the independent Action Gateway publisher read the trusted host's
 
 ## Runner policy
 
-Use a repository-scoped self-hosted runner dedicated to this pilot. Do not keep
-a broadly reusable runner with ChatGPT/GitHub credentials permanently online.
+This repository is public, so do **not** attach a persistent self-hosted runner
+with reusable default labels. Use one ephemeral repository runner for exactly
+one retained engineering job.
 
-Recommended M1 operation:
+For each pilot:
 
-1. register the runner only for `jiying2007/engineering-platform`;
-2. add the custom label `engineering-platform-codex`;
-3. run it under the same trusted Linux account that owns the existing Codex and
-   `gh` logins;
-4. enable it only for the retained pilot window and remove/disable it after the
-   pilot;
-5. do not add `pull_request` or `push` triggers to the self-hosted engineer
-   workflow.
+1. generate a fresh 128-bit custom label:
+   `engineering-platform-codex-<32 lowercase hex>`;
+2. dispatch the protected-main workflow with that label while no matching runner
+   is online, so the intended job is already queued;
+3. register one repository-scoped runner with **only** that custom label by
+   using both `--no-default-labels` and `--ephemeral`;
+4. start the runner under the trusted Linux account that owns the existing Codex
+   and `gh` logins;
+5. let GitHub assign the already-queued matching job; the runner automatically
+   deregisters after that one job;
+6. delete the local runner work directory before the next pilot and generate a
+   different random label.
 
-The workflow itself is `workflow_dispatch` only and refuses to run unless
-GitHub reports protected `refs/heads/main`.
+Do not configure a long-lived `self-hosted` / `linux` / `x64` labelled
+runner for this public repository. An unrelated workflow requiring only those
+default labels would otherwise also be eligible to run on the trusted machine.
+
+The engineer workflow is `workflow_dispatch` only, requires protected
+`refs/heads/main`, and validates the one-time label format before any pilot
+work starts.
 
 ## Host prerequisites
 
@@ -95,20 +105,53 @@ or Debug engineering Evidence.
 
 ## Run Feature
 
-After this branch is merged and the dedicated runner is online:
+First generate the one-time runner label and queue the intended job:
 
 ```sh
+RUNNER_LABEL="engineering-platform-codex-$(openssl rand -hex 16)"
+
 gh workflow run retained-pilot-self-hosted-engineer.yml \
   --repo jiying2007/engineering-platform \
   --ref main \
   -f pilot=feature \
-  -f model=gpt-5.6-sol
+  -f model=gpt-5.6-sol \
+  -f runner_label="$RUNNER_LABEL"
 
 gh run list \
   --repo jiying2007/engineering-platform \
   --workflow=retained-pilot-self-hosted-engineer.yml \
   --limit 5
 ```
+
+Then, from an already installed GitHub Actions runner directory on AiotServer01,
+mint the short-lived repository registration token and configure the runner
+without default labels:
+
+```sh
+REG_TOKEN="$(
+  gh api --method POST \
+    repos/jiying2007/engineering-platform/actions/runners/registration-token \
+    --jq .token
+)"
+
+./config.sh \
+  --url https://github.com/jiying2007/engineering-platform \
+  --token "$REG_TOKEN" \
+  --name "AiotServer01-m1-feature" \
+  --labels "$RUNNER_LABEL" \
+  --no-default-labels \
+  --ephemeral \
+  --unattended
+
+unset REG_TOKEN
+./run.sh
+```
+
+Use GitHub's **Settings → Actions → Runners → New self-hosted runner** page to
+install/update the runner application itself before these commands. The
+registration token is time-limited and must not be retained. After `run.sh`
+finishes the single job, remove the local runner directory before the Debug
+pilot.
 
 The workflow performs:
 

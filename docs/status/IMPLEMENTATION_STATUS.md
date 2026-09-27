@@ -219,25 +219,28 @@ publisher credential, a managed-workspace WIF rule, or a production service.
 
 M1 phase 1 no longer requires WIF. The next retained proof sequence is:
 
-1. Register/enable a repository-scoped trusted self-hosted Linux runner for
-   `jiying2007/engineering-platform` with label
-   `engineering-platform-codex`. Require exact `codex-cli 0.155.0`,
-   `codex login status` = `Logged in using ChatGPT`, working Docker/Go, and
-   an authenticated host `gh` publisher credential.
-2. Dispatch `retained-pilot-self-hosted-engineer.yml` for Feature #54 from
-   protected main. The workflow must freeze the exact base, execute one
-   Core-bound saved-login Codex turn, retain FINISHED state/result bundle, stop
-   the model process, and only then materialize the host GitHub publisher token
-   for the existing Action Gateway.
-3. Require publication CONFIRMED and exact PR-head CI PASS.
-4. Dispatch `retained-pilot-verify.yml` with the self-hosted engineering run
-   ID; require exact Codex/Git/CI Evidence plus PASS Verification.
-5. A GitHub actor different from the engineering dispatcher performs the
+1. Because this repository is public, generate a fresh 128-bit one-time
+   runner label `engineering-platform-codex-<32 lowercase hex>` and dispatch
+   `retained-pilot-self-hosted-engineer.yml` for Feature #54 while no matching
+   runner is online.
+2. Register one repository-scoped trusted Linux runner using that exact custom
+   label with `--no-default-labels --ephemeral`, then start it under the
+   ChatGPT-authenticated `aiot03` account. Require exact `codex-cli 0.155.0`,
+   working Docker/Go and an authenticated host `gh` publisher credential.
+3. The already-queued workflow must freeze the exact protected-main base,
+   execute one Core-bound saved-login Codex turn, retain FINISHED state/result
+   bundle, stop the model process, and only then materialize the host GitHub
+   publisher token for the existing Action Gateway.
+4. Require publication CONFIRMED and exact PR-head CI PASS.
+5. Dispatch `retained-pilot-verify.yml` with the ephemeral engineering run ID;
+   require exact Codex/Git/CI Evidence plus PASS Verification.
+6. A GitHub actor different from the engineering dispatcher performs the
    existing independent Review. PASS alone permits Closure.
-6. Disable/remove the dedicated runner after the pilot window.
-7. Repeat the complete chain for Debug #55 from the then-current protected main
-   with new Work/Task/Run/Evidence/Review/Closure identities.
-8. Only after both real ClosureReceipts exist should M1 be reassessed.
+7. Confirm the ephemeral runner deregistered, delete its local work directory,
+   and use a new random label for Debug #55.
+8. Repeat the complete chain for Debug from the then-current protected main with
+   new Work/Task/Run/Evidence/Review/Closure identities.
+9. Only after both real ClosureReceipts exist should M1 be reassessed.
 
 `examples/pilots/self-hosted/qualify-login.sh` remains an optional diagnostic
 read-only model probe. It is not a prerequisite for phase-1 retained engineering,
@@ -248,9 +251,12 @@ The existing managed-workspace WIF/Admin API/GitHub-hosted workflow remains
 supported as the unattended execution lane. It is no longer an M1 phase-1 hard
 blocker and must not be represented as qualified until a real WIF turn exists.
 
-Trusted self-hosted mode has an explicit known limit: the host/account itself is
-trusted, so unrelated credentials elsewhere on that account are outside the
-Codex child-process isolation boundary. The model process receives neither the
+Trusted self-hosted mode has explicit known limits: the host/account itself is
+trusted, and the repository is public. The retained engineering runner therefore
+uses a one-time random label, no default runner labels and ephemeral one-job
+registration; it must never remain persistently eligible for public-repository
+workflow jobs. Unrelated credentials elsewhere on the host account are outside
+the Codex child-process isolation boundary. The model process receives neither the
 operator HOME nor publisher/API/WIF credential environment, and the isolated
 saved-login bootstrap is deleted before thread/start. Production/unattended
 claims should prefer WIF or a separately reviewed stronger host-isolation design.

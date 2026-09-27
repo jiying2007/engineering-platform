@@ -319,7 +319,9 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"runs-on: [self-hosted, linux, x64, engineering-platform-codex]",
+		"runner_label:",
+		"runs-on: ${{ inputs.runner_label }}",
+		"engineering-platform-codex-[0-9a-f]{32}",
 		"GITHUB_REF_PROTECTED",
 		"persist-credentials: false",
 		"Retain resumable engineering state",
@@ -359,5 +361,10 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	}
 	if strings.Contains(workflow, "${{ github.token }}") {
 		t.Fatal("self-hosted workflow must not inject job-scoped GitHub token into the saved-login chain")
+	}
+	if strings.Contains(workflow, "runs-on: [self-hosted") ||
+		strings.Contains(workflow, "runs-on: self-hosted") ||
+		strings.Contains(workflow, "engineering-platform-codex]") {
+		t.Fatal("public-repository self-hosted workflow must not target persistent/default runner labels")
 	}
 }
