@@ -15,6 +15,10 @@ on:
         required: true
         default: gpt-5.6-sol
         type: string
+      runner_label:
+        description: One-time random label of the ephemeral no-default-labels runner
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -23,18 +27,22 @@ permissions:
 jobs:
   engineer:
     name: trusted-self-hosted-${{ inputs.pilot }}-engineering-to-pr
-    runs-on: [self-hosted, linux, x64, engineering-platform-codex]
+    runs-on: ${{ inputs.runner_label }}
     timeout-minutes: 45
     steps:
-      - name: Require protected main on trusted self-hosted runner
+      - name: Require protected main and one-time ephemeral runner target
         shell: bash
+        env:
+          EXPECTED_RUNNER_LABEL: ${{ inputs.runner_label }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
           test "$GITHUB_REF" = "refs/heads/main"
           test "$GITHUB_REF_TYPE" = "branch"
           test "$GITHUB_REF_PROTECTED" = "true"
-          test "${{ runner.environment }}" = "self-hosted"
+          test "$RUNNER_ENVIRONMENT" = "self-hosted"
+          [[ "$EXPECTED_RUNNER_LABEL" =~ ^engineering-platform-codex-[0-9a-f]{32}$ ]]
 
       - uses: actions/checkout@v7
         with:
