@@ -18,6 +18,7 @@ import (
 
 const (
 	engineeringWIFTurnTimeout           = 4 * time.Minute
+	engineeringSavedLoginTurnTimeout    = 12 * time.Minute
 	engineeringWIFAssertionSafetyMargin = 30 * time.Second
 	engineeringWIFMinimumWindow         = 90 * time.Second
 	engineeringWIFProviderLifetimeLimit = 10 * time.Minute
@@ -317,7 +318,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, wo
 	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
 		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
 	}
-	runCtx, cancel := context.WithTimeout(ctx, engineeringWIFTurnTimeout)
+	runCtx, cancel := context.WithTimeout(ctx, engineeringSavedLoginTurnTimeout)
 	defer cancel()
 	cmd, err := provider.Command(runCtx, runtimeprovider.LaunchSpec{Dir: work, Env: []string{"HOME=" + home}})
 	if err != nil {
