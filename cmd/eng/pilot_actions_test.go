@@ -288,7 +288,6 @@ func readPilotActionFile(t *testing.T, path string) string {
 	return string(data)
 }
 
-
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	qualifyPath := filepath.Join(root, "examples", "pilots", "self-hosted", "qualify-login.sh")
