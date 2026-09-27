@@ -74,33 +74,56 @@ A trusted Linux execution host may use an existing Codex CLI ChatGPT login when:
 - the model tool profile remains no-network, workspace-write and
   approval-policy `never`.
 
-Qualify the existing login before consuming the retained model turn:
+Use a dedicated repository-scoped GitHub self-hosted runner for the retained
+phase-1 execution. The runner must carry the custom label
+`engineering-platform-codex` and should be enabled only for the pilot window.
+
+The existing saved login is readiness input; a separate model probe is optional,
+not mandatory. Verify the host before dispatch:
+
+```sh
+CODEX_NATIVE="$(readlink -f "$(command -v codex)")"
+"$CODEX_NATIVE" --version
+"$CODEX_NATIVE" login status
+gh auth status
+docker version
+```
+
+Required Codex state is exact `codex-cli 0.155.0` and
+`Logged in using ChatGPT`.
+
+When diagnosing saved-login behavior independently, the optional read-only probe
+is:
 
 ```sh
 bash examples/pilots/self-hosted/qualify-login.sh \
   "$HOME/operator/self-hosted-login" \
-  /absolute/path/to/codex \
-  "$HOME/.codex/auth.json" \
+  "$CODEX_NATIVE" \
+  "$(readlink -f "${CODEX_HOME:-$HOME/.codex}/auth.json")" \
   gpt-5.6-sol
 ```
 
-Then the self-hosted retained model phase may be run with:
+For the retained Feature execution, dispatch:
 
 ```sh
-bash examples/pilots/self-hosted/engineer-model.sh \
-  feature \
-  "$HOME/operator/retained-feature" \
-  /absolute/path/to/codex \
-  "$HOME/.codex/auth.json" \
-  gpt-5.6-sol
+gh workflow run retained-pilot-self-hosted-engineer.yml \
+  --repo jiying2007/engineering-platform \
+  --ref main \
+  -f pilot=feature \
+  -f model=gpt-5.6-sol
 ```
+
+The workflow performs the saved-login Core-bound Codex turn and existing Action
+Gateway publication in one resumable GitHub engineering run, but preserves the
+credential boundary: FINISHED Core state, result bundle and the stopped model
+process must exist before the host `gh` publisher token is materialized. The
+resulting engineering artifact uses the same shape consumed by
+`retained-pilot-verify.yml`.
 
 This lane deliberately treats the Linux account/host as trusted. It does not
 claim unattended or production-grade credential isolation: unrelated
-credentials may exist elsewhere in the same account. The Codex child process
-does not inherit the operator HOME or publisher-token environment, and its
-isolated auth bootstrap is removed before model-reachable work. Managed WIF is
-the preferred upgrade for unattended execution.
+credentials may exist elsewhere in the same account. Managed WIF is the
+preferred upgrade for unattended execution.
 
 #### Managed-workspace WIF — unattended/GitHub-hosted lane
 
@@ -488,9 +511,9 @@ the fix and that the exact CI/Verification evidence covers the regression.
 
 Stop the pilot rather than weakening authority when any of these occurs:
 
-- the selected Codex authentication mode has no successful real qualification;
-- saved-login mode cannot prove ChatGPT login/bootstrap deletion, or WIF mode
-  cannot mint/verify the approved workload identity assertion;
+- saved-login mode cannot prove the trusted host's ChatGPT login/private
+  `auth.json` source or cannot delete the isolated bootstrap before model work;
+- WIF mode cannot mint/verify the approved workload identity assertion;
 - publisher credential or artifact view is absent;
 - main/base commit changes before publication;
 - Codex status is not FINISHED;
