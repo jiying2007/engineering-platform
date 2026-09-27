@@ -26,7 +26,7 @@ type Provider struct {
 }
 
 const (
-	CredentialModeWorkloadIdentity = "workload_identity"
+	CredentialModeWorkloadIdentity  = "workload_identity"
 	CredentialModeSavedChatGPTLogin = "saved_chatgpt_login"
 )
 
