@@ -1,14 +1,15 @@
 # Implementation Status
 
-Reviewed base: `973bf27daad5b546fe4fdd4d6c62d2d6cce17443` (#68).
+Reviewed base: `fa4d9174299009fad2d1d242a98b961776bcbf95` (#72).
 Stage: **Retained M1 execution mechanics are assembled end-to-end:
 authenticated Core + frozen approved requirement context + real managed-workspace
 WIF Codex engineering + retained result commit/Git bundle + credential-separated
 Git/PR publication + exact PR-head CI + requirement-bound Evidence + Verification
 + independent human Review + conditional Closure. The external managed-workspace
-WIF workspace enablement/provider-rule provisioning and two real retained
-Feature/Debug executions still gate M1. The Admin API provisioning helper is
-implemented and tested, but no real retained pilot has run yet.**
+WIF workspace enablement plus administrator execution of the hardened
+provider/rule provisioning and two real retained Feature/Debug executions still
+gate M1. The Admin API helper is aligned to current OpenAI/GitHub WIF contracts,
+but no real retained pilot has run yet.**
 
 ## Canonical scope
 
@@ -75,11 +76,11 @@ to create ClosureReceipt.
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
 | Codex qualification | Exact `codex-cli 0.155.0`, native hash, generated schema digests, real app-server protocol qualification | Production binary installation/pin remains operator-owned |
-| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained | ChatGPT workspace administrator must configure the real WIF provider/rule before a retained real model claim |
+| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained; GitHub immutable repository identity validated; execution deadline bounded by actual upstream JWT lifetime | ChatGPT workspace administrator must enable WIF and execute the hardened real provider/rule provisioning before a retained real model claim |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
-| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff + Admin API provisioning helpers; resumable GitHub-hosted execution artifacts | Managed-workspace WIF beta/provider/rule must be enabled/configured by an administrator; real runs have not yet occurred |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; WIF handoff + Admin API provisioning helpers; resumable GitHub-hosted execution artifacts | Managed-workspace WIF beta must be enabled and the #72-hardened provider/rule must be provisioned by an administrator; real runs have not yet occurred |
 
 ## Retained evidence
 
@@ -171,6 +172,24 @@ to create ClosureReceipt.
   implementation checkpoint main was `973bf27daad5b546fe4fdd4d6c62d2d6cce17443`. The helper creates/reuses
   exact GitHub OIDC provider/rule policy and can hand off the two non-secret
   repository variables without exposing the Admin API key to Runtime/Worker.
+- #69 canonical live-tree cleanup: exact-head `36259229901`, fresh-main
+  `36259541528` passed all five gates. Superseded architecture/adoption
+  snapshots and transient CI markers now remain in Git history instead of the
+  live authority/search surface.
+- #70 real WIF provider/token contract hardening: exact-head `36278545554`,
+  fresh-main `36278796891` passed all five gates. Provider creation now matches
+  the Admin API schema, alternate provider trust sources fail closed, and M1
+  engineering no longer assumes a 15-minute credential window.
+- #71 GitHub OIDC immutable identity/upstream-lifetime fencing: exact-head
+  `36283137777`, fresh-main `36283385395` passed all five gates. Both live
+  qualification and retained engineering validate immutable repository IDs and
+  exact workflow identity without depending on the legacy subject format;
+  Runtime deadlines derive from actual JWT expiry.
+- #72 OpenAI server-side immutable federation claims: exact-head `36288357165`,
+  fresh-main `36288625934` passed all five gates. The OpenAI rule itself now
+  requires exact repository name, immutable repository/owner IDs,
+  `workflow_dispatch`, protected main, dedicated audience and the approved
+  workflow-ref allow-list.
 
 ## Publication authority
 
@@ -197,8 +216,10 @@ Codex binaries. Operators still own those deployment boundaries.
 
 The remaining M1 sequence is now execution-only:
 
-1. ChatGPT workspace administrator enables/configures the managed-workspace Codex
-   WIF provider/rule for the exact protected-main workflow refs.
+1. ChatGPT workspace administrator enables managed-workspace Codex WIF and runs
+   the #72-hardened Admin API provisioning helper. The OpenAI rule must bind the
+   repository name, immutable repository/owner IDs, `workflow_dispatch`,
+   protected main, dedicated audience and the exact approved workflow refs.
 2. Dispatch `retained-pilot-engineer.yml` for Feature #54. This performs the
    real WIF qualification + one retained engineering turn and publishes the exact
    result only after the model process exits.
