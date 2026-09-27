@@ -57,6 +57,7 @@ ISSUER="https://token.actions.githubusercontent.com"
 REPOSITORY="jiying2007/engineering-platform"
 REPOSITORY_ID="1383377268"
 REPOSITORY_OWNER_ID="33591504"
+EVENT_NAME="workflow_dispatch"
 REF="refs/heads/main"
 LIVE_WORKFLOW_REF="jiying2007/engineering-platform/.github/workflows/codex-wif-live.yml@refs/heads/main"
 ENGINEER_WORKFLOW_REF="jiying2007/engineering-platform/.github/workflows/retained-pilot-engineer.yml@refs/heads/main"
@@ -137,7 +138,7 @@ if [ "$rule_count" -gt 1 ]; then
 fi
 
 RULE_REQUEST="$OUTPUT_DIR/rule-request.json"
-jq -n   --arg name "$RULE_NAME"   --arg workspace_id "$WORKSPACE_ID"   --arg principal_id "$PRINCIPAL_ID"   --arg repository "$REPOSITORY"   --arg repository_id "$REPOSITORY_ID"   --arg repository_owner_id "$REPOSITORY_OWNER_ID"   --arg ref "$REF"   --arg audience "$OPENAI_WIF_AUDIENCE"   --arg condition "$CONDITION"   '{
+jq -n   --arg name "$RULE_NAME"   --arg workspace_id "$WORKSPACE_ID"   --arg principal_id "$PRINCIPAL_ID"   --arg repository "$REPOSITORY"   --arg repository_id "$REPOSITORY_ID"   --arg repository_owner_id "$REPOSITORY_OWNER_ID"   --arg event_name "$EVENT_NAME"   --arg ref "$REF"   --arg audience "$OPENAI_WIF_AUDIENCE"   --arg condition "$CONDITION"   '{
     name:$name,
     description:"engineering-platform protected-main live qualification and retained engineering",
     workspace_id:$workspace_id,
@@ -146,6 +147,7 @@ jq -n   --arg name "$RULE_NAME"   --arg workspace_id "$WORKSPACE_ID"   --arg pri
       repository:$repository,
       repository_id:$repository_id,
       repository_owner_id:$repository_owner_id,
+      event_name:$event_name,
       ref:$ref
     },
     audiences:[$audience],
@@ -165,7 +167,7 @@ else
 fi
 
 printf '%s' "$rule" |
-  jq -e     --arg name "$RULE_NAME"     --arg workspace_id "$WORKSPACE_ID"     --arg principal_id "$PRINCIPAL_ID"     --arg repository "$REPOSITORY"     --arg repository_id "$REPOSITORY_ID"     --arg repository_owner_id "$REPOSITORY_OWNER_ID"     --arg ref "$REF"     --arg audience "$OPENAI_WIF_AUDIENCE"     --arg condition "$CONDITION"     '
+  jq -e     --arg name "$RULE_NAME"     --arg workspace_id "$WORKSPACE_ID"     --arg principal_id "$PRINCIPAL_ID"     --arg repository "$REPOSITORY"     --arg repository_id "$REPOSITORY_ID"     --arg repository_owner_id "$REPOSITORY_OWNER_ID"     --arg event_name "$EVENT_NAME"     --arg ref "$REF"     --arg audience "$OPENAI_WIF_AUDIENCE"     --arg condition "$CONDITION"     '
       .name==$name and
       .workspace_id==$workspace_id and
       .principal_id==$principal_id and
@@ -173,6 +175,7 @@ printf '%s' "$rule" |
       .claims.repository==$repository and
       .claims.repository_id==$repository_id and
       .claims.repository_owner_id==$repository_owner_id and
+      .claims.event_name==$event_name and
       .claims.ref==$ref and
       .audiences==[$audience] and
       .condition==$condition and
@@ -195,6 +198,7 @@ jq -n   --arg provider_id "$PROVIDER_ID"   --arg federation_rule_id "$FEDERATION
     repository:$repository,
     repository_id:$repository_id,
     repository_owner_id:$repository_owner_id,
+    event_name:$event_name,
     ref:$ref,
     condition:$condition
   }' > "$RECEIPT"
