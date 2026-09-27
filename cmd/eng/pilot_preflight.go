@@ -31,8 +31,9 @@ type pilotPreflightOptions struct {
 	PreparationFile string
 	WorkerProfile   string
 	WorkerCodexFile string
-	PublisherFile   string
-	WIFReceiptFile  string
+	PublisherFile          string
+	WIFReceiptFile         string
+	SavedLoginReceiptFile  string
 }
 
 type pilotPreflightResult struct {
@@ -50,7 +51,9 @@ type pilotPreflightResult struct {
 type pilotWorkerCodexConfig struct {
 	Version          int               `json:"version"`
 	Executable       string            `json:"codex_executable"`
-	FederationRuleID string            `json:"federation_rule_id"`
+	CredentialMode   string            `json:"credential_mode"`
+	FederationRuleID string            `json:"federation_rule_id,omitempty"`
+	SavedLoginFile   string            `json:"saved_login_file,omitempty"`
 	Profile          codexexec.Profile `json:"profile"`
 }
 
@@ -64,9 +67,10 @@ func pilotPreflight(args []string) error {
 	fs.StringVar(&options.PolicyFile, "access-policy", "", "rendered access policy JSON")
 	fs.StringVar(&options.PreparationFile, "preparation", "", "rendered Worker preparation JSON")
 	fs.StringVar(&options.WorkerProfile, "worker-profile", "", "exact WorkerProfile")
-	fs.StringVar(&options.WorkerCodexFile, "worker-codex", "", "rendered Worker Codex config JSON; optional until WIF rule exists")
+	fs.StringVar(&options.WorkerCodexFile, "worker-codex", "", "rendered Worker Codex config JSON; optional until a Codex authentication mode is ready")
 	fs.StringVar(&options.PublisherFile, "publisher", "", "publisher config JSON; optional until publisher credential exists")
-	fs.StringVar(&options.WIFReceiptFile, "wif-receipt", "", "real codex-wif-live receipt JSON; optional until administrator WIF succeeds")
+	fs.StringVar(&options.WIFReceiptFile, "wif-receipt", "", "real codex-wif-live receipt JSON for workload-identity mode")
+	fs.StringVar(&options.SavedLoginReceiptFile, "saved-login-receipt", "", "real self-hosted saved-ChatGPT-login qualification receipt")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
 		return fmt.Errorf("invalid pilot-preflight arguments")
 	}
@@ -130,12 +134,12 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 		Version: 1, Repository: "jiying2007/engineering-platform",
 		BaseCommit: mainCommit, ProfileDigest: profile.ProfileDigest,
 		WorkerProfile: options.WorkerProfile, Internal: "READY",
-		ModelExecution: "BLOCKED_EXTERNAL_WIF", Publication: "BLOCKED_EXTERNAL_PUBLISHER",
+		ModelExecution: "BLOCKED_EXTERNAL_CODEX_AUTH", Publication: "BLOCKED_EXTERNAL_PUBLISHER",
 	}
 
 	var workerCodex *pilotWorkerCodexConfig
 	if options.WorkerCodexFile == "" {
-		result.Blockers = append(result.Blockers, "worker_codex_federation_rule")
+		result.Blockers = append(result.Blockers, "worker_codex_authentication")
 	} else {
 		config, err := readPilotWorkerCodex(options.WorkerCodexFile)
 		if err != nil {
@@ -147,22 +151,52 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 		workerCodex = &config
 	}
 
-	if options.WIFReceiptFile == "" {
-		result.Blockers = append(result.Blockers, "managed_workspace_wif_qualification")
-	} else {
-		if workerCodex == nil {
-			return empty, fmt.Errorf("WIF receipt cannot be checked without Worker Codex configuration")
+	if workerCodex != nil {
+		switch workerCodex.CredentialMode {
+		case codexapp.CredentialModeWorkloadIdentity:
+			if options.SavedLoginReceiptFile != "" {
+				return empty, fmt.Errorf("saved-login receipt is incompatible with workload-identity Worker config")
+			}
+			if options.WIFReceiptFile == "" {
+				result.Blockers = append(result.Blockers, "managed_workspace_wif_qualification")
+			} else {
+				receipt, err := readPilotWIFReceipt(options.WIFReceiptFile)
+				if err != nil {
+					return empty, err
+				}
+				if receipt.CredentialMode != codexapp.CredentialModeWorkloadIdentity ||
+					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
+					receipt.Model != profile.Profile.Model ||
+					receipt.FederationRuleID != workerCodex.FederationRuleID {
+					return empty, fmt.Errorf("WIF qualification does not bind the exact Worker Codex profile")
+				}
+				result.ModelExecution = "READY"
+			}
+		case codexapp.CredentialModeSavedChatGPTLogin:
+			if options.WIFReceiptFile != "" {
+				return empty, fmt.Errorf("WIF receipt is incompatible with saved-login Worker config")
+			}
+			if err := codexapp.ValidateSavedLoginFile(workerCodex.SavedLoginFile); err != nil {
+				return empty, fmt.Errorf("saved ChatGPT login source: %w", err)
+			}
+			if options.SavedLoginReceiptFile == "" {
+				result.Blockers = append(result.Blockers, "trusted_self_hosted_login_qualification")
+			} else {
+				receipt, err := readPilotWIFReceipt(options.SavedLoginReceiptFile)
+				if err != nil {
+					return empty, err
+				}
+				if receipt.CredentialMode != codexapp.CredentialModeSavedChatGPTLogin ||
+					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
+					receipt.Model != profile.Profile.Model ||
+					receipt.FederationRuleID != "" {
+					return empty, fmt.Errorf("saved-login qualification does not bind the exact Worker Codex profile")
+				}
+				result.ModelExecution = "READY"
+			}
+		default:
+			return empty, fmt.Errorf("unsupported Worker Codex credential mode")
 		}
-		receipt, err := readPilotWIFReceipt(options.WIFReceiptFile)
-		if err != nil {
-			return empty, err
-		}
-		if receipt.BinaryDigest != profile.Profile.BinaryDigest ||
-			receipt.Model != profile.Profile.Model ||
-			receipt.FederationRuleID != workerCodex.FederationRuleID {
-			return empty, fmt.Errorf("WIF qualification does not bind the exact Worker Codex profile")
-		}
-		result.ModelExecution = "READY"
 	}
 
 	if options.PublisherFile == "" {
@@ -374,8 +408,20 @@ func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {
 	if err := strictjson.Decode(data, &config); err != nil {
 		return config, err
 	}
-	if config.Version != 1 || strings.TrimSpace(config.FederationRuleID) == "" || config.Profile.Validate() != nil {
+	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" || config.Profile.Validate() != nil {
 		return config, fmt.Errorf("invalid Worker Codex configuration")
+	}
+	switch config.CredentialMode {
+	case codexapp.CredentialModeWorkloadIdentity:
+		if strings.TrimSpace(config.FederationRuleID) == "" || config.SavedLoginFile != "" {
+			return config, fmt.Errorf("invalid workload-identity Worker Codex configuration")
+		}
+	case codexapp.CredentialModeSavedChatGPTLogin:
+		if config.FederationRuleID != "" || strings.TrimSpace(config.SavedLoginFile) == "" {
+			return config, fmt.Errorf("invalid saved-login Worker Codex configuration")
+		}
+	default:
+		return config, fmt.Errorf("unsupported Worker Codex credential mode")
 	}
 	return config, nil
 }
