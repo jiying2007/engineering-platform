@@ -52,9 +52,12 @@ is bound to the exact `repository`, immutable `repository_id` and
 rather than the legacy name-only `sub` shape. Longer-running production turns
 require a separately designed host-owned refresh mechanism.
 
-The rule requires:
+The rule requires all of these **server-side** identity checks before OpenAI
+issues an access token:
 
 - exact repository `jiying2007/engineering-platform`;
+- exact immutable repository ID `1383377268`;
+- exact immutable repository-owner ID `33591504`;
 - exact ref `refs/heads/main`;
 - the dedicated audience;
 - a CEL allow-list containing only:
@@ -69,8 +72,8 @@ admin workstation, set:
 export SET_GITHUB_VARIABLES=1
 ```
 
-The generated `wif-admin-receipt.json` contains provider/rule IDs and the
-non-secret trust policy. It never contains the Admin API key.
+The generated `wif-admin-receipt.json` contains provider/rule IDs, immutable
+repository/owner IDs, and the non-secret trust policy. It never contains the Admin API key.
 
 If the Admin API returns 403/404 because the organization/workspace is not
 enabled for Codex WIF beta or the key owner lacks permission, that remains the
