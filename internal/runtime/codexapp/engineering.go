@@ -66,25 +66,25 @@ type EngineeringObservation struct {
 }
 
 type EngineeringReceipt struct {
-	SchemaVersion              int    `json:"schema_version"`
-	CLI                        string `json:"cli"`
-	Version                    string `json:"version"`
-	BinaryDigest               string `json:"binary_digest"`
-	EngineeringConfigDigest    string `json:"engineering_config_digest"`
-	CredentialMode             string `json:"credential_mode"`
-	FederationRuleID           string `json:"federation_rule_id"`
-	Model                      string `json:"model"`
-	PromptDigest               string `json:"prompt_digest"`
-	ThreadID                   string `json:"thread_id"`
-	TurnID                     string `json:"turn_id"`
-	TurnStatus                 string `json:"turn_status"`
-	Output                     string `json:"output"`
-	OutputDigest               string `json:"output_digest"`
-	CommandCount               int    `json:"command_count"`
-	FailedCommands             int    `json:"failed_commands"`
-	FileChangeCount            int    `json:"file_change_count"`
-	ApprovalRequests           int    `json:"approval_requests"`
-	AssertionRemovedBeforeTurn          bool   `json:"assertion_removed_before_turn"`
+	SchemaVersion                        int    `json:"schema_version"`
+	CLI                                  string `json:"cli"`
+	Version                              string `json:"version"`
+	BinaryDigest                         string `json:"binary_digest"`
+	EngineeringConfigDigest              string `json:"engineering_config_digest"`
+	CredentialMode                       string `json:"credential_mode"`
+	FederationRuleID                     string `json:"federation_rule_id"`
+	Model                                string `json:"model"`
+	PromptDigest                         string `json:"prompt_digest"`
+	ThreadID                             string `json:"thread_id"`
+	TurnID                               string `json:"turn_id"`
+	TurnStatus                           string `json:"turn_status"`
+	Output                               string `json:"output"`
+	OutputDigest                         string `json:"output_digest"`
+	CommandCount                         int    `json:"command_count"`
+	FailedCommands                       int    `json:"failed_commands"`
+	FileChangeCount                      int    `json:"file_change_count"`
+	ApprovalRequests                     int    `json:"approval_requests"`
+	AssertionRemovedBeforeTurn           bool   `json:"assertion_removed_before_turn"`
 	CredentialBootstrapRemovedBeforeTurn bool   `json:"credential_bootstrap_removed_before_turn"`
 }
 
@@ -292,12 +292,11 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
 		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
 		FileChangeCount: observation.FileChangeCount, ApprovalRequests: observation.ApprovalRequests,
-		AssertionRemovedBeforeTurn: true,
+		AssertionRemovedBeforeTurn:           true,
 		CredentialBootstrapRemovedBeforeTurn: false,
 	}
 	return receipt, receipt.Validate()
 }
-
 
 func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model, prompt string) (EngineeringReceipt, error) {
 	var receipt EngineeringReceipt
@@ -402,7 +401,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, wo
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
 		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
 		FileChangeCount: observation.FileChangeCount, ApprovalRequests: observation.ApprovalRequests,
-		AssertionRemovedBeforeTurn: false,
+		AssertionRemovedBeforeTurn:           false,
 		CredentialBootstrapRemovedBeforeTurn: true,
 	}
 	return receipt, receipt.Validate()
