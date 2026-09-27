@@ -79,11 +79,15 @@ func helperServer() error {
 			ready = true
 		case "account/rateLimits/read":
 			token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE")
-			if token == "" {
-				return errors.New("WIF token path missing during prewarm")
-			}
-			if _, err := os.Stat(token); err != nil {
-				return errors.New("WIF assertion unavailable during prewarm")
+			if token != "" {
+				if _, err := os.Stat(token); err != nil {
+					return errors.New("WIF assertion unavailable during prewarm")
+				}
+			} else {
+				auth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
+				if _, err := os.Stat(auth); err != nil {
+					return errors.New("saved ChatGPT login unavailable during prewarm")
+				}
 			}
 			if err := send(m.ID, map[string]any{"rateLimits": map[string]any{"primary": nil}}); err != nil {
 				return err
@@ -107,12 +111,18 @@ func helperServer() error {
 			}
 			engineering = p.Sandbox == "workspace-write"
 			worktree = p.CWD
-			if engineering {
-				if token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE"); token == "" {
-					return errors.New("engineering launch lost token locator")
-				} else if _, err := os.Stat(token); !os.IsNotExist(err) {
-					return errors.New("WIF assertion remained reachable at engineering thread/start")
+			token := os.Getenv("OPENAI_IDENTITY_TOKEN_FILE")
+			if token != "" {
+				if _, err := os.Stat(token); !os.IsNotExist(err) {
+					return errors.New("WIF assertion remained reachable at thread/start")
 				}
+			} else {
+				auth := filepath.Join(os.Getenv("CODEX_HOME"), "auth.json")
+				if _, err := os.Stat(auth); !os.IsNotExist(err) {
+					return errors.New("saved ChatGPT login bootstrap remained reachable at thread/start")
+				}
+			}
+			if engineering {
 				config, err := os.ReadFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"))
 				if err != nil || string(config) != engineeringConfig {
 					return errors.New("engineering config was not the fixed qualified profile")
