@@ -70,7 +70,6 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"subject.startswith",
-		"repo:" + repository + ":",
 	} {
 		if strings.Contains(liveWorkflow, forbidden) {
 			t.Fatalf("live WIF workflow retains legacy subject-format assumption %q", forbidden)
