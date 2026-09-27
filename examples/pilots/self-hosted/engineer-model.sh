@@ -6,9 +6,11 @@ usage() {
   cat >&2 <<'EOF'
 usage: engineer-model.sh PILOT OUTPUT_ROOT CODEX_NATIVE SAVED_LOGIN_FILE [MODEL]
 
-Runs only the retained model phase on a trusted self-hosted Linux host.
-PILOT is feature or debug. OUTPUT_ROOT, CODEX_NATIVE and SAVED_LOGIN_FILE must
-be absolute paths. No GitHub publisher credential is accepted by this command.
+Runs one retained engineering-to-PR chain on a trusted GitHub self-hosted Linux
+runner. PILOT is feature or debug. OUTPUT_ROOT, CODEX_NATIVE and SAVED_LOGIN_FILE
+must be absolute paths. No publisher credential may be present during the model
+phase; the script reads the trusted host's gh credential only after the Codex
+process has exited and FINISHED state has been retained.
 EOF
   exit 2
 }
@@ -19,6 +21,15 @@ OUTPUT_ROOT="$2"
 CODEX_NATIVE="$3"
 SAVED_LOGIN_FILE="$4"
 MODEL="${5:-gpt-5.6-sol}"
+
+: "${GITHUB_RUN_ID:?GitHub Actions run id required}"
+: "${GITHUB_REPOSITORY:?GitHub repository required}"
+: "${GITHUB_SHA:?GitHub source SHA required}"
+: "${GITHUB_REF:?GitHub ref required}"
+: "${GITHUB_REF_PROTECTED:?GitHub protected-ref fact required}"
+test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+test "$GITHUB_REF" = "refs/heads/main"
+test "$GITHUB_REF_PROTECTED" = "true"
 
 case "$PILOT" in
   feature|debug) ;;
@@ -44,13 +55,13 @@ command -v jq >/dev/null
 command -v go >/dev/null
 command -v docker >/dev/null
 command -v sha256sum >/dev/null
+command -v gh >/dev/null
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 test -f "$ROOT/go.mod"
 test -z "$(git -C "$ROOT" status --porcelain=v1 --untracked-files=all)"
-test "$(git -C "$ROOT" branch --show-current)" = main
 BASE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
-test "$BASE_COMMIT" = "$(git -C "$ROOT" rev-parse refs/heads/main)"
+test "$BASE_COMMIT" = "$GITHUB_SHA"
 REMOTE_MAIN="$(git ls-remote https://github.com/jiying2007/engineering-platform.git refs/heads/main | awk '{print $1}')"
 test "$REMOTE_MAIN" = "$BASE_COMMIT"
 curl -fsSL https://api.github.com/repos/jiying2007/engineering-platform/branches/main |
@@ -59,13 +70,20 @@ curl -fsSL https://api.github.com/repos/jiying2007/engineering-platform/branches
 CODEX_NATIVE="$(readlink -f "$CODEX_NATIVE")"
 SAVED_LOGIN_FILE="$(readlink -f "$SAVED_LOGIN_FILE")"
 test "$("$CODEX_NATIVE" --version)" = "codex-cli 0.155.0"
+login_status="$(
+  env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u OPENAI_FEDERATION_RULE_ID     -u OPENAI_IDENTITY_TOKEN_FILE -u OPENAI_WORKLOAD_IDENTITY_CONTEXT     -u CODEX_API_KEY -u CODEX_ACCESS_TOKEN     "$CODEX_NATIVE" login status 2>&1
+)"
+test "$(printf '%s' "$login_status" | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
+# Prove the independent publisher credential exists before consuming the
+# non-replayable model turn, without exporting or copying it into model state.
+gh auth status >/dev/null 2>&1
+gh auth token >/dev/null
 
 install -d -m 0700 "$OUTPUT_ROOT"
 STATE_ROOT="$OUTPUT_ROOT/retained-pilot-state"
 STACK_ROOT="$OUTPUT_ROOT/retained-pilot-stack"
 BIN_DIR="$OUTPUT_ROOT/bin"
-QUAL_ROOT="$OUTPUT_ROOT/login-qualification"
-rm -rf "$STATE_ROOT" "$STACK_ROOT" "$BIN_DIR" "$QUAL_ROOT"
+rm -rf "$STATE_ROOT" "$STACK_ROOT" "$BIN_DIR"
 install -d -m 0700 "$STATE_ROOT" "$BIN_DIR"
 
 (
@@ -75,10 +93,6 @@ install -d -m 0700 "$STATE_ROOT" "$BIN_DIR"
   go build -trimpath -o "$BIN_DIR/worker" ./cmd/worker
   go build -trimpath -o "$BIN_DIR/codex-saved-login-live" ./cmd/codex-saved-login-live
 )
-
-"$ROOT/examples/pilots/self-hosted/qualify-login.sh"   "$QUAL_ROOT" "$CODEX_NATIVE" "$SAVED_LOGIN_FILE" "$MODEL"
-cp "$QUAL_ROOT/saved-login-live-receipt.json" "$STATE_ROOT/saved-login-live-receipt.json"
-chmod 0600 "$STATE_ROOT/saved-login-live-receipt.json"
 
 "$BIN_DIR/eng" codex-profile --codex "$CODEX_NATIVE" --model "$MODEL" > "$STATE_ROOT/codex-profile.json"
 PROFILE_FILE="$STATE_ROOT/codex-profile.json"
@@ -202,7 +216,7 @@ jq --arg login "$SAVED_LOGIN_FILE" '{
 }' "$PROFILE_FILE" > "$WORKER_CODEX_FILE"
 chmod 0600 "$WORKER_CODEX_FILE"
 
-"$BIN_DIR/eng" pilot-preflight   --repository "$ROOT"   --base "$BASE_COMMIT"   --codex-profile "$PROFILE_FILE"   --access-policy "$STACK_ROOT/operator/access-policy.json"   --preparation "$PREPARATION_FILE"   --worker-profile worker/codex-pilot   --worker-codex "$WORKER_CODEX_FILE"   --saved-login-receipt "$STATE_ROOT/saved-login-live-receipt.json"   > "$STATE_ROOT/preflight-before-engineering.json"
+"$BIN_DIR/eng" pilot-preflight   --repository "$ROOT"   --base "$BASE_COMMIT"   --codex-profile "$PROFILE_FILE"   --access-policy "$STACK_ROOT/operator/access-policy.json"   --preparation "$PREPARATION_FILE"   --worker-profile worker/codex-pilot   --worker-codex "$WORKER_CODEX_FILE"   > "$STATE_ROOT/preflight-before-engineering.json"
 jq -e '.internal=="READY" and .model_execution=="READY" and .publication=="BLOCKED_EXTERNAL_PUBLISHER"'   "$STATE_ROOT/preflight-before-engineering.json" >/dev/null
 
 (
@@ -256,5 +270,109 @@ echo "trusted self-hosted retained pilot model phase: FINISHED"
 echo "pilot=$PILOT"
 echo "base_commit=$BASE_COMMIT"
 echo "credential_mode=saved_chatgpt_login"
+
+# Only after the model process has exited and the FINISHED Core state/result
+# bundle have been retained may the trusted host materialize a publisher token.
+TOKEN_FILE="$STACK_ROOT/secrets/github-token"
+gh auth token > "$TOKEN_FILE"
+chmod 0600 "$TOKEN_FILE"
+
+set -a
+# shellcheck disable=SC1090
+. "$STACK_ROOT/operator/control-plane-with-publisher.env"
+set +a
+"$BIN_DIR/control-plane" >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
+CONTROL_PID=$!
+for _ in $(seq 1 60); do
+  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+    break
+  fi
+  if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
+    cat "$STATE_ROOT/control-plane-publisher.log" >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+
+"$BIN_DIR/eng" pilot-preflight   --repository "$ROOT"   --base "$BASE_COMMIT"   --codex-profile "$PROFILE_FILE"   --access-policy "$STACK_ROOT/operator/access-policy.json"   --preparation "$PREPARATION_FILE"   --worker-profile worker/codex-pilot   --worker-codex "$WORKER_CODEX_FILE"   --publisher "$STACK_ROOT/operator/github-publisher.json"   > "$STATE_ROOT/preflight-before-publication.json"
+jq -e '.internal=="READY" and .model_execution=="READY" and .publication=="READY" and ((.external_blockers // [])|length==0)'   "$STATE_ROOT/preflight-before-publication.json" >/dev/null
+
+# Publisher requester is certificate-separated from Worker/owner.
+# shellcheck disable=SC1090
+. "$STACK_ROOT/clients/publisher.env"
+"$BIN_DIR/eng" api GET "/api/v1/runs/$RUN_ID" > "$STATE_ROOT/run-before-publication.json"
+"$BIN_DIR/eng" api GET /api/v1/recovery > "$STATE_ROOT/recovery-before-publication.json"
+"$BIN_DIR/eng" api GET "/api/v1/runs/$RUN_ID/codex" > "$STATE_ROOT/codex-status.json"
+
+EXECUTION_EPOCH="$(jq -er .run.current_epoch "$STATE_ROOT/run-before-publication.json")"
+RECOVERY_EPOCH="$(jq -er .recovery_epoch "$STATE_ROOT/recovery-before-publication.json")"
+CODEX_RESULT_DIGEST="$(jq -er .receipt.result_digest "$STATE_ROOT/codex-status.json")"
+RESULT_COMMIT="$(jq -er .receipt.result.change.result_commit "$STATE_ROOT/codex-status.json")"
+EXECUTION_ID="$(jq -er .token.execution_id "$STATE_ROOT/codex-status.json")"
+
+sed   -e "s/__EXECUTION_EPOCH__/$EXECUTION_EPOCH/g"   -e "s/__RECOVERY_EPOCH__/$RECOVERY_EPOCH/g"   -e "s#__CODEX_RESULT_DIGEST__#$CODEX_RESULT_DIGEST#g"   "$PILOT_DIR/publish.json.tmpl" > "$STATE_ROOT/publish.json"
+
+"$BIN_DIR/eng" api POST "/api/v1/runs/$RUN_ID/actions" "$STATE_ROOT/publish.json" > "$STATE_ROOT/publication-receipt.json"
+RESULT="$(jq -er .result "$STATE_ROOT/publication-receipt.json")"
+OPERATION_ID="$(jq -er .operation_id "$STATE_ROOT/publication-receipt.json")"
+if [ "$RESULT" = "UNKNOWN" ]; then
+  "$BIN_DIR/eng" api POST "/api/v1/actions/$OPERATION_ID/reconcile" <(printf '{}') > "$STATE_ROOT/publication-reconcile.json"
+  RESULT="$(jq -er .result "$STATE_ROOT/publication-reconcile.json")"
+  if [ "$RESULT" = "CONFIRMED" ]; then
+    cp "$STATE_ROOT/publication-reconcile.json" "$STATE_ROOT/publication-receipt.json"
+  fi
+fi
+test "$RESULT" = "CONFIRMED"
+
+PR_URL="$(jq -er .external_ref "$STATE_ROOT/publication-receipt.json")"
+OBSERVED_STATE="$(jq -er .observed_state "$STATE_ROOT/publication-receipt.json")"
+PR_NUMBER="$(printf '%s' "$PR_URL" | sed -n 's#^.*/pull/\([0-9][0-9]*\)$#\1#p')"
+test -n "$PR_NUMBER"
+PUBLISHED_BRANCH="$(printf '%s' "$OBSERVED_STATE" | jq -er .branch)"
+OBSERVED_RESULT="$(printf '%s' "$OBSERVED_STATE" | jq -er .result_commit)"
+test "$OBSERVED_RESULT" = "$RESULT_COMMIT"
+
+BUNDLE_SOURCE="$STACK_ROOT/preparation-root/artifacts/$EXECUTION_ID.bundle"
+test -f "$BUNDLE_SOURCE"
+test "sha256:$(sha256sum "$BUNDLE_SOURCE" | awk '{print $1}')" = "$BUNDLE_DIGEST"
+test "$(stat -c%s "$BUNDLE_SOURCE")" = "$BUNDLE_SIZE"
+
+kill "$CONTROL_PID"
+wait "$CONTROL_PID" || true
+CONTROL_PID=""
+rm -f "$TOKEN_FILE"
+
+docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core.dump"
+test -s "$STATE_ROOT/core.dump"
+
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
+    version:1,
+    execution_origin:"trusted_self_hosted",
+    credential_mode:$credential_mode,
+    pilot:$pilot,
+    run_id:$run_id,
+    base_commit:$base_commit,
+    result_commit:$result_commit,
+    codex_result_digest:$result_digest,
+    bundle_digest:$bundle_digest,
+    profile_digest:$profile_digest,
+    pull_request:{number:$pr_number,url:$pr_url,branch:$pr_branch},
+    github_engineering_run_id:$github_engineering_run_id,
+    next_gate:"PASS_EXACT_PR_HEAD_CI"
+  }' > "$STATE_ROOT/engineering-state.json"
+
+cp "$STACK_ROOT/operator/access-policy.json" "$STATE_ROOT/access-policy.json"
+cp "$PREPARATION_FILE" "$STATE_ROOT/worker-preparation.json"
+cp "$WORKER_CODEX_FILE" "$STATE_ROOT/worker-codex.json"
+cp "$PILOT_DIR/requirement.md" "$STATE_ROOT/requirement.md"
+chmod 0600 "$STATE_ROOT"/*.json "$STATE_ROOT/core.dump" "$STATE_ROOT/core-pre-publication.dump" "$STATE_ROOT/result.bundle"
+
+echo "trusted self-hosted retained pilot engineering publication: CONFIRMED"
+echo "pilot=$PILOT"
+echo "base_commit=$BASE_COMMIT"
+echo "result_commit=$RESULT_COMMIT"
+echo "credential_mode=saved_chatgpt_login"
+echo "pr_url=$PR_URL"
 echo "state_root=$STATE_ROOT"
-echo "next=independent publication; no model replay"
+echo "next=exact PR-head CI, then retained-pilot-verify"
