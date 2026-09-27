@@ -111,7 +111,8 @@ func NewPinnedSavedLoginEngineeringProvider(executable, digest, savedLoginSource
 	return p, nil
 }
 
-func EngineeringConfigDigest() string { return canonical.BytesDigest([]byte(engineeringConfig)) }
+func CredentialSafeConfigDigest() string { return canonical.BytesDigest([]byte(credentialSafeConfig)) }
+func EngineeringConfigDigest() string    { return canonical.BytesDigest([]byte(engineeringConfig)) }
 func (p *Provider) Name() string      { return "codex-app-server" }
 
 // Command is a narrow launch policy, not an OS sandbox. Host-controlled absolute
