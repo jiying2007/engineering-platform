@@ -24,7 +24,7 @@ func TestPilotPreflightReportsOnlyExternalBlockers(t *testing.T) {
 		t.Fatalf("unexpected partial readiness: %#v", result)
 	}
 	want := map[string]bool{
-		"worker_codex_authentication":            true,
+		"worker_codex_authentication":           true,
 		"publisher_configuration_or_credential": true,
 	}
 	if len(result.Blockers) != len(want) {
@@ -310,7 +310,6 @@ func pilotGit(t *testing.T, git, repository string, args ...string) string {
 	return string(out)
 }
 
-
 func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 	options, profile, _ := pilotPreflightFixture(t)
 	root := filepath.Dir(options.ProfileFile)
@@ -332,19 +331,19 @@ func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved.json", workerCodex)
 
 	saved := codexapp.LiveReceipt{
-		SchemaVersion: 1,
-		CLI: "codex-cli",
-		Version: codexapp.QualifiedCodexVersion,
-		BinaryDigest: profile.Profile.BinaryDigest,
-		CredentialSafeConfigDigest: canonical.BytesDigest([]byte("cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n")),
-		CredentialMode: codexapp.CredentialModeSavedChatGPTLogin,
-		Model: profile.Profile.Model,
-		PromptDigest: canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
-		ThreadID: "thread-saved-preflight",
-		TurnID: "turn-saved-preflight",
-		TurnStatus: "completed",
-		Output: codexapp.LiveProbeExpected,
-		OutputDigest: canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
+		SchemaVersion:                        1,
+		CLI:                                  "codex-cli",
+		Version:                              codexapp.QualifiedCodexVersion,
+		BinaryDigest:                         profile.Profile.BinaryDigest,
+		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte("cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n")),
+		CredentialMode:                       codexapp.CredentialModeSavedChatGPTLogin,
+		Model:                                profile.Profile.Model,
+		PromptDigest:                         canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
+		ThreadID:                             "thread-saved-preflight",
+		TurnID:                               "turn-saved-preflight",
+		TurnStatus:                           "completed",
+		Output:                               codexapp.LiveProbeExpected,
+		OutputDigest:                         canonical.BytesDigest([]byte(codexapp.LiveProbeExpected)),
 		CredentialBootstrapRemovedBeforeTurn: true,
 	}
 	if err := saved.Validate(); err != nil {
@@ -376,7 +375,7 @@ func TestPilotPreflightRejectsCrossModeCredentialReceipt(t *testing.T) {
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-cross-mode.json", workerCodex)
-	options.SavedLoginReceiptFile = writePilotJSON(t, root, "fake-saved.json", map[string]any{"version":1})
+	options.SavedLoginReceiptFile = writePilotJSON(t, root, "fake-saved.json", map[string]any{"version": 1})
 	if _, err := checkPilotPreflight(options); err == nil ||
 		!strings.Contains(err.Error(), "incompatible") {
 		t.Fatalf("cross-mode receipt accepted: %v", err)
