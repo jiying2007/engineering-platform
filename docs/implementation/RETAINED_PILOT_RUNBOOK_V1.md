@@ -12,7 +12,8 @@ A pilot is retained only when the exact chain reaches Closure:
 ```
 Requirement
   -> frozen Task / Run / approved Context
-  -> real managed-workspace WIF Codex engineering
+  -> real Core-bound Codex engineering
+       (trusted self-hosted saved ChatGPT login OR managed-workspace WIF)
   -> retained result commit + Git bundle
   -> independently authorized GitHub PR publication
   -> exact PR-head trusted CI
@@ -51,7 +52,57 @@ GitHub's own `GITHUB_REF_PROTECTED=true` runtime fact. If branch protection is
 removed after setup, the retained chain fails closed before model execution or
 evidence/review mutation.
 
-### Managed-workspace WIF
+### Codex authentication modes
+
+M1 accepts exactly one of two explicit authentication modes for a retained
+engineering execution. The Core Task/Run, Worker preparation, prompt identity,
+result bundle, publication, CI, Evidence, Verification, Review and Closure
+authorities are identical in both modes.
+
+#### Trusted self-hosted saved ChatGPT login — M1 phase 1
+
+A trusted Linux execution host may use an existing Codex CLI ChatGPT login when:
+
+- the exact qualified native Codex binary is pinned and hashed;
+- `codex login status` reports `Logged in using ChatGPT`;
+- the operator saved login file is an owner-private regular file;
+- the Worker receives a fresh isolated HOME rather than the operator HOME;
+- the saved login is copied only into that isolated HOME for authentication
+  prewarm and the copied `auth.json` is deleted before `thread/start`;
+- `OPENAI_API_KEY`, `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN`, WIF inputs and
+  all publisher credentials are absent from the model-phase environment;
+- the model tool profile remains no-network, workspace-write and
+  approval-policy `never`.
+
+Qualify the existing login before consuming the retained model turn:
+
+```sh
+bash examples/pilots/self-hosted/qualify-login.sh \
+  "$HOME/operator/self-hosted-login" \
+  /absolute/path/to/codex \
+  "$HOME/.codex/auth.json" \
+  gpt-5.6-sol
+```
+
+Then the self-hosted retained model phase may be run with:
+
+```sh
+bash examples/pilots/self-hosted/engineer-model.sh \
+  feature \
+  "$HOME/operator/retained-feature" \
+  /absolute/path/to/codex \
+  "$HOME/.codex/auth.json" \
+  gpt-5.6-sol
+```
+
+This lane deliberately treats the Linux account/host as trusted. It does not
+claim unattended or production-grade credential isolation: unrelated
+credentials may exist elsewhere in the same account. The Codex child process
+does not inherit the operator HOME or publisher-token environment, and its
+isolated auth bootstrap is removed before model-reachable work. Managed WIF is
+the preferred upgrade for unattended execution.
+
+#### Managed-workspace WIF — unattended/GitHub-hosted lane
 
 The ChatGPT workspace administrator must enable/configure the Codex workload
 identity provider/rule that accepts the approved workload identity.
@@ -135,8 +186,10 @@ capabilities, the selected worker profile, `action:execute`, and only the exact
 Core-bound Codex action grant required by policy. Do not grant
 `github.publish-pr` to the Worker.
 
-The Worker Codex config also binds the exact native executable and approved
-federation rule ID.
+The Worker Codex config also binds the exact native executable and exactly one
+credential mode. WIF mode binds the approved federation rule ID. Trusted
+self-hosted mode binds the owner-private saved-login source path; the runtime
+copies it only into an isolated HOME and deletes the copy before model work.
 
 ## 3. Select a small real pilot
 
@@ -203,15 +256,29 @@ The Work/Task/Run must remain on one immutable base/result lineage.
 ## 6. Admit, prepare and execute the real Codex turn
 
 First consume the normal Worker admission/preparation flow for the exact Run.
-Then, with the prepared Run and short-lived WIF assertion available:
+Then execute exactly one configured authentication mode.
+
+WIF:
 
 ```sh
 WORKER_PREPARATION_CONFIG=/operator/preparation.json \
-WORKER_CODEX_CONFIG=/operator/codex.json \
+WORKER_CODEX_CONFIG=/operator/codex-wif.json \
 OPENAI_IDENTITY_TOKEN_FILE=/run/identity/assertion.jwt \
 eng-worker --profile <worker-profile> \
   --execute-codex --run <run-id> --once
 ```
+
+Trusted self-hosted saved login:
+
+```sh
+WORKER_PREPARATION_CONFIG=/operator/preparation.json \
+WORKER_CODEX_CONFIG=/operator/codex-saved-login.json \
+eng-worker --profile <worker-profile> \
+  --execute-codex --run <run-id> --once
+```
+
+The saved-login config points to the operator-owned private login source. It
+does not make the operator HOME the model HOME.
 
 Use the repository's built `worker` binary name/path in deployment; the example
 above names it `eng-worker` only to distinguish it from the `eng` CLI.
@@ -421,8 +488,9 @@ the fix and that the exact CI/Verification evidence covers the regression.
 
 Stop the pilot rather than weakening authority when any of these occurs:
 
-- WIF qualification has no successful retained real turn;
-- Worker assertion cannot be minted by the approved external workload identity;
+- the selected Codex authentication mode has no successful real qualification;
+- saved-login mode cannot prove ChatGPT login/bootstrap deletion, or WIF mode
+  cannot mint/verify the approved workload identity assertion;
 - publisher credential or artifact view is absent;
 - main/base commit changes before publication;
 - Codex status is not FINISHED;
