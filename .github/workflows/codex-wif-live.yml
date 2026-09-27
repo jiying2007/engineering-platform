@@ -24,6 +24,8 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF_PROTECTED" = "true"
           test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
           test -n "${{ vars.OPENAI_WIF_AUDIENCE }}"
           test -n "${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}"

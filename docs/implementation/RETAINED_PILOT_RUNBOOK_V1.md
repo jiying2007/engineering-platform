@@ -29,6 +29,28 @@ Repository fake app-server tests are never accepted as real model evidence.
 
 Do not create a pilot WorkItem until all external prerequisites are ready.
 
+### GitHub protected main
+
+The retained-pilot authority assumes that `refs/heads/main` is actually protected
+by GitHub, not merely named `main`. Configure the repository minimum policy
+before provisioning WIF:
+
+```sh
+bash examples/pilots/github/configure-main-protection.sh /operator/github-main
+```
+
+Retain `/operator/github-main/github-main-protection-receipt.json`. The minimum
+policy requires pull-request-only changes (zero approvals is sufficient for the
+single-owner repository), strict success of all five canonical CI jobs,
+administrator enforcement, linear history, no force pushes/deletions, and
+conversation resolution. A pre-existing stricter policy is accepted only when it
+still satisfies those minimum invariants; the helper never silently weakens it.
+
+Every live/engineering/verification/review `workflow_dispatch` also requires
+GitHub's own `GITHUB_REF_PROTECTED=true` runtime fact. If branch protection is
+removed after setup, the retained chain fails closed before model execution or
+evidence/review mutation.
+
 ### Managed-workspace WIF
 
 The ChatGPT workspace administrator must enable/configure the Codex workload

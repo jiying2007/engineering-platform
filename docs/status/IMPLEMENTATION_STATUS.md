@@ -1,15 +1,17 @@
 # Implementation Status
 
-Reviewed base: `fa4d9174299009fad2d1d242a98b961776bcbf95` (#72).
+Reviewed base: `cc04aea21794a89e03e505bb4f129b873a63dcf9` (#73).
 Stage: **Retained M1 execution mechanics are assembled end-to-end:
 authenticated Core + frozen approved requirement context + real managed-workspace
 WIF Codex engineering + retained result commit/Git bundle + credential-separated
 Git/PR publication + exact PR-head CI + requirement-bound Evidence + Verification
-+ independent human Review + conditional Closure. The external managed-workspace
-WIF workspace enablement plus administrator execution of the hardened
-provider/rule provisioning and two real retained Feature/Debug executions still
-gate M1. The Admin API helper is aligned to current OpenAI/GitHub WIF contracts,
-but no real retained pilot has run yet.**
++ independent human Review + conditional Closure. GitHub main protection,
+managed-workspace WIF workspace enablement, administrator execution of the
+hardened provider/rule provisioning and two real retained Feature/Debug
+executions still gate M1. The repository currently has no branch protection or
+ruleset on main; this must be corrected before WIF is provisioned. The Admin API
+helper is aligned to current OpenAI/GitHub WIF contracts and now fails closed
+when main is not protected, but no real retained pilot has run yet.**
 
 ## Canonical scope
 
@@ -76,7 +78,7 @@ to create ClosureReceipt.
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
 | Codex qualification | Exact `codex-cli 0.155.0`, native hash, generated schema digests, real app-server protocol qualification | Production binary installation/pin remains operator-owned |
-| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained; GitHub immutable repository identity validated; execution deadline bounded by actual upstream JWT lifetime | ChatGPT workspace administrator must enable WIF and execute the hardened real provider/rule provisioning before a retained real model claim |
+| Core-bound Codex engineering | One reserved WIF engineering turn; frozen prompt identity; no approvals/network credentials exposed to model; result commit/tree/source/bundle retained; GitHub immutable repository identity validated; execution deadline bounded by actual upstream JWT lifetime | GitHub main must first be protected; then the ChatGPT workspace administrator must enable WIF and execute the hardened real provider/rule provisioning before a retained real model claim |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
@@ -186,10 +188,12 @@ to create ClosureReceipt.
   exact workflow identity without depending on the legacy subject format;
   Runtime deadlines derive from actual JWT expiry.
 - #72 OpenAI server-side immutable federation claims: exact-head `36288357165`,
-  fresh-main `36288625934` passed all five gates. The OpenAI rule itself now
+  fresh-main `36288625934` passed all five gates. The OpenAI rule itself
   requires exact repository name, immutable repository/owner IDs,
-  `workflow_dispatch`, protected main, dedicated audience and the approved
-  workflow-ref allow-list.
+  `workflow_dispatch`, exact `refs/heads/main`, dedicated audience and the
+  approved workflow-ref allow-list. GitHub branch-protection state is not an
+  OIDC token claim and must be enforced separately by repository protection plus
+  the workflow runtime `GITHUB_REF_PROTECTED` fact.
 
 ## Publication authority
 
@@ -216,22 +220,27 @@ Codex binaries. Operators still own those deployment boundaries.
 
 The remaining M1 sequence is now execution-only:
 
-1. ChatGPT workspace administrator enables managed-workspace Codex WIF and runs
-   the #72-hardened Admin API provisioning helper. The OpenAI rule must bind the
+1. Repository administrator runs
+   `examples/pilots/github/configure-main-protection.sh` and retains the
+   protection receipt. Main must be pull-request-only, admin-enforced, strict on
+   all five canonical CI checks, linear-history, and non-force/non-deletable.
+2. ChatGPT workspace administrator enables managed-workspace Codex WIF and runs
+   the hardened Admin API provisioning helper. The OpenAI rule must bind the
    repository name, immutable repository/owner IDs, `workflow_dispatch`,
-   protected main, dedicated audience and the exact approved workflow refs.
-2. Dispatch `retained-pilot-engineer.yml` for Feature #54. This performs the
+   exact `refs/heads/main`, dedicated audience and the exact approved workflow
+   refs. The helper refuses to provision while GitHub reports main unprotected.
+3. Dispatch `retained-pilot-engineer.yml` for Feature #54. This performs the
    real WIF qualification + one retained engineering turn and publishes the exact
    result only after the model process exits.
-3. Approve the generated PR workflow run when GitHub marks the
+4. Approve the generated PR workflow run when GitHub marks the
    `GITHUB_TOKEN`-created PR approval-required; require exact PR-head CI PASS.
-4. Dispatch `retained-pilot-verify.yml` with the engineering run ID; require
+5. Dispatch `retained-pilot-verify.yml` with the engineering run ID; require
    exact PASS Verification backed by Codex/Git/CI Evidence.
-5. A different GitHub account from the engineering dispatcher performs the
+6. A different GitHub account from the engineering dispatcher performs the
    explicit PASS/FAIL decision through `retained-pilot-review.yml`. PASS alone
    permits Closure; FAIL remains retained and non-CLOSED.
-6. Repeat steps 2-5 for Debug #55 using the then-current main.
-7. Only after both ClosureReceipts exist should M1 be reassessed.
+7. Repeat steps 3-6 for Debug #55 using the then-current main.
+8. Only after both ClosureReceipts exist should M1 be reassessed.
 
 Do not substitute repository fake app-server evidence for step 1. The first real
 pilot should follow `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`; use
