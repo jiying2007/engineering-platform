@@ -78,10 +78,10 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("invalid workflow run identity")
 	}
 	requiredJobs := map[string]bool{
-		"go":                                     false,
-		"offline-container-integration":          false,
-		"postgres-authority-restore-drill":       false,
-		"codex-app-server-qualification": false,
+		"go":                               false,
+		"offline-container-integration":    false,
+		"postgres-authority-restore-drill": false,
+		"codex-app-server-qualification":   false,
 	}
 	last := ""
 	for _, j := range r.Jobs {
