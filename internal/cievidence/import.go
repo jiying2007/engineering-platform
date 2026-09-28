@@ -344,15 +344,8 @@ func verifyCodexArchive(path string) error {
 	if err := decoder.Decode(&q); err != nil || decoder.Decode(new(any)) != io.EOF {
 		return fmt.Errorf("invalid Codex qualification receipt")
 	}
-	if q.SchemaVersion != 1 || q.CLI != "codex-cli" || q.Version != codexapp.QualifiedCodexVersion ||
-		q.ReleaseTag != codexapp.QualifiedCodexReleaseTag || q.ReleaseCommit != codexapp.QualifiedCodexReleaseCommit ||
-		!canonical.ValidDigest(q.BinaryDigest) || !canonical.ValidDigest(q.StableSchemaDigest) ||
-		!canonical.ValidDigest(q.ExperimentalSchemaDigest) || q.Transport != "stdio" || !q.FreshProcess ||
-		q.ManagedDaemon || q.PerThreadConfigOverride || !q.InitializePassed || !q.ThreadStartPassed ||
-		q.ThreadStartModel != "gpt-5.6-sol" || !q.StableSchemaContractChecked || !q.ExperimentalSurfaceChecked ||
-		!canonical.ValidDigest(q.CredentialSafeConfigDigest) || !q.CredentialSafeProfileChecked ||
-		q.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() || !q.EngineeringProfileChecked {
-		return fmt.Errorf("Codex qualification receipt does not satisfy pinned contract")
+	if q.Validate() != nil || q.ThreadStartModel != "gpt-5.6-sol" {
+		return fmt.Errorf("Codex qualification receipt does not satisfy compatibility contract")
 	}
 	return nil
 }
