@@ -134,7 +134,7 @@ PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
 QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
 CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 
-"$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
+bash "$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
 
 PG_NAME="engineering-platform-retained-$PPID-$$"
 CONTROL_PID=""
