@@ -318,18 +318,6 @@ jobs:
           retention-days: 30
 
 
-  # Temporary bridge for the pre-migration protected-main required context.
-  # Remove after branch protection requires codex-app-server-qualification.
-  codex_legacy_required_context:
-    name: codex-app-server-0.155.0-qualification
-    needs: codex
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Bridge legacy protected-main check to compatibility qualification
-        shell: bash
-        run: test "${{ needs.codex.result }}" = success
-
   evidence:
     name: trusted-ci-artifact-evidence
     needs: [go, offline, restore, codex]
