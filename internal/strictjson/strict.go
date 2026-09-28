@@ -16,6 +16,18 @@ const MaxBytes = 1 << 20
 // at every depth and valid UTF-8. This prevents encoding/json's case-insensitive
 // struct matching or duplicate-key merging from changing authorization meaning.
 func ValidateObject(data []byte) error {
+	return validateObject(data, validKey)
+}
+
+// ValidateForeignObject validates a bounded external JSON object without
+// imposing engineering-platform's lower_snake_case wire-name policy. It still
+// rejects duplicate members, invalid UTF-8, excessive nesting and trailing
+// data. Use this only for opaque JSON owned by an external protocol/schema.
+func ValidateForeignObject(data []byte) error {
+	return validateObject(data, validForeignKey)
+}
+
+func validateObject(data []byte, keyOK func(string) bool) error {
 	if len(data) == 0 || len(data) > MaxBytes || !utf8.Valid(data) {
 		return fmt.Errorf("invalid JSON size or encoding")
 	}
@@ -25,7 +37,7 @@ func ValidateObject(data []byte) error {
 	if err != nil || first != json.Delim('{') {
 		return fmt.Errorf("JSON object required")
 	}
-	if err := object(d, 1); err != nil {
+	if err := object(d, 1, keyOK); err != nil {
 		return err
 	}
 	if _, err := d.Token(); err != io.EOF {
@@ -34,7 +46,7 @@ func ValidateObject(data []byte) error {
 	return nil
 }
 
-func object(d *json.Decoder, depth int) error {
+func object(d *json.Decoder, depth int, keyOK func(string) bool) error {
 	seen := map[string]bool{}
 	for d.More() {
 		token, err := d.Token()
@@ -42,11 +54,11 @@ func object(d *json.Decoder, depth int) error {
 			return err
 		}
 		key, ok := token.(string)
-		if !ok || !validKey(key) || seen[key] {
+		if !ok || !keyOK(key) || seen[key] {
 			return fmt.Errorf("invalid or duplicate JSON member")
 		}
 		seen[key] = true
-		if err := value(d, depth+1); err != nil {
+		if err := value(d, depth+1, keyOK); err != nil {
 			return err
 		}
 	}
@@ -57,7 +69,7 @@ func object(d *json.Decoder, depth int) error {
 	return nil
 }
 
-func value(d *json.Decoder, depth int) error {
+func value(d *json.Decoder, depth int, keyOK func(string) bool) error {
 	if depth > 64 {
 		return fmt.Errorf("JSON nesting limit exceeded")
 	}
@@ -71,10 +83,10 @@ func value(d *json.Decoder, depth int) error {
 	}
 	switch delim {
 	case '{':
-		return object(d, depth)
+		return object(d, depth, keyOK)
 	case '[':
 		for d.More() {
-			if err := value(d, depth+1); err != nil {
+			if err := value(d, depth+1, keyOK); err != nil {
 				return err
 			}
 		}
@@ -86,6 +98,18 @@ func value(d *json.Decoder, depth int) error {
 	default:
 		return fmt.Errorf("unexpected JSON delimiter")
 	}
+}
+
+func validForeignKey(s string) bool {
+	if len(s) == 0 || len(s) > 128 {
+		return false
+	}
+	for _, ch := range s {
+		if ch < 0x20 || ch == 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 func validKey(s string) bool {
