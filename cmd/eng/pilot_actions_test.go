@@ -351,6 +351,78 @@ func TestPilotControlHealthRequiresMTLS(t *testing.T) {
 	}
 }
 
+func TestPilotControlEnvironmentIsIsolatedFromOrchestrators(t *testing.T) {
+	root := filepath.Join("..", "..")
+	runnerPath := filepath.Join(root, "examples", "pilots", "local-stack", "run-control.sh")
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", runnerPath).CombinedOutput(); err != nil {
+		t.Fatalf("run-control.sh syntax: %v: %s", err, out)
+	}
+
+	runner := readPilotActionFile(t, runnerPath)
+	for _, required := range []string{
+		". \"$ENV_FILE\"",
+		"exec \"$CONTROL\"",
+		"export AUTO_MIGRATE=\"$AUTO_MIGRATE_OVERRIDE\"",
+	} {
+		if !strings.Contains(runner, required) {
+			t.Fatalf("run-control helper missing %q", required)
+		}
+	}
+
+	scripts := map[string][]string{
+		filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh"): {
+			"local-stack/run-control.sh",
+			"operator/control-plane.env",
+			"operator/control-plane-with-publisher.env",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"): {
+			"local health_client=\"$2\"",
+			"local-stack/run-control.sh",
+			"start_control \"$STACK_ROOT/operator/control-plane.env\" owner",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-publish.sh"): {
+			"local-stack/run-control.sh",
+			"operator/control-plane-with-publisher.env",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "verify-retained.sh"): {
+			"local-stack/run-control.sh",
+			"operator/control-plane.env",
+			"  0 \\",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "review-close-retained.sh"): {
+			"local-stack/run-control.sh",
+			"operator/control-plane.env",
+			"  0 \\",
+		},
+	}
+
+	for path, required := range scripts {
+		body := readPilotActionFile(t, path)
+		if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
+			t.Fatalf("%s syntax: %v: %s", path, err, out)
+		}
+		for _, value := range required {
+			if !strings.Contains(body, value) {
+				t.Fatalf("%s missing isolated control contract %q", path, value)
+			}
+		}
+		for _, forbidden := range []string{
+			". \"$STACK_ROOT/operator/control-plane.env\"",
+			". \"$STACK_ROOT/operator/control-plane-with-publisher.env\"",
+			"export DATABASE_URL=",
+		} {
+			if strings.Contains(body, forbidden) {
+				t.Fatalf("%s leaks control-plane environment through %q", path, forbidden)
+			}
+		}
+	}
+}
+
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-self-hosted-engineer.yml")
