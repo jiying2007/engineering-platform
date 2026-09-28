@@ -1,6 +1,6 @@
 # Open Source Reference Research Index
 
-Date: 2026-09-24
+Date: 2026-09-28
 Status: **Archived research / extension reference index**
 
 Current Core:
@@ -64,6 +64,45 @@ Historical foundation:
 | 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
 | 42 | Device diagnostics / service interface | OpenSOVD, ISO 17978-3:2026, UDS/iso14229 | DiagnosticServiceProfile; snapshot-before-mutation; diagnostic query/operation receipts |
 | 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |
+| 44 | Agent operations control plane | Paperclip, lightweight coding-agent control planes | Agent/runtime operations projection; heartbeat/activity/budget UX without replacing engineering authority |
+| 45 | Secure agent runtime | NVIDIA OpenShell, BoxLite | SandboxProvider seam; filesystem/process/network/provider policy; stronger local isolation |
+| 46 | Coding-agent interoperability | Agent Client Protocol, codex-acp, OpenHands SDK | AgentRuntimeAdapter seam; session/tool/permission transport kept separate from Run/Evidence authority |
+| 47 | Agent sandbox scale | Kubernetes Agent Sandbox, Coder | scalable workspace/sandbox allocation, templates/claims/warm-pool patterns |
+| 48 | Multi-agent coordination | Agent Commons, Clade | leases/fencing/handoff/coordination and delivery-control comparison without parallel authority |
+| 49 | Agent operator UX | Open Orchestrator, Cezar, Agetor, AGX | worktree supervision, structured approvals/questions, conflict detection, live activity UX |
+| 50 | Safe agentic CI / mutation separation | GitHub Agentic Workflows | read-only sandboxed reasoning; structured safe outputs; separately scoped mutation jobs reinforce Action Gateway |
+| 51 | Sandbox/runtime substrate refresh | OpenSandbox, Rivet agentOS, Coder, Daytona, NemoClaw | provider seam; lightweight-vs-full sandbox tradeoff; Daytona OSS retained as historical reference only |
+| 52 | Software factory decomposition | Open SWE, Vercel eve Foreman, AWS CLI Agent Orchestrator | independent implementation/review roles; durable sandbox/session patterns; human judgment remains explicit |
+| 53 | Agent qualification/evaluation | Harbor, Terminal-Bench 2.0, SWE-smith, mini-swe-agent | exact RuntimeQualificationProfile + public benchmark + project failure replay; keep agent loop simple |
+| 54 | Agent protocol stack | AG-UI, A2A, MCP Registry, agentgateway, Archestra | UI/agent/tool discovery protocols remain transport/projection, never Work/Run/Evidence authority |
+| 55 | Agent governance/runtime control | Microsoft Agent Governance Toolkit | fail-closed policy, pinned policy snapshots, decision trace and conformance patterns; no second policy authority |
+| 56 | Current operator UX | Emdash, Paseo, dmux, 1code, Vibe Kanban (historical) | remote/local multi-provider supervision, parallel worktrees and cross-device steering patterns |
+| 57 | Embedded-first agent engineering | Firment | build/flash/monitor/debug/HIL/physical-observation loop; preserve stronger Evidence/Verification authority separation |
+| 58 | AI-to-hardware tool adapters | Renode MCP proposal, embedded-mcp, serial MCP, Embedded GDB MCP, PlatformIO MCP, Hardware MCP, probe-rs/OpenOCD | classify OBSERVE vs controlled state change vs privileged hardware mutation; exact device/procedure/evidence binding |
+| 59 | Hardware-gated agent verification | Agentic HIL, SCPI MCP, oscilloscope MCP, MCP-CAN | operator-owned bench policy outside agent workspace; test-oracle negative control; safe-state/lease/report; instrument/bus actions classified by physical effect |
+| 60 | Agent execution provenance / forensics | AgentProvenance, Agent Flight Recorder, Agent-SLSA-style research | source-aware causal evidence graph; intent/policy/approval/execution/effect provenance; optional attestation export |
+| 61 | Reversible/forkable agent execution | Shepherd | retained workspace proposals; checkpoint/fork/replay/compare without pretending external side effects are reversible |
+| 62 | Remote HIL lab / device farm | Jumpstarter, jumpstarter-lab-config | DeviceResourceProvider seam; authenticated multi-tenant leases/routing; GitOps lab configuration; physical-state != lease-state |
+| 63 | Hardware capability/safety description | Open-MHS | DeviceCapabilityProfile; machine-readable units/ranges/rates/safety envelope; shared enforcement path and typed refusal |
+| 64 | Portable Agent Skills packaging | Agent Skills standard, Microsoft Agent Skills | canonical SkillContract -> portable SKILL.md projection; progressive disclosure; bundled resources do not gain authority |
+| 65 | Spec-driven / repo-local operating contracts | GitHub Spec Kit, AgentSpec | spec/plan/task authoring and repo-local handoff as projections into immutable TaskContract/VerificationPlan authority |
+| 66 | Skill qualification / promotion | agent-skill-eval, AMD Skillscope, AWS skill-eval sample, NVIDIA Skills | structural/routing/behavior/project-replay qualification; with/without baseline; real harnesses; signed benchmarked release packages; promotion policy != score |
+| 67 | Embedded qualification corpus | EmbedEval, closed-loop embedded agent benchmark, HWE-bench, Agentic Embedded Lab | layered public embedded probes + hidden self-verify + project failure replay + real HIL; explicit negative/mutation and not-proven boundaries |
+| 68 | Tool / MCP supply-chain qualification | Docker MCP Gateway, Snyk Agent Scan, MCPRadar, MCP Gateway Registry | exact ToolProfile source/digest/schema/capability/SBOM/signature/behavioral fingerprint; drift requalification; scan facts != authorization |
+| 69 | Agent identity / delegation | Open Agent Auth, Microsoft Agent Governance Toolkit delegation, emerging WIMSE/OAuth delegation drafts | accountable principal + ephemeral agent identity; monotonic scope narrowing; brokered short-lived credentials; explicit delegation receipt |
+
+---
+
+Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)
+Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–56](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_50_56.md)
+Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_57_58_EMBEDDED.md)
+Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_59_HARDWARE_GATE.md)
+Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL / Hardware Capability](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_60_63.md)
+Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_64_65.md)
+Detailed round 66: [Skill Qualification and Promotion](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_66_SKILL_QUALIFICATION.md)
+Detailed round 67: [Embedded Qualification Corpus](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_67_EMBEDDED_QUALIFICATION.md)
+Detailed round 68: [Tool and MCP Qualification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_68_TOOL_QUALIFICATION.md)
+Detailed round 69: [Agent Identity and Delegation](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_69_AGENT_IDENTITY_DELEGATION.md)
 
 ---
 
@@ -125,6 +164,10 @@ Prefer:
 - CycloneDX/SPDX BOM artifacts
 - SCIP for portable semantic code index where available
 - OpenTelemetry official GenAI/MCP semantic conventions
+- ACP for coding-agent client/runtime interoperability where provider-neutral session control is useful
+- AG-UI for user-facing agent event streaming/state projection without granting Core mutation authority
+- A2A for external peer-agent interoperability; keep internal engineering Task/Run/Evidence semantics authoritative
+- MCP Registry metadata as discovery/provenance input only; Formal Runs still bind exact approved ToolProfile
 - CloudEvents + CDEvents for external CI/CD event projection
 - ReqIF for future requirement interchange
 - GSN/SACM export only for future high-assurance use
@@ -223,6 +266,53 @@ Do not let any standard become the mutable engineering business authority.
 59. internal canonical identity remains independent from PLM/MES/GS1/DPP/customer identifiers.
 60. external identifiers are issuer/namespace/effectivity scoped and scans are observations until validated.
 61. EPCIS-style supply-chain events preserve What/When/Where/Why/How while remaining external observations.
+62. agentic reasoning and privileged mutation remain structurally separated; structured effect requests execute under a separately scoped authority.
+63. public agent benchmarks qualify only an exact runtime/model/tool/environment profile and must be paired with project failure replay for engineering confidence.
+64. ACP/AG-UI/A2A/MCP protocol identities and events are transport/interoperability facts, not canonical Work/Run/Evidence identities.
+65. registry or capability discovery never grants execution authority; exact ToolProfile/capability/policy binding remains mandatory.
+66. software-factory reviewer independence is enforced through identity, input and action boundaries rather than role prompts alone.
+67. sandbox loss/replacement must fail safely when unreconciled engineering state may exist; infrastructure convenience cannot silently discard work.
+68. generic agent-governance policy engines may contribute conformance and decision-trace patterns but do not replace the platform's single Action Gateway/policy authority.
+69. embedded tool access is classified by semantic physical effect rather than protocol name: observation, controlled state change and privileged mutation have different authority.
+70. physical/device Evidence binds exact DeviceInstance, firmware, procedure, tool configuration and raw observation artifacts; agent summaries are never the evidence source.
+71. simulation/debugger/serial/MCP access never collapses the VerificationEnvironment fidelity ladder; simulation cannot silently substitute for HIL or physical proof.
+72. DeviceSession lease expiry does not imply physical rollback; post-action observed state and recovery reconciliation remain explicit.
+73. energetic-system safety requires independent physical limits/interlocks; software or agent approval cannot override the safety mechanism.
+74. device/bench authority configuration is operator-owned and snapshotted outside the model-writable workspace; task artifacts may narrow but never expand that action ceiling.
+75. a hardware test oracle is qualified by demonstrating both a known-positive PASS and an intentional negative/failure response before its PASS verdict is trusted.
+76. laboratory instruments are both sensors and actuators; measurement queries, acquisition configuration, stimulus/output and raw passthrough require distinct policy classes.
+77. timeout/UNKNOWN after flash, reset, bus stimulus or instrument output is reconciled against observed physical state before any retry.
+78. runtime/application/kernel provenance sources carry different trust semantics; AI-asserted context never overrides stronger observed facts.
+79. agent-action provenance/attestation is an export over Core authority, not a parallel mutable truth set.
+80. workspace fork/replay only reverses retained execution state; external Git/CI/device/release effects remain subject to normal reconciliation.
+81. remote hardware allocation is a replaceable DeviceResourceProvider concern; Core keeps canonical Task/Device/Procedure/Evidence authority.
+82. hardware capability descriptors may narrow an action ceiling but never widen operator policy or bypass independent physical safety.
+83. resource lease ownership and physical device state remain separate facts across local and remote labs.
+84. Agent Skills/SKILL.md is a portable runtime packaging format, not the canonical semantic definition of an engineering Skill.
+85. canonical SkillContract retains owner, inputs, outputs, BLOCK conditions, action ceiling, qualification and Evidence contract; provider formats are digest-bound projections.
+86. skill discovery/installation never grants script/tool privilege; executable resources remain subject to ToolProfile and Action Gateway policy.
+87. spec-driven Markdown artifacts and repo-local operating contracts are authoring/handoff projections; Core freezes the accepted immutable TaskContract/VerificationPlan revision.
+88. progressive disclosure is preferred for large embedded Skill catalogs so target-specific knowledge/resources load only when needed.
+89. Skill maturity is multidimensional and scope-bound; structural validity, routing, behavior, project replay and retained real engineering proof are distinct qualification stages.
+90. skill qualification uses real agent harnesses and exact runtime/model/tool identities where possible; raw-model tests alone do not prove production behavior.
+91. with-skill vs baseline/ablation and should-not-trigger controls are required to prove causal value and routing discipline.
+92. Skill promotion consumes immutable QualificationFacts under explicit policy; no weighted benchmark score directly becomes engineering authority.
+93. signed/distributed Skill packages bind canonical SkillContract/resource digests and qualification identity; a signature proves integrity/issuer, not effectiveness.
+94. embedded qualification is layered: general coding sanity, public domain probes, closed-loop self-verify, project historical replay and real target/HIL proof are distinct evidence classes.
+95. public embedded benchmark scores do not establish local shipping confidence; frozen project failure replay and retained real engineering Evidence dominate local qualification.
+96. qualification cases bind a known-bad starting state and independent hidden oracle where possible; test tampering and deliberately wrong outputs must fail.
+97. simulator or model evidence carries an explicit fidelity/not-proven boundary and cannot satisfy a hardware-required acceptance condition.
+98. category-level failures such as ISR, DMA/cache, RTOS timing, boot/storage/OTA and driver semantics are preserved instead of hidden behind one aggregate score.
+99. ToolProfile identity is bound to immutable source/version/digest plus schema/capability fingerprints, not a tool name, path or mutable locator.
+100. tool/security scan results are immutable QualificationFacts consumed by ToolAdmissionPolicy; they never grant source, secret, network, GitHub or device authority.
+101. material schema/description/package/permission/egress/dependency drift invalidates prior ToolProfile qualification according to explicit freshness/change policy.
+102. scanning an untrusted MCP/tool package is itself a code-execution/network risk; prefer source/archive inspection and disposable isolation, and report incomplete inspection as missing evidence rather than clean.
+103. registry membership, signature, SBOM and vulnerability scans establish discoverability/origin/integrity/composition facts but do not prove runtime correctness or business authorization.
+104. delegated agent authority is explicit and monotonically narrowing: a child agent may never receive a capability, resource scope or action ceiling broader than its parent.
+105. accountable principal identity and ephemeral Runtime/agent workload identity remain distinct and are both retained in delegated-operation provenance.
+106. downstream credentials should be short-lived/proof-bound and brokered outside model context where practical; parent authorization does not justify sharing raw credentials with children.
+107. delegation receipts prove authorization lineage, not engineering correctness; child completion is still not Verification and child lineage may disqualify reviewer independence.
+108. emerging OAuth/WIMSE/agent-authorization token formats are interoperability mechanisms; Core retains protocol-neutral immutable delegation semantics only when multi-agent execution becomes real.
 
 ---
 
