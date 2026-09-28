@@ -219,7 +219,7 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 		SchemaVersion: 2, CLI: "codex-cli", Version: "0.157.1",
 		BinaryDigest: digestOf("binary"), QualificationDigest: digestOf("qualification"),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
-		CredentialMode: "workload_identity", FederationRuleID: "rule-1", Model: "gpt-test",
+		CredentialMode:          "workload_identity", FederationRuleID: "rule-1", Model: "gpt-test",
 		PromptDigest: digestOf("prompt"), ThreadID: "thread-1", TurnID: "turn-1",
 		TurnStatus: "completed", Output: "done", OutputDigest: canonical.BytesDigest([]byte("done")),
 		CommandCount: 1, FileChangeCount: 1, ApprovalRequests: 0, AssertionRemovedBeforeTurn: true,
