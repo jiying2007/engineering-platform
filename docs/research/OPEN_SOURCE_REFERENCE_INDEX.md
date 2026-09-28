@@ -84,6 +84,8 @@ Historical foundation:
 | 61 | Reversible/forkable agent execution | Shepherd | retained workspace proposals; checkpoint/fork/replay/compare without pretending external side effects are reversible |
 | 62 | Remote HIL lab / device farm | Jumpstarter, jumpstarter-lab-config | DeviceResourceProvider seam; authenticated multi-tenant leases/routing; GitOps lab configuration; physical-state != lease-state |
 | 63 | Hardware capability/safety description | Open-MHS | DeviceCapabilityProfile; machine-readable units/ranges/rates/safety envelope; shared enforcement path and typed refusal |
+| 64 | Portable Agent Skills packaging | Agent Skills standard, Microsoft Agent Skills | canonical SkillContract -> portable SKILL.md projection; progressive disclosure; bundled resources do not gain authority |
+| 65 | Spec-driven / repo-local operating contracts | GitHub Spec Kit, AgentSpec | spec/plan/task authoring and repo-local handoff as projections into immutable TaskContract/VerificationPlan authority |
 
 ---
 
@@ -92,6 +94,7 @@ Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–5
 Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_57_58_EMBEDDED.md)
 Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_59_HARDWARE_GATE.md)
 Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL / Hardware Capability](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_60_63.md)
+Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_64_65.md)
 
 ---
 
@@ -277,6 +280,11 @@ Do not let any standard become the mutable engineering business authority.
 81. remote hardware allocation is a replaceable DeviceResourceProvider concern; Core keeps canonical Task/Device/Procedure/Evidence authority.
 82. hardware capability descriptors may narrow an action ceiling but never widen operator policy or bypass independent physical safety.
 83. resource lease ownership and physical device state remain separate facts across local and remote labs.
+84. Agent Skills/SKILL.md is a portable runtime packaging format, not the canonical semantic definition of an engineering Skill.
+85. canonical SkillContract retains owner, inputs, outputs, BLOCK conditions, action ceiling, qualification and Evidence contract; provider formats are digest-bound projections.
+86. skill discovery/installation never grants script/tool privilege; executable resources remain subject to ToolProfile and Action Gateway policy.
+87. spec-driven Markdown artifacts and repo-local operating contracts are authoring/handoff projections; Core freezes the accepted immutable TaskContract/VerificationPlan revision.
+88. progressive disclosure is preferred for large embedded Skill catalogs so target-specific knowledge/resources load only when needed.
 
 ---
 
