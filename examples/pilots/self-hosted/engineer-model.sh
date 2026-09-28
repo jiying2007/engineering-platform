@@ -218,6 +218,7 @@ jq --arg login "$SAVED_LOGIN_FILE" '{
   codex_executable:.codex_executable,
   credential_mode:"saved_chatgpt_login",
   saved_login_file:$login,
+  qualification:.qualification,
   profile:.profile
 }' "$PROFILE_FILE" > "$WORKER_CODEX_FILE"
 chmod 0600 "$WORKER_CODEX_FILE"
@@ -366,6 +367,8 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
     codex_result_digest:$result_digest,
     bundle_digest:$bundle_digest,
     profile_digest:$profile_digest,
+    qualification_digest:$qualification_digest,
+    codex_version:$codex_version,
     pull_request:{number:$pr_number,url:$pr_url,branch:$pr_branch},
     github_engineering_run_id:$github_engineering_run_id,
     next_gate:"PASS_EXACT_PR_HEAD_CI"
