@@ -168,7 +168,7 @@ set +a
 "$BIN_DIR/control-plane" >"$STATE_ROOT/control-plane.log" 2>&1 &
 CONTROL_PID=$!
 for _ in $(seq 1 60); do
-  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+  if bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" owner >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -177,7 +177,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" owner >/dev/null
 
 case "$PILOT" in
   feature)
@@ -343,7 +343,7 @@ set +a
 "$BIN_DIR/control-plane" >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
 CONTROL_PID=$!
 for _ in $(seq 1 60); do
-  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+  if bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -352,7 +352,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null
 
 "$BIN_DIR/eng" pilot-preflight   --repository "$ROOT"   --base "$BASE_COMMIT"   --codex-profile "$PROFILE_FILE"   --access-policy "$STACK_ROOT/operator/access-policy.json"   --preparation "$PREPARATION_FILE"   --worker-profile worker/codex-pilot   --worker-codex "$WORKER_CODEX_FILE"   --publisher "$STACK_ROOT/operator/github-publisher.json"   > "$STATE_ROOT/preflight-before-publication.json"
 jq -e '.internal=="READY" and .model_execution=="READY" and .publication=="READY" and ((.external_blockers // [])|length==0)'   "$STATE_ROOT/preflight-before-publication.json" >/dev/null
