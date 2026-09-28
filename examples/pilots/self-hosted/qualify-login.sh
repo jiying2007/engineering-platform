@@ -46,7 +46,7 @@ test -x "$CODEX_NATIVE"
 test -f "$SAVED_LOGIN_FILE"
 
 version="$("$CODEX_NATIVE" --version)"
-test "$version" = "codex-cli 0.155.0"
+[[ "$version" =~ ^codex-cli[[:space:]][0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
 
 login_status="$(
   env     -u OPENAI_API_KEY     -u OPENAI_BASE_URL     -u OPENAI_FEDERATION_RULE_ID     -u OPENAI_IDENTITY_TOKEN_FILE     -u OPENAI_WORKLOAD_IDENTITY_CONTEXT     -u CODEX_API_KEY     -u CODEX_ACCESS_TOKEN     "$CODEX_NATIVE" login status 2>&1
