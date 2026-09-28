@@ -1,6 +1,6 @@
 # Open Source Reference Research Index
 
-Date: 2026-09-24
+Date: 2026-09-28
 Status: **Archived research / extension reference index**
 
 Current Core:
@@ -63,11 +63,29 @@ Historical foundation:
 | 40 | System safety / STPA | XSTAMPP, OSATE/AADL, Resolute | SafetyLoss/Hazard/UCA/LossScenario; SafetyConstraint; SafeStateDefinition |
 | 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
 | 42 | Device diagnostics / service interface | OpenSOVD, ISO 17978-3:2026, UDS/iso14229 | DiagnosticServiceProfile; snapshot-before-mutation; diagnostic query/operation receipts |
-| 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |\n| 44 | Agent operations control plane | Paperclip, lightweight coding-agent control planes | Agent/runtime operations projection; heartbeat/activity/budget UX without replacing engineering authority |\n| 45 | Secure agent runtime | NVIDIA OpenShell, BoxLite | SandboxProvider seam; filesystem/process/network/provider policy; stronger local isolation |\n| 46 | Coding-agent interoperability | Agent Client Protocol, codex-acp, OpenHands SDK | AgentRuntimeAdapter seam; session/tool/permission transport kept separate from Run/Evidence authority |\n| 47 | Agent sandbox scale | Kubernetes Agent Sandbox, Coder | scalable workspace/sandbox allocation, templates/claims/warm-pool patterns |\n| 48 | Multi-agent coordination | Agent Commons, Clade | leases/fencing/handoff/coordination and delivery-control comparison without parallel authority |\n| 49 | Agent operator UX | Open Orchestrator, Cezar, Agetor, AGX | worktree supervision, structured approvals/questions, conflict detection, live activity UX |
+| 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |
+| 44 | Agent operations control plane | Paperclip, lightweight coding-agent control planes | Agent/runtime operations projection; heartbeat/activity/budget UX without replacing engineering authority |
+| 45 | Secure agent runtime | NVIDIA OpenShell, BoxLite | SandboxProvider seam; filesystem/process/network/provider policy; stronger local isolation |
+| 46 | Coding-agent interoperability | Agent Client Protocol, codex-acp, OpenHands SDK | AgentRuntimeAdapter seam; session/tool/permission transport kept separate from Run/Evidence authority |
+| 47 | Agent sandbox scale | Kubernetes Agent Sandbox, Coder | scalable workspace/sandbox allocation, templates/claims/warm-pool patterns |
+| 48 | Multi-agent coordination | Agent Commons, Clade | leases/fencing/handoff/coordination and delivery-control comparison without parallel authority |
+| 49 | Agent operator UX | Open Orchestrator, Cezar, Agetor, AGX | worktree supervision, structured approvals/questions, conflict detection, live activity UX |
+| 50 | Safe agentic CI / mutation separation | GitHub Agentic Workflows | read-only sandboxed reasoning; structured safe outputs; separately scoped mutation jobs reinforce Action Gateway |
+| 51 | Sandbox/runtime substrate refresh | OpenSandbox, Rivet agentOS, Coder, Daytona, NemoClaw | provider seam; lightweight-vs-full sandbox tradeoff; Daytona OSS retained as historical reference only |
+| 52 | Software factory decomposition | Open SWE, Vercel eve Foreman, AWS CLI Agent Orchestrator | independent implementation/review roles; durable sandbox/session patterns; human judgment remains explicit |
+| 53 | Agent qualification/evaluation | Harbor, Terminal-Bench 2.0, SWE-smith, mini-swe-agent | exact RuntimeQualificationProfile + public benchmark + project failure replay; keep agent loop simple |
+| 54 | Agent protocol stack | AG-UI, A2A, MCP Registry, agentgateway, Archestra | UI/agent/tool discovery protocols remain transport/projection, never Work/Run/Evidence authority |
+| 55 | Agent governance/runtime control | Microsoft Agent Governance Toolkit | fail-closed policy, pinned policy snapshots, decision trace and conformance patterns; no second policy authority |
+| 56 | Current operator UX | Emdash, Paseo, dmux, 1code, Vibe Kanban (historical) | remote/local multi-provider supervision, parallel worktrees and cross-device steering patterns |
 
 ---
 
-Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)\n\n---\n\n## 2. Current M1 hard dependencies
+Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)
+Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–56](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_50_56.md)
+
+---
+
+## 2. Current M1 hard dependencies
 
 Use now:
 - PostgreSQL
@@ -125,6 +143,10 @@ Prefer:
 - CycloneDX/SPDX BOM artifacts
 - SCIP for portable semantic code index where available
 - OpenTelemetry official GenAI/MCP semantic conventions
+- ACP for coding-agent client/runtime interoperability where provider-neutral session control is useful
+- AG-UI for user-facing agent event streaming/state projection without granting Core mutation authority
+- A2A for external peer-agent interoperability; keep internal engineering Task/Run/Evidence semantics authoritative
+- MCP Registry metadata as discovery/provenance input only; Formal Runs still bind exact approved ToolProfile
 - CloudEvents + CDEvents for external CI/CD event projection
 - ReqIF for future requirement interchange
 - GSN/SACM export only for future high-assurance use
@@ -223,6 +245,13 @@ Do not let any standard become the mutable engineering business authority.
 59. internal canonical identity remains independent from PLM/MES/GS1/DPP/customer identifiers.
 60. external identifiers are issuer/namespace/effectivity scoped and scans are observations until validated.
 61. EPCIS-style supply-chain events preserve What/When/Where/Why/How while remaining external observations.
+62. agentic reasoning and privileged mutation remain structurally separated; structured effect requests execute under a separately scoped authority.
+63. public agent benchmarks qualify only an exact runtime/model/tool/environment profile and must be paired with project failure replay for engineering confidence.
+64. ACP/AG-UI/A2A/MCP protocol identities and events are transport/interoperability facts, not canonical Work/Run/Evidence identities.
+65. registry or capability discovery never grants execution authority; exact ToolProfile/capability/policy binding remains mandatory.
+66. software-factory reviewer independence is enforced through identity, input and action boundaries rather than role prompts alone.
+67. sandbox loss/replacement must fail safely when unreconciled engineering state may exist; infrastructure convenience cannot silently discard work.
+68. generic agent-governance policy engines may contribute conformance and decision-trace patterns but do not replace the platform's single Action Gateway/policy authority.
 
 ---
 
