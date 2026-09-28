@@ -363,10 +363,10 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("self-hosted model state is marked FINISHED before pre-publication snapshot")
 	}
-		if strings.Index(model, "gh auth status --hostname github.com --show-token") < strings.Index(model, "model_phase:\"FINISHED\"") {
+	if strings.Index(model, "gh auth status --hostname github.com --show-token") < strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("legacy token export occurs before retained model FINISHED state")
 	}
-if strings.Index(model, "gh auth token --hostname github.com > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
+	if strings.Index(model, "gh auth token --hostname github.com > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("publisher token is materialized before retained model FINISHED state")
 	}
 	if strings.Contains(workflow, "${{ github.token }}") {
