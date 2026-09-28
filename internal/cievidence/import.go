@@ -139,7 +139,7 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	if err := verifyArchiveFile(req.Files.BinariesZip, binaryArtifact); err != nil {
 		return empty, fmt.Errorf("binary archive changed during verification: %w", err)
 	}
-	codexArtifact, ok := findArtifact(req.Live.Artifacts, "codex-0.155.0-qualification-"+req.Delivery.ResultCommit)
+	codexArtifact, ok := findArtifact(req.Live.Artifacts, "codex-compatibility-qualification-"+req.Delivery.ResultCommit)
 	if !ok {
 		return empty, fmt.Errorf("Codex qualification artifact missing")
 	}
