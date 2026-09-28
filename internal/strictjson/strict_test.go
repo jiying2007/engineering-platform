@@ -5,6 +5,32 @@ import (
 	"testing"
 )
 
+func TestForeignObjectAllowsExternalKeyNamesButRejectsAmbiguity(t *testing.T) {
+	for _, data := range []string{
+		`{"auth_mode":"chatgpt","OPENAI_API_KEY":null,"tokens":{"id_token":"id","access_token":"access","refresh_token":"refresh","account_id":"acct"},"last_refresh":"2026-09-28T00:00:00Z"}`,
+		`{"camelCase":true,"UPPER_CASE":"ok"}`,
+	} {
+		if err := ValidateForeignObject([]byte(data)); err != nil {
+			t.Fatalf("foreign object rejected: %v", err)
+		}
+	}
+
+	for _, data := range []string{
+		`{"OPENAI_API_KEY":"a","OPENAI_API_KEY":"b"}`,
+		`{"OPENAI_API_KEY":"a","OPENAI_API_K\u0045Y":"b"}`,
+		`[]`,
+		`{"x":1} trailing`,
+	} {
+		if err := ValidateForeignObject([]byte(data)); err == nil {
+			t.Fatalf("ambiguous foreign object accepted: %s", data)
+		}
+	}
+
+	if err := ValidateObject([]byte(`{"OPENAI_API_KEY":null}`)); err == nil {
+		t.Fatal("internal wire validator accepted external uppercase key")
+	}
+}
+
 func TestWireAmbiguityRejected(t *testing.T) {
 	for _, data := range []string{
 		`null`, `[]`, `{} {}`, `{"actor":"a","actor":"b"}`,
