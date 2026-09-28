@@ -111,7 +111,9 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		codexReceipt, err = codexapp.EngineeringWIFTurn(
 			runCtx,
 			runtime.Executable,
+			request.Profile.CodexVersion,
 			request.Profile.BinaryDigest,
+			request.Profile.QualificationDigest,
 			prepared.Workspace.WorktreePath,
 			prepared.Workspace.HomePath,
 			runtime.FederationRuleID,
@@ -124,7 +126,9 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		codexReceipt, err = codexapp.EngineeringSavedLoginTurn(
 			runCtx,
 			runtime.Executable,
+			request.Profile.CodexVersion,
 			request.Profile.BinaryDigest,
+			request.Profile.QualificationDigest,
 			prepared.Workspace.WorktreePath,
 			prepared.Workspace.HomePath,
 			runtime.SavedLoginFile,
