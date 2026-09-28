@@ -192,7 +192,7 @@ func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	receipt, err := EngineeringWIFTurn(
-		ctx, executable, digest, work, home,
+		ctx, executable, testCodexVersion, digest, "sha256:" + strings.Repeat("a", 64), work, home,
 		"rule-engineering-test", token, `{"run_id":"fixture"}`,
 		"gpt-test", "Modify the fixture workspace.",
 	)
@@ -241,7 +241,7 @@ func TestEngineeringSavedLoginTurnDeletesBootstrapBeforeModelReachableWork(t *te
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	receipt, err := EngineeringSavedLoginTurn(
-		ctx, executable, digest, work, home, login,
+		ctx, executable, testCodexVersion, digest, "sha256:" + strings.Repeat("a", 64), work, home, login,
 		"gpt-test", "Modify the fixture workspace.",
 	)
 	if err != nil {
