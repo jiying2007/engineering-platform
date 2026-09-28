@@ -161,11 +161,10 @@ for _ in $(seq 1 60); do
 done
 docker exec "$PG_NAME" pg_isready -U postgres -d engineering_platform >/dev/null
 
-set -a
-# shellcheck disable=SC1090
-. "$STACK_ROOT/operator/control-plane.env"
-set +a
-"$BIN_DIR/control-plane" >"$STATE_ROOT/control-plane.log" 2>&1 &
+bash "$ROOT/examples/pilots/local-stack/run-control.sh" \
+  "$STACK_ROOT/operator/control-plane.env" \
+  "$BIN_DIR/control-plane" \
+  >"$STATE_ROOT/control-plane.log" 2>&1 &
 CONTROL_PID=$!
 for _ in $(seq 1 60); do
   if bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" owner >/dev/null 2>&1; then
@@ -336,11 +335,10 @@ chmod 0600 "$TOKEN_FILE"
 test -s "$TOKEN_FILE"
 GH_TOKEN="$(cat "$TOKEN_FILE")" gh api user --jq '.login == "jiying2007"' | grep -qx true
 
-set -a
-# shellcheck disable=SC1090
-. "$STACK_ROOT/operator/control-plane-with-publisher.env"
-set +a
-"$BIN_DIR/control-plane" >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
+bash "$ROOT/examples/pilots/local-stack/run-control.sh" \
+  "$STACK_ROOT/operator/control-plane-with-publisher.env" \
+  "$BIN_DIR/control-plane" \
+  >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
 CONTROL_PID=$!
 for _ in $(seq 1 60); do
   if bash "$ROOT/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null 2>&1; then
