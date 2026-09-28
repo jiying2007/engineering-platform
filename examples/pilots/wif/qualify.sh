@@ -34,6 +34,7 @@ mkdir -p "$OUTPUT_DIR"
 chmod 700 "$OUTPUT_DIR"
 
 PROFILE_MODEL="$(jq -er .profile.model "$PROFILE_FILE")"
+PROFILE_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 if [ "$PROFILE_MODEL" != "$MODEL" ]; then
   echo "profile model does not match requested live model" >&2
   exit 2
@@ -53,7 +54,7 @@ gh variable set OPENAI_WIF_AUDIENCE --repo "$REPO" --body "$AUDIENCE"
 gh variable set OPENAI_CODEX_FEDERATION_RULE_ID --repo "$REPO" --body "$RULE_ID"
 
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-gh workflow run codex-wif-live.yml   --repo "$REPO"   --ref main   -f "model=$MODEL"
+gh workflow run codex-wif-live.yml   --repo "$REPO"   --ref main   -f "model=$MODEL" -f "codex_version=$PROFILE_VERSION"
 
 RUN_ID=""
 for _ in $(seq 1 60); do
@@ -88,10 +89,10 @@ RECEIPT_SOURCE="$DOWNLOAD_DIR/codex-wif-live-receipt.json"
   exit 1
 }
 
-jq -e   --arg model "$MODEL"   --arg rule "$RULE_ID"   '
+jq -e   --arg model "$MODEL"   --arg rule "$RULE_ID" --arg version "$PROFILE_VERSION"   '
     .schema_version == 1 and
     .cli == "codex-cli" and
-    .version == "0.155.0" and
+    .version == $version and
     .credential_mode == "workload_identity" and
     .federation_rule_id == $rule and
     .model == $model and
@@ -110,6 +111,7 @@ jq --arg rule "$RULE_ID" '
   {
     version: 1,
     codex_executable: .codex_executable,
+    credential_mode: "workload_identity",
     federation_rule_id: $rule,
     profile: .profile
   }
