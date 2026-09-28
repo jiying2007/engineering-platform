@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
-	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
