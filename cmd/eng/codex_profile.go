@@ -24,8 +24,8 @@ type codexProfileOutput struct {
 	QualificationDigest string                        `json:"qualification_digest"`
 	Profile             codexexec.Profile             `json:"profile"`
 	ProfileDigest       string                        `json:"profile_digest"`
-	ToolProfile     string            `json:"tool_profile"`
-	ActionGrant     struct {
+	ToolProfile         string                        `json:"tool_profile"`
+	ActionGrant         struct {
 		Action     string `json:"action"`
 		RiskClass  string `json:"risk_class"`
 		Capability string `json:"capability"`
@@ -66,8 +66,6 @@ func buildCodexProfile(executable, model string, qualification codexapp.Qualific
 	}
 	if err := qualification.Validate(); err != nil || qualification.ThreadStartModel != model {
 		return output, fmt.Errorf("valid compatibility qualification for exact model required")
-	}
-		return output, fmt.Errorf("absolute Codex executable and bounded exact model required")
 	}
 	clean := filepath.Clean(executable)
 	resolved, err := filepath.EvalSymlinks(clean)
