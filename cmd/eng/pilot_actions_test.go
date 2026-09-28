@@ -489,6 +489,10 @@ func TestTrustedSelfHostedSavedLoginStaging(t *testing.T) {
 	if out, err := exec.Command(bash, "-n", helperPath).CombinedOutput(); err != nil {
 		t.Fatalf("stage-saved-login.sh syntax: %v: %s", err, out)
 	}
+	helper := readPilotActionFile(t, helperPath)
+	if !strings.Contains(helper, "chmod go-w \"$SOURCE_PARENT\"") {
+		t.Fatal("saved-login staging helper must harden the owned source parent before copy")
+	}
 
 	sourceParent := t.TempDir()
 	if err := os.Chmod(sourceParent, 0o755); err != nil {
@@ -530,13 +534,18 @@ func TestTrustedSelfHostedSavedLoginStaging(t *testing.T) {
 	if err := os.Chmod(sourceParent, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	if out, err := exec.Command(bash, helperPath, source, filepath.Join(stageParent, "bad-parent")).CombinedOutput(); err == nil {
-		t.Fatalf("group/world-writable source parent accepted: %s", out)
+	hardenedStage := filepath.Join(stageParent, "hardened-parent")
+	if out, err := exec.Command(bash, helperPath, source, hardenedStage).CombinedOutput(); err != nil {
+		t.Fatalf("owned writable source parent was not hardened: %v: %s", err, out)
 	}
-
-	if err := os.Chmod(sourceParent, 0o755); err != nil {
+	sourceParentInfo, err := os.Stat(sourceParent)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if sourceParentInfo.Mode().Perm()&0o022 != 0 {
+		t.Fatalf("source parent remains group/world writable: %o", sourceParentInfo.Mode().Perm())
+	}
+
 	alias := filepath.Join(sourceParent, "auth-link.json")
 	if err := os.Symlink(source, alias); err != nil {
 		t.Fatal(err)
