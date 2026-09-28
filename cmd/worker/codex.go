@@ -11,17 +11,19 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
 )
 
 type codexConfiguration struct {
-	Version          int               `json:"version"`
-	Executable       string            `json:"codex_executable"`
-	CredentialMode   string            `json:"credential_mode"`
-	FederationRuleID string            `json:"federation_rule_id,omitempty"`
-	SavedLoginFile   string            `json:"saved_login_file,omitempty"`
-	Profile          codexexec.Profile `json:"profile"`
+	Version          int                           `json:"version"`
+	Executable       string                        `json:"codex_executable"`
+	CredentialMode   string                        `json:"credential_mode"`
+	FederationRuleID string                        `json:"federation_rule_id,omitempty"`
+	SavedLoginFile   string                        `json:"saved_login_file,omitempty"`
+	Qualification    codexapp.QualificationReceipt `json:"qualification"`
+	Profile          codexexec.Profile             `json:"profile"`
 }
 
 func executeCodex(ctx context.Context, client *controlclient.Client, preparer *preparation.Preparer, workerProfile, runID string) error {
@@ -63,6 +65,23 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	default:
 		return fmt.Errorf("unsupported Worker Codex credential mode")
 	}
+	qualificationDigest, err := config.Qualification.Digest()
+	if err != nil ||
+		qualificationDigest != config.Profile.QualificationDigest ||
+		config.Qualification.Version != config.Profile.CodexVersion ||
+		config.Qualification.BinaryDigest != config.Profile.BinaryDigest ||
+		config.Qualification.EngineeringConfigDigest != config.Profile.EngineeringConfigDigest ||
+		config.Qualification.ThreadStartModel != config.Profile.Model {
+		return fmt.Errorf("Worker Codex qualification does not bind exact Profile")
+	}
+	actualQualification, err := codexapp.Qualify(ctx, config.Executable, config.Profile.Model)
+	if err != nil {
+		return fmt.Errorf("Worker Codex compatibility requalification: %w", err)
+	}
+	actualQualificationDigest, err := actualQualification.Digest()
+	if err != nil || actualQualificationDigest != qualificationDigest || actualQualification != config.Qualification {
+		return fmt.Errorf("Worker Codex compatibility qualification drifted")
+	}
 	profileDigest, err := config.Profile.Digest()
 	if err != nil {
 		return err
@@ -71,7 +90,9 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 		"run_id":         runID,
 		"worker_subject": client.Subject(),
 		"worker_profile": workerProfile,
-		"profile_digest": profileDigest,
+		"profile_digest":       profileDigest,
+		"qualification_digest": qualificationDigest,
+		"codex_version":        config.Profile.CodexVersion,
 	})
 	if err != nil {
 		return err
