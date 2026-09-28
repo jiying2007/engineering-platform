@@ -86,6 +86,7 @@ Historical foundation:
 | 63 | Hardware capability/safety description | Open-MHS | DeviceCapabilityProfile; machine-readable units/ranges/rates/safety envelope; shared enforcement path and typed refusal |
 | 64 | Portable Agent Skills packaging | Agent Skills standard, Microsoft Agent Skills | canonical SkillContract -> portable SKILL.md projection; progressive disclosure; bundled resources do not gain authority |
 | 65 | Spec-driven / repo-local operating contracts | GitHub Spec Kit, AgentSpec | spec/plan/task authoring and repo-local handoff as projections into immutable TaskContract/VerificationPlan authority |
+| 66 | Skill qualification / promotion | agent-skill-eval, AMD Skillscope, AWS skill-eval sample, NVIDIA Skills | structural/routing/behavior/project-replay qualification; with/without baseline; real harnesses; signed benchmarked release packages; promotion policy != score |
 
 ---
 
@@ -95,6 +96,7 @@ Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_P
 Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_59_HARDWARE_GATE.md)
 Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL / Hardware Capability](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_60_63.md)
 Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_64_65.md)
+Detailed round 66: [Skill Qualification and Promotion](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_66_SKILL_QUALIFICATION.md)
 
 ---
 
@@ -285,6 +287,11 @@ Do not let any standard become the mutable engineering business authority.
 86. skill discovery/installation never grants script/tool privilege; executable resources remain subject to ToolProfile and Action Gateway policy.
 87. spec-driven Markdown artifacts and repo-local operating contracts are authoring/handoff projections; Core freezes the accepted immutable TaskContract/VerificationPlan revision.
 88. progressive disclosure is preferred for large embedded Skill catalogs so target-specific knowledge/resources load only when needed.
+89. Skill maturity is multidimensional and scope-bound; structural validity, routing, behavior, project replay and retained real engineering proof are distinct qualification stages.
+90. skill qualification uses real agent harnesses and exact runtime/model/tool identities where possible; raw-model tests alone do not prove production behavior.
+91. with-skill vs baseline/ablation and should-not-trigger controls are required to prove causal value and routing discipline.
+92. Skill promotion consumes immutable QualificationFacts under explicit policy; no weighted benchmark score directly becomes engineering authority.
+93. signed/distributed Skill packages bind canonical SkillContract/resource digests and qualification identity; a signature proves integrity/issuer, not effectiveness.
 
 ---
 
