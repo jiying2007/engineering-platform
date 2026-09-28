@@ -79,12 +79,14 @@ Historical foundation:
 | 56 | Current operator UX | Emdash, Paseo, dmux, 1code, Vibe Kanban (historical) | remote/local multi-provider supervision, parallel worktrees and cross-device steering patterns |
 | 57 | Embedded-first agent engineering | Firment | build/flash/monitor/debug/HIL/physical-observation loop; preserve stronger Evidence/Verification authority separation |
 | 58 | AI-to-hardware tool adapters | Renode MCP proposal, embedded-mcp, serial MCP, Embedded GDB MCP, PlatformIO MCP, Hardware MCP, probe-rs/OpenOCD | classify OBSERVE vs controlled state change vs privileged hardware mutation; exact device/procedure/evidence binding |
+| 59 | Hardware-gated agent verification | Agentic HIL, SCPI MCP, oscilloscope MCP, MCP-CAN | operator-owned bench policy outside agent workspace; test-oracle negative control; safe-state/lease/report; instrument/bus actions classified by physical effect |
 
 ---
 
 Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)
 Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–56](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_50_56.md)
 Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_57_58_EMBEDDED.md)
+Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_59_HARDWARE_GATE.md)
 
 ---
 
@@ -260,6 +262,10 @@ Do not let any standard become the mutable engineering business authority.
 71. simulation/debugger/serial/MCP access never collapses the VerificationEnvironment fidelity ladder; simulation cannot silently substitute for HIL or physical proof.
 72. DeviceSession lease expiry does not imply physical rollback; post-action observed state and recovery reconciliation remain explicit.
 73. energetic-system safety requires independent physical limits/interlocks; software or agent approval cannot override the safety mechanism.
+74. device/bench authority configuration is operator-owned and snapshotted outside the model-writable workspace; task artifacts may narrow but never expand that action ceiling.
+75. a hardware test oracle is qualified by demonstrating both a known-positive PASS and an intentional negative/failure response before its PASS verdict is trusted.
+76. laboratory instruments are both sensors and actuators; measurement queries, acquisition configuration, stimulus/output and raw passthrough require distinct policy classes.
+77. timeout/UNKNOWN after flash, reset, bus stimulus or instrument output is reconciled against observed physical state before any retry.
 
 ---
 
