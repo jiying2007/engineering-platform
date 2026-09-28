@@ -87,9 +87,9 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 		return err
 	}
 	audit, err := json.Marshal(map[string]string{
-		"run_id":         runID,
-		"worker_subject": client.Subject(),
-		"worker_profile": workerProfile,
+		"run_id":               runID,
+		"worker_subject":       client.Subject(),
+		"worker_profile":       workerProfile,
 		"profile_digest":       profileDigest,
 		"qualification_digest": qualificationDigest,
 		"codex_version":        config.Profile.CodexVersion,
