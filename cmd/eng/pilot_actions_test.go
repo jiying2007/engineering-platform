@@ -101,6 +101,9 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	if strings.Contains(model, "\n\"$ROOT/examples/pilots/local-stack/bootstrap.sh\" ") {
 		t.Fatal("self-hosted path must not depend on executable bit for bootstrap.sh")
 	}
+	if strings.Contains(model, "PG_NAME=\"engineering-platform-retained-$PPID-$\"") {
+		t.Fatal("self-hosted postgres container name retains malformed literal dollar suffix")
+	}
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("model state is marked FINISHED before pre-publication snapshot")
 	}
@@ -617,6 +620,7 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"stage-saved-login.sh",
 		"jq --arg login \"$STAGED_LOGIN_FILE\"",
 		"rm -rf -- \"$LOGIN_STAGE_ROOT\"",
+		"PG_NAME=\"engineering-platform-retained-${GITHUB_RUN_ID}-${PPID}\"",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
