@@ -77,11 +77,14 @@ Historical foundation:
 | 54 | Agent protocol stack | AG-UI, A2A, MCP Registry, agentgateway, Archestra | UI/agent/tool discovery protocols remain transport/projection, never Work/Run/Evidence authority |
 | 55 | Agent governance/runtime control | Microsoft Agent Governance Toolkit | fail-closed policy, pinned policy snapshots, decision trace and conformance patterns; no second policy authority |
 | 56 | Current operator UX | Emdash, Paseo, dmux, 1code, Vibe Kanban (historical) | remote/local multi-provider supervision, parallel worktrees and cross-device steering patterns |
+| 57 | Embedded-first agent engineering | Firment | build/flash/monitor/debug/HIL/physical-observation loop; preserve stronger Evidence/Verification authority separation |
+| 58 | AI-to-hardware tool adapters | Renode MCP proposal, embedded-mcp, serial MCP, Embedded GDB MCP, PlatformIO MCP, Hardware MCP, probe-rs/OpenOCD | classify OBSERVE vs controlled state change vs privileged hardware mutation; exact device/procedure/evidence binding |
 
 ---
 
 Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)
 Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–56](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_50_56.md)
+Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_57_58_EMBEDDED.md)
 
 ---
 
@@ -252,6 +255,11 @@ Do not let any standard become the mutable engineering business authority.
 66. software-factory reviewer independence is enforced through identity, input and action boundaries rather than role prompts alone.
 67. sandbox loss/replacement must fail safely when unreconciled engineering state may exist; infrastructure convenience cannot silently discard work.
 68. generic agent-governance policy engines may contribute conformance and decision-trace patterns but do not replace the platform's single Action Gateway/policy authority.
+69. embedded tool access is classified by semantic physical effect rather than protocol name: observation, controlled state change and privileged mutation have different authority.
+70. physical/device Evidence binds exact DeviceInstance, firmware, procedure, tool configuration and raw observation artifacts; agent summaries are never the evidence source.
+71. simulation/debugger/serial/MCP access never collapses the VerificationEnvironment fidelity ladder; simulation cannot silently substitute for HIL or physical proof.
+72. DeviceSession lease expiry does not imply physical rollback; post-action observed state and recovery reconciliation remain explicit.
+73. energetic-system safety requires independent physical limits/interlocks; software or agent approval cannot override the safety mechanism.
 
 ---
 
