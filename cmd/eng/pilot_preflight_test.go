@@ -46,6 +46,7 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
@@ -121,6 +122,7 @@ func TestPilotPreflightRejectsPublisherArtifactViewDrift(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
@@ -327,6 +329,7 @@ func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 		"codex_executable": profile.CodexExecutable,
 		"credential_mode":  "saved_chatgpt_login",
 		"saved_login_file": loginFile,
+		"qualification":    profile.Qualification,
 		"profile":          profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved.json", workerCodex)
@@ -360,6 +363,7 @@ func TestPilotPreflightAcceptsOptionalTrustedSelfHostedQualificationReceipt(t *t
 		"codex_executable": profile.CodexExecutable,
 		"credential_mode":  "saved_chatgpt_login",
 		"saved_login_file": loginFile,
+		"qualification":    profile.Qualification,
 		"profile":          profile.Profile,
 	})
 	saved := codexapp.LiveReceipt{
@@ -399,6 +403,7 @@ func TestPilotPreflightRejectsCrossModeCredentialReceipt(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-cross-mode.json", workerCodex)
