@@ -96,8 +96,10 @@ func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 		ThreadStartModel:             "gpt-5.6-sol",
 		StableSchemaContractChecked:  true,
 		ExperimentalSurfaceChecked:   true,
-		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialSafeConfigDigest:   CredentialSafeConfigDigest(),
 		CredentialSafeProfileChecked: true,
+		EngineeringConfigDigest:      EngineeringConfigDigest(),
+		EngineeringProfileChecked:    true,
 	})
 	if err != nil {
 		t.Fatal(err)
