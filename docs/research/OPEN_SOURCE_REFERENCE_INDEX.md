@@ -63,11 +63,11 @@ Historical foundation:
 | 40 | System safety / STPA | XSTAMPP, OSATE/AADL, Resolute | SafetyLoss/Hazard/UCA/LossScenario; SafetyConstraint; SafeStateDefinition |
 | 41 | HIL / measurement / test interoperability | ASAM MDF/ODS/OTX/XIL/TDF, asammdf | MeasurementDataArtifact; TestSequenceArtifact; bench interface profile; trace/timebase interoperability |
 | 42 | Device diagnostics / service interface | OpenSOVD, ISO 17978-3:2026, UDS/iso14229 | DiagnosticServiceProfile; snapshot-before-mutation; diagnostic query/operation receipts |
-| 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |
+| 43 | External identifiers / EPCIS | GS1 EPCIS/CBV 2.0, GS1 Digital Link, Tractus-X | ExternalIdentifierBinding; EPCIS What/When/Where/Why/How trace-event projection |\n| 44 | Agent operations control plane | Paperclip, lightweight coding-agent control planes | Agent/runtime operations projection; heartbeat/activity/budget UX without replacing engineering authority |\n| 45 | Secure agent runtime | NVIDIA OpenShell, BoxLite | SandboxProvider seam; filesystem/process/network/provider policy; stronger local isolation |\n| 46 | Coding-agent interoperability | Agent Client Protocol, codex-acp, OpenHands SDK | AgentRuntimeAdapter seam; session/tool/permission transport kept separate from Run/Evidence authority |\n| 47 | Agent sandbox scale | Kubernetes Agent Sandbox, Coder | scalable workspace/sandbox allocation, templates/claims/warm-pool patterns |\n| 48 | Multi-agent coordination | Agent Commons, Clade | leases/fencing/handoff/coordination and delivery-control comparison without parallel authority |\n| 49 | Agent operator UX | Open Orchestrator, Cezar, Agetor, AGX | worktree supervision, structured approvals/questions, conflict detection, live activity UX |
 
 ---
 
-## 2. Current M1 hard dependencies
+Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–49](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_44_49.md)\n\n---\n\n## 2. Current M1 hard dependencies
 
 Use now:
 - PostgreSQL
