@@ -88,6 +88,7 @@ Historical foundation:
 | 65 | Spec-driven / repo-local operating contracts | GitHub Spec Kit, AgentSpec | spec/plan/task authoring and repo-local handoff as projections into immutable TaskContract/VerificationPlan authority |
 | 66 | Skill qualification / promotion | agent-skill-eval, AMD Skillscope, AWS skill-eval sample, NVIDIA Skills | structural/routing/behavior/project-replay qualification; with/without baseline; real harnesses; signed benchmarked release packages; promotion policy != score |
 | 67 | Embedded qualification corpus | EmbedEval, closed-loop embedded agent benchmark, HWE-bench, Agentic Embedded Lab | layered public embedded probes + hidden self-verify + project failure replay + real HIL; explicit negative/mutation and not-proven boundaries |
+| 68 | Tool / MCP supply-chain qualification | Docker MCP Gateway, Snyk Agent Scan, MCPRadar, MCP Gateway Registry | exact ToolProfile source/digest/schema/capability/SBOM/signature/behavioral fingerprint; drift requalification; scan facts != authorization |
 
 ---
 
@@ -99,6 +100,7 @@ Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL /
 Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_64_65.md)
 Detailed round 66: [Skill Qualification and Promotion](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_66_SKILL_QUALIFICATION.md)
 Detailed round 67: [Embedded Qualification Corpus](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_67_EMBEDDED_QUALIFICATION.md)
+Detailed round 68: [Tool and MCP Qualification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_68_TOOL_QUALIFICATION.md)
 
 ---
 
@@ -299,6 +301,11 @@ Do not let any standard become the mutable engineering business authority.
 96. qualification cases bind a known-bad starting state and independent hidden oracle where possible; test tampering and deliberately wrong outputs must fail.
 97. simulator or model evidence carries an explicit fidelity/not-proven boundary and cannot satisfy a hardware-required acceptance condition.
 98. category-level failures such as ISR, DMA/cache, RTOS timing, boot/storage/OTA and driver semantics are preserved instead of hidden behind one aggregate score.
+99. ToolProfile identity is bound to immutable source/version/digest plus schema/capability fingerprints, not a tool name, path or mutable locator.
+100. tool/security scan results are immutable QualificationFacts consumed by ToolAdmissionPolicy; they never grant source, secret, network, GitHub or device authority.
+101. material schema/description/package/permission/egress/dependency drift invalidates prior ToolProfile qualification according to explicit freshness/change policy.
+102. scanning an untrusted MCP/tool package is itself a code-execution/network risk; prefer source/archive inspection and disposable isolation, and report incomplete inspection as missing evidence rather than clean.
+103. registry membership, signature, SBOM and vulnerability scans establish discoverability/origin/integrity/composition facts but do not prove runtime correctness or business authorization.
 
 ---
 
