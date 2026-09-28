@@ -140,7 +140,7 @@ CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 
 bash "$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
 
-PG_NAME="engineering-platform-retained-$PPID-$"
+PG_NAME="engineering-platform-retained-${GITHUB_RUN_ID}-${PPID}"
 CONTROL_PID=""
 LOGIN_STAGE_ROOT="$OUTPUT_ROOT/saved-login-source"
 cleanup() {
