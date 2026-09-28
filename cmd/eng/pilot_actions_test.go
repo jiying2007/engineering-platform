@@ -461,10 +461,8 @@ func TestPilotRepositorySourceSecurity(t *testing.T) {
 	}
 
 	scripts := map[string]string{
-		filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh"):
-			"secure-repository-source.sh\" \"$ROOT\"",
-		filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"):
-			"secure-repository-source.sh\" \"$GITHUB_WORKSPACE\"",
+		filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh"): "secure-repository-source.sh\" \"$ROOT\"",
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"):     "secure-repository-source.sh\" \"$GITHUB_WORKSPACE\"",
 	}
 	for path, required := range scripts {
 		body := readPilotActionFile(t, path)
