@@ -10,9 +10,10 @@ Configures the minimum GitHub branch-protection policy required by the retained
 M1 pilot. The authenticated gh principal must have repository Administration
 write permission.
 
-This script only creates the policy when main is currently unprotected. If main
-is already protected, it validates the existing policy and fails instead of
-silently weakening or replacing a stricter/different operator policy.
+This script creates the policy when main is unprotected. For an already
+protected branch it validates the existing policy and never weakens it. The only
+automatic migration allowed is the one-time Codex check rename from the legacy
+versioned context to the stable compatibility-qualification context.
 EOF
   exit 2
 }
@@ -35,7 +36,7 @@ EXPECTED_CHECKS_JSON='[
   "go",
   "offline-container-integration",
   "postgres-authority-restore-drill",
-  "codex-app-server-0.155.0-qualification",
+  "codex-app-server-qualification",
   "trusted-ci-artifact-evidence"
 ]'
 
@@ -87,6 +88,25 @@ printf '%s' "$branch_json" | jq -e '.protected == true' >/dev/null || {
 protection_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection")"
 status_checks_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks")"
 
+LEGACY_CODEX_CHECK="codex-app-server-0.155.0-qualification"
+STABLE_CODEX_CHECK="codex-app-server-qualification"
+if printf '%s' "$status_checks_json" |
+  jq -e --arg old "$LEGACY_CODEX_CHECK" --arg new "$STABLE_CODEX_CHECK" '
+    .strict == true and
+    ((.contexts // []) | index($old)) != null and
+    ((.contexts // []) | index($new)) == null
+  ' >/dev/null; then
+  migration_payload="$OUTPUT_DIR/codex-check-migration.json"
+  printf '%s' "$status_checks_json" |
+    jq --arg old "$LEGACY_CODEX_CHECK" --arg new "$STABLE_CODEX_CHECK" '{
+      strict: .strict,
+      contexts: ((.contexts // []) | map(if . == $old then $new else . end) | unique)
+    }' > "$migration_payload"
+  chmod 0600 "$migration_payload"
+  gh api     --method PATCH     -H "Accept: application/vnd.github+json"     -H "X-GitHub-Api-Version: $API_VERSION"     "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks"     --input "$migration_payload" >/dev/null
+  status_checks_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks")"
+fi
+
 printf '%s' "$status_checks_json" |
   jq -e --argjson expected "$EXPECTED_CHECKS_JSON" '
     . as $checks |
@@ -121,7 +141,7 @@ PROTECTION_DIGEST="sha256:$(sha256sum "$NORMALIZED_PROTECTION" | awk '{print $1}
 
 RECEIPT="$OUTPUT_DIR/github-main-protection-receipt.json"
 jq -n   --arg repository "$REPOSITORY"   --arg branch "$BRANCH"   --arg head_sha "$HEAD_SHA"   --arg protection_digest "$PROTECTION_DIGEST"   --argjson required_checks "$EXPECTED_CHECKS_JSON"   '{
-    version: 1,
+    version: 2,
     repository: $repository,
     branch: $branch,
     protected: true,
@@ -144,5 +164,5 @@ branch=$BRANCH
 head_sha=$HEAD_SHA
 protection_digest=$PROTECTION_DIGEST
 receipt=$RECEIPT
-next=bash examples/pilots/wif/configure-admin-api.sh /operator/wif-admin
+next=queue retained-pilot-self-hosted-engineer.yml with a one-time ephemeral runner label
 EOF
