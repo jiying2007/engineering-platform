@@ -89,6 +89,7 @@ Historical foundation:
 | 66 | Skill qualification / promotion | agent-skill-eval, AMD Skillscope, AWS skill-eval sample, NVIDIA Skills | structural/routing/behavior/project-replay qualification; with/without baseline; real harnesses; signed benchmarked release packages; promotion policy != score |
 | 67 | Embedded qualification corpus | EmbedEval, closed-loop embedded agent benchmark, HWE-bench, Agentic Embedded Lab | layered public embedded probes + hidden self-verify + project failure replay + real HIL; explicit negative/mutation and not-proven boundaries |
 | 68 | Tool / MCP supply-chain qualification | Docker MCP Gateway, Snyk Agent Scan, MCPRadar, MCP Gateway Registry | exact ToolProfile source/digest/schema/capability/SBOM/signature/behavioral fingerprint; drift requalification; scan facts != authorization |
+| 69 | Agent identity / delegation | Open Agent Auth, Microsoft Agent Governance Toolkit delegation, emerging WIMSE/OAuth delegation drafts | accountable principal + ephemeral agent identity; monotonic scope narrowing; brokered short-lived credentials; explicit delegation receipt |
 
 ---
 
@@ -101,6 +102,7 @@ Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEE
 Detailed round 66: [Skill Qualification and Promotion](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_66_SKILL_QUALIFICATION.md)
 Detailed round 67: [Embedded Qualification Corpus](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_67_EMBEDDED_QUALIFICATION.md)
 Detailed round 68: [Tool and MCP Qualification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_68_TOOL_QUALIFICATION.md)
+Detailed round 69: [Agent Identity and Delegation](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_69_AGENT_IDENTITY_DELEGATION.md)
 
 ---
 
@@ -306,6 +308,11 @@ Do not let any standard become the mutable engineering business authority.
 101. material schema/description/package/permission/egress/dependency drift invalidates prior ToolProfile qualification according to explicit freshness/change policy.
 102. scanning an untrusted MCP/tool package is itself a code-execution/network risk; prefer source/archive inspection and disposable isolation, and report incomplete inspection as missing evidence rather than clean.
 103. registry membership, signature, SBOM and vulnerability scans establish discoverability/origin/integrity/composition facts but do not prove runtime correctness or business authorization.
+104. delegated agent authority is explicit and monotonically narrowing: a child agent may never receive a capability, resource scope or action ceiling broader than its parent.
+105. accountable principal identity and ephemeral Runtime/agent workload identity remain distinct and are both retained in delegated-operation provenance.
+106. downstream credentials should be short-lived/proof-bound and brokered outside model context where practical; parent authorization does not justify sharing raw credentials with children.
+107. delegation receipts prove authorization lineage, not engineering correctness; child completion is still not Verification and child lineage may disqualify reviewer independence.
+108. emerging OAuth/WIMSE/agent-authorization token formats are interoperability mechanisms; Core retains protocol-neutral immutable delegation semantics only when multi-agent execution becomes real.
 
 ---
 
