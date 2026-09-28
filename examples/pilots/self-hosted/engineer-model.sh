@@ -140,14 +140,16 @@ CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 
 bash "$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
 
-PG_NAME="engineering-platform-retained-$PPID-$$"
+PG_NAME="engineering-platform-retained-$PPID-$"
 CONTROL_PID=""
+LOGIN_STAGE_ROOT="$OUTPUT_ROOT/saved-login-source"
 cleanup() {
   if [ -n "$CONTROL_PID" ] && kill -0 "$CONTROL_PID" 2>/dev/null; then
     kill "$CONTROL_PID" 2>/dev/null || true
     wait "$CONTROL_PID" 2>/dev/null || true
   fi
   docker rm -f "$PG_NAME" >/dev/null 2>&1 || true
+  rm -rf -- "$LOGIN_STAGE_ROOT"
 }
 trap cleanup EXIT
 
@@ -245,8 +247,16 @@ for _ in $(seq 1 30); do
 done
 test "$prepare_ok" = 1
 
+starting saved-login-staging
+STAGED_LOGIN_FILE="$(
+  bash "$ROOT/examples/pilots/self-hosted/stage-saved-login.sh" \
+    "$SAVED_LOGIN_FILE" \
+    "$LOGIN_STAGE_ROOT"
+)"
+checkpoint saved-login-staging
+
 WORKER_CODEX_FILE="$STATE_ROOT/worker-codex.json"
-jq --arg login "$SAVED_LOGIN_FILE" '{
+jq --arg login "$STAGED_LOGIN_FILE" '{
   version:1,
   codex_executable:.codex_executable,
   credential_mode:"saved_chatgpt_login",
