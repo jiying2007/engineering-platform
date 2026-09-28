@@ -300,6 +300,9 @@ func TestPilotControlHealthRequiresMTLS(t *testing.T) {
 	if err != nil {
 		t.Skip("bash unavailable")
 	}
+	if out, err := exec.Command(bash, "-n", healthPath).CombinedOutput(); err != nil {
+		t.Fatalf("health.sh syntax: %v: %s", err, out)
+	}
 
 	for _, required := range []string{
 		"--cacert \"$CA\"",
