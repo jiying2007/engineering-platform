@@ -20,15 +20,15 @@ func profileQualificationFixture(t *testing.T, binary, version, model string) co
 	return codexapp.QualificationReceipt{
 		SchemaVersion: 2, CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI: "codex-cli", Version: version, BinaryDigest: canonical.BytesDigest(data),
-		StableSchemaDigest: canonical.BytesDigest([]byte("stable")),
+		StableSchemaDigest:       canonical.BytesDigest([]byte("stable")),
 		ExperimentalSchemaDigest: canonical.BytesDigest([]byte("experimental")),
-		Transport: "stdio", FreshProcess: true, ManagedDaemon: false, PerThreadConfigOverride: false,
+		Transport:                "stdio", FreshProcess: true, ManagedDaemon: false, PerThreadConfigOverride: false,
 		InitializePassed: true, ThreadStartPassed: true, ThreadStartModel: model,
 		StableSchemaContractChecked: true, ExperimentalSurfaceChecked: true,
-		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
+		CredentialSafeConfigDigest:   codexapp.CredentialSafeConfigDigest(),
 		CredentialSafeProfileChecked: true,
-		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
-		EngineeringProfileChecked: true,
+		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
+		EngineeringProfileChecked:    true,
 	}
 }
 
@@ -42,7 +42,7 @@ func TestBuildCodexProfileBindsExactBinaryModelAndPolicyGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	qualification := profileQualificationFixture(t, binary, "0.157.1", "gpt-5.6-sol")
-output, err := buildCodexProfile(binary, "gpt-5.6-sol", qualification)
+	output, err := buildCodexProfile(binary, "gpt-5.6-sol", qualification)
 	if err != nil {
 		t.Fatal(err)
 	}
