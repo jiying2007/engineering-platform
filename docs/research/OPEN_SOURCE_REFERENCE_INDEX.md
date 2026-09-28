@@ -80,6 +80,10 @@ Historical foundation:
 | 57 | Embedded-first agent engineering | Firment | build/flash/monitor/debug/HIL/physical-observation loop; preserve stronger Evidence/Verification authority separation |
 | 58 | AI-to-hardware tool adapters | Renode MCP proposal, embedded-mcp, serial MCP, Embedded GDB MCP, PlatformIO MCP, Hardware MCP, probe-rs/OpenOCD | classify OBSERVE vs controlled state change vs privileged hardware mutation; exact device/procedure/evidence binding |
 | 59 | Hardware-gated agent verification | Agentic HIL, SCPI MCP, oscilloscope MCP, MCP-CAN | operator-owned bench policy outside agent workspace; test-oracle negative control; safe-state/lease/report; instrument/bus actions classified by physical effect |
+| 60 | Agent execution provenance / forensics | AgentProvenance, Agent Flight Recorder, Agent-SLSA-style research | source-aware causal evidence graph; intent/policy/approval/execution/effect provenance; optional attestation export |
+| 61 | Reversible/forkable agent execution | Shepherd | retained workspace proposals; checkpoint/fork/replay/compare without pretending external side effects are reversible |
+| 62 | Remote HIL lab / device farm | Jumpstarter, jumpstarter-lab-config | DeviceResourceProvider seam; authenticated multi-tenant leases/routing; GitOps lab configuration; physical-state != lease-state |
+| 63 | Hardware capability/safety description | Open-MHS | DeviceCapabilityProfile; machine-readable units/ranges/rates/safety envelope; shared enforcement path and typed refusal |
 
 ---
 
@@ -87,6 +91,7 @@ Detailed rounds 44–49: [Agent Engineering Platform Reference — Rounds 44–4
 Detailed rounds 50–56: [Agent Engineering Platform Reference — Rounds 50–56](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_50_56.md)
 Detailed rounds 57–58: [Embedded / Device Agent Reference](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_57_58_EMBEDDED.md)
 Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_59_HARDWARE_GATE.md)
+Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL / Hardware Capability](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_60_63.md)
 
 ---
 
@@ -266,6 +271,12 @@ Do not let any standard become the mutable engineering business authority.
 75. a hardware test oracle is qualified by demonstrating both a known-positive PASS and an intentional negative/failure response before its PASS verdict is trusted.
 76. laboratory instruments are both sensors and actuators; measurement queries, acquisition configuration, stimulus/output and raw passthrough require distinct policy classes.
 77. timeout/UNKNOWN after flash, reset, bus stimulus or instrument output is reconciled against observed physical state before any retry.
+78. runtime/application/kernel provenance sources carry different trust semantics; AI-asserted context never overrides stronger observed facts.
+79. agent-action provenance/attestation is an export over Core authority, not a parallel mutable truth set.
+80. workspace fork/replay only reverses retained execution state; external Git/CI/device/release effects remain subject to normal reconciliation.
+81. remote hardware allocation is a replaceable DeviceResourceProvider concern; Core keeps canonical Task/Device/Procedure/Evidence authority.
+82. hardware capability descriptors may narrow an action ceiling but never widen operator policy or bypass independent physical safety.
+83. resource lease ownership and physical device state remain separate facts across local and remote labs.
 
 ---
 
