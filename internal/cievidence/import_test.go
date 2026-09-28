@@ -37,11 +37,10 @@ func fixtureImport(t *testing.T) ImportRequest {
 	binaryDigest := digestFixtureFile(t, binaryZip)
 
 	qualification := codexapp.QualificationReceipt{
-		SchemaVersion:                1,
+		SchemaVersion:                2,
+		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
-		Version:                      codexapp.QualifiedCodexVersion,
-		ReleaseTag:                   codexapp.QualifiedCodexReleaseTag,
-		ReleaseCommit:                codexapp.QualifiedCodexReleaseCommit,
+		Version:                      "0.157.1",
 		BinaryDigest:                 "sha256:" + strings.Repeat("1", 64),
 		StableSchemaDigest:           "sha256:" + strings.Repeat("2", 64),
 		ExperimentalSchemaDigest:     "sha256:" + strings.Repeat("3", 64),
@@ -54,7 +53,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 		ThreadStartModel:             "gpt-5.6-sol",
 		StableSchemaContractChecked:  true,
 		ExperimentalSurfaceChecked:   true,
-		CredentialSafeConfigDigest:   "sha256:" + strings.Repeat("4", 64),
+		CredentialSafeConfigDigest:   codexapp.CredentialSafeConfigDigest(),
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
@@ -80,13 +79,13 @@ func fixtureImport(t *testing.T) ImportRequest {
 		RunID:         42,
 		RunAttempt:    1,
 		Jobs: []Job{
-			{Name: "codex-app-server-0.155.0-qualification", ID: 101, Conclusion: "success"},
+			{Name: "codex-app-server-qualification", ID: 101, Conclusion: "success"},
 			{Name: "go", ID: 102, Conclusion: "success"},
 			{Name: "offline-container-integration", ID: 103, Conclusion: "success"},
 			{Name: "postgres-authority-restore-drill", ID: 104, Conclusion: "success"},
 		},
 		Artifacts: []Artifact{
-			{Name: "codex-0.155.0-qualification-" + commit, ID: 201, Digest: codexDigest, Size: codexInfo.Size()},
+			{Name: "codex-compatibility-qualification-" + commit, ID: 201, Digest: codexDigest, Size: codexInfo.Size()},
 			{Name: "engineering-binaries-" + commit, ID: 202, Digest: binaryDigest, Size: binaryInfo.Size()},
 		},
 		Files: files,
