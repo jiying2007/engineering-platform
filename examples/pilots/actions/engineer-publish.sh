@@ -40,11 +40,10 @@ printf '%s' "$PUBLISH_TOKEN" > "$TOKEN_FILE"
 chmod 0600 "$TOKEN_FILE"
 unset PUBLISH_TOKEN
 
-set -a
-# shellcheck disable=SC1090
-. "$STACK_ROOT/operator/control-plane-with-publisher.env"
-set +a
-"$CONTROL" >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
+bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/run-control.sh" \
+  "$STACK_ROOT/operator/control-plane-with-publisher.env" \
+  "$CONTROL" \
+  >"$STATE_ROOT/control-plane-publisher.log" 2>&1 &
 CONTROL_PID=$!
 trap 'if [ -n "${CONTROL_PID:-}" ]; then kill "$CONTROL_PID" 2>/dev/null || true; wait "$CONTROL_PID" 2>/dev/null || true; fi; rm -f "$TOKEN_FILE"' EXIT
 for _ in $(seq 1 60); do

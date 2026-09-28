@@ -58,11 +58,11 @@ bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/bootstrap.sh"   "$STACK_ROOT
 
 start_control() {
   local env_file="$1"
-  set -a
-  # shellcheck disable=SC1090
-  . "$env_file"
-  set +a
-  "$CONTROL" >"$STATE_ROOT/control-plane.log" 2>&1 &
+  local health_client="$2"
+  bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/run-control.sh" \
+    "$env_file" \
+    "$CONTROL" \
+    >"$STATE_ROOT/control-plane.log" 2>&1 &
   CONTROL_PID=$!
   echo "$CONTROL_PID" > "$STATE_ROOT/control-plane.pid"
   for _ in $(seq 1 60); do

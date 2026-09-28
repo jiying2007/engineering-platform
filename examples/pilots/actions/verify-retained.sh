@@ -113,12 +113,11 @@ cmp "$ENGINEERING_ROOT/access-policy.json" "$STACK_ROOT/operator/access-policy.j
 
 docker run --rm --network host   -e PGPASSWORD=postgres   -v "$ENGINEERING_ROOT:/engineering:ro"   postgres:17-alpine   pg_restore -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     --clean --if-exists --no-owner /engineering/core.dump
 
-set -a
-. "$STACK_ROOT/operator/control-plane.env"
-set +a
-export AUTO_MIGRATE=0
-
-"$CONTROL" >"$STATE_ROOT/control-plane.log" 2>&1 &
+bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/run-control.sh" \
+  "$STACK_ROOT/operator/control-plane.env" \
+  "$CONTROL" \
+  0 \
+  >"$STATE_ROOT/control-plane.log" 2>&1 &
 CONTROL_PID=$!
 
 for _ in $(seq 1 60); do
