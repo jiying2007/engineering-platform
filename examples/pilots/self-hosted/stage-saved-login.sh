@@ -48,14 +48,15 @@ test "$resolved_parent" = "$SOURCE_PARENT" || {
   exit 1
 }
 parent_uid="$(stat -c '%u' "$SOURCE_PARENT")"
-parent_mode="$(stat -c '%a' "$SOURCE_PARENT")"
 test "$parent_uid" = "$(id -u)" || {
   echo "saved ChatGPT login source parent must be owned by the current user" >&2
   exit 1
 }
+chmod go-w "$SOURCE_PARENT"
+parent_mode="$(stat -c '%a' "$SOURCE_PARENT")"
 parent_perm=$((8#$parent_mode))
 if (( parent_perm & 8#022 )); then
-  echo "saved ChatGPT login source parent must not be group/world writable" >&2
+  echo "saved ChatGPT login source parent remains group/world writable" >&2
   exit 1
 fi
 
