@@ -54,6 +54,14 @@ login_status="$(
 test "$(printf '%s' "$login_status" | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
 
 install -d -m 0700 "$OUTPUT_DIR"
+LOGIN_STAGE_ROOT="$OUTPUT_DIR/saved-login-source"
+rm -rf -- "$LOGIN_STAGE_ROOT"
+trap 'rm -rf -- "$LOGIN_STAGE_ROOT"' EXIT
+STAGED_LOGIN_FILE="$(
+  bash "$ROOT/examples/pilots/self-hosted/stage-saved-login.sh" \
+    "$SAVED_LOGIN_FILE" \
+    "$LOGIN_STAGE_ROOT"
+)"
 WORK="$OUTPUT_DIR/work"
 HOME_DIR="$OUTPUT_DIR/codex-home"
 BIN="$OUTPUT_DIR/bin"
@@ -67,7 +75,7 @@ BINARY_DIGEST="sha256:$(sha256sum "$CODEX_NATIVE" | awk '{print $1}')"
 )
 
 RECEIPT="$OUTPUT_DIR/saved-login-live-receipt.json"
-"$BIN/codex-saved-login-live"   --codex "$CODEX_NATIVE"   --digest "$BINARY_DIGEST"   --work "$WORK"   --home "$HOME_DIR"   --saved-login-file "$SAVED_LOGIN_FILE"   --model "$MODEL" > "$RECEIPT"
+"$BIN/codex-saved-login-live"   --codex "$CODEX_NATIVE"   --digest "$BINARY_DIGEST"   --work "$WORK"   --home "$HOME_DIR"   --saved-login-file "$STAGED_LOGIN_FILE"   --model "$MODEL" > "$RECEIPT"
 chmod 0600 "$RECEIPT"
 
 jq -e   --arg digest "$BINARY_DIGEST"   --arg model "$MODEL"   '.credential_mode=="saved_chatgpt_login" and
