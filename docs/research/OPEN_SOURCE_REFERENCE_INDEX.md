@@ -87,6 +87,7 @@ Historical foundation:
 | 64 | Portable Agent Skills packaging | Agent Skills standard, Microsoft Agent Skills | canonical SkillContract -> portable SKILL.md projection; progressive disclosure; bundled resources do not gain authority |
 | 65 | Spec-driven / repo-local operating contracts | GitHub Spec Kit, AgentSpec | spec/plan/task authoring and repo-local handoff as projections into immutable TaskContract/VerificationPlan authority |
 | 66 | Skill qualification / promotion | agent-skill-eval, AMD Skillscope, AWS skill-eval sample, NVIDIA Skills | structural/routing/behavior/project-replay qualification; with/without baseline; real harnesses; signed benchmarked release packages; promotion policy != score |
+| 67 | Embedded qualification corpus | EmbedEval, closed-loop embedded agent benchmark, HWE-bench, Agentic Embedded Lab | layered public embedded probes + hidden self-verify + project failure replay + real HIL; explicit negative/mutation and not-proven boundaries |
 
 ---
 
@@ -97,6 +98,7 @@ Detailed round 59: [Hardware-Gated Agent Verification](AGENT_ENGINEERING_PLATFOR
 Detailed rounds 60–63: [Agent Provenance / Reversible Execution / Remote HIL / Hardware Capability](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_60_63.md)
 Detailed rounds 64–65: [Portable Skills / Spec-Driven Contracts](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUNDS_64_65.md)
 Detailed round 66: [Skill Qualification and Promotion](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_66_SKILL_QUALIFICATION.md)
+Detailed round 67: [Embedded Qualification Corpus](AGENT_ENGINEERING_PLATFORM_REFERENCE_ROUND_67_EMBEDDED_QUALIFICATION.md)
 
 ---
 
@@ -292,6 +294,11 @@ Do not let any standard become the mutable engineering business authority.
 91. with-skill vs baseline/ablation and should-not-trigger controls are required to prove causal value and routing discipline.
 92. Skill promotion consumes immutable QualificationFacts under explicit policy; no weighted benchmark score directly becomes engineering authority.
 93. signed/distributed Skill packages bind canonical SkillContract/resource digests and qualification identity; a signature proves integrity/issuer, not effectiveness.
+94. embedded qualification is layered: general coding sanity, public domain probes, closed-loop self-verify, project historical replay and real target/HIL proof are distinct evidence classes.
+95. public embedded benchmark scores do not establish local shipping confidence; frozen project failure replay and retained real engineering Evidence dominate local qualification.
+96. qualification cases bind a known-bad starting state and independent hidden oracle where possible; test tampering and deliberately wrong outputs must fail.
+97. simulator or model evidence carries an explicit fidelity/not-proven boundary and cannot satisfy a hardware-required acceptance condition.
+98. category-level failures such as ISR, DMA/cache, RTOS timing, boot/storage/OTA and driver semantics are preserved instead of hidden behind one aggregate score.
 
 ---
 
