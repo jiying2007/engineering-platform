@@ -122,12 +122,11 @@ cmp "$VERIFICATION_ROOT/engineering/access-policy.json" "$STACK_ROOT/operator/ac
 
 docker run --rm --network host   -e PGPASSWORD=postgres   -v "$VERIFICATION_ROOT:/verification:ro"   postgres:17-alpine   pg_restore -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     --clean --if-exists --no-owner /verification/core-verification.dump
 
-set -a
-. "$STACK_ROOT/operator/control-plane.env"
-set +a
-export AUTO_MIGRATE=0
-
-"$CONTROL" >"$STATE_ROOT/control-plane.log" 2>&1 &
+bash "$RUNTIME_SRC/examples/pilots/local-stack/run-control.sh" \
+  "$STACK_ROOT/operator/control-plane.env" \
+  "$CONTROL" \
+  0 \
+  >"$STATE_ROOT/control-plane.log" 2>&1 &
 CONTROL_PID=$!
 
 for _ in $(seq 1 60); do
