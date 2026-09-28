@@ -18,9 +18,10 @@ import (
 func contractFixture(t *testing.T) (Profile, Permit) {
 	t.Helper()
 	p := Profile{
-		Version:                 1,
-		CodexVersion:            codexapp.QualifiedCodexVersion,
+		Version:                 2,
+		CodexVersion:            "0.157.1",
 		BinaryDigest:            "sha256:" + strings.Repeat("a", 64),
+		QualificationDigest:     "sha256:" + strings.Repeat("e", 64),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Model:                   "gpt-test",
 		Sandbox:                 "workspace-write",
@@ -181,10 +182,11 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 	p, permit := contractFixture(t)
 	promptDigest, _ := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	codex := codexapp.EngineeringReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		CLI:                        "codex-cli",
-		Version:                    codexapp.QualifiedCodexVersion,
+		Version:                    p.CodexVersion,
 		BinaryDigest:               p.BinaryDigest,
+		QualificationDigest:        p.QualificationDigest,
 		EngineeringConfigDigest:    p.EngineeringConfigDigest,
 		CredentialMode:             "workload_identity",
 		FederationRuleID:           "rule",
