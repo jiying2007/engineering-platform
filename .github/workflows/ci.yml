@@ -235,9 +235,11 @@ jobs:
         run: go test -race -v -count=1 -timeout 8m ./internal/store/postgres -run TestPostgresAuthorityRestoreDrill
 
   codex:
-    name: codex-app-server-0.155.0-qualification
+    name: codex-app-server-qualification
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      CODEX_COMPATIBILITY_BASELINE_VERSION: '0.157.1'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -263,19 +265,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install exact stable Codex package and locate native binary
+      - name: Install CI compatibility-baseline Codex package
         shell: bash
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/codex-0.155.0"
-          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
-          npm view @openai/codex@0.155.0 dist.integrity > "$RUNNER_TEMP/codex-npm-integrity.txt"
+          version="$CODEX_COMPATIBILITY_BASELINE_VERSION"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
+          root="$RUNNER_TEMP/codex-$version"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false "@openai/codex@$version"
+          npm view "@openai/codex@$version" dist.integrity > "$RUNNER_TEMP/codex-npm-integrity.txt"
           mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
           printf 'native candidates: %s\n' "${candidates[*]-}"
           test "${#candidates[@]}" -eq 1
           codex="$(readlink -f "${candidates[0]}")"
           test -x "$codex"
-          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          test "$("$codex" --version)" = "codex-cli $version"
           printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
       - name: Require Linux sandbox prerequisite
         shell: bash
@@ -300,20 +304,31 @@ jobs:
           set -euo pipefail
           go run ./cmd/codex-qualifier \
             --codex "$CODEX_NATIVE" \
-            --version 0.155.0 \
             --model gpt-5.6-sol \
             > "$RUNNER_TEMP/codex-qualification.json"
           cat "$RUNNER_TEMP/codex-qualification.json"
       - name: Retain Codex qualification receipt
         uses: actions/upload-artifact@v4
         with:
-          name: codex-0.155.0-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+          name: codex-compatibility-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/codex-qualification.json
             ${{ runner.temp }}/codex-npm-integrity.txt
           if-no-files-found: error
           retention-days: 30
 
+
+  # Temporary bridge for the pre-migration protected-main required context.
+  # Remove after branch protection requires codex-app-server-qualification.
+  codex_legacy_required_context:
+    name: codex-app-server-0.155.0-qualification
+    needs: codex
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bridge legacy protected-main check to compatibility qualification
+        shell: bash
+        run: test "${{ needs.codex.result }}" = success
 
   evidence:
     name: trusted-ci-artifact-evidence
@@ -356,9 +371,9 @@ jobs:
           curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
           curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
 
-          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==4 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
+          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==4 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
           binary_id="$(jq -er '.artifacts[] | select(.name|startswith("engineering-binaries-")) | .id' "$RUNNER_TEMP/artifacts.json")"
-          codex_id="$(jq -er '.artifacts[] | select(.name|startswith("codex-0.155.0-qualification-")) | .id' "$RUNNER_TEMP/artifacts.json")"
+          codex_id="$(jq -er '.artifacts[] | select(.name|startswith("codex-compatibility-qualification-")) | .id' "$RUNNER_TEMP/artifacts.json")"
           test -n "$binary_id" -a -n "$codex_id"
 
           curl -fsSL -L "${auth[@]}" "$api/actions/artifacts/$binary_id/zip" -o "$RUNNER_TEMP/binaries.zip"
@@ -368,8 +383,8 @@ jobs:
           test -n "$manifest"
           jq -e 'length==5 and all(.[]; (.digest|test("^sha256:[0-9a-f]{64}$")) and .size>0)' "$manifest" >/dev/null
 
-          jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-0.155.0-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
-          artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-0.155.0-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
+          jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
+          artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-compatibility-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
           files="$(jq -c '.' "$manifest")"
           tested_sha="$(git rev-parse HEAD)"
           event="$GITHUB_EVENT_NAME"
