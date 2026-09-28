@@ -150,7 +150,6 @@ func TestCredentialSafeProfileProbeFailsWhenShellRemainsEnabled(t *testing.T) {
 	}
 }
 
-
 func TestCodexVersionCompatibilityIsNotExactPinned(t *testing.T) {
 	for _, version := range []string{"0.155.0", "0.157.1", "1.2.3", "0.160.0-beta.1"} {
 		got, err := ParseCodexVersionOutput("codex-cli " + version + "\n")
