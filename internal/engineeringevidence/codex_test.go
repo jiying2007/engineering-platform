@@ -33,10 +33,11 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		BundleSize:         int64(len(bundle)),
 	}
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		CLI:                        "codex-cli",
-		Version:                    codexapp.QualifiedCodexVersion,
+		Version:                    "0.157.1",
 		BinaryDigest:               "sha256:" + strings.Repeat("7", 64),
+		QualificationDigest:        "sha256:" + strings.Repeat("0", 64),
 		EngineeringConfigDigest:    codexapp.EngineeringConfigDigest(),
 		CredentialMode:             "workload_identity",
 		FederationRuleID:           "rule-test",
