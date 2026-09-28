@@ -22,29 +22,7 @@ import (
 
 const CompatibilityContractVersion = 1
 
-var codexVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?package codexapp
-
-import (
-	"bytes"
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
-	"time"
-
-	"github.com/jiying2007/engineering-platform/internal/canonical"
-	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
-)
-
-)
+var codexVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
 type QualificationReceipt struct {
 	SchemaVersion                int    `json:"schema_version"`
