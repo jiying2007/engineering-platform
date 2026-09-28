@@ -66,7 +66,7 @@ start_control() {
   CONTROL_PID=$!
   echo "$CONTROL_PID" > "$STATE_ROOT/control-plane.pid"
   for _ in $(seq 1 60); do
-    if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+    if bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" "$health_client" >/dev/null 2>&1; then
       return 0
     fi
     if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -89,7 +89,7 @@ stop_control() {
 }
 trap stop_control EXIT
 
-start_control "$STACK_ROOT/operator/control-plane.env"
+start_control "$STACK_ROOT/operator/control-plane.env" owner
 
 # Create the immutable Work/Task/Run subject under the owner identity.
 # shellcheck disable=SC1090

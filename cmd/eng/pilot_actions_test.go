@@ -291,6 +291,66 @@ func readPilotActionFile(t *testing.T, path string) string {
 	return string(data)
 }
 
+func TestPilotControlHealthRequiresMTLS(t *testing.T) {
+	root := filepath.Join("..", "..")
+	healthPath := filepath.Join(root, "examples", "pilots", "local-stack", "health.sh")
+	health := readPilotActionFile(t, healthPath)
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+
+	for _, required := range []string{
+		"--cacert \"$CA\"",
+		"--cert \"$CERT\"",
+		"--key \"$KEY\"",
+		"https://127.0.0.1:18443/healthz",
+	} {
+		if !strings.Contains(health, required) {
+			t.Fatalf("mTLS health helper missing %q", required)
+		}
+	}
+
+	scripts := map[string][]string{
+		filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh"): {
+			"local-stack/health.sh\" \"$STACK_ROOT\" owner",
+			"local-stack/health.sh\" \"$STACK_ROOT\" publisher",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"): {
+			"local-stack/health.sh\" \"$STACK_ROOT\" \"$health_client\"",
+			"start_control \"$STACK_ROOT/operator/control-plane.env\" owner",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-publish.sh"): {
+			"local-stack/health.sh\" \"$STACK_ROOT\" publisher",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "verify-retained.sh"): {
+			"local-stack/health.sh\" \"$STACK_ROOT\" verifier",
+		},
+		filepath.Join(root, "examples", "pilots", "actions", "review-close-retained.sh"): {
+			"local-stack/health.sh\" \"$STACK_ROOT\" reviewer",
+		},
+		filepath.Join(root, "examples", "pilots", "local-stack", "status.sh"): {
+			"health.sh\" \"$ROOT\" owner",
+		},
+	}
+
+	for path, required := range scripts {
+		body := readPilotActionFile(t, path)
+		if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
+			t.Fatalf("%s syntax: %v: %s", path, err, out)
+		}
+		for _, value := range required {
+			if !strings.Contains(body, value) {
+				t.Fatalf("%s missing authenticated health contract %q", path, value)
+			}
+		}
+		if strings.Contains(body, "--cacert \"$STACK_ROOT/pki/ca.crt\" https://127.0.0.1:18443/healthz") {
+			t.Fatalf("%s retains CA-only health probe", path)
+		}
+	}
+}
+
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-self-hosted-engineer.yml")

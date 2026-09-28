@@ -48,7 +48,7 @@ set +a
 CONTROL_PID=$!
 trap 'if [ -n "${CONTROL_PID:-}" ]; then kill "$CONTROL_PID" 2>/dev/null || true; wait "$CONTROL_PID" 2>/dev/null || true; fi; rm -f "$TOKEN_FILE"' EXIT
 for _ in $(seq 1 60); do
-  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+  if bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -57,7 +57,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null
 
 BASE_COMMIT="$(jq -er .base_commit "$STATE_ROOT/model-phase.json")"
 PROFILE_DIGEST="$(jq -er .profile_digest "$STATE_ROOT/model-phase.json")"
