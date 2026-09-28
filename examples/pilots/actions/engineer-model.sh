@@ -47,6 +47,8 @@ local_main="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
 test "$local_main" = "$GITHUB_SHA"
 test "$remote_main" = "$GITHUB_SHA"
 
+bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/secure-repository-source.sh" "$GITHUB_WORKSPACE"
+
 "$BIN_DIR/codex-qualifier" --codex "$CODEX_NATIVE" --model "$MODEL" > "$QUALIFICATION_FILE"
 "$ENG" codex-profile --codex "$CODEX_NATIVE" --qualification "$QUALIFICATION_FILE" --model "$MODEL" > "$PROFILE_FILE"
 PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
