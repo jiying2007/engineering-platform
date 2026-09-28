@@ -1,113 +1,146 @@
-# Codex real app-server qualification v1
+# Codex compatibility qualification v1
 
-Reviewed base: `df5d69d2d2f822d90571c44526b313eb9a872090` (#35).
-This gate qualifies a concrete upstream Codex CLI/protocol before the platform is
-allowed to claim Codex compatibility. It does not make a model turn, provision a
-credential, enable external network actions, or complete an engineering Run.
+This contract qualifies the **actual Codex CLI binary used by a Worker** before
+that binary may participate in a retained engineering execution. It deliberately
+does not make one Codex CLI version a long-lived platform authority.
 
-## Qualified upstream
+A qualification is non-model protocol evidence: it does not perform
+`turn/start`, does not consume a retained engineering turn, does not provision a
+provider credential, and does not grant GitHub/publication authority.
 
-- CLI: `codex-cli 0.155.0`
-- upstream release: `rust-v0.155.0`
-- upstream release commit: `f0a1b8f`
-- transport: a NEW `codex app-server --stdio` process for each qualified session
-- stable client capability: `experimentalApi=false`
-- thread profile: `ephemeral=true`, `sandbox=read-only`,
-  `approvalPolicy=never`
-- per-thread `config` overrides: forbidden
-- managed daemon/proxy: forbidden in this qualification path
+## Admission model
 
-The version is intentionally not "latest". A future upgrade changes this contract
-and must produce a new exact-head qualification receipt and pass all downstream
-Runtime/Worker tests before becoming the repository default.
+Runtime admission is based on compatibility proof, not exact version equality:
+
+```text
+actual Codex executable
+  -> observe codex-cli semantic version
+  -> hash exact executable bytes
+  -> generate stable + experimental app-server schemas
+  -> validate required protocol vocabulary/surface
+  -> validate fixed credential-safe + engineering profiles
+  -> real initialize / initialized / ephemeral thread/start
+  -> deterministic QualificationReceipt
+  -> qualification_digest
+  -> Codex Profile v2
+       actual codex_version
+       binary_digest
+       qualification_digest
+       engineering_config_digest
+       model / sandbox / approval / network policy
+```
+
+Different team machines may therefore run different Codex versions. A version
+change causes a different binary/qualification/profile identity, but does not
+require source changes merely because the version string changed.
+
+The final admission rule is **qualification PASS**, not a semver allow-list.
+Version syntax is retained for provenance and diagnostics only. An old or future
+version whose app-server/profiles no longer satisfy the contract fails closed
+during qualification.
+
+## Required compatibility surface
+
+The executable must be a canonical trusted regular file and must report a
+bounded `codex-cli <semver>` value. Qualification then proves all of the
+following against that exact byte digest:
+
+- fresh `codex app-server --stdio` process;
+- stable client capability `experimentalApi=false`;
+- generated stable schema contains `sandbox` and `approvalPolicy`;
+- required stable sandbox vocabulary includes
+  `read-only/workspace-write/danger-full-access`;
+- required approval vocabulary includes `never/on-request`;
+- stable `ThreadStartParams` does not silently expose the experimental
+  `permissions` surface;
+- experimental schema exposes the expected experimental surface;
+- fixed credential-safe feature profile is accepted;
+- fixed engineering profile is accepted;
+- real `initialize` + `initialized` + ephemeral `thread/start` succeeds;
+- managed daemon/proxy and per-thread config overrides are not execution
+  authorities.
+
+No `turn/start` occurs in compatibility qualification.
 
 ## Why a fresh stdio process
 
-Upstream 0.155.0 added more app-server daemon lifecycle/update behavior. A reported
-0.155.0 updater failure also demonstrated that a background daemon can remain on
-an older binary than the CLI. The platform therefore does not use the daemon as
-its execution identity. The executable selected by the host is canonicalized,
-hashed before launch, and launched directly; a changed byte digest fails closed.
+The executable selected by the host is canonicalized, hashed and launched
+directly. The platform does not use a background Codex daemon as execution
+identity because a daemon may be stale relative to the CLI selected by the
+operator. A changed executable byte digest invalidates the frozen Profile.
 
-A current upstream report also shows that 0.154.0 per-thread `config` overrides
-can wedge a subsequent turn. This platform does not send that override. Provider
-configuration belongs to the host launch profile and fresh isolated HOME.
+Provider configuration belongs to the host launch profile and isolated HOME.
+Per-thread config injection is not accepted as authority.
 
-## Protocol drift fixed by this change
+## QualificationReceipt
 
-The former helper accepted values that no longer represent the current stable
-wire contract:
+The deterministic receipt records at least:
 
-- `sandbox: "readOnly"`
-- `approvalPolicy: "unlessTrusted"`
-- `app-server --listen stdio`
+- schema version and compatibility-contract version;
+- actual Codex CLI version;
+- raw executable SHA-256;
+- stable/experimental schema digests;
+- credential-safe and engineering config digests;
+- required protocol/profile checks;
+- thread-start model used for this compatibility check.
 
-The qualified path now uses the current explicit stable forms:
+The canonical receipt digest is frozen into `codexexec.Profile v2`. The
+Profile digest is then the Worker capability and RunInput tool-profile identity.
 
-- `sandbox: "read-only"`
-- `approvalPolicy: "never"`
-- `app-server --stdio`
+The Worker configuration also carries the full QualificationReceipt. Before a
+model-reachable engineering turn, the Worker **reruns compatibility
+qualification on the current executable** and requires the new deterministic
+receipt/digest to equal the frozen receipt/Profile. This prevents a hand-written
+Profile or stale qualification JSON from admitting an unqualified binary.
 
-The generated stable `ThreadStartParams` schema must contain `sandbox` and
-`approvalPolicy`, and the generated schema set must contain the stable
-`read-only/workspace-write/danger-full-access` sandbox vocabulary plus
-`never/on-request` approval vocabulary. The stable `ThreadStartParams` must NOT
-expose the experimental `permissions` field; the same version's
-`--experimental` schema MUST expose it. This detects an accidental surface change
-rather than silently opting the product into an unstable API.
+## CI sentinel baseline
 
-## CI qualification sequence
+Repository CI still selects one concrete Codex package version as a **sentinel
+compatibility baseline** so protocol drift is detected continuously. That
+version is CI input, not a runtime admission pin.
 
-The mandatory `codex-app-server-0.155.0-qualification` job:
+The durable required check is:
 
-1. installs exactly `@openai/codex@0.155.0` in an isolated runner directory;
-2. locates the single native executable from the platform package rather than
-   qualifying the Node wrapper;
-3. requires exact `codex-cli 0.155.0` output and retains npm package integrity;
-4. hashes the native executable bytes;
-5. generates stable and experimental JSON-schema trees with fresh HOME and pre-created owner-only CODEX/XDG directories;
-6. validates the stable/experimental split and records deterministic tree digests;
-7. starts the exact pinned native binary with a fresh empty HOME and no provider
-   credential, daemon, inherited config or proxy;
-8. completes real `initialize` + `initialized` + ephemeral `thread/start`;
-9. uploads a deterministic JSON qualification receipt and npm integrity value as
-   a CI artifact.
+```text
+codex-app-server-qualification
+```
 
-No `turn/start` occurs in this gate, so no model inference or API billing is
-represented by a green qualification job. The thread-start model string is a
-protocol input only.
+and the durable artifact is:
 
-## Runtime boundary
+```text
+codex-compatibility-qualification-<source-sha>
+```
 
-`NewPinnedProvider` binds launch to an exact raw-byte SHA-256. It retains the
-existing rules: absolute host-selected executable/workspace, owner-only fresh HOME,
-no parent environment, no arbitrary CLI arguments, explicit credential/HTTPS
-endpoint only, and no inherited Git/proxy/loader settings. Pinning does not defend
-against a malicious host/kernel or a same-privilege replacement race outside the
-host trust model.
+Branch protection therefore does not change when the CI sentinel version is
+updated.
 
-The adapter remains deliberately non-interactive for this qualification profile:
-there is no API that accepts approval requests. Stable command/file approval
-requests are declined; unknown server requests receive method-not-found. A later
-interactive Codex lane must bind each approval to current Core/Action authority
-rather than changing this qualification adapter into a permissive client.
+The CI qualification job:
 
-## Acceptance and remaining gates
+1. installs the selected sentinel `@openai/codex@<version>` in an isolated
+   runner directory;
+2. locates the native executable rather than qualifying a wrapper;
+3. records package integrity and exact native binary digest;
+4. runs the full compatibility contract above;
+5. uploads the deterministic QualificationReceipt.
 
-This change is accepted only when both the ordinary repository CI and this real
-Codex qualification job pass on the exact PR head, followed by fresh-main checks
-after merge. Offline helper tests are regression coverage, not substitutes.
+## Runtime and retained evidence boundary
 
-Still NOT established by this gate:
+Qualification proves compatibility only. A retained Feature/Debug proof still
+requires the normal authority chain:
 
-- a real authenticated model turn;
-- provider credential brokering or egress policy;
-- workspace-write Codex execution;
-- interactive Action Gateway approvals;
-- Git/CI/Artifact publication authority;
-- independent Review, reconciliation/restore drills or retained Feature/Debug
-  pilots.
+```text
+qualification
+  -> frozen Profile / Run
+  -> credential mode (saved ChatGPT login or WIF)
+  -> Core-bound model turn
+  -> result commit + Git bundle
+  -> independent publication
+  -> exact PR-head CI
+  -> Codex/Git/CI Evidence
+  -> Verification
+  -> independent Review
+  -> Closure
+```
 
-The next execution increment should consume this qualified binary identity inside
-the already-built preparation/execution authority chain rather than creating a
-second Runtime authority.
+Repository fixture/fake app-server tests remain regression evidence only. They
+must never be represented as a real retained model execution.
