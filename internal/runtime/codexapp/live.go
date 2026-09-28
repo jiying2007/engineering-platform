@@ -145,8 +145,9 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	}
 	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
-	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
-		return receipt, fmt.Errorf("live qualification requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	version, parseErr := ParseCodexVersionOutput(string(versionOut))
+	if err != nil || parseErr != nil {
+		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: probe=%v parse=%v; stderr=%s", err, parseErr, strings.TrimSpace(diagnostics))
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -234,7 +235,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	receipt = LiveReceipt{
 		SchemaVersion:                        1,
 		CLI:                                  "codex-cli",
-		Version:                              QualifiedCodexVersion,
+		Version:                              version,
 		BinaryDigest:                         binaryDigest,
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:                       CredentialModeWorkloadIdentity,
@@ -269,8 +270,9 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	}
 	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
-	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
-		return receipt, fmt.Errorf("live qualification requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	version, parseErr := ParseCodexVersionOutput(string(versionOut))
+	if err != nil || parseErr != nil {
+		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: probe=%v parse=%v; stderr=%s", err, parseErr, strings.TrimSpace(diagnostics))
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -350,7 +352,7 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	receipt = LiveReceipt{
 		SchemaVersion:                        1,
 		CLI:                                  "codex-cli",
-		Version:                              QualifiedCodexVersion,
+		Version:                              version,
 		BinaryDigest:                         binaryDigest,
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:                       CredentialModeSavedChatGPTLogin,
@@ -371,7 +373,7 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion ||
+	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) ||
 		r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 ||
