@@ -17,13 +17,13 @@ func fixture() Receipt {
 		RunID:         123,
 		RunAttempt:    1,
 		Jobs: []Job{
-			{Name: "codex-app-server-0.155.0-qualification", ID: 1, Conclusion: "success"},
+			{Name: "codex-app-server-qualification", ID: 1, Conclusion: "success"},
 			{Name: "go", ID: 2, Conclusion: "success"},
 			{Name: "offline-container-integration", ID: 3, Conclusion: "success"},
 			{Name: "postgres-authority-restore-drill", ID: 4, Conclusion: "success"},
 		},
 		Artifacts: []Artifact{
-			{Name: "codex-0.155.0-qualification-x", ID: 4, Digest: "sha256:" + strings.Repeat("d", 64), Size: 10},
+			{Name: "codex-compatibility-qualification-x", ID: 4, Digest: "sha256:" + strings.Repeat("d", 64), Size: 10},
 			{Name: "engineering-binaries-x", ID: 5, Digest: "sha256:" + strings.Repeat("e", 64), Size: 20},
 		},
 		Files: []File{
