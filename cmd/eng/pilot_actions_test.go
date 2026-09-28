@@ -475,6 +475,74 @@ func TestPilotRepositorySourceSecurity(t *testing.T) {
 	}
 }
 
+func TestTrustedSelfHostedSavedLoginStaging(t *testing.T) {
+	root := filepath.Join("..", "..")
+	helperPath := filepath.Join(root, "examples", "pilots", "self-hosted", "stage-saved-login.sh")
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", helperPath).CombinedOutput(); err != nil {
+		t.Fatalf("stage-saved-login.sh syntax: %v: %s", err, out)
+	}
+
+	sourceParent := t.TempDir()
+	if err := os.Chmod(sourceParent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(sourceParent, "auth.json")
+	if err := os.WriteFile(source, []byte("{\"auth\":\"0123456789abcdef\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stageParent := t.TempDir()
+	if err := os.Chmod(stageParent, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stageRoot := filepath.Join(stageParent, "staged-login")
+	out, err := exec.Command(bash, helperPath, source, stageRoot).CombinedOutput()
+	if err != nil {
+		t.Fatalf("stage saved login: %v: %s", err, out)
+	}
+	staged := strings.TrimSpace(string(out))
+	if staged != filepath.Join(stageRoot, "auth.json") {
+		t.Fatalf("unexpected staged path %q", staged)
+	}
+	info, err := os.Stat(staged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("staged login is not owner-private regular file: %v", info.Mode())
+	}
+	parentInfo, err := os.Stat(stageRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !parentInfo.IsDir() || parentInfo.Mode().Perm()&0o077 != 0 {
+		t.Fatalf("staged login parent is not owner-private: %v", parentInfo.Mode())
+	}
+
+	if err := os.Chmod(sourceParent, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(bash, helperPath, source, filepath.Join(stageParent, "bad-parent")).CombinedOutput(); err == nil {
+		t.Fatalf("group/world-writable source parent accepted: %s", out)
+	}
+
+	if err := os.Chmod(sourceParent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(sourceParent, "auth-link.json")
+	if err := os.Symlink(source, alias); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(bash, helperPath, alias, filepath.Join(stageParent, "bad-link")).CombinedOutput(); err == nil {
+		t.Fatalf("symlink saved-login source accepted: %s", out)
+	}
+}
+
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-self-hosted-engineer.yml")
@@ -488,7 +556,8 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	if err != nil {
 		t.Skip("bash unavailable")
 	}
-	for _, script := range []string{qualifyPath, modelPath} {
+	stagePath := filepath.Join(root, "examples", "pilots", "self-hosted", "stage-saved-login.sh")
+	for _, script := range []string{stagePath, qualifyPath, modelPath} {
 		if out, err := exec.Command(bash, "-n", script).CombinedOutput(); err != nil {
 			t.Fatalf("%s syntax: %v: %s", script, err, out)
 		}
@@ -500,6 +569,8 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"codex-saved-login-live",
 		"credential_bootstrap_removed_before_turn==true",
 		"test ! -e \"$HOME_DIR/.codex/auth.json\"",
+		"stage-saved-login.sh",
+		"--saved-login-file \"$STAGED_LOGIN_FILE\"",
 	} {
 		if !strings.Contains(qualify, required) {
 			t.Fatalf("saved-login qualification missing %q", required)
@@ -543,6 +614,9 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"gh api user --jq '.login == \"jiying2007\"'",
 		"gh api repos/jiying2007/engineering-platform/branches/main",
 		"bash \"$ROOT/examples/pilots/local-stack/bootstrap.sh\"",
+		"stage-saved-login.sh",
+		"jq --arg login \"$STAGED_LOGIN_FILE\"",
+		"rm -rf -- \"$LOGIN_STAGE_ROOT\"",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
