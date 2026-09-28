@@ -93,7 +93,15 @@ checkpoint repository
 # so retained execution does not depend on the shared anonymous rate limit.
 starting github-publisher-readiness
 gh auth status --hostname github.com >/dev/null 2>&1
-gh auth token --hostname github.com >/dev/null
+gh api user --jq '.login == "jiying2007"' | grep -qx true
+if gh auth token --help >/dev/null 2>&1; then
+  :
+elif gh auth status --help 2>&1 | grep -q -- '--show-token'; then
+  :
+else
+  echo "installed gh cannot export the authenticated token for the post-model publisher" >&2
+  exit 1
+fi
 gh api repos/jiying2007/engineering-platform/branches/main |
   jq -e --arg sha "$BASE_COMMIT" '.name=="main" and .protected==true and .commit.sha==$sha' >/dev/null
 checkpoint github-publisher-readiness
@@ -306,8 +314,27 @@ echo "retained_policy=no model replay after FINISHED; publication failures must 
 # Only after the model process has exited and the FINISHED Core state/result
 # bundle have been retained may the trusted host materialize a publisher token.
 TOKEN_FILE="$STACK_ROOT/secrets/github-token"
-gh auth token --hostname github.com > "$TOKEN_FILE"
+if gh auth token --help >/dev/null 2>&1; then
+  gh auth token --hostname github.com > "$TOKEN_FILE"
+else
+  legacy_status="$(
+    NO_COLOR=1 GH_FORCE_TTY=0 gh auth status --hostname github.com --show-token 2>&1
+  )"
+  legacy_token="$(
+    printf '%s\n' "$legacy_status" |
+      sed -n 's/.*Token:[[:space:]]*//p' |
+      tail -n 1
+  )"
+  test -n "$legacy_token"
+  case "$legacy_token" in
+    *'*'*) echo "legacy gh returned a masked token" >&2; exit 1 ;;
+  esac
+  printf '%s\n' "$legacy_token" > "$TOKEN_FILE"
+  unset legacy_status legacy_token
+fi
 chmod 0600 "$TOKEN_FILE"
+test -s "$TOKEN_FILE"
+GH_TOKEN="$(cat "$TOKEN_FILE")" gh api user --jq '.login == "jiying2007"' | grep -qx true
 
 set -a
 # shellcheck disable=SC1090
