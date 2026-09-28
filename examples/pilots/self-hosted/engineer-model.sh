@@ -49,14 +49,33 @@ for key in OPENAI_API_KEY OPENAI_BASE_URL OPENAI_FEDERATION_RULE_ID OPENAI_IDENT
   fi
 done
 
+install -d -m 0700 "$OUTPUT_ROOT"
+STATE_ROOT="$OUTPUT_ROOT/retained-pilot-state"
+STACK_ROOT="$OUTPUT_ROOT/retained-pilot-stack"
+BIN_DIR="$OUTPUT_ROOT/bin"
+rm -rf "$STATE_ROOT" "$STACK_ROOT" "$BIN_DIR"
+install -d -m 0700 "$STATE_ROOT" "$BIN_DIR"
+PREMODEL_LOG="$STATE_ROOT/preflight-checks.log"
+: > "$PREMODEL_LOG"
+chmod 0600 "$PREMODEL_LOG"
+
+checkpoint() {
+  printf 'PASS %s\n' "$1" | tee -a "$PREMODEL_LOG"
+}
+starting() {
+  printf 'START %s\n' "$1" | tee -a "$PREMODEL_LOG"
+}
+
+starting toolchain
 command -v git >/dev/null
-command -v curl >/dev/null
 command -v jq >/dev/null
 command -v go >/dev/null
 command -v docker >/dev/null
 command -v sha256sum >/dev/null
 command -v gh >/dev/null
+checkpoint toolchain
 
+starting repository
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 test -f "$ROOT/go.mod"
 test -z "$(git -C "$ROOT" status --porcelain=v1 --untracked-files=all)"
@@ -64,9 +83,21 @@ BASE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
 test "$BASE_COMMIT" = "$GITHUB_SHA"
 REMOTE_MAIN="$(git ls-remote https://github.com/jiying2007/engineering-platform.git refs/heads/main | awk '{print $1}')"
 test "$REMOTE_MAIN" = "$BASE_COMMIT"
-curl -fsSL https://api.github.com/repos/jiying2007/engineering-platform/branches/main |
-  jq -e --arg sha "$BASE_COMMIT" '.name=="main" and .protected==true and .commit.sha==$sha' >/dev/null
+checkpoint repository
 
+# Prove the independent publisher credential exists before consuming the
+# non-replayable model turn, without exporting or copying it into model state.
+# The token is not materialized here; gh only proves that the host credential is
+# retrievable. Use the authenticated API rather than anonymous api.github.com
+# so retained execution does not depend on the shared anonymous rate limit.
+starting github-publisher-readiness
+gh auth status --hostname github.com >/dev/null 2>&1
+gh auth token --hostname github.com >/dev/null
+gh api repos/jiying2007/engineering-platform/branches/main |
+  jq -e --arg sha "$BASE_COMMIT" '.name=="main" and .protected==true and .commit.sha==$sha' >/dev/null
+checkpoint github-publisher-readiness
+
+starting codex-login
 CODEX_NATIVE="$(readlink -f "$CODEX_NATIVE")"
 SAVED_LOGIN_FILE="$(readlink -f "$SAVED_LOGIN_FILE")"
 CODEX_VERSION_OUTPUT="$("$CODEX_NATIVE" --version)"
@@ -75,17 +106,7 @@ login_status="$(
   env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u OPENAI_FEDERATION_RULE_ID     -u OPENAI_IDENTITY_TOKEN_FILE -u OPENAI_WORKLOAD_IDENTITY_CONTEXT     -u CODEX_API_KEY -u CODEX_ACCESS_TOKEN     "$CODEX_NATIVE" login status 2>&1
 )"
 test "$(printf '%s' "$login_status" | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
-# Prove the independent publisher credential exists before consuming the
-# non-replayable model turn, without exporting or copying it into model state.
-gh auth status >/dev/null 2>&1
-gh auth token >/dev/null
-
-install -d -m 0700 "$OUTPUT_ROOT"
-STATE_ROOT="$OUTPUT_ROOT/retained-pilot-state"
-STACK_ROOT="$OUTPUT_ROOT/retained-pilot-stack"
-BIN_DIR="$OUTPUT_ROOT/bin"
-rm -rf "$STATE_ROOT" "$STACK_ROOT" "$BIN_DIR"
-install -d -m 0700 "$STATE_ROOT" "$BIN_DIR"
+checkpoint codex-login
 
 (
   cd "$ROOT"
@@ -284,7 +305,7 @@ echo "retained_policy=no model replay after FINISHED; publication failures must 
 # Only after the model process has exited and the FINISHED Core state/result
 # bundle have been retained may the trusted host materialize a publisher token.
 TOKEN_FILE="$STACK_ROOT/secrets/github-token"
-gh auth token > "$TOKEN_FILE"
+gh auth token --hostname github.com > "$TOKEN_FILE"
 chmod 0600 "$TOKEN_FILE"
 
 set -a
