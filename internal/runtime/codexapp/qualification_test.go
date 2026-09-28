@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jiying2007/engineering-platform/internal/canonical"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
