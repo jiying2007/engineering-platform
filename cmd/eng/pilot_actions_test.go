@@ -423,6 +423,60 @@ func TestPilotControlEnvironmentIsIsolatedFromOrchestrators(t *testing.T) {
 	}
 }
 
+func TestPilotRepositorySourceSecurity(t *testing.T) {
+	root := filepath.Join("..", "..")
+	helperPath := filepath.Join(root, "examples", "pilots", "local-stack", "secure-repository-source.sh")
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", helperPath).CombinedOutput(); err != nil {
+		t.Fatalf("secure-repository-source.sh syntax: %v: %s", err, out)
+	}
+
+	repository := t.TempDir()
+	if err := os.Chmod(repository, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(bash, helperPath, repository).CombinedOutput(); err != nil {
+		t.Fatalf("secure repository source: %v: %s", err, out)
+	}
+	info, err := os.Stat(repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0o022 != 0 {
+		t.Fatalf("repository source remains group/world writable: %o", info.Mode().Perm())
+	}
+
+	realRepository := t.TempDir()
+	aliasRoot := t.TempDir()
+	alias := filepath.Join(aliasRoot, "repository-link")
+	if err := os.Symlink(realRepository, alias); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(bash, helperPath, alias).CombinedOutput(); err == nil {
+		t.Fatalf("symlink repository source accepted: %s", out)
+	}
+
+	scripts := map[string]string{
+		filepath.Join(root, "examples", "pilots", "self-hosted", "engineer-model.sh"):
+			"secure-repository-source.sh\" \"$ROOT\"",
+		filepath.Join(root, "examples", "pilots", "actions", "engineer-model.sh"):
+			"secure-repository-source.sh\" \"$GITHUB_WORKSPACE\"",
+	}
+	for path, required := range scripts {
+		body := readPilotActionFile(t, path)
+		if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
+			t.Fatalf("%s syntax: %v: %s", path, err, out)
+		}
+		if !strings.Contains(body, required) {
+			t.Fatalf("%s missing repository source hardening %q", path, required)
+		}
+	}
+}
+
 func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-self-hosted-engineer.yml")
