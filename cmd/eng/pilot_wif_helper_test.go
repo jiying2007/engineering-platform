@@ -44,7 +44,8 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 	if err := os.WriteFile(codex, []byte("#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.155.0'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	profile, err := buildCodexProfile(codex, "gpt-5.6-sol")
+	qualification := profileQualificationFixture(t, codex, "0.155.0", "gpt-5.6-sol")
+	profile, err := buildCodexProfile(codex, "gpt-5.6-sol", qualification)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +55,7 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 	receipt := codexapp.LiveReceipt{
 		SchemaVersion:              1,
 		CLI:                        "codex-cli",
-		Version:                    codexapp.QualifiedCodexVersion,
+		Version:                    profile.Profile.CodexVersion,
 		BinaryDigest:               profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
 		CredentialMode:             "workload_identity",
