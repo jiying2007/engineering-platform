@@ -8,6 +8,11 @@ on:
         required: true
         default: gpt-5.6-sol
         type: string
+      codex_version:
+        description: Codex CLI package version to compatibility-qualify for this live probe
+        required: true
+        default: 0.157.1
+        type: string
 
 permissions:
   contents: read
@@ -37,16 +42,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install exact qualified Codex native binary
+      - name: Install selected Codex native binary
         shell: bash
+        env:
+          CODEX_VERSION: ${{ inputs.codex_version }}
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/codex-0.155.0"
-          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
+          [[ "$CODEX_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
+          root="$RUNNER_TEMP/codex-$CODEX_VERSION"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false "@openai/codex@$CODEX_VERSION"
           mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
           test "${#candidates[@]}" -eq 1
           codex="$(readlink -f "${candidates[0]}")"
-          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          test "$("$codex" --version)" = "codex-cli $CODEX_VERSION"
           printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
           printf 'CODEX_DIGEST=sha256:%s\n' "$(sha256sum "$codex" | awk '{print $1}')" >> "$GITHUB_ENV"
       - name: Require Codex Linux sandbox prerequisite
