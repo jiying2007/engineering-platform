@@ -96,7 +96,7 @@ func codexResult(t *testing.T, permit codexexec.Permit) codexexec.Result {
 		SchemaVersion: 2, CLI: "codex-cli", Version: permit.Profile.CodexVersion,
 		BinaryDigest: permit.Profile.BinaryDigest, QualificationDigest: permit.Profile.QualificationDigest,
 		EngineeringConfigDigest: permit.Profile.EngineeringConfigDigest,
-		CredentialMode: "workload_identity", FederationRuleID: "rule-test", Model: permit.Profile.Model,
+		CredentialMode:          "workload_identity", FederationRuleID: "rule-test", Model: permit.Profile.Model,
 		PromptDigest: canonical.BytesDigest([]byte("rendered prompt")), ThreadID: "thread", TurnID: "turn",
 		TurnStatus: "completed", Output: "implemented", OutputDigest: canonical.BytesDigest([]byte("implemented")),
 		CommandCount: 2, FileChangeCount: 1, AssertionRemovedBeforeTurn: true,
