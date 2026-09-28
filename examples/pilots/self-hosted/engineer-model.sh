@@ -68,6 +68,7 @@ starting() {
 
 starting toolchain
 command -v git >/dev/null
+command -v curl >/dev/null
 command -v jq >/dev/null
 command -v go >/dev/null
 command -v docker >/dev/null
