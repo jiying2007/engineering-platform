@@ -271,7 +271,7 @@ func savedLoginFixture(t *testing.T, engineering bool) (*Provider, runtimeprovid
 		t.Fatal(err)
 	}
 	source := filepath.Join(secretDir, "auth.json")
-	if err := os.WriteFile(source, []byte(`{"tokens":{"access_token":"fixture","refresh_token":"fixture"}}`), 0o600); err != nil {
+	if err := os.WriteFile(source, []byte(`{"auth_mode":"chatgpt","OPENAI_API_KEY":null,"tokens":{"id_token":"fixture-id","access_token":"fixture","refresh_token":"fixture","account_id":"fixture-account"},"last_refresh":"2026-09-28T00:00:00Z"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var provider *Provider
@@ -310,6 +310,16 @@ func TestSavedLoginProviderBootstrapsOnlyIsolatedAuthFile(t *testing.T) {
 	}
 	if string(config) != engineeringConfig || !strings.Contains(string(config), `cli_auth_credentials_store = "file"`) {
 		t.Fatalf("unexpected saved-login engineering config: %q", config)
+	}
+}
+
+func TestSavedLoginProviderRejectsAmbiguousForeignJSON(t *testing.T) {
+	p, spec, source := savedLoginFixture(t, true)
+	if err := os.WriteFile(source, []byte(`{"OPENAI_API_KEY":"a","OPENAI_API_KEY":"b"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Command(context.Background(), spec); err == nil {
+		t.Fatal("duplicate-key saved login accepted")
 	}
 }
 
