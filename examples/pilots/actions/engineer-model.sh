@@ -32,6 +32,7 @@ WORKER="$BIN_DIR/worker"
 CONTROL="$BIN_DIR/control-plane"
 STACK_ROOT="$RUNNER_TEMP/retained-pilot-stack"
 STATE_ROOT="$RUNNER_TEMP/retained-pilot-state"
+QUALIFICATION_FILE="$STATE_ROOT/codex-qualification.json"
 PROFILE_FILE="$STATE_ROOT/codex-profile.json"
 PREPARATION_FILE="$STATE_ROOT/worker-preparation.json"
 WORKER_CODEX_FILE="$STATE_ROOT/worker-codex.json"
@@ -46,8 +47,11 @@ local_main="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
 test "$local_main" = "$GITHUB_SHA"
 test "$remote_main" = "$GITHUB_SHA"
 
-"$ENG" codex-profile --codex "$CODEX_NATIVE" --model "$MODEL" > "$PROFILE_FILE"
+"$BIN_DIR/codex-qualifier" --codex "$CODEX_NATIVE" --model "$MODEL" > "$QUALIFICATION_FILE"
+"$ENG" codex-profile --codex "$CODEX_NATIVE" --qualification "$QUALIFICATION_FILE" --model "$MODEL" > "$PROFILE_FILE"
 PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
+QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
+CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 BINARY_DIGEST="$(jq -er .profile.binary_digest "$PROFILE_FILE")"
 
 bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/bootstrap.sh"   "$STACK_ROOT" "$PROFILE_DIGEST" "$WORKER_PROFILE"
@@ -184,6 +188,7 @@ jq --arg rule "$OPENAI_CODEX_FEDERATION_RULE_ID"   '{
     codex_executable:.codex_executable,
     credential_mode:"workload_identity",
     federation_rule_id:$rule,
+    qualification:.qualification,
     profile:.profile
   }' "$PROFILE_FILE" > "$WORKER_CODEX_FILE"
 chmod 600 "$WORKER_CODEX_FILE"

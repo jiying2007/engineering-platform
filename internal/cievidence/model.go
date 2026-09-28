@@ -78,10 +78,10 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("invalid workflow run identity")
 	}
 	requiredJobs := map[string]bool{
-		"go":                                     false,
-		"offline-container-integration":          false,
-		"postgres-authority-restore-drill":       false,
-		"codex-app-server-0.155.0-qualification": false,
+		"go":                               false,
+		"offline-container-integration":    false,
+		"postgres-authority-restore-drill": false,
+		"codex-app-server-qualification":   false,
 	}
 	last := ""
 	for _, j := range r.Jobs {
@@ -109,7 +109,7 @@ func (r Receipt) Validate() error {
 			return fmt.Errorf("invalid or unsorted artifact fact")
 		}
 		switch {
-		case strings.HasPrefix(a.Name, "codex-0.155.0-qualification-"):
+		case strings.HasPrefix(a.Name, "codex-compatibility-qualification-"):
 			seenArtifact["codex"] = true
 		case strings.HasPrefix(a.Name, "engineering-binaries-"):
 			seenArtifact["binaries"] = true

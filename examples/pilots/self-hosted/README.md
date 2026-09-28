@@ -74,9 +74,15 @@ go version
 Required Codex state:
 
 ```text
-codex-cli 0.155.0
+codex-cli <semantic-version>
 Logged in using ChatGPT
 ```
+
+The team does not need one common Codex version. The self-hosted engineering
+script runs `codex-qualifier` against the actual executable, freezes its
+QualificationReceipt/digest into Profile v2, and the Worker re-runs the same
+non-model compatibility qualification immediately before execution. A binary
+that no longer satisfies the contract fails closed.
 
 Do not print or upload `auth.json`.
 

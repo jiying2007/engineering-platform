@@ -49,12 +49,13 @@ type pilotPreflightResult struct {
 }
 
 type pilotWorkerCodexConfig struct {
-	Version          int               `json:"version"`
-	Executable       string            `json:"codex_executable"`
-	CredentialMode   string            `json:"credential_mode"`
-	FederationRuleID string            `json:"federation_rule_id,omitempty"`
-	SavedLoginFile   string            `json:"saved_login_file,omitempty"`
-	Profile          codexexec.Profile `json:"profile"`
+	Version          int                           `json:"version"`
+	Executable       string                        `json:"codex_executable"`
+	CredentialMode   string                        `json:"credential_mode"`
+	FederationRuleID string                        `json:"federation_rule_id,omitempty"`
+	SavedLoginFile   string                        `json:"saved_login_file,omitempty"`
+	Qualification    codexapp.QualificationReceipt `json:"qualification"`
+	Profile          codexexec.Profile             `json:"profile"`
 }
 
 func pilotPreflight(args []string) error {
@@ -103,7 +104,12 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 	if profile.ToolProfile != "codex/"+profile.ProfileDigest || profile.ProfileDigest == "" {
 		return empty, fmt.Errorf("invalid retained Codex profile output")
 	}
-	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model)
+	qualificationDigest, err := profile.Qualification.Digest()
+	if err != nil || qualificationDigest != profile.QualificationDigest ||
+		qualificationDigest != profile.Profile.QualificationDigest {
+		return empty, fmt.Errorf("retained Codex profile qualification binding mismatch")
+	}
+	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model, profile.Qualification)
 	if err != nil {
 		return empty, err
 	}
@@ -145,8 +151,9 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 		if err != nil {
 			return empty, err
 		}
-		if config.Executable != profile.CodexExecutable || config.Profile != profile.Profile {
-			return empty, fmt.Errorf("Worker Codex config does not bind exact generated profile")
+		if config.Executable != profile.CodexExecutable || config.Profile != profile.Profile ||
+			config.Qualification != profile.Qualification {
+			return empty, fmt.Errorf("Worker Codex config does not bind exact generated profile/qualification")
 		}
 		workerCodex = &config
 	}
@@ -165,6 +172,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 					return empty, err
 				}
 				if receipt.CredentialMode != codexapp.CredentialModeWorkloadIdentity ||
+					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
 					receipt.FederationRuleID != workerCodex.FederationRuleID {
@@ -185,6 +193,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 					return empty, err
 				}
 				if receipt.CredentialMode != codexapp.CredentialModeSavedChatGPTLogin ||
+					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
 					receipt.FederationRuleID != "" {
@@ -406,8 +415,17 @@ func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {
 	if err := strictjson.Decode(data, &config); err != nil {
 		return config, err
 	}
-	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" || config.Profile.Validate() != nil {
+	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" ||
+		config.Profile.Validate() != nil || config.Qualification.Validate() != nil {
 		return config, fmt.Errorf("invalid Worker Codex configuration")
+	}
+	qualificationDigest, err := config.Qualification.Digest()
+	if err != nil || qualificationDigest != config.Profile.QualificationDigest ||
+		config.Qualification.Version != config.Profile.CodexVersion ||
+		config.Qualification.BinaryDigest != config.Profile.BinaryDigest ||
+		config.Qualification.EngineeringConfigDigest != config.Profile.EngineeringConfigDigest ||
+		config.Qualification.ThreadStartModel != config.Profile.Model {
+		return config, fmt.Errorf("Worker Codex qualification/Profile binding mismatch")
 	}
 	switch config.CredentialMode {
 	case codexapp.CredentialModeWorkloadIdentity:

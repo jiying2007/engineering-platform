@@ -10,7 +10,8 @@ trusted CI, Evidence, Verification, Review and Closure remain the same.
 
 The retained-pilot-engineer workflow runs on protected main and:
 
-1. installs the exact qualified Codex 0.155.0 native binary;
+1. installs the selected CI/runtime Codex binary and compatibility-qualifies
+   its actual version/bytes before building Profile v2;
 2. boots an ephemeral PostgreSQL + mTLS Core;
 3. freezes the selected real Feature/Debug Work/Task/Run and approved requirement context;
 4. performs one real read-only WIF qualification;

@@ -75,7 +75,7 @@ to create ClosureReceipt.
 | Worker admission/preparation | Real relay, mTLS identities/profiles and leases; approved source/context preparation | Approval snapshots remain operator-managed |
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
-| Codex qualification | Exact `codex-cli 0.155.0`, native hash, generated schema digests, real app-server protocol qualification | Production binary installation/pin remains operator-owned |
+| Codex qualification | Version-independent compatibility contract: actual semver + native hash + generated schema digests + fixed-profile/app-server qualification; deterministic qualification digest frozen into Profile v2 | CI keeps a sentinel baseline, while each real Worker binary must qualify and requalify before execution |
 | Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential mode is explicit and mutually exclusive: trusted self-hosted saved ChatGPT login or managed-workspace WIF. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the M1 phase-1 lane; WIF remains the preferred unattended/GitHub-hosted upgrade. |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
@@ -225,8 +225,10 @@ M1 phase 1 no longer requires WIF. The next retained proof sequence is:
    runner is online.
 2. Register one repository-scoped trusted Linux runner using that exact custom
    label with `--no-default-labels --ephemeral`, then start it under the
-   ChatGPT-authenticated `aiot03` account. Require exact `codex-cli 0.155.0`,
-   working Docker/Go and an authenticated host `gh` publisher credential.
+   ChatGPT-authenticated `aiot03` account. Require a valid installed
+   `codex-cli <semver>`, working Docker/Go and an authenticated host `gh`
+   publisher credential. The actual binary is compatibility-qualified and
+   rebound into Profile v2 before the retained turn.
 3. The already-queued workflow must freeze the exact protected-main base,
    execute one Core-bound saved-login Codex turn, retain FINISHED state/result
    bundle, stop the model process, and only then materialize the host GitHub

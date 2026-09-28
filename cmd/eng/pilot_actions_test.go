@@ -169,7 +169,7 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 		"worktree add --detach",
 		"trusted-ci-evidence-$RESULT_COMMIT",
 		"engineering-binaries-$RESULT_COMMIT",
-		"codex-0.155.0-qualification-$RESULT_COMMIT",
+		"codex-compatibility-qualification-$RESULT_COMMIT",
 		"import-codex-evidence",
 		"import-git-change-evidence",
 		"import-ci-evidence",

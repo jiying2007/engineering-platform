@@ -29,6 +29,7 @@ type Profile struct {
 	Version                 int    `json:"version"`
 	CodexVersion            string `json:"codex_version"`
 	BinaryDigest            string `json:"binary_digest"`
+	QualificationDigest     string `json:"qualification_digest"`
 	EngineeringConfigDigest string `json:"engineering_config_digest"`
 	Model                   string `json:"model"`
 	Sandbox                 string `json:"sandbox"`
@@ -37,8 +38,8 @@ type Profile struct {
 }
 
 func (p Profile) Validate() error {
-	if p.Version != 1 || p.CodexVersion != codexapp.QualifiedCodexVersion ||
-		!canonical.ValidDigest(p.BinaryDigest) ||
+	if p.Version != 2 || !codexapp.ValidCodexVersion(p.CodexVersion) ||
+		!canonical.ValidDigest(p.BinaryDigest) || !canonical.ValidDigest(p.QualificationDigest) ||
 		p.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() ||
 		strings.TrimSpace(p.Model) == "" || len(p.Model) > 128 ||
 		p.Sandbox != "workspace-write" || p.ApprovalPolicy != "never" || p.ToolNetwork {
@@ -190,7 +191,8 @@ func (r Result) Validate(p Profile, permit Permit) error {
 	expectedPrompt, promptErr := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	if err != nil || promptErr != nil || permit.Token.ProfileDigest != pd ||
 		r.PromptIdentityDigest != expectedPrompt ||
-		r.Codex.Validate() != nil || r.Codex.BinaryDigest != p.BinaryDigest ||
+		r.Codex.Validate() != nil || r.Codex.Version != p.CodexVersion ||
+		r.Codex.BinaryDigest != p.BinaryDigest || r.Codex.QualificationDigest != p.QualificationDigest ||
 		r.Codex.EngineeringConfigDigest != p.EngineeringConfigDigest || r.Codex.Model != p.Model ||
 		r.Change.Recipe != workspace.FinalizeRecipe ||
 		r.Change.BaseCommit != permit.Preparation.Facts.BaseCommit ||

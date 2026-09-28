@@ -15,14 +15,17 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 type codexProfileOutput struct {
-	CodexExecutable string            `json:"codex_executable"`
-	Profile         codexexec.Profile `json:"profile"`
-	ProfileDigest   string            `json:"profile_digest"`
-	ToolProfile     string            `json:"tool_profile"`
-	ActionGrant     struct {
+	CodexExecutable     string                        `json:"codex_executable"`
+	Qualification       codexapp.QualificationReceipt `json:"qualification"`
+	QualificationDigest string                        `json:"qualification_digest"`
+	Profile             codexexec.Profile             `json:"profile"`
+	ProfileDigest       string                        `json:"profile_digest"`
+	ToolProfile         string                        `json:"tool_profile"`
+	ActionGrant         struct {
 		Action     string `json:"action"`
 		RiskClass  string `json:"risk_class"`
 		Capability string `json:"capability"`
@@ -33,12 +36,22 @@ func codexProfile(args []string) error {
 	fs := flag.NewFlagSet("codex-profile", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	executable := fs.String("codex", "", "absolute native Codex executable")
-	model := fs.String("model", "", "exact managed-workspace model")
+	qualificationFile := fs.String("qualification", "", "compatibility qualification receipt JSON for this exact binary")
+	model := fs.String("model", "", "exact model")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 ||
-		strings.TrimSpace(*executable) == "" || strings.TrimSpace(*model) == "" {
-		return fmt.Errorf("usage: eng codex-profile --codex ABSOLUTE_NATIVE_CODEX --model MODEL")
+		strings.TrimSpace(*executable) == "" || strings.TrimSpace(*qualificationFile) == "" ||
+		strings.TrimSpace(*model) == "" {
+		return fmt.Errorf("usage: eng codex-profile --codex ABSOLUTE_NATIVE_CODEX --qualification RECEIPT.json --model MODEL")
 	}
-	output, err := buildCodexProfile(*executable, *model)
+	data, err := os.ReadFile(*qualificationFile)
+	if err != nil {
+		return err
+	}
+	var qualification codexapp.QualificationReceipt
+	if err := strictjson.Decode(data, &qualification); err != nil {
+		return err
+	}
+	output, err := buildCodexProfile(*executable, *model, qualification)
 	if err != nil {
 		return err
 	}
@@ -46,10 +59,13 @@ func codexProfile(args []string) error {
 	return nil
 }
 
-func buildCodexProfile(executable, model string) (codexProfileOutput, error) {
+func buildCodexProfile(executable, model string, qualification codexapp.QualificationReceipt) (codexProfileOutput, error) {
 	var output codexProfileOutput
 	if !filepath.IsAbs(executable) || strings.TrimSpace(model) != model || model == "" || len(model) > 128 {
 		return output, fmt.Errorf("absolute Codex executable and bounded exact model required")
+	}
+	if err := qualification.Validate(); err != nil || qualification.ThreadStartModel != model {
+		return output, fmt.Errorf("valid compatibility qualification for exact model required")
 	}
 	clean := filepath.Clean(executable)
 	resolved, err := filepath.EvalSymlinks(clean)
@@ -78,6 +94,14 @@ func buildCodexProfile(executable, model string) (codexProfileOutput, error) {
 		return output, fmt.Errorf("Codex binary changed during hash read or exceeds limit")
 	}
 	binaryDigest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
+	if binaryDigest != qualification.BinaryDigest ||
+		qualification.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() {
+		return output, fmt.Errorf("Codex binary/engineering contract does not match compatibility qualification")
+	}
+	qualificationDigest, err := qualification.Digest()
+	if err != nil {
+		return output, err
+	}
 
 	home, err := os.MkdirTemp("", "engineering-platform-codex-profile-")
 	if err != nil {
@@ -100,18 +124,20 @@ func buildCodexProfile(executable, model string) (codexProfileOutput, error) {
 	if err := cmd.Run(); err != nil {
 		return output, fmt.Errorf("Codex version probe failed: %w", err)
 	}
-	if got := strings.TrimSpace(string(stdout.data)); got != "codex-cli "+codexapp.QualifiedCodexVersion {
+	actualVersion, err := codexapp.ParseCodexVersionOutput(string(stdout.data))
+	if err != nil || actualVersion != qualification.Version {
 		return output, fmt.Errorf(
-			"Codex version mismatch: got %q want %q",
-			got,
-			"codex-cli "+codexapp.QualifiedCodexVersion,
+			"Codex version drift after qualification: got %q want %q",
+			strings.TrimSpace(string(stdout.data)),
+			"codex-cli "+qualification.Version,
 		)
 	}
 
 	profile := codexexec.Profile{
-		Version:                 1,
-		CodexVersion:            codexapp.QualifiedCodexVersion,
+		Version:                 2,
+		CodexVersion:            actualVersion,
 		BinaryDigest:            binaryDigest,
+		QualificationDigest:     qualificationDigest,
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Model:                   model,
 		Sandbox:                 "workspace-write",
@@ -123,10 +149,12 @@ func buildCodexProfile(executable, model string) (codexProfileOutput, error) {
 		return output, err
 	}
 	output = codexProfileOutput{
-		CodexExecutable: resolved,
-		Profile:         profile,
-		ProfileDigest:   digest,
-		ToolProfile:     "codex/" + digest,
+		CodexExecutable:     resolved,
+		Qualification:       qualification,
+		QualificationDigest: qualificationDigest,
+		Profile:             profile,
+		ProfileDigest:       digest,
+		ToolProfile:         "codex/" + digest,
 	}
 	output.ActionGrant.Action = codexexec.Action
 	output.ActionGrant.RiskClass = "CONTROLLED_MUTATION"

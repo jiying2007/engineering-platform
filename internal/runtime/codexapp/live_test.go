@@ -98,7 +98,7 @@ func TestLiveReceiptRejectsTamper(t *testing.T) {
 	r := LiveReceipt{
 		SchemaVersion:              1,
 		CLI:                        "codex-cli",
-		Version:                    QualifiedCodexVersion,
+		Version:                    testCodexVersion,
 		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:             "workload_identity",
@@ -175,7 +175,7 @@ func TestLiveReceiptRequiresAssertionRemovalFence(t *testing.T) {
 	r := LiveReceipt{
 		SchemaVersion:              1,
 		CLI:                        "codex-cli",
-		Version:                    QualifiedCodexVersion,
+		Version:                    testCodexVersion,
 		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:             "workload_identity",
@@ -205,7 +205,7 @@ func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
 	r := LiveReceipt{
 		SchemaVersion:                        1,
 		CLI:                                  "codex-cli",
-		Version:                              QualifiedCodexVersion,
+		Version:                              testCodexVersion,
 		BinaryDigest:                         "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
 		CredentialMode:                       CredentialModeSavedChatGPTLogin,

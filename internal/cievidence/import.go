@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
-	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
@@ -140,7 +139,7 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	if err := verifyArchiveFile(req.Files.BinariesZip, binaryArtifact); err != nil {
 		return empty, fmt.Errorf("binary archive changed during verification: %w", err)
 	}
-	codexArtifact, ok := findArtifact(req.Live.Artifacts, "codex-0.155.0-qualification-"+req.Delivery.ResultCommit)
+	codexArtifact, ok := findArtifact(req.Live.Artifacts, "codex-compatibility-qualification-"+req.Delivery.ResultCommit)
 	if !ok {
 		return empty, fmt.Errorf("Codex qualification artifact missing")
 	}
@@ -344,15 +343,8 @@ func verifyCodexArchive(path string) error {
 	if err := decoder.Decode(&q); err != nil || decoder.Decode(new(any)) != io.EOF {
 		return fmt.Errorf("invalid Codex qualification receipt")
 	}
-	if q.SchemaVersion != 1 || q.CLI != "codex-cli" || q.Version != codexapp.QualifiedCodexVersion ||
-		q.ReleaseTag != codexapp.QualifiedCodexReleaseTag || q.ReleaseCommit != codexapp.QualifiedCodexReleaseCommit ||
-		!canonical.ValidDigest(q.BinaryDigest) || !canonical.ValidDigest(q.StableSchemaDigest) ||
-		!canonical.ValidDigest(q.ExperimentalSchemaDigest) || q.Transport != "stdio" || !q.FreshProcess ||
-		q.ManagedDaemon || q.PerThreadConfigOverride || !q.InitializePassed || !q.ThreadStartPassed ||
-		q.ThreadStartModel != "gpt-5.6-sol" || !q.StableSchemaContractChecked || !q.ExperimentalSurfaceChecked ||
-		!canonical.ValidDigest(q.CredentialSafeConfigDigest) || !q.CredentialSafeProfileChecked ||
-		q.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() || !q.EngineeringProfileChecked {
-		return fmt.Errorf("Codex qualification receipt does not satisfy pinned contract")
+	if q.Validate() != nil || q.ThreadStartModel != "gpt-5.6-sol" {
+		return fmt.Errorf("Codex qualification receipt does not satisfy compatibility contract")
 	}
 	return nil
 }

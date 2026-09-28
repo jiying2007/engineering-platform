@@ -71,6 +71,7 @@ type EngineeringReceipt struct {
 	CLI                                  string `json:"cli"`
 	Version                              string `json:"version"`
 	BinaryDigest                         string `json:"binary_digest"`
+	QualificationDigest                  string `json:"qualification_digest"`
 	EngineeringConfigDigest              string `json:"engineering_config_digest"`
 	CredentialMode                       string `json:"credential_mode"`
 	FederationRuleID                     string `json:"federation_rule_id"`
@@ -170,9 +171,10 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 	}
 }
 
-func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, home, ruleID, tokenFile, auditContext, model, prompt string) (EngineeringReceipt, error) {
+func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, ruleID, tokenFile, auditContext, model, prompt string) (EngineeringReceipt, error) {
 	var receipt EngineeringReceipt
-	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
+	if !ValidCodexVersion(qualifiedVersion) || !canonical.ValidDigest(binaryDigest) ||
+		!canonical.ValidDigest(qualificationDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
 		strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > 64<<10 {
 		return receipt, fmt.Errorf("qualified binary, bounded model and prompt required")
 	}
@@ -191,8 +193,9 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 	}
 	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
-	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
-		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
+	if err != nil || parseErr != nil || actualVersion != qualifiedVersion {
+		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q; probe=%v parse=%v; stderr=%s", strings.TrimSpace(string(versionOut)), "codex-cli "+qualifiedVersion, err, parseErr, strings.TrimSpace(diagnostics))
 	}
 	assertion, err := os.ReadFile(tokenPath)
 	if err != nil {
@@ -285,9 +288,10 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 		}
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 1, CLI: "codex-cli", Version: QualifiedCodexVersion,
-		BinaryDigest: binaryDigest, EngineeringConfigDigest: EngineeringConfigDigest(),
-		CredentialMode: CredentialModeWorkloadIdentity, FederationRuleID: ruleID, Model: model,
+		SchemaVersion: 2, CLI: "codex-cli", Version: qualifiedVersion,
+		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
+		EngineeringConfigDigest: EngineeringConfigDigest(),
+		CredentialMode:          CredentialModeWorkloadIdentity, FederationRuleID: ruleID, Model: model,
 		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
@@ -299,9 +303,10 @@ func EngineeringWIFTurn(ctx context.Context, executable, binaryDigest, work, hom
 	return receipt, receipt.Validate()
 }
 
-func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model, prompt string) (EngineeringReceipt, error) {
+func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, savedLoginFile, model, prompt string) (EngineeringReceipt, error) {
 	var receipt EngineeringReceipt
-	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
+	if !ValidCodexVersion(qualifiedVersion) || !canonical.ValidDigest(binaryDigest) ||
+		!canonical.ValidDigest(qualificationDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
 		strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > 64<<10 {
 		return receipt, fmt.Errorf("qualified binary, bounded model and prompt required")
 	}
@@ -315,8 +320,9 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, wo
 	}
 	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
-	if err != nil || strings.TrimSpace(string(versionOut)) != "codex-cli "+QualifiedCodexVersion {
-		return receipt, fmt.Errorf("engineering execution requires exact codex-cli %s: %v; stderr=%s", QualifiedCodexVersion, err, strings.TrimSpace(diagnostics))
+	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
+	if err != nil || parseErr != nil || actualVersion != qualifiedVersion {
+		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q; probe=%v parse=%v; stderr=%s", strings.TrimSpace(string(versionOut)), "codex-cli "+qualifiedVersion, err, parseErr, strings.TrimSpace(diagnostics))
 	}
 	runCtx, cancel := context.WithTimeout(ctx, engineeringSavedLoginTurnTimeout)
 	defer cancel()
@@ -394,9 +400,10 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, wo
 		}
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 1, CLI: "codex-cli", Version: QualifiedCodexVersion,
-		BinaryDigest: binaryDigest, EngineeringConfigDigest: EngineeringConfigDigest(),
-		CredentialMode: CredentialModeSavedChatGPTLogin, FederationRuleID: "", Model: model,
+		SchemaVersion: 2, CLI: "codex-cli", Version: qualifiedVersion,
+		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
+		EngineeringConfigDigest: EngineeringConfigDigest(),
+		CredentialMode:          CredentialModeSavedChatGPTLogin, FederationRuleID: "", Model: model,
 		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
@@ -409,8 +416,9 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, binaryDigest, wo
 }
 
 func (r EngineeringReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || r.Version != QualifiedCodexVersion ||
-		!canonical.ValidDigest(r.BinaryDigest) || r.EngineeringConfigDigest != EngineeringConfigDigest() ||
+	if r.SchemaVersion != 2 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.QualificationDigest) ||
+		r.EngineeringConfigDigest != EngineeringConfigDigest() ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
 		strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 ||

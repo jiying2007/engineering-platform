@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jiying2007/engineering-platform/internal/canonical"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
@@ -82,11 +81,10 @@ func TestPinnedProviderRejectsExecutableByteDrift(t *testing.T) {
 
 func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 	data, err := MarshalQualification(QualificationReceipt{
-		SchemaVersion:                1,
+		SchemaVersion:                2,
+		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
-		Version:                      QualifiedCodexVersion,
-		ReleaseTag:                   QualifiedCodexReleaseTag,
-		ReleaseCommit:                QualifiedCodexReleaseCommit,
+		Version:                      "0.157.1",
 		BinaryDigest:                 "sha256:" + strings.Repeat("a", 64),
 		StableSchemaDigest:           "sha256:" + strings.Repeat("b", 64),
 		ExperimentalSchemaDigest:     "sha256:" + strings.Repeat("c", 64),
@@ -97,8 +95,10 @@ func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 		ThreadStartModel:             "gpt-5.6-sol",
 		StableSchemaContractChecked:  true,
 		ExperimentalSurfaceChecked:   true,
-		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialSafeConfigDigest:   CredentialSafeConfigDigest(),
 		CredentialSafeProfileChecked: true,
+		EngineeringConfigDigest:      EngineeringConfigDigest(),
+		EngineeringProfileChecked:    true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -148,5 +148,19 @@ func TestCredentialSafeProfileProbeFailsWhenShellRemainsEnabled(t *testing.T) {
 	}
 	if err := qualifyCredentialSafeProfile(context.Background(), executable, filepath.Join(root, "home")); err == nil {
 		t.Fatal("enabled shell tool accepted")
+	}
+}
+
+func TestCodexVersionCompatibilityIsNotExactPinned(t *testing.T) {
+	for _, version := range []string{"0.155.0", "0.157.1", "1.2.3", "0.160.0-beta.1"} {
+		got, err := ParseCodexVersionOutput("codex-cli " + version + "\n")
+		if err != nil || got != version || !ValidCodexVersion(got) {
+			t.Fatalf("compatible version %q rejected: got=%q err=%v", version, got, err)
+		}
+	}
+	for _, output := range []string{"codex 0.157.1", "codex-cli latest", "codex-cli 0.157", "codex-cli "} {
+		if _, err := ParseCodexVersionOutput(output); err == nil {
+			t.Fatalf("invalid version output accepted: %q", output)
+		}
 	}
 }

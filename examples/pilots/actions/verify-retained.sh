@@ -168,7 +168,7 @@ CODEX_ZIP="$CI_ROOT/codex-qualification.zip"
 ENVELOPE_ZIP="$CI_ROOT/trusted-ci-evidence.zip"
 
 download_artifact_zip "engineering-binaries-$RESULT_COMMIT" "$BINARIES_ZIP" > "$CI_ROOT/binaries.digest"
-download_artifact_zip "codex-0.155.0-qualification-$RESULT_COMMIT" "$CODEX_ZIP" > "$CI_ROOT/codex.digest"
+download_artifact_zip "codex-compatibility-qualification-$RESULT_COMMIT" "$CODEX_ZIP" > "$CI_ROOT/codex.digest"
 CI_ENVELOPE_DIGEST="$(download_artifact_zip "trusted-ci-evidence-$RESULT_COMMIT" "$ENVELOPE_ZIP")"
 
 . "$STACK_ROOT/clients/owner.env"

@@ -92,8 +92,10 @@ gh auth status
 docker version
 ```
 
-Required Codex state is exact `codex-cli 0.155.0` and
-`Logged in using ChatGPT`.
+Required Codex state is a syntactically valid `codex-cli <semver>` plus
+`Logged in using ChatGPT`. The actual binary is compatibility-qualified by the
+retained workflow before the non-replayable model turn; no team-wide exact
+Codex version is required.
 
 When diagnosing saved-login behavior independently, the optional read-only probe
 is:
@@ -196,20 +198,34 @@ Provision separate mTLS identities for:
 The Reviewer must remain certificate-separated from the Work human owner and
 Verifier. Evidence importer reserved identities remain dedicated importers.
 
-## 2. Freeze the exact Codex profile
+## 2. Compatibility-qualify and freeze the exact Codex profile
 
-Install/review the qualified native `codex-cli 0.155.0` binary on the Worker
-host, then derive the exact Core profile from its real bytes:
+Use the actual native Codex binary installed on the Worker host. First perform
+the non-model compatibility qualification:
+
+```sh
+codex-qualifier \
+  --codex /absolute/path/to/codex \
+  --model gpt-5.6-sol \
+  > codex-qualification.json
+```
+
+Then derive the exact Core Profile from the same executable and receipt:
 
 ```sh
 eng codex-profile \
   --codex /absolute/path/to/codex \
+  --qualification codex-qualification.json \
   --model gpt-5.6-sol \
   > codex-profile.json
 ```
 
+The Profile freezes the actual Codex version, exact binary digest,
+qualification digest and engineering configuration digest.
+
 Use the returned values without editing:
 
+- `qualification` -> `WORKER_CODEX_CONFIG.qualification`;
 - `profile` -> `WORKER_CODEX_CONFIG.profile`;
 - `profile_digest` -> Worker access-policy
   `worker.codex-execute` action capability;

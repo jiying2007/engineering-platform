@@ -46,6 +46,7 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
@@ -53,7 +54,7 @@ func TestPilotPreflightFullyReadyWithBoundWIFAndPublisher(t *testing.T) {
 	wif := codexapp.LiveReceipt{
 		SchemaVersion:              1,
 		CLI:                        "codex-cli",
-		Version:                    codexapp.QualifiedCodexVersion,
+		Version:                    profile.Profile.CodexVersion,
 		BinaryDigest:               profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
 		CredentialMode:             "workload_identity",
@@ -121,6 +122,7 @@ func TestPilotPreflightRejectsPublisherArtifactViewDrift(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex.json", workerCodex)
@@ -128,7 +130,7 @@ func TestPilotPreflightRejectsPublisherArtifactViewDrift(t *testing.T) {
 	wif := codexapp.LiveReceipt{
 		SchemaVersion:              1,
 		CLI:                        "codex-cli",
-		Version:                    codexapp.QualifiedCodexVersion,
+		Version:                    profile.Profile.CodexVersion,
 		BinaryDigest:               profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
 		CredentialMode:             "workload_identity",
@@ -218,7 +220,8 @@ func pilotPreflightFixture(t *testing.T) (pilotPreflightOptions, codexProfileOut
 	if err := os.WriteFile(codex, []byte("#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.155.0'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	profile, err := buildCodexProfile(codex, "gpt-5.6-sol")
+	qualification := profileQualificationFixture(t, codex, "0.155.0", "gpt-5.6-sol")
+	profile, err := buildCodexProfile(codex, "gpt-5.6-sol", qualification)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,6 +329,7 @@ func TestPilotPreflightReadyWithTrustedSelfHostedSavedLogin(t *testing.T) {
 		"codex_executable": profile.CodexExecutable,
 		"credential_mode":  "saved_chatgpt_login",
 		"saved_login_file": loginFile,
+		"qualification":    profile.Qualification,
 		"profile":          profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-saved.json", workerCodex)
@@ -359,12 +363,13 @@ func TestPilotPreflightAcceptsOptionalTrustedSelfHostedQualificationReceipt(t *t
 		"codex_executable": profile.CodexExecutable,
 		"credential_mode":  "saved_chatgpt_login",
 		"saved_login_file": loginFile,
+		"qualification":    profile.Qualification,
 		"profile":          profile.Profile,
 	})
 	saved := codexapp.LiveReceipt{
 		SchemaVersion:                        1,
 		CLI:                                  "codex-cli",
-		Version:                              codexapp.QualifiedCodexVersion,
+		Version:                              profile.Profile.CodexVersion,
 		BinaryDigest:                         profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest:           codexapp.CredentialSafeConfigDigest(),
 		CredentialMode:                       codexapp.CredentialModeSavedChatGPTLogin,
@@ -398,6 +403,7 @@ func TestPilotPreflightRejectsCrossModeCredentialReceipt(t *testing.T) {
 		"codex_executable":   profile.CodexExecutable,
 		"credential_mode":    "workload_identity",
 		"federation_rule_id": rule,
+		"qualification":      profile.Qualification,
 		"profile":            profile.Profile,
 	}
 	options.WorkerCodexFile = writePilotJSON(t, root, "worker-codex-cross-mode.json", workerCodex)

@@ -15,6 +15,11 @@ on:
         required: true
         default: gpt-5.6-sol
         type: string
+      codex_version:
+        description: Codex CLI package version to compatibility-qualify for this run
+        required: true
+        default: 0.157.1
+        type: string
 
 permissions:
   contents: write
@@ -78,16 +83,19 @@ jobs:
             sleep $((attempt * 2))
           done
 
-      - name: Install exact qualified Codex native binary
+      - name: Install selected Codex native binary for compatibility qualification
         shell: bash
+        env:
+          CODEX_VERSION: ${{ inputs.codex_version }}
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/codex-0.155.0"
-          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false @openai/codex@0.155.0
+          [[ "$CODEX_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
+          root="$RUNNER_TEMP/codex-$CODEX_VERSION"
+          npm install --prefix "$root" --omit=dev --ignore-scripts --package-lock=false "@openai/codex@$CODEX_VERSION"
           mapfile -t candidates < <(find "$root/node_modules" -type f -name codex -perm -u+x | sort)
           test "${#candidates[@]}" -eq 1
           codex="$(readlink -f "${candidates[0]}")"
-          test "$("$codex" --version)" = "codex-cli 0.155.0"
+          test "$("$codex" --version)" = "codex-cli $CODEX_VERSION"
           printf 'CODEX_NATIVE=%s\n' "$codex" >> "$GITHUB_ENV"
 
       - name: Require Codex Linux sandbox prerequisite
@@ -114,6 +122,7 @@ jobs:
           go build -trimpath -o "$bin/eng" ./cmd/eng
           go build -trimpath -o "$bin/worker" ./cmd/worker
           go build -trimpath -o "$bin/codex-wif-live" ./cmd/codex-wif-live
+          go build -trimpath -o "$bin/codex-qualifier" ./cmd/codex-qualifier
           printf 'BIN_DIR=%s\n' "$bin" >> "$GITHUB_ENV"
 
       - name: Real WIF qualification and retained engineering turn

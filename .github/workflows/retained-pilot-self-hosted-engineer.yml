@@ -64,7 +64,8 @@ jobs:
           saved_login="$(readlink -f "$codex_home/auth.json")"
           test -x "$codex_native"
           test -f "$saved_login"
-          test "$("$codex_native" --version)" = "codex-cli 0.155.0"
+          codex_version="$("$codex_native" --version)"
+          [[ "$codex_version" =~ ^codex-cli[[:space:]][0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
           test "$("$codex_native" login status 2>&1 | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
           gh auth status >/dev/null 2>&1
           printf 'codex_native=%s\n' "$codex_native" >> "$GITHUB_OUTPUT"

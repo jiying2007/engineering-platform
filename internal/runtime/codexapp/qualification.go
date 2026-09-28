@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -19,18 +20,15 @@ import (
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
-const (
-	QualifiedCodexVersion       = "0.155.0"
-	QualifiedCodexReleaseTag    = "rust-v0.155.0"
-	QualifiedCodexReleaseCommit = "f0a1b8f"
-)
+const CompatibilityContractVersion = 1
+
+var codexVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
 type QualificationReceipt struct {
 	SchemaVersion                int    `json:"schema_version"`
+	CompatibilityContractVersion int    `json:"compatibility_contract_version"`
 	CLI                          string `json:"cli"`
 	Version                      string `json:"version"`
-	ReleaseTag                   string `json:"release_tag"`
-	ReleaseCommit                string `json:"release_commit"`
 	BinaryDigest                 string `json:"binary_digest"`
 	StableSchemaDigest           string `json:"stable_schema_digest"`
 	ExperimentalSchemaDigest     string `json:"experimental_schema_digest"`
@@ -49,15 +47,14 @@ type QualificationReceipt struct {
 	EngineeringProfileChecked    bool   `json:"engineering_profile_checked"`
 }
 
-// Qualify exercises a real Codex binary without making a model turn. It verifies
-// exact CLI version, hashes executable bytes, generates both stable/experimental
-// app-server schemas, checks the fields our adapter depends on, then starts a
-// fresh stdio app-server and completes initialize + ephemeral thread/start.
-// No daemon, proxy, per-thread config override, credential, turn or tool runs.
-func Qualify(ctx context.Context, executable, expectedVersion, model string) (QualificationReceipt, error) {
+// Qualify exercises the actual Codex binary without making a model turn.
+// Admission is compatibility-based rather than version-pinned: the binary must
+// expose the protocol/schema/profile semantics required by this contract. The
+// observed version and exact binary digest are retained for provenance.
+func Qualify(ctx context.Context, executable, model string) (QualificationReceipt, error) {
 	var receipt QualificationReceipt
-	if expectedVersion != QualifiedCodexVersion || strings.TrimSpace(model) == "" || len(model) > 128 {
-		return receipt, fmt.Errorf("qualification requires the repository-pinned Codex version and model")
+	if strings.TrimSpace(model) == "" || len(model) > 128 {
+		return receipt, fmt.Errorf("qualification requires a bounded model")
 	}
 	executable, err := canonicalPath(executable, false)
 	if err != nil {
@@ -89,8 +86,9 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	if err != nil {
 		return receipt, fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
 	}
-	if got, want := strings.TrimSpace(string(out)), "codex-cli "+expectedVersion; got != want {
-		return receipt, fmt.Errorf("unexpected Codex version %q want %q; stderr=%s", got, want, strings.TrimSpace(diagnostics))
+	version, err := ParseCodexVersionOutput(string(out))
+	if err != nil {
+		return receipt, fmt.Errorf("unsupported Codex version output %q: %w; stderr=%s", strings.TrimSpace(string(out)), err, strings.TrimSpace(diagnostics))
 	}
 
 	stable := filepath.Join(root, "stable")
@@ -176,11 +174,10 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 	_ = cmd.Wait()
 
 	receipt = QualificationReceipt{
-		SchemaVersion:                1,
+		SchemaVersion:                2,
+		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
-		Version:                      expectedVersion,
-		ReleaseTag:                   QualifiedCodexReleaseTag,
-		ReleaseCommit:                QualifiedCodexReleaseCommit,
+		Version:                      version,
 		BinaryDigest:                 digest,
 		StableSchemaDigest:           stableDigest,
 		ExperimentalSchemaDigest:     experimentalDigest,
@@ -198,7 +195,52 @@ func Qualify(ctx context.Context, executable, expectedVersion, model string) (Qu
 		EngineeringConfigDigest:      EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
 	}
+	if err := receipt.Validate(); err != nil {
+		return QualificationReceipt{}, err
+	}
 	return receipt, nil
+}
+
+func ValidCodexVersion(version string) bool {
+	return len(version) <= 64 && codexVersionPattern.MatchString(version)
+}
+
+func ParseCodexVersionOutput(output string) (string, error) {
+	const prefix = "codex-cli "
+	value := strings.TrimSpace(output)
+	if !strings.HasPrefix(value, prefix) {
+		return "", fmt.Errorf("expected codex-cli version output")
+	}
+	version := strings.TrimSpace(strings.TrimPrefix(value, prefix))
+	if !ValidCodexVersion(version) {
+		return "", fmt.Errorf("invalid Codex semantic version")
+	}
+	return version, nil
+}
+
+func (r QualificationReceipt) Validate() error {
+	if r.SchemaVersion != 2 || r.CompatibilityContractVersion != CompatibilityContractVersion ||
+		r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.StableSchemaDigest) ||
+		!canonical.ValidDigest(r.ExperimentalSchemaDigest) || r.Transport != "stdio" ||
+		!r.FreshProcess || r.ManagedDaemon || r.PerThreadConfigOverride ||
+		!r.InitializePassed || !r.ThreadStartPassed ||
+		strings.TrimSpace(r.ThreadStartModel) == "" || len(r.ThreadStartModel) > 128 ||
+		!r.StableSchemaContractChecked || !r.ExperimentalSurfaceChecked ||
+		r.CredentialSafeConfigDigest != CredentialSafeConfigDigest() ||
+		!r.CredentialSafeProfileChecked ||
+		r.EngineeringConfigDigest != EngineeringConfigDigest() ||
+		!r.EngineeringProfileChecked {
+		return fmt.Errorf("invalid Codex compatibility qualification receipt")
+	}
+	return nil
+}
+
+func (r QualificationReceipt) Digest() (string, error) {
+	if err := r.Validate(); err != nil {
+		return "", err
+	}
+	return canonical.Digest(r)
 }
 
 func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) error {
@@ -426,5 +468,8 @@ func (w *boundedWriter) Write(p []byte) (int, error) {
 // MarshalQualification is intentionally deterministic so CI can retain an exact
 // machine-readable receipt without timestamps or host paths.
 func MarshalQualification(receipt QualificationReceipt) ([]byte, error) {
+	if err := receipt.Validate(); err != nil {
+		return nil, err
+	}
 	return json.MarshalIndent(receipt, "", "  ")
 }

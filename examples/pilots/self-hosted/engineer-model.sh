@@ -69,7 +69,8 @@ curl -fsSL https://api.github.com/repos/jiying2007/engineering-platform/branches
 
 CODEX_NATIVE="$(readlink -f "$CODEX_NATIVE")"
 SAVED_LOGIN_FILE="$(readlink -f "$SAVED_LOGIN_FILE")"
-test "$("$CODEX_NATIVE" --version)" = "codex-cli 0.155.0"
+CODEX_VERSION_OUTPUT="$("$CODEX_NATIVE" --version)"
+[[ "$CODEX_VERSION_OUTPUT" =~ ^codex-cli[[:space:]][0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]
 login_status="$(
   env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u OPENAI_FEDERATION_RULE_ID     -u OPENAI_IDENTITY_TOKEN_FILE -u OPENAI_WORKLOAD_IDENTITY_CONTEXT     -u CODEX_API_KEY -u CODEX_ACCESS_TOKEN     "$CODEX_NATIVE" login status 2>&1
 )"
@@ -92,11 +93,16 @@ install -d -m 0700 "$STATE_ROOT" "$BIN_DIR"
   go build -trimpath -o "$BIN_DIR/eng" ./cmd/eng
   go build -trimpath -o "$BIN_DIR/worker" ./cmd/worker
   go build -trimpath -o "$BIN_DIR/codex-saved-login-live" ./cmd/codex-saved-login-live
+  go build -trimpath -o "$BIN_DIR/codex-qualifier" ./cmd/codex-qualifier
 )
 
-"$BIN_DIR/eng" codex-profile --codex "$CODEX_NATIVE" --model "$MODEL" > "$STATE_ROOT/codex-profile.json"
+"$BIN_DIR/codex-qualifier"   --codex "$CODEX_NATIVE"   --model "$MODEL"   > "$STATE_ROOT/codex-qualification.json"
+
+"$BIN_DIR/eng" codex-profile   --codex "$CODEX_NATIVE"   --qualification "$STATE_ROOT/codex-qualification.json"   --model "$MODEL"   > "$STATE_ROOT/codex-profile.json"
 PROFILE_FILE="$STATE_ROOT/codex-profile.json"
 PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
+QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
+CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 
 "$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
 
@@ -212,6 +218,7 @@ jq --arg login "$SAVED_LOGIN_FILE" '{
   codex_executable:.codex_executable,
   credential_mode:"saved_chatgpt_login",
   saved_login_file:$login,
+  qualification:.qualification,
   profile:.profile
 }' "$PROFILE_FILE" > "$WORKER_CODEX_FILE"
 chmod 0600 "$WORKER_CODEX_FILE"
@@ -252,7 +259,7 @@ install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core-pre-publication.dump"
 test -s "$STATE_ROOT/core-pre-publication.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg credential_mode "saved_chatgpt_login"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
     version:1,
     execution_origin:"trusted_self_hosted",
     credential_mode:$credential_mode,
@@ -260,6 +267,8 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
     run_id:$run_id,
     base_commit:$base_commit,
     profile_digest:$profile_digest,
+    qualification_digest:$qualification_digest,
+    codex_version:$codex_version,
     execution_epoch:($execution_epoch|tonumber),
     model_phase:"FINISHED",
     publication:"NOT_STARTED"
@@ -347,7 +356,7 @@ rm -f "$TOKEN_FILE"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core.dump"
 test -s "$STATE_ROOT/core.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
     version:1,
     execution_origin:"trusted_self_hosted",
     credential_mode:$credential_mode,
@@ -358,6 +367,8 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
     codex_result_digest:$result_digest,
     bundle_digest:$bundle_digest,
     profile_digest:$profile_digest,
+    qualification_digest:$qualification_digest,
+    codex_version:$codex_version,
     pull_request:{number:$pr_number,url:$pr_url,branch:$pr_branch},
     github_engineering_run_id:$github_engineering_run_id,
     next_gate:"PASS_EXACT_PR_HEAD_CI"
