@@ -122,7 +122,7 @@ export AUTO_MIGRATE=0
 CONTROL_PID=$!
 
 for _ in $(seq 1 60); do
-  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+  if bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" verifier >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -131,7 +131,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" verifier >/dev/null
 
 git -C "$GITHUB_WORKSPACE" fetch --no-tags "https://github.com/$GITHUB_REPOSITORY.git"   "refs/heads/$PR_BRANCH:refs/ep/retained-result"
 test "$(git -C "$GITHUB_WORKSPACE" rev-parse refs/ep/retained-result^{commit})" = "$RESULT_COMMIT"
