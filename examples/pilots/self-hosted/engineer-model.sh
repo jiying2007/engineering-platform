@@ -86,6 +86,10 @@ REMOTE_MAIN="$(git ls-remote https://github.com/jiying2007/engineering-platform.
 test "$REMOTE_MAIN" = "$BASE_COMMIT"
 checkpoint repository
 
+starting repository-source-security
+bash "$ROOT/examples/pilots/local-stack/secure-repository-source.sh" "$ROOT" | tee -a "$PREMODEL_LOG"
+checkpoint repository-source-security
+
 # Prove the independent publisher credential exists before consuming the
 # non-replayable model turn, without exporting or copying it into model state.
 # The token is not materialized here; gh only proves that the host credential is
