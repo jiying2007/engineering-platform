@@ -70,6 +70,21 @@ jobs:
             sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           fi
           bwrap --ro-bind / / --proc /proc --dev /dev /bin/true
+      - name: Compatibility-qualify selected Codex binary without a model turn
+        shell: bash
+        env:
+          LIVE_MODEL: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          go run ./cmd/codex-qualifier \
+            --codex "$CODEX_NATIVE" \
+            --model "$LIVE_MODEL" \
+            > "$RUNNER_TEMP/codex-compatibility-qualification.json"
+          jq -e --arg digest "$CODEX_DIGEST" '
+            .schema_version == 2 and
+            .compatibility_contract_version == 1 and
+            .binary_digest == $digest
+          ' "$RUNNER_TEMP/codex-compatibility-qualification.json" >/dev/null
       - name: Mint and verify one GitHub OIDC assertion
         shell: bash
         env:
@@ -121,7 +136,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: codex-wif-live-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/codex-wif-live-receipt.json
+          path: |
+            ${{ runner.temp }}/codex-wif-live-receipt.json
+            ${{ runner.temp }}/codex-compatibility-qualification.json
           if-no-files-found: error
           retention-days: 90
       - name: Destroy identity assertion
