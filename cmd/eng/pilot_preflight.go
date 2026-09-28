@@ -103,7 +103,12 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 	if profile.ToolProfile != "codex/"+profile.ProfileDigest || profile.ProfileDigest == "" {
 		return empty, fmt.Errorf("invalid retained Codex profile output")
 	}
-	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model)
+	qualificationDigest, err := profile.Qualification.Digest()
+	if err != nil || qualificationDigest != profile.QualificationDigest ||
+		qualificationDigest != profile.Profile.QualificationDigest {
+		return empty, fmt.Errorf("retained Codex profile qualification binding mismatch")
+	}
+	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model, profile.Qualification)
 	if err != nil {
 		return empty, err
 	}
@@ -165,6 +170,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 					return empty, err
 				}
 				if receipt.CredentialMode != codexapp.CredentialModeWorkloadIdentity ||
+					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
 					receipt.FederationRuleID != workerCodex.FederationRuleID {
@@ -185,6 +191,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 					return empty, err
 				}
 				if receipt.CredentialMode != codexapp.CredentialModeSavedChatGPTLogin ||
+					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
 					receipt.FederationRuleID != "" {
