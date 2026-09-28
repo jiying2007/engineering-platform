@@ -131,7 +131,7 @@ export AUTO_MIGRATE=0
 CONTROL_PID=$!
 
 for _ in $(seq 1 60); do
-  if curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null 2>&1; then
+  if bash "$RUNTIME_SRC/examples/pilots/local-stack/health.sh" "$STACK_ROOT" reviewer >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$CONTROL_PID" 2>/dev/null; then
@@ -140,7 +140,7 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-curl -fsS --cacert "$STACK_ROOT/pki/ca.crt" https://127.0.0.1:18443/healthz >/dev/null
+bash "$RUNTIME_SRC/examples/pilots/local-stack/health.sh" "$STACK_ROOT" reviewer >/dev/null
 
 PILOT_DIR="$RUNTIME_SRC/examples/pilots/$PILOT_DIR_NAME"
 
