@@ -266,7 +266,7 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	}
 	if savedLogin {
 		data, err := os.ReadFile(p.savedLoginSource)
-		if err != nil || len(data) < 16 || len(data) > 1<<20 || strictjson.ValidateObject(data) != nil {
+		if err != nil || len(data) < 16 || len(data) > 1<<20 || strictjson.ValidateForeignObject(data) != nil {
 			return nil, fmt.Errorf("saved ChatGPT login source must be a bounded JSON object")
 		}
 		if err := os.WriteFile(filepath.Join(home, ".codex", "auth.json"), data, 0o600); err != nil {
