@@ -98,6 +98,9 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 			t.Fatalf("model-phase script missing %q", required)
 		}
 	}
+	if strings.Contains(model, "\n\"$ROOT/examples/pilots/local-stack/bootstrap.sh\" ") {
+		t.Fatal("self-hosted path must not depend on executable bit for bootstrap.sh")
+	}
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("model state is marked FINISHED before pre-publication snapshot")
 	}
@@ -355,6 +358,7 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"--show-token",
 		"gh api user --jq '.login == \"jiying2007\"'",
 		"gh api repos/jiying2007/engineering-platform/branches/main",
+		"bash \"$ROOT/examples/pilots/local-stack/bootstrap.sh\"",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
