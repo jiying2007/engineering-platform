@@ -96,14 +96,33 @@ if printf '%s' "$status_checks_json" |
     ((.contexts // []) | index($old)) != null and
     ((.contexts // []) | index($new)) == null
   ' >/dev/null; then
+  printf '%s' "$protection_json" |
+    jq -e --arg old "$LEGACY_CODEX_CHECK" --arg new "$STABLE_CODEX_CHECK" '
+      .required_status_checks as $required |
+      [($required.checks // [])[] | select(.context == $old)] as $old_checks |
+      [($required.checks // [])[] | select(.context == $new)] as $new_checks |
+      ($old_checks | length) == 1 and
+      ($new_checks | length) == 0 and
+      ($old_checks[0].app_id | type) == "number" and
+      $old_checks[0].app_id > 0
+    ' >/dev/null || {
+      echo "legacy Codex required check is not bound to exactly one GitHub App; refusing migration" >&2
+      exit 1
+    }
+
   migration_payload="$OUTPUT_DIR/codex-check-migration.json"
-  printf '%s' "$status_checks_json" |
-    jq --arg old "$LEGACY_CODEX_CHECK" --arg new "$STABLE_CODEX_CHECK" '{
-      strict: .strict,
-      contexts: ((.contexts // []) | map(if . == $old then $new else . end) | unique)
-    }' > "$migration_payload"
+  printf '%s' "$protection_json" |
+    jq --arg old "$LEGACY_CODEX_CHECK" --arg new "$STABLE_CODEX_CHECK" '
+      .required_status_checks as $required |
+      {
+        strict: $required.strict,
+        checks: (($required.checks // []) |
+          map(if .context == $old then .context = $new else . end))
+      }
+    ' > "$migration_payload"
   chmod 0600 "$migration_payload"
   gh api     --method PATCH     -H "Accept: application/vnd.github+json"     -H "X-GitHub-Api-Version: $API_VERSION"     "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks"     --input "$migration_payload" >/dev/null
+  protection_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection")"
   status_checks_json="$(api_get "/repos/$REPOSITORY/branches/$BRANCH/protection/required_status_checks")"
 fi
 
@@ -114,6 +133,17 @@ printf '%s' "$status_checks_json" |
     ($expected | all(. as $name | (($checks.contexts // []) | index($name)) != null))
   ' >/dev/null || {
     echo "GitHub main required status-check policy does not satisfy retained-pilot minimum policy" >&2
+    exit 1
+  }
+
+printf '%s' "$protection_json" |
+  jq -e --argjson expected "$EXPECTED_CHECKS_JSON" '
+    .required_status_checks as $required |
+    ($expected | all(. as $name |
+      any(($required.checks // [])[]; .context == $name and
+        (.app_id | type) == "number" and .app_id > 0)))
+  ' >/dev/null || {
+    echo "GitHub main required checks are not all bound to a specific GitHub App" >&2
     exit 1
   }
 
