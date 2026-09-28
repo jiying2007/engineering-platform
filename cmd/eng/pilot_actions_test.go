@@ -341,13 +341,17 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"core-pre-publication.dump",
 		"result.bundle",
 		"model_phase:\"FINISHED\"",
-		"gh auth token > \"$TOKEN_FILE\"",
+		"gh auth token --hostname github.com > \"$TOKEN_FILE\"",
 		"control-plane-with-publisher.env",
 		"/api/v1/runs/$RUN_ID/actions",
 		"test \"$RESULT\" = \"CONFIRMED\"",
 		"core.dump",
 		"engineering-state.json",
 		"no model replay",
+		"preflight-checks.log",
+		"gh auth status --hostname github.com",
+		"gh auth token --hostname github.com >/dev/null",
+		"gh api repos/jiying2007/engineering-platform/branches/main",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
@@ -356,7 +360,7 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("self-hosted model state is marked FINISHED before pre-publication snapshot")
 	}
-	if strings.Index(model, "gh auth token > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
+	if strings.Index(model, "gh auth token --hostname github.com > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("publisher token is materialized before retained model FINISHED state")
 	}
 	if strings.Contains(workflow, "${{ github.token }}") {
