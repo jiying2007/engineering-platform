@@ -1,14 +1,15 @@
 # Implementation Status
 
-Reviewed base: `6f29464ab0cad9261fe6d3827c283339b51cd72b` (#74).
-Stage: **Retained M1 execution mechanics remain one authority chain, but Codex
-authentication is no longer WIF-only. M1 phase 1 supports trusted self-hosted
-ChatGPT-authenticated Codex on an explicitly trusted Linux host, with the saved
-login copied only into a fresh isolated Codex HOME for auth prewarm and deleted
-before model-reachable work. Managed-workspace WIF remains the preferred
-GitHub-hosted/unattended authentication lane. GitHub main protection is now
-actually active. No real retained Feature/Debug Closure chain has completed, so
-M1 and production readiness remain unclaimed.**
+Reviewed base: `ee0249fe25b860a83beba9fe06b7acdc80cd75c6` (#101).
+Stage: **Trusted self-hosted M1 phase 1 is now proven by two real retained
+Closure chains: one Feature and one Debug. Both chains reached real Core-bound
+Codex FINISHED state, independent Action Gateway publication, exact PR-head CI,
+requirement-bound Codex/Git/CI Evidence, PASS Verification, comment-bound
+independent PASS Review and ClosureReceipt; both closed results were then
+promoted separately to protected main and fresh-main CI passed. Managed-workspace
+WIF remains the preferred GitHub-hosted/unattended authentication lane but is
+not yet qualified by a real WIF model turn. Production/unattended readiness
+therefore remains unclaimed.**
 
 ## Canonical scope
 
@@ -79,8 +80,23 @@ to create ClosureReceipt.
 | Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential mode is explicit and mutually exclusive: trusted self-hosted saved ChatGPT login or managed-workspace WIF. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the M1 phase-1 lane; WIF remains the preferred unattended/GitHub-hosted upgrade. |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
-| Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | One retained real Feature pilot and one retained real Debug pilot are still required |
-| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; trusted self-hosted saved-login and managed WIF authentication variants; resumable engineering artifacts consumed by the same Verification/Review/Closure chain | M1 phase 1 requires one dedicated repository-scoped self-hosted runner plus real Feature/Debug retained Closure chains; managed-workspace WIF remains a future unattended-path prerequisite, not a phase-1 blocker |
+| Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | Trusted self-hosted M1 phase-1 proof is complete with one real Feature and one real Debug Closure chain; production rollout/SLO evidence remains outside this pilot proof |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; trusted self-hosted saved-login and managed WIF authentication variants; resumable engineering artifacts consumed by the same Verification/Review/Closure chain | Trusted self-hosted phase-1 pilots are complete; managed-workspace WIF remains an unqualified unattended-path upgrade until a real administrator-provisioned live WIF turn succeeds |
+
+## M1 phase-1 closure evidence
+
+The two required real retained Closure chains are complete. The canonical proof
+record is `docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`.
+
+- Feature: result `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
+  Verification `36516020897`, Review `36517048600`, ClosureReceipt
+  `m1-feature-routing-closure`, post-Closure promotion #100.
+- Debug: reproduction `36518555837`, result
+  `91d7d9fa068b7667bab5c211f13cd9e0151aeb92`, Verification
+  `36536077026`, Review `36536314395`, ClosureReceipt
+  `m1-debug-firmware-identity-closure`, post-Closure promotion #101.
+- Current protected main: `ee0249fe25b860a83beba9fe06b7acdc80cd75c6`;
+  fresh-main CI `36538546170` passed.
 
 ## Retained evidence
 
@@ -217,32 +233,33 @@ GitHub main protection is now a live external fact: main is protected and the
 five canonical CI checks are required. Source merge still does not provision a
 publisher credential, a managed-workspace WIF rule, or a production service.
 
-M1 phase 1 no longer requires WIF. The next retained proof sequence is:
+M1 phase 1 no longer requires WIF, and the retained proof sequence has now
+completed for both required subjects:
 
-1. Because this repository is public, generate a fresh 128-bit one-time
-   runner label `engineering-platform-codex-<32 lowercase hex>` and dispatch
-   `retained-pilot-self-hosted-engineer.yml` for Feature #54 while no matching
-   runner is online.
-2. Register one repository-scoped trusted Linux runner using that exact custom
-   label with `--no-default-labels --ephemeral`, then start it under the
-   ChatGPT-authenticated `aiot03` account. Require a valid installed
-   `codex-cli <semver>`, working Docker/Go and an authenticated host `gh`
-   publisher credential. The actual binary is compatibility-qualified and
-   rebound into Profile v2 before the retained turn.
-3. The already-queued workflow must freeze the exact protected-main base,
-   execute one Core-bound saved-login Codex turn, retain FINISHED state/result
-   bundle, stop the model process, and only then materialize the host GitHub
-   publisher token for the existing Action Gateway.
-4. Require publication CONFIRMED and exact PR-head CI PASS.
-5. Dispatch `retained-pilot-verify.yml` with the ephemeral engineering run ID;
-   require exact Codex/Git/CI Evidence plus PASS Verification.
-6. A GitHub actor different from the engineering dispatcher performs the
-   existing independent Review. PASS alone permits Closure.
-7. Confirm the ephemeral runner deregistered, delete its local work directory,
-   and use a new random label for Debug #55.
-8. Repeat the complete chain for Debug from the then-current protected main with
-   new Work/Task/Run/Evidence/Review/Closure identities.
-9. Only after both real ClosureReceipts exist should M1 be reassessed.
+1. Feature #54 ran from frozen base
+   `75b6e24a409999129a0e89e6aa56e13733109034`. Engineering run
+   `36505950006` reached FINISHED and publication CONFIRMED; the workflow then
+   hit a mechanical post-publication self-copy failure. Read-only recovery run
+   `36515098424` validated the retained subject with no model replay.
+2. Feature exact-head CI `36513182863`, Verification `36516020897` and
+   independent Review `36517048600` passed. ClosureReceipt
+   `m1-feature-routing-closure` closed the WorkItem.
+3. Debug #55 first retained authoritative reproduction run `36518555837` on
+   frozen base `9d6309c6eff62d3489959ed574dda31536578568`, then engineering
+   run `36518908635` completed directly with FINISHED + publication CONFIRMED.
+4. Debug exact-head CI `36526250474`, Verification `36536077026` and
+   independent Review `36536314395` passed. ClosureReceipt
+   `m1-debug-firmware-identity-closure` closed the WorkItem.
+5. Post-Closure promotion PRs #100 and #101 integrated the already-closed
+   retained results onto protected main without mutating the immutable retained
+   result branches. Current main is
+   `ee0249fe25b860a83beba9fe06b7acdc80cd75c6`; fresh-main CI
+   `36538546170` passed.
+6. The original publication transport PRs #91 and #98 are closed as superseded
+   evidence transports; their retained result SHAs remain immutable.
+
+Detailed proof is retained in
+`docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`.
 
 `examples/pilots/self-hosted/qualify-login.sh` remains an optional diagnostic
 read-only model probe. It is not a prerequisite for phase-1 retained engineering,
@@ -263,11 +280,17 @@ operator HOME nor publisher/API/WIF credential environment, and the isolated
 saved-login bootstrap is deleted before thread/start. Production/unattended
 claims should prefer WIF or a separately reviewed stronger host-isolation design.
 
-At this checkpoint there are still **no real retained Feature or Debug Closure
-chains**. Repository fixtures/fake app-server tests remain protocol/filesystem
-evidence only.
+At this checkpoint there are **two real retained Closure chains**: one Feature
+and one Debug. This is sufficient to claim the trusted self-hosted **M1 phase-1
+retained vertical slice** as proven for the scoped pilot authority chain.
 
-**M1 and production readiness remain unclaimed.**
+Repository fixtures/fake app-server tests remain protocol/filesystem evidence
+only and still do not qualify managed-workspace WIF. A real administrator-
+provisioned WIF provider/rule and live WIF model turn are still required before
+the unattended/GitHub-hosted credential lane can be called qualified.
+
+**Trusted self-hosted M1 phase 1 is proven. Production/unattended readiness
+remains unclaimed.**
 
 Contracts:
 - `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`
