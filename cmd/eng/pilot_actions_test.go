@@ -159,7 +159,7 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 		}
 	}
 
-	if got := strings.Count(verification, "expired|tostring"); got < 2 {
+	if got := strings.Count(verify, "expired|tostring"); got < 2 {
 		t.Fatalf("verification must safely parse false expiry at both source and CI artifact boundaries; got %d guarded reads", got)
 	}
 	for _, forbidden := range []string{
