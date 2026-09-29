@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -42,11 +43,12 @@ func TestBuildCodexProfileBindsExactBinaryModelAndPolicyGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	qualification := profileQualificationFixture(t, binary, "0.157.1", "gpt-5.6-sol")
-	output, err := buildCodexProfile(binary, "gpt-5.6-sol", qualification)
+	output, err := buildCodexProfile(binary, "gpt-5.6-sol", qualification, provideridentity.OpenAIChatGPTTrustedSelfHosted())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output.Profile.Version != 2 ||
+	if output.Profile.Version != 3 ||
+		output.Profile.Provider != provideridentity.OpenAIChatGPTTrustedSelfHosted() ||
 		output.Profile.CodexVersion != "0.157.1" ||
 		output.Profile.QualificationDigest == "" ||
 		output.Profile.QualificationDigest != output.QualificationDigest ||
@@ -73,7 +75,7 @@ func TestBuildCodexProfileRejectsQualificationDriftAndUnsafeBinary(t *testing.T)
 		t.Fatal(err)
 	}
 	wrongQualification := profileQualificationFixture(t, wrong, "0.157.1", "gpt-5.6-sol")
-	if _, err := buildCodexProfile(wrong, "gpt-5.6-sol", wrongQualification); err == nil {
+	if _, err := buildCodexProfile(wrong, "gpt-5.6-sol", wrongQualification, provideridentity.OpenAIChatGPTTrustedSelfHosted()); err == nil {
 		t.Fatal("version drift from qualification accepted")
 	}
 	unsafe := filepath.Join(dir, "unsafe")
@@ -84,7 +86,7 @@ func TestBuildCodexProfileRejectsQualificationDriftAndUnsafeBinary(t *testing.T)
 		t.Fatal(err)
 	}
 	unsafeQualification := profileQualificationFixture(t, unsafe, "0.157.1", "gpt-5.6-sol")
-	if _, err := buildCodexProfile(unsafe, "gpt-5.6-sol", unsafeQualification); err == nil {
+	if _, err := buildCodexProfile(unsafe, "gpt-5.6-sol", unsafeQualification, provideridentity.OpenAIChatGPTTrustedSelfHosted()); err == nil {
 		t.Fatal("group/world-writable binary accepted")
 	}
 }
