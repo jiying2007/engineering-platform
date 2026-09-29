@@ -58,6 +58,7 @@ Current canonical documents:
 - [Embedded Domain Capability Model v1](docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md)
 - [Core M0 / M1 Vertical Slice Plan v1](docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md)
 - [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md)
+- [Codex Credential Lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md)
 - [Extension Catalog v1](docs/extensions/EXTENSION_CATALOG_V1.md)
 - [ADR-001 — Clean-Slate Embedded Platform Scope](docs/adr/ADR-001-clean-slate-embedded-platform-scope.md)
 
@@ -109,28 +110,35 @@ Automatic Planner comes later. Explicit Skill routing is enough for M1.
 
 ## Current implementation status
 
-The platform is past bootstrap and is now **retained-pilot-ready, externally WIF-gated**.
+The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is proven**
+by one real retained Feature Closure chain and one separate retained Debug
+Closure chain.
 
 The authoritative live status is
-[Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). In summary, the
-repository now contains the authenticated Core, PostgreSQL authority, Worker
-admission/preparation, isolated workspace execution, exact Codex qualification,
-Core-bound WIF engineering, credential-separated Git/PR publication, exact
-PR-head CI evidence, requirement-bound Evidence/Verification, independent
-Review, recovery drills, and retained Feature/Debug pilot workflows.
+[Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). Authentication
+and provider selection are summarized in
+[Codex credential lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md).
 
-Current boundary:
+Current execution posture:
 
-- source code and internal execution mechanics are assembled;
-- fresh-main CI has passed all five authority/qualification gates through #68;
-- managed-workspace Codex WIF still requires the external administrator
-  enablement/provider/rule step;
-- Feature #54 and Debug #55 must then run as real retained pilots;
-- M1 and production readiness remain unclaimed until those retained proofs
-  complete.
+- **default internal development lane:** trusted Ubuntu host with a
+  ChatGPT-authenticated Codex CLI, exact compatibility qualification, isolated
+  Codex HOME and the existing Core/Worker/Action Gateway/Evidence chain;
+- **optional unattended lane:** managed-workspace WIF for GitHub-hosted or other
+  workload-identity execution; repository mechanics are ready, but the external
+  workspace administrator provider/rule and first real live qualification are
+  still pending in #103;
+- **optional future company relay/model gateway:** a separate provider lane that
+  requires its own compatibility, credential, privacy, retry/UNKNOWN and
+  provenance review. It is not a WIF fallback.
 
-Do not infer maturity from files, schemas, mocks or green CI alone. Real retained
-engineering Evidence is the maturity boundary.
+Feature #54 and Debug #55 are already CLOSED and their retained results were
+promoted to protected main after Verification/Review/Closure. Do not rerun them
+merely to qualify another credential lane.
+
+Production/unattended readiness remains a separate gate (#105). Do not infer it
+from files, schemas, mocks or green CI alone; retained operational Evidence is
+the maturity boundary.
 
 ## M0
 
