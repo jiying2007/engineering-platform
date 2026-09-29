@@ -644,6 +644,22 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	if strings.Index(model, "gh auth token --hostname github.com > \"$TOKEN_FILE\"") < strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("publisher token is materialized before retained model FINISHED state")
 	}
+	for _, forbidden := range []string{
+		`cp "$PREPARATION_FILE" "$STATE_ROOT/worker-preparation.json"`,
+		`cp "$WORKER_CODEX_FILE" "$STATE_ROOT/worker-codex.json"`,
+	} {
+		if strings.Contains(model, forbidden) {
+			t.Fatalf("self-hosted retained state must not copy a file onto itself: %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		`test "$PREPARATION_FILE" = "$STATE_ROOT/worker-preparation.json"`,
+		`test "$WORKER_CODEX_FILE" = "$STATE_ROOT/worker-codex.json"`,
+	} {
+		if !strings.Contains(model, required) {
+			t.Fatalf("self-hosted retained state identity guard missing %q", required)
+		}
+	}
 	if strings.Contains(workflow, "${{ github.token }}") {
 		t.Fatal("self-hosted workflow must not inject job-scoped GitHub token into the saved-login chain")
 	}
