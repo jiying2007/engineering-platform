@@ -41,6 +41,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "relay-render-codex-config":
+		if err := relayRenderCodexConfig(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "relay-prequalification":
 		if err := relayPrequalification(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -132,6 +137,7 @@ func usage() {
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
+	fmt.Println("  relay-render-codex-config --contract FILE --out FILE  render exact owner-private user-level Codex provider config")
 	fmt.Println("  relay-prequalification --contract FILE       validate/digest relay provider contract without live account use")
 	fmt.Println("  codex-profile --codex PATH --model MODEL derive exact Core-bound Codex profile/tool grant")
 	fmt.Println("  pilot-preflight <flags>                   validate retained-pilot local/deployment readiness")
