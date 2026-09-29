@@ -1,17 +1,19 @@
 # Implementation Status
 
-Reviewed base: `1b50c17ccf3dbef3b0ac708da574cdfc88871944` (#104).
+Reviewed base: `6094e108932be79ae3a02a0d6e195f46d4110b05` (#108).
 Stage: **Trusted self-hosted M1 phase 1 is proven by two real retained Closure
-chains and is the default internal R&D execution lane. The current internal lane
-uses a trusted Ubuntu host with a ChatGPT-authenticated Codex CLI, exact
-compatibility qualification, isolated Codex HOME, credential-separated
-publication and the same retained Evidence/Verification/Review/Closure chain.
-Managed-workspace WIF is an optional workload-identity enhancement for
-GitHub-hosted/unattended execution; repository mechanics are READY but the
-external administrator provider/rule and first live WIF qualification remain
-pending in #103. A company relay/model gateway, if adopted, is a separate
-provider lane that requires independent qualification and must never be a silent
-WIF fallback. Production/unattended readiness remains unclaimed.**
+chains and remains the default internal R&D execution lane. Since #108, Codex
+execution authority uses Profile v3: `provider_id / credential_mode /
+execution_mode / provider_config_digest` are frozen into one provider identity
+inside the Core-authorized Profile digest and are carried through Worker
+execution, live/engineering receipts, publication state, Recovery, Verification
+and Review/Closure state. The Worker no longer owns a second top-level
+`credential_mode` authority. Current code admits only
+`openai-codex + chatgpt-session + trusted-self-hosted` and
+`openai-codex + workload-identity + unattended`; unknown providers and
+cross-lane combinations fail closed. Managed-workspace WIF remains externally
+unqualified in #103, and company relay/model gateway remains unqualified in
+#106. Production/unattended readiness remains unclaimed.**
 
 ## Canonical scope
 
@@ -80,8 +82,8 @@ to create ClosureReceipt.
 | Worker admission/preparation | Real relay, mTLS identities/profiles and leases; approved source/context preparation | Approval snapshots remain operator-managed |
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
-| Codex qualification | Version-independent compatibility contract: actual semver + native hash + generated schema digests + fixed-profile/app-server qualification; deterministic qualification digest frozen into Profile v2 | CI keeps a sentinel baseline, while each real Worker binary must qualify and requalify before execution |
-| Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential/provider lane is explicit and mutually exclusive. Proven lanes are trusted self-hosted saved ChatGPT login and repository-ready managed-workspace WIF; any future relay/provider requires separate qualification. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the default internal R&D lane. Unattended production must separately qualify one explicit machine/provider credential lane; WIF is one candidate and #106 tracks optional relay qualification. |
+| Codex qualification | Version-independent compatibility contract: actual semver + native hash + generated schema digests + fixed-profile/app-server qualification; deterministic qualification digest plus exact Provider v3 identity frozen into the Profile digest | CI keeps a sentinel baseline, while each real Worker binary/provider combination must qualify and requalify before execution |
+| Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and retained result chain. Profile v3 freezes provider, credential, execution and provider-config digest as one capability identity. Worker config carries only credential material locators; it cannot override the Core-authorized provider identity. Saved-session mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the default internal R&D lane. Unattended production must separately qualify one explicit machine/provider credential lane; WIF is one candidate and #106 tracks optional relay qualification. |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | Trusted self-hosted M1 phase-1 proof is complete with one real Feature and one real Debug Closure chain; production rollout/SLO evidence remains outside this pilot proof |
@@ -104,24 +106,41 @@ record is `docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`.
 - Canonical status checkpoint after #102: protected main
   `644127255f615abb753fab5c450ea23caad76b11`; fresh-main CI
   `36540163771` passed all five canonical gates.
+- Credential-policy checkpoint after #107: protected main
+  `04169db0b69862e90e1d8ff90c093a4dc65fa9c4`; fresh-main CI
+  `36565274419` passed all five canonical gates.
+- Provider-identity authority checkpoint after #108: protected main
+  `6094e108932be79ae3a02a0d6e195f46d4110b05`; fresh-main CI
+  `36574110172` passed all five canonical gates.
 
 ## Credential/provider posture
 
 The canonical credential/provider policy is
 `docs/implementation/CODEX_CREDENTIAL_LANES_V1.md`.
 
-- **Default internal lane:** trusted self-hosted saved ChatGPT login on an
-  explicitly trusted Ubuntu host. This lane is already proven by the retained
-  Feature/Debug M1 Closure chains.
-- **Optional unattended lane:** managed-workspace WIF. It is tracked by #103 and
-  is needed only when workload identity / GitHub-hosted unattended execution is
-  selected.
-- **Optional future relay lane:** company relay/model gateway. It is not WIF,
-  does not inherit WIF or saved-login evidence, and must receive its own
-  provider/credential/compatibility/provenance qualification before admission.
+Profile v3 makes provider selection part of execution authority rather than a
+late runtime switch. Every admitted execution freezes:
 
-Credential selection is explicit and fail-closed. Authentication failure in one
-lane must not cause Runtime to try another credential/provider implicitly.
+- `provider_id`;
+- `credential_mode`;
+- `execution_mode`;
+- `provider_config_digest`.
+
+Current admitted combinations:
+
+- **Default internal lane:** `openai-codex / chatgpt-session /
+  trusted-self-hosted`. This lane is already proven by the retained
+  Feature/Debug M1 Closure chains.
+- **Optional unattended lane:** `openai-codex / workload-identity /
+  unattended`. Repository mechanics are admitted, while real managed-workspace
+  WIF qualification remains tracked by #103.
+- **Optional future relay lane:** company relay/model gateway. No relay identity
+  is currently admitted. #106 must first establish exact provider qualification,
+  model/upstream semantics, credential lifecycle, privacy/retention,
+  retry/UNKNOWN behavior and retained provenance.
+
+Authentication/provider failure is fail-closed. Runtime must not silently move
+to another provider, credential mode or execution mode.
 
 ## Managed-workspace WIF unattended gate
 
@@ -348,7 +367,9 @@ Repository fixtures/fake app-server tests remain protocol/filesystem evidence
 only and do not qualify any unattended credential/provider lane. For WIF, a real
 administrator-provisioned provider/rule and live WIF model turn are required
 before #103 may close. A future company relay/provider must independently meet
-the #106 qualification contract before it may satisfy the credential prerequisite
+the #106 qualification contract and then receive a new explicitly admitted
+Provider v3 identity; it cannot reuse either current `openai-codex` combination
+or their qualification receipts before it may satisfy the credential prerequisite
 for #105.
 
 **Trusted self-hosted M1 phase 1 is proven. Production/unattended readiness
