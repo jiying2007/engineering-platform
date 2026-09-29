@@ -282,6 +282,41 @@ succeed.
   OIDC token claim and must be enforced separately by repository protection plus
   the workflow runtime `GITHUB_REF_PROTECTED` fact.
 
+## Historical divergent branch disposition
+
+Two old implementation branches are now explicitly classified as **superseded
+history**, not pending product work and not retained pilot evidence:
+
+- `feat/github-ci-core-evidence-import` diverged from merge-base
+  `e895fc6dddb509a51897b5fe32b21216312ebb9d` (#43). Its branch-only
+  `cmd/eng/evidence_import.go` / `internal/cievidence/github_import.go`
+  prototype was replaced on main by the dedicated trusted importer delivered by
+  #44 (`cmd/eng/import_ci.go`, `docs/implementation/TRUSTED_CI_IMPORT_V1.md`),
+  then hardened by the engineering evidence bridge (#48) and exact PR-head CI
+  provenance (#51). The historical branch must not be merged or cherry-picked
+  back into main.
+- `feat/independent-review-authority` diverged from merge-base
+  `34ff7d82316d1d095040ce6f62522fe5397dee86` (#44). Its early ReviewReport
+  and migration prototype was replaced by the stricter #46 authority now on
+  main: `db/migrations/0006_review_reports.sql`,
+  `internal/review/review.go`, and
+  `docs/implementation/INDEPENDENT_REVIEW_V1.md`. The canonical successor
+  binds task-contract digest, PASS/FAIL semantics, severity-aware bounded
+  findings, independent reviewer identity and Closure foreign-key authority.
+  The historical branch must not be merged or cherry-picked back into main.
+
+These two branches may therefore be deleted as repository hygiene once the
+operator chooses to remove the refs. Their continued existence is not an
+implementation blocker and grants no authority.
+
+Do **not** apply this disposition to the two retained M1 result branches:
+
+- `engineering-platform/3ac04fc7097e8375e5f7c1f8` — retained Feature result;
+- `engineering-platform/994964383ed085e51545105d` — retained Debug result.
+
+Those branches are immutable evidence references for the already-closed M1
+Feature/Debug chains and remain intentionally preserved.
+
 ## Publication authority
 
 The publication contract is `docs/implementation/GITHUB_PR_PUBLICATION_V1.md`.
