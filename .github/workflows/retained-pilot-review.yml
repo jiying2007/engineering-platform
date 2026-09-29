@@ -14,8 +14,12 @@ on:
         description: Successful retained verification workflow run ID
         required: true
         type: string
+      decision_comment_id:
+        description: GitHub PR comment ID carrying the independent review decision
+        required: true
+        type: string
       result:
-        description: Independent review decision
+        description: Independent review decision mirrored from the bound GitHub comment
         required: true
         type: choice
         options:
@@ -35,6 +39,8 @@ on:
 permissions:
   contents: read
   actions: read
+  issues: read
+  pull-requests: read
 
 jobs:
   review:
@@ -91,6 +97,7 @@ jobs:
         env:
           PILOT: ${{ inputs.pilot }}
           VERIFICATION_RUN_ID: ${{ inputs.verification_run_id }}
+          REVIEW_DECISION_COMMENT_ID: ${{ inputs.decision_comment_id }}
           REVIEW_RESULT: ${{ inputs.result }}
           REVIEW_FINDINGS_JSON: ${{ inputs.findings_json }}
           REVIEW_KNOWN_LIMITS_JSON: ${{ inputs.known_limits_json }}
