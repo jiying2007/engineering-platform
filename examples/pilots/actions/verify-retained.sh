@@ -252,7 +252,7 @@ download_artifact_zip() {
   id="$(printf '%s' "$artifacts_json" | jq -er --arg n "$name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].id else error("artifact identity missing/ambiguous") end')"
   digest="$(printf '%s' "$artifacts_json" | jq -er --arg n "$name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].digest else error("artifact identity missing/ambiguous") end')"
   size="$(printf '%s' "$artifacts_json" | jq -er --arg n "$name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].size_in_bytes else error("artifact identity missing/ambiguous") end')"
-  expired="$(printf '%s' "$artifacts_json" | jq -er --arg n "$name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].expired else error("artifact identity missing/ambiguous") end')"
+  expired="$(printf '%s' "$artifacts_json" | jq -er --arg n "$name" '[.artifacts[]|select(.name==$n)] | if length==1 then (.[0].expired|tostring) else error("artifact identity missing/ambiguous") end')"
   test "$expired" = false
   gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$output"
   test "$(stat -c%s "$output")" = "$size"
