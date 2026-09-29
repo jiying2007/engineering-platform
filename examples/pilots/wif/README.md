@@ -19,7 +19,9 @@ automates the remaining GitHub-side qualification steps:
 7. require the live receipt to bind that same binary digest plus exact
    model/federation rule and no approval/tool effects;
 8. retain both receipts locally and render `worker-codex.json` from the exact
-   existing `codex-profile.json`.
+   existing `codex-profile.json`, including both the frozen compatibility
+   `qualification` and `profile` required by Worker pre-execution
+   requalification.
 
 Example:
 
