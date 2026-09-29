@@ -38,11 +38,19 @@ func Resolve(taskType, subsystem string) (Route, error) {
 		}, nil
 
 	case "FEATURE", "BRINGUP", "COMPATIBILITY":
-		return Route{
+		route := Route{
 			TaskType:      task,
 			CapabilityIDs: []string{"embedded.architecture", "embedded.driver-component"},
 			SkillIDs:      []string{"material-readiness", "architecture-impact-analysis", "interface-contract-review", "driver-integration-review"},
-		}, nil
+		}
+		if strings.Contains(sub, "linux") || strings.Contains(sub, "bsp") || strings.Contains(sub, "storage") || strings.Contains(sub, "ubi") {
+			route.CapabilityIDs = append(route.CapabilityIDs, "embedded.linux-bsp")
+			route.SkillIDs = append(route.SkillIDs, "linux-bsp-integration")
+		} else if strings.Contains(sub, "mcu") || strings.Contains(sub, "rtos") || strings.Contains(sub, "motor") {
+			route.CapabilityIDs = append(route.CapabilityIDs, "embedded.mcu-rtos")
+			route.SkillIDs = append(route.SkillIDs, "mcu-rtos-integration")
+		}
+		return route, nil
 
 	case "DEVICE_TEST", "RELEASE":
 		return Route{
