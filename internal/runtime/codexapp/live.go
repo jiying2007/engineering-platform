@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
@@ -21,14 +22,14 @@ const (
 )
 
 type LiveReceipt struct {
-	SchemaVersion                        int    `json:"schema_version"`
-	CLI                                  string `json:"cli"`
-	Version                              string `json:"version"`
-	BinaryDigest                         string `json:"binary_digest"`
-	CredentialSafeConfigDigest           string `json:"credential_safe_config_digest"`
-	CredentialMode                       string `json:"credential_mode"`
-	FederationRuleID                     string `json:"federation_rule_id"`
-	Model                                string `json:"model"`
+	SchemaVersion                        int                       `json:"schema_version"`
+	CLI                                  string                    `json:"cli"`
+	Version                              string                    `json:"version"`
+	BinaryDigest                         string                    `json:"binary_digest"`
+	CredentialSafeConfigDigest           string                    `json:"credential_safe_config_digest"`
+	Provider                             provideridentity.Identity `json:"provider"`
+	FederationRuleID                     string                    `json:"federation_rule_id"`
+	Model                                string                    `json:"model"`
 	PromptDigest                         string `json:"prompt_digest"`
 	ThreadID                             string `json:"thread_id"`
 	TurnID                               string `json:"turn_id"`
@@ -233,12 +234,12 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		}
 	}
 	receipt = LiveReceipt{
-		SchemaVersion:                        1,
+		SchemaVersion:                        2,
 		CLI:                                  "codex-cli",
 		Version:                              version,
 		BinaryDigest:                         binaryDigest,
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:                       CredentialModeWorkloadIdentity,
+		Provider:                             provideridentity.OpenAIWIFUnattended(),
 		FederationRuleID:                     ruleID,
 		Model:                                model,
 		PromptDigest:                         canonical.BytesDigest([]byte(LiveProbePrompt)),
@@ -355,7 +356,7 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 		Version:                              version,
 		BinaryDigest:                         binaryDigest,
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:                       CredentialModeSavedChatGPTLogin,
+		Provider:                             provideridentity.OpenAIChatGPTTrustedSelfHosted(),
 		FederationRuleID:                     "",
 		Model:                                model,
 		PromptDigest:                         canonical.BytesDigest([]byte(LiveProbePrompt)),
@@ -373,9 +374,10 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 }
 
 func (r LiveReceipt) Validate() error {
-	if r.SchemaVersion != 1 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+	if r.SchemaVersion != 2 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) ||
 		r.CredentialSafeConfigDigest != canonical.BytesDigest([]byte(credentialSafeConfig)) ||
+		r.Provider.Validate() != nil ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 ||
 		r.PromptDigest != canonical.BytesDigest([]byte(LiveProbePrompt)) ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
@@ -383,19 +385,19 @@ func (r LiveReceipt) Validate() error {
 		r.ApprovalRequests != 0 || r.UnexpectedToolUse {
 		return fmt.Errorf("invalid live qualification receipt")
 	}
-	switch r.CredentialMode {
-	case CredentialModeWorkloadIdentity:
+	switch r.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		if !validFederationRuleID(r.FederationRuleID) || !r.AssertionRemovedBeforeTurn ||
 			r.CredentialBootstrapRemovedBeforeTurn {
 			return fmt.Errorf("invalid live workload-identity receipt")
 		}
-	case CredentialModeSavedChatGPTLogin:
+	case provideridentity.CredentialChatGPTSession:
 		if r.FederationRuleID != "" || r.AssertionRemovedBeforeTurn ||
 			!r.CredentialBootstrapRemovedBeforeTurn {
 			return fmt.Errorf("invalid live saved-login receipt")
 		}
 	default:
-		return fmt.Errorf("invalid live credential mode")
+		return fmt.Errorf("invalid live provider credential mode")
 	}
 	return nil
 }
