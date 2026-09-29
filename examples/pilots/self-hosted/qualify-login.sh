@@ -78,7 +78,11 @@ RECEIPT="$OUTPUT_DIR/saved-login-live-receipt.json"
 "$BIN/codex-saved-login-live"   --codex "$CODEX_NATIVE"   --digest "$BINARY_DIGEST"   --work "$WORK"   --home "$HOME_DIR"   --saved-login-file "$STAGED_LOGIN_FILE"   --model "$MODEL" > "$RECEIPT"
 chmod 0600 "$RECEIPT"
 
-jq -e   --arg digest "$BINARY_DIGEST"   --arg model "$MODEL"   '.credential_mode=="saved_chatgpt_login" and
+jq -e   --arg digest "$BINARY_DIGEST"   --arg model "$MODEL"   '
+   .schema_version==2 and
+   .provider.provider_id=="openai-codex" and
+   .provider.credential_mode=="chatgpt-session" and
+   .provider.execution_mode=="trusted-self-hosted" and
    .binary_digest==$digest and
    .model==$model and
    .turn_status=="completed" and
@@ -89,9 +93,10 @@ jq -e   --arg digest "$BINARY_DIGEST"   --arg model "$MODEL"   '.credential_mode
 test ! -e "$HOME_DIR/.codex/auth.json"
 
 META="$OUTPUT_DIR/self-hosted-login-qualification.json"
-jq -n   --arg credential_mode "saved_chatgpt_login"   --arg codex_version "$version"   --arg binary_digest "$BINARY_DIGEST"   --arg model "$MODEL"   --arg receipt "$RECEIPT"   '{
-    version:1,
-    credential_mode:$credential_mode,
+PROVIDER_JSON="$(jq -cS .provider "$RECEIPT")"
+jq -n   --argjson provider "$PROVIDER_JSON"   --arg codex_version "$version"   --arg binary_digest "$BINARY_DIGEST"   --arg model "$MODEL"   --arg receipt "$RECEIPT"   '{
+    version:2,
+    provider:$provider,
     login_status:"Logged in using ChatGPT",
     codex_version:$codex_version,
     binary_digest:$binary_digest,
@@ -102,7 +107,9 @@ jq -n   --arg credential_mode "saved_chatgpt_login"   --arg codex_version "$vers
 chmod 0600 "$META"
 
 echo "trusted self-hosted Codex login qualification: READY"
-echo "credential_mode=saved_chatgpt_login"
+echo "provider_id=$(jq -r .provider_id <<<"$PROVIDER_JSON")"
+echo "credential_mode=$(jq -r .credential_mode <<<"$PROVIDER_JSON")"
+echo "execution_mode=$(jq -r .execution_mode <<<"$PROVIDER_JSON")"
 echo "codex_version=$version"
 echo "binary_digest=$BINARY_DIGEST"
 echo "model=$MODEL"
