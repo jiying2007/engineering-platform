@@ -183,7 +183,9 @@ exit 1
 		t.Fatal(err)
 	}
 	if worker.Version != 1 || worker.FederationRuleID != rule ||
-		worker.Executable != profile.CodexExecutable || worker.Profile != profile.Profile {
+		worker.Executable != profile.CodexExecutable ||
+		worker.Qualification != qualification ||
+		worker.Profile != profile.Profile {
 		t.Fatalf("unexpected rendered Worker Codex config: %#v", worker)
 	}
 
@@ -229,6 +231,7 @@ func TestWIFQualificationHelperShellSyntax(t *testing.T) {
 		"live WIF compatibility qualification does not match frozen Codex profile",
 		".binary_digest == $binary_digest",
 		"qualification_digest=$PROFILE_QUALIFICATION_DIGEST",
+		"qualification: .qualification",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("qualify.sh missing exact-profile binding %q", required)
