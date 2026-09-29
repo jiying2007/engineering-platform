@@ -21,6 +21,8 @@ OUTPUT_ROOT="$2"
 CODEX_NATIVE="$3"
 SAVED_LOGIN_FILE="$4"
 MODEL="${5:-gpt-5.6-sol}"
+DEBUG_REPRODUCTION_RUN_ID="${DEBUG_REPRODUCTION_RUN_ID:-}"
+DEBUG_REPRODUCTION_RECEIPT_DIGEST=""
 
 : "${GITHUB_RUN_ID:?GitHub Actions run id required}"
 : "${GITHUB_REPOSITORY:?GitHub repository required}"
@@ -32,7 +34,12 @@ test "$GITHUB_REF" = "refs/heads/main"
 test "$GITHUB_REF_PROTECTED" = "true"
 
 case "$PILOT" in
-  feature|debug) ;;
+  feature)
+    test -z "$DEBUG_REPRODUCTION_RUN_ID"
+    ;;
+  debug)
+    [[ "$DEBUG_REPRODUCTION_RUN_ID" =~ ^[0-9]+$ ]]
+    ;;
   *) usage ;;
 esac
 for path in "$OUTPUT_ROOT" "$CODEX_NATIVE" "$SAVED_LOGIN_FILE"; do
@@ -74,6 +81,7 @@ command -v go >/dev/null
 command -v docker >/dev/null
 command -v sha256sum >/dev/null
 command -v gh >/dev/null
+command -v unzip >/dev/null
 checkpoint toolchain
 
 starting repository
@@ -120,6 +128,77 @@ login_status="$(
 )"
 test "$(printf '%s' "$login_status" | tr -d '\r' | xargs)" = "Logged in using ChatGPT"
 checkpoint codex-login
+
+if [ "$PILOT" = debug ]; then
+  starting debug-reproduction-binding
+  REPRO_RUN_JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEBUG_REPRODUCTION_RUN_ID")"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .name)" = "Retained Debug firmware identity reproduction"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .event)" = "workflow_dispatch"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .status)" = "completed"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .conclusion)" = "success"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .head_branch)" = "main"
+  test "$(printf '%s' "$REPRO_RUN_JSON" | jq -er .head_sha)" = "$BASE_COMMIT"
+
+  REPRO_ARTIFACT_NAME="retained-debug-firmware-identity-reproduction-$BASE_COMMIT-$DEBUG_REPRODUCTION_RUN_ID"
+  REPRO_ARTIFACTS_JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEBUG_REPRODUCTION_RUN_ID/artifacts?per_page=100")"
+  REPRO_ARTIFACT_ID="$(printf '%s' "$REPRO_ARTIFACTS_JSON" | jq -er --arg n "$REPRO_ARTIFACT_NAME" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].id else error("Debug reproduction artifact missing/ambiguous") end')"
+  REPRO_ARTIFACT_DIGEST="$(printf '%s' "$REPRO_ARTIFACTS_JSON" | jq -er --arg n "$REPRO_ARTIFACT_NAME" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].digest else error("Debug reproduction artifact digest missing/ambiguous") end')"
+  REPRO_ARTIFACT_SIZE="$(printf '%s' "$REPRO_ARTIFACTS_JSON" | jq -er --arg n "$REPRO_ARTIFACT_NAME" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].size_in_bytes else error("Debug reproduction artifact size missing/ambiguous") end')"
+  REPRO_ARTIFACT_EXPIRED="$(printf '%s' "$REPRO_ARTIFACTS_JSON" | jq -r --arg n "$REPRO_ARTIFACT_NAME" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].expired else error("Debug reproduction artifact expiry missing/ambiguous") end')"
+  test "$REPRO_ARTIFACT_EXPIRED" = false
+  [[ "$REPRO_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+  REPRO_ZIP="$STATE_ROOT/debug-reproduction.zip"
+  REPRO_ROOT="$STATE_ROOT/debug-reproduction"
+  install -d -m 0700 "$REPRO_ROOT"
+  gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$REPRO_ARTIFACT_ID/zip" > "$REPRO_ZIP"
+  chmod 0600 "$REPRO_ZIP"
+  test "$(stat -c%s "$REPRO_ZIP")" = "$REPRO_ARTIFACT_SIZE"
+  test "sha256:$(sha256sum "$REPRO_ZIP" | awk '{print $1}')" = "$REPRO_ARTIFACT_DIGEST"
+  unzip -q "$REPRO_ZIP" -d "$REPRO_ROOT"
+
+  REPRO_RECEIPT="$REPRO_ROOT/reproduction-receipt.json"
+  REPRO_TEST="$REPRO_ROOT/reproduction-test.go"
+  REPRO_OUTPUT="$REPRO_ROOT/go-test-output.txt"
+  test -f "$REPRO_RECEIPT"
+  test -f "$REPRO_TEST"
+  test -f "$REPRO_OUTPUT"
+  jq -e \
+    --arg base "$BASE_COMMIT" \
+    '.version==1 and
+     .reproduction=="m1-debug-firmware-identity" and
+     .base_commit==$base and
+     .reproduction_confirmed==true and
+     .expected_status=="BLOCKED" and
+     .observed_status=="READY" and
+     .firmware_identity=="not-a-digest" and
+     .test_exit_code!=0' "$REPRO_RECEIPT" >/dev/null
+  test "sha256:$(sha256sum "$REPRO_TEST" | awk '{print $1}')" = "$(jq -er .test_digest "$REPRO_RECEIPT")"
+  test "sha256:$(sha256sum "$REPRO_OUTPUT" | awk '{print $1}')" = "$(jq -er .output_digest "$REPRO_RECEIPT")"
+  DEBUG_REPRODUCTION_RECEIPT_DIGEST="sha256:$(sha256sum "$REPRO_RECEIPT" | awk '{print $1}')"
+
+  jq -n \
+    --arg run_id "$DEBUG_REPRODUCTION_RUN_ID" \
+    --arg artifact_name "$REPRO_ARTIFACT_NAME" \
+    --arg artifact_id "$REPRO_ARTIFACT_ID" \
+    --arg artifact_digest "$REPRO_ARTIFACT_DIGEST" \
+    --arg receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST" \
+    --arg base_commit "$BASE_COMMIT" \
+    '{
+      version:1,
+      reproduction_run_id:($run_id|tonumber),
+      artifact_name:$artifact_name,
+      artifact_id:($artifact_id|tonumber),
+      artifact_digest:$artifact_digest,
+      receipt_digest:$receipt_digest,
+      base_commit:$base_commit,
+      expected_status:"BLOCKED",
+      observed_status:"READY",
+      reproduction_confirmed:true
+    }' > "$STATE_ROOT/debug-reproduction-binding.json"
+  chmod 0600 "$STATE_ROOT/debug-reproduction-binding.json"
+  checkpoint debug-reproduction-binding
+fi
 
 (
   cd "$ROOT"
@@ -302,7 +381,7 @@ install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core-pre-publication.dump"
 test -s "$STATE_ROOT/core-pre-publication.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg execution_epoch "$EXECUTION_EPOCH"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
     version:1,
     execution_origin:"trusted_self_hosted",
     credential_mode:$credential_mode,
@@ -313,6 +392,8 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
     qualification_digest:$qualification_digest,
     codex_version:$codex_version,
     execution_epoch:($execution_epoch|tonumber),
+    debug_reproduction_run_id:(if $debug_reproduction_run_id=="" then null else ($debug_reproduction_run_id|tonumber) end),
+    debug_reproduction_receipt_digest:(if $debug_reproduction_receipt_digest=="" then null else $debug_reproduction_receipt_digest end),
     model_phase:"FINISHED",
     publication:"NOT_STARTED"
   }' > "$STATE_ROOT/model-phase.json"
@@ -417,7 +498,7 @@ rm -f "$TOKEN_FILE"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core.dump"
 test -s "$STATE_ROOT/core.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
     version:1,
     execution_origin:"trusted_self_hosted",
     credential_mode:$credential_mode,
@@ -432,6 +513,8 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
     codex_version:$codex_version,
     pull_request:{number:$pr_number,url:$pr_url,branch:$pr_branch},
     github_engineering_run_id:$github_engineering_run_id,
+    debug_reproduction_run_id:(if $debug_reproduction_run_id=="" then null else ($debug_reproduction_run_id|tonumber) end),
+    debug_reproduction_receipt_digest:(if $debug_reproduction_receipt_digest=="" then null else $debug_reproduction_receipt_digest end),
     next_gate:"PASS_EXACT_PR_HEAD_CI"
   }' > "$STATE_ROOT/engineering-state.json"
 
