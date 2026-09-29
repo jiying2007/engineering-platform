@@ -66,8 +66,9 @@ gh run download "$VERIFICATION_RUN_ID"   --repo "$GITHUB_REPOSITORY"   --name "$
 
 VERIFICATION_STATE="$VERIFICATION_ROOT/verification-state.json"
 test -f "$VERIFICATION_STATE"
-test "$(jq -er .version "$VERIFICATION_STATE")" = 1
+test "$(jq -er .version "$VERIFICATION_STATE")" = 2
 test "$(jq -er .pilot "$VERIFICATION_STATE")" = "$PILOT"
+PROVIDER_JSON="$(jq -cS .provider "$VERIFICATION_STATE")"
 test "$(jq -er .verification "$VERIFICATION_STATE")" = PASS
 test "$(jq -er .delivery_receipt_id "$VERIFICATION_STATE")" = "$DELIVERY_ID"
 test "$(jq -er .verification_report_id "$VERIFICATION_STATE")" = "$VERIFICATION_ID"
@@ -77,7 +78,9 @@ BASE_COMMIT="$(jq -er .base_commit "$VERIFICATION_STATE")"
 RESULT_COMMIT="$(jq -er .result_commit "$VERIFICATION_STATE")"
 ENGINEERING_STATE="$VERIFICATION_ROOT/engineering/engineering-state.json"
 test -f "$ENGINEERING_STATE"
+test "$(jq -er .version "$ENGINEERING_STATE")" = 2
 test "$(jq -er .github_engineering_run_id "$ENGINEERING_STATE")" = "$ENGINEERING_RUN_ID"
+test "$(jq -cS .provider "$ENGINEERING_STATE")" = "$PROVIDER_JSON"
 PROFILE_DIGEST="$(jq -er .profile_digest "$ENGINEERING_STATE")"
 
 ENGINEERING_ACTOR="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RUN_ID" --jq .actor.login)"
@@ -227,8 +230,9 @@ docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state
 
 test -s "$STATE_ROOT/core-review.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg verification_run_id "$VERIFICATION_RUN_ID"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_actor "$ENGINEERING_ACTOR"   --arg reviewer_actor "$REVIEWER_ACTOR"   --arg dispatcher_actor "$GITHUB_ACTOR"   --arg decision_comment_id "$REVIEW_DECISION_COMMENT_ID"   --arg decision_comment_url "$REVIEW_COMMENT_URL"   --arg review_result "$REVIEW_RESULT"   --arg closure "$CLOSURE_STATE"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg verification_run_id "$VERIFICATION_RUN_ID"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_actor "$ENGINEERING_ACTOR"   --arg reviewer_actor "$REVIEWER_ACTOR"   --arg dispatcher_actor "$GITHUB_ACTOR"   --arg decision_comment_id "$REVIEW_DECISION_COMMENT_ID"   --arg decision_comment_url "$REVIEW_COMMENT_URL"   --arg review_result "$REVIEW_RESULT"   --arg closure "$CLOSURE_STATE"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --argjson provider "$PROVIDER_JSON"   '{
+    version:2,
+    provider:$provider,
     pilot:$pilot,
     verification_run_id:($verification_run_id|tonumber),
     engineering_run_id:($engineering_run_id|tonumber),
