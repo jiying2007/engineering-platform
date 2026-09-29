@@ -137,7 +137,6 @@ func TestCommandTokenContractUsesAbsoluteDedicatedCommand(t *testing.T) {
 	}
 }
 
-
 func TestCommandTokenRequiresBoundedExplicitExecutionPolicy(t *testing.T) {
 	contract := validContract()
 	contract.AuthMode = AuthCommandToken
