@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
 	"github.com/jiying2007/engineering-platform/internal/workspace"
@@ -26,19 +27,20 @@ const (
 var tokenID = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 type Profile struct {
-	Version                 int    `json:"version"`
-	CodexVersion            string `json:"codex_version"`
-	BinaryDigest            string `json:"binary_digest"`
-	QualificationDigest     string `json:"qualification_digest"`
-	EngineeringConfigDigest string `json:"engineering_config_digest"`
-	Model                   string `json:"model"`
-	Sandbox                 string `json:"sandbox"`
-	ApprovalPolicy          string `json:"approval_policy"`
-	ToolNetwork             bool   `json:"tool_network"`
+	Version                 int                       `json:"version"`
+	Provider                provideridentity.Identity `json:"provider"`
+	CodexVersion            string                    `json:"codex_version"`
+	BinaryDigest            string                    `json:"binary_digest"`
+	QualificationDigest     string                    `json:"qualification_digest"`
+	EngineeringConfigDigest string                    `json:"engineering_config_digest"`
+	Model                   string                    `json:"model"`
+	Sandbox                 string                    `json:"sandbox"`
+	ApprovalPolicy          string                    `json:"approval_policy"`
+	ToolNetwork             bool                      `json:"tool_network"`
 }
 
 func (p Profile) Validate() error {
-	if p.Version != 2 || !codexapp.ValidCodexVersion(p.CodexVersion) ||
+	if p.Version != 3 || p.Provider.Validate() != nil || !codexapp.ValidCodexVersion(p.CodexVersion) ||
 		!canonical.ValidDigest(p.BinaryDigest) || !canonical.ValidDigest(p.QualificationDigest) ||
 		p.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() ||
 		strings.TrimSpace(p.Model) == "" || len(p.Model) > 128 ||
@@ -191,7 +193,8 @@ func (r Result) Validate(p Profile, permit Permit) error {
 	expectedPrompt, promptErr := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	if err != nil || promptErr != nil || permit.Token.ProfileDigest != pd ||
 		r.PromptIdentityDigest != expectedPrompt ||
-		r.Codex.Validate() != nil || r.Codex.Version != p.CodexVersion ||
+		r.Codex.Validate() != nil || r.Codex.Provider != p.Provider ||
+		r.Codex.Version != p.CodexVersion ||
 		r.Codex.BinaryDigest != p.BinaryDigest || r.Codex.QualificationDigest != p.QualificationDigest ||
 		r.Codex.EngineeringConfigDigest != p.EngineeringConfigDigest || r.Codex.Model != p.Model ||
 		r.Change.Recipe != workspace.FinalizeRecipe ||
