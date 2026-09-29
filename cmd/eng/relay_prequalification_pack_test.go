@@ -48,7 +48,6 @@ func TestReadRelayPolicyFileRejectsSymlink(t *testing.T) {
 	}
 }
 
-
 func TestRelayPrequalificationPackAllowsExplicitPrivateHTTPWithoutCredentialUse(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, value string) string {
