@@ -123,6 +123,54 @@ test "$BASE_COMMIT" != "$RESULT_COMMIT"
 test "$PR_URL" = "https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
 test "$SOURCE_HEAD_SHA" = "$BASE_COMMIT"
 
+if [ "$PILOT" = debug ]; then
+  DEBUG_REPRODUCTION_RUN_ID="$(jq -er .debug_reproduction_run_id "$ENGINEERING_STATE")"
+  DEBUG_REPRODUCTION_RECEIPT_DIGEST="$(jq -er .debug_reproduction_receipt_digest "$ENGINEERING_STATE")"
+  [[ "$DEBUG_REPRODUCTION_RUN_ID" =~ ^[0-9]+$ ]]
+  [[ "$DEBUG_REPRODUCTION_RECEIPT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
+  DEBUG_REPRO_BINDING="$ENGINEERING_ROOT/debug-reproduction-binding.json"
+  DEBUG_REPRO_RECEIPT="$ENGINEERING_ROOT/debug-reproduction/reproduction-receipt.json"
+  DEBUG_REPRO_TEST="$ENGINEERING_ROOT/debug-reproduction/reproduction-test.go"
+  DEBUG_REPRO_OUTPUT="$ENGINEERING_ROOT/debug-reproduction/go-test-output.txt"
+  DEBUG_TASK="$ENGINEERING_ROOT/task.json"
+  for required in "$DEBUG_REPRO_BINDING" "$DEBUG_REPRO_RECEIPT" "$DEBUG_REPRO_TEST" "$DEBUG_REPRO_OUTPUT" "$DEBUG_TASK"; do
+    test -f "$required"
+  done
+
+  jq -e \
+    --argjson run_id "$DEBUG_REPRODUCTION_RUN_ID" \
+    --arg base "$BASE_COMMIT" \
+    --arg receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST" \
+    '.reproduction_run_id==$run_id and
+     .base_commit==$base and
+     .receipt_digest==$receipt_digest and
+     .reproduction_confirmed==true' \
+    "$DEBUG_REPRO_BINDING" >/dev/null
+
+  test "sha256:$(sha256sum "$DEBUG_REPRO_RECEIPT" | awk '{print $1}')" = "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"
+  jq -e \
+    --arg base "$BASE_COMMIT" \
+    '.version==1 and
+     .reproduction=="m1-debug-firmware-identity" and
+     .base_commit==$base and
+     .reproduction_confirmed==true and
+     .test_exit_code==1 and
+     .expected_status=="BLOCKED" and
+     .observed_status=="READY" and
+     .firmware_identity=="not-a-digest"' \
+    "$DEBUG_REPRO_RECEIPT" >/dev/null
+  test "sha256:$(sha256sum "$DEBUG_REPRO_TEST" | awk '{print $1}')" = "$(jq -er .test_digest "$DEBUG_REPRO_RECEIPT")"
+  test "sha256:$(sha256sum "$DEBUG_REPRO_OUTPUT" | awk '{print $1}')" = "$(jq -er .output_digest "$DEBUG_REPRO_RECEIPT")"
+  jq -e '.contract.task_type=="DEBUG" and .material.has_reproduction==true' "$DEBUG_TASK" >/dev/null
+
+  debug_run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$DEBUG_REPRODUCTION_RUN_ID")"
+  test "$(printf '%s' "$debug_run_json" | jq -er .name)" = "Retained Debug firmware identity reproduction"
+  test "$(printf '%s' "$debug_run_json" | jq -er .status)" = completed
+  test "$(printf '%s' "$debug_run_json" | jq -er .conclusion)" = success
+  test "$(printf '%s' "$debug_run_json" | jq -er .head_sha)" = "$BASE_COMMIT"
+fi
+
 CODEX_STATUS="$ENGINEERING_ROOT/codex-status.json"
 PUBLICATION_RECEIPT="$ENGINEERING_ROOT/publication-receipt.json"
 PUBLICATION_PREFLIGHT="$ENGINEERING_ROOT/preflight-before-publication.json"
