@@ -10,6 +10,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/contextbundle"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
 	"github.com/jiying2007/engineering-platform/internal/workspace"
@@ -18,7 +19,8 @@ import (
 func contractFixture(t *testing.T) (Profile, Permit) {
 	t.Helper()
 	p := Profile{
-		Version:                 2,
+		Version:                 3,
+		Provider:                provideridentity.OpenAIWIFUnattended(),
 		CodexVersion:            "0.157.1",
 		BinaryDigest:            "sha256:" + strings.Repeat("a", 64),
 		QualificationDigest:     "sha256:" + strings.Repeat("e", 64),
@@ -182,13 +184,13 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 	p, permit := contractFixture(t)
 	promptDigest, _ := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	codex := codexapp.EngineeringReceipt{
-		SchemaVersion:              2,
+		SchemaVersion:              3,
 		CLI:                        "codex-cli",
 		Version:                    p.CodexVersion,
 		BinaryDigest:               p.BinaryDigest,
 		QualificationDigest:        p.QualificationDigest,
 		EngineeringConfigDigest:    p.EngineeringConfigDigest,
-		CredentialMode:             "workload_identity",
+		Provider:                   p.Provider,
 		FederationRuleID:           "rule",
 		Model:                      p.Model,
 		PromptDigest:               "sha256:" + strings.Repeat("7", 64),
