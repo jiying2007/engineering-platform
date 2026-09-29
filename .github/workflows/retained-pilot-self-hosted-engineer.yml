@@ -19,6 +19,11 @@ on:
         description: One-time random label of the ephemeral no-default-labels runner
         required: true
         type: string
+      reproduction_run_id:
+        description: Required pre-task reproduction run ID for debug; empty for feature
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -76,6 +81,7 @@ jobs:
         env:
           PILOT: ${{ inputs.pilot }}
           MODEL: ${{ inputs.model }}
+          DEBUG_REPRODUCTION_RUN_ID: ${{ inputs.reproduction_run_id }}
         run: |
           set -euo pipefail
           bash examples/pilots/self-hosted/engineer-model.sh             "$PILOT"             "$RUNNER_TEMP"             "${{ steps.host.outputs.codex_native }}"             "${{ steps.host.outputs.saved_login }}"             "$MODEL"
