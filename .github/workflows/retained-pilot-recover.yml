@@ -1,0 +1,77 @@
+name: Retained M1 pilot engineering recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Retained pilot
+        required: true
+        type: choice
+        options:
+          - feature
+          - debug
+      engineering_run_id:
+        description: Failed engineering run that already reached FINISHED and CONFIRMED publication
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  recover:
+    name: recover-${{ inputs.pilot }}-retained-engineering
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF_PROTECTED" = "true"
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate retained FINISHED subject without model replay
+        shell: bash
+        env:
+          PILOT: ${{ inputs.pilot }}
+          ENGINEERING_RUN_ID: ${{ inputs.engineering_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash examples/pilots/actions/recover-retained-engineering.sh
+
+      - name: Retain engineering recovery receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-pilot-engineering-recovery-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-engineering-recovery
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Summarize recovery gate
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/retained-pilot-engineering-recovery/recovery-receipt.json"
+          test "$(jq -er .model_phase "$receipt")" = FINISHED
+          test "$(jq -er .publication "$receipt")" = CONFIRMED
+          {
+            echo "## Retained ${{ inputs.pilot }} engineering recovery"
+            echo
+            echo "- Source engineering run: `${{ inputs.engineering_run_id }}`"
+            echo "- Model replay: **FORBIDDEN / NOT PERFORMED**"
+            echo "- Retained model phase: **FINISHED**"
+            echo "- Publication: **CONFIRMED**"
+            echo "- Next gate: exact PR-head CI, then verification using this recovery run ID `$GITHUB_RUN_ID`."
+          } >> "$GITHUB_STEP_SUMMARY"
