@@ -60,3 +60,25 @@ func TestBuildPackRejectsInvalidAuthSelection(t *testing.T) {
 		t.Fatal("relative token command accepted")
 	}
 }
+
+func TestBuildPackCarriesExplicitPrivateHTTPPolicy(t *testing.T) {
+	input := BuildInput{
+		CodexProviderID:          "company-relay-v1",
+		BaseURL:                  "http://192.168.10.100:8317/v1",
+		AllowInsecurePrivateHTTP: true,
+		AuthMode:                 AuthEnvKey,
+		EnvKey:                   "COMPANY_RELAY_TOKEN",
+		RequestedModel:           "relay-gpt-5.6",
+		StreamIdleTimeoutMS:      30000,
+		GatewayPolicy:            []byte("gateway"),
+		PrivacyPolicy:            []byte("privacy"),
+		ModelMapping:             []byte("mapping"),
+	}
+	pack, err := BuildPack(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pack.Contract.AllowInsecurePrivateHTTP || pack.Contract.BaseURL != input.BaseURL {
+		t.Fatalf("private HTTP transport policy was not retained: %#v", pack.Contract)
+	}
+}

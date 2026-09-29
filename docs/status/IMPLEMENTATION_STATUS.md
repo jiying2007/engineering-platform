@@ -156,11 +156,14 @@ are available:
 - `eng relay-prequalification --contract CONTRACT.json` strictly revalidates an
   already-materialized contract.
 
-This stage freezes one exact HTTPS Codex custom-provider configuration, its
+This stage freezes one exact Codex custom-provider configuration, its
 credential locator (never credential material), requested model and policy
-digests. The operator pack computes those policy digests from exact file bytes,
-rejects symlinked/oversized inputs, and performs no network or credential
-operation. Initial qualification disables request/stream retries, WebSockets and
+digests. HTTPS remains the default. An explicit private-HTTP exception is
+available only for literal private/loopback IP endpoints; public/DNS/link-local
+cleartext endpoints remain fail-closed, and the exception bit is included in the
+provider configuration digest. The operator pack computes policy digests from
+exact file bytes, rejects symlinked/oversized inputs, and performs no network or
+credential operation. Initial qualification disables request/stream retries, WebSockets and
 standalone web search to keep the first provider proof bounded.
 
 A successful repository prequalification explicitly records

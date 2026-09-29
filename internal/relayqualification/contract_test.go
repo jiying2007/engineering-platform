@@ -77,6 +77,42 @@ func TestContractRejectsUnsafeOrAmbiguousProviderConfiguration(t *testing.T) {
 	}
 }
 
+func TestContractAllowsExplicitLiteralPrivateHTTPOnly(t *testing.T) {
+	for _, endpoint := range []string{
+		"http://192.168.2.109:3000/v1",
+		"http://10.0.0.7:8080/v1",
+		"http://127.0.0.1:8317/v1",
+		"http://[::1]:8317/v1",
+	} {
+		contract := validContract()
+		contract.BaseURL = endpoint
+		contract.AllowInsecurePrivateHTTP = true
+		if err := contract.Validate(); err != nil {
+			t.Fatalf("explicit private HTTP endpoint %q rejected: %v", endpoint, err)
+		}
+	}
+
+	for _, endpoint := range []string{
+		"http://relay.example.invalid/v1",
+		"http://8.8.8.8/v1",
+		"http://169.254.1.2/v1",
+		"http://[fe80::1]/v1",
+	} {
+		contract := validContract()
+		contract.BaseURL = endpoint
+		contract.AllowInsecurePrivateHTTP = true
+		if err := contract.Validate(); err == nil {
+			t.Fatalf("unsafe/ambiguous HTTP endpoint %q accepted", endpoint)
+		}
+	}
+
+	contract := validContract()
+	contract.AllowInsecurePrivateHTTP = true
+	if err := contract.Validate(); err == nil {
+		t.Fatal("unused insecure-private-http permission accepted for HTTPS endpoint")
+	}
+}
+
 func TestCommandTokenContractUsesAbsoluteDedicatedCommand(t *testing.T) {
 	contract := validContract()
 	contract.AuthMode = AuthCommandToken
