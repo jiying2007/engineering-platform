@@ -56,7 +56,7 @@ func Evaluate(m Manifest) Result {
 		if m.DeviceID == "" {
 			hard = append(hard, "device test requires exact device identity")
 		}
-		if m.FirmwareIdentity == "" {
+		if !isCanonicalSHA256(m.FirmwareIdentity) {
 			hard = append(hard, "device test requires exact firmware identity")
 		}
 	}
@@ -74,6 +74,19 @@ func Evaluate(m Manifest) Result {
 		return Result{Status: Degraded, Reasons: degradable}
 	}
 	return Result{Status: Blocked, Reasons: append(degradable, "degradation requires approver and reason")}
+}
+
+func isCanonicalSHA256(v string) bool {
+	const prefix = "sha256:"
+	if len(v) != len(prefix)+64 || !strings.HasPrefix(v, prefix) {
+		return false
+	}
+	for _, r := range v[len(prefix):] {
+		if !(r >= '0' && r <= '9') && !(r >= 'a' && r <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func isFullCommit(v string) bool {
