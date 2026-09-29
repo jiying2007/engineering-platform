@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 )
 
 func unsignedTimingAssertion(t *testing.T, issuedAt, expiresAt time.Time) []byte {
@@ -247,7 +249,7 @@ func TestEngineeringSavedLoginTurnDeletesBootstrapBeforeModelReachableWork(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receipt.CredentialMode != CredentialModeSavedChatGPTLogin ||
+	if receipt.Provider != provideridentity.OpenAIChatGPTTrustedSelfHosted() ||
 		!receipt.CredentialBootstrapRemovedBeforeTurn ||
 		receipt.AssertionRemovedBeforeTurn ||
 		receipt.CommandCount != 1 || receipt.FileChangeCount != 1 ||
