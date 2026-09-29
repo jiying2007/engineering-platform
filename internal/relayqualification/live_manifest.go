@@ -15,33 +15,33 @@ const (
 )
 
 type LiveManifest struct {
-	SchemaVersion                  int    `json:"schema_version"`
-	ProviderConfigDigest           string `json:"provider_config_digest"`
-	ContractDigest                 string `json:"contract_digest"`
-	RendererContractVersion        int    `json:"renderer_contract_version"`
-	CodexConfigDigest              string `json:"codex_config_digest"`
-	ProviderID                     string `json:"provider_id"`
-	CodexProviderID                string `json:"codex_provider_id"`
-	RequestedModel                 string `json:"requested_model"`
-	PromptDigest                   string `json:"prompt_digest"`
-	ExpectedOutputDigest           string `json:"expected_output_digest"`
-	MaxModelTurns                  int    `json:"max_model_turns"`
-	ReadOnly                       bool   `json:"read_only"`
-	ApprovalPolicy                 string `json:"approval_policy"`
-	AllowTools                     bool   `json:"allow_tools"`
-	ToolNetwork                    bool   `json:"tool_network"`
-	AllowWebSearch                 bool   `json:"allow_web_search"`
-	RequestMaxRetries              int    `json:"request_max_retries"`
-	StreamMaxRetries               int    `json:"stream_max_retries"`
-	MaxOutputBytes                 int    `json:"max_output_bytes"`
-	MaxWallTimeMS                  int    `json:"max_wall_time_ms"`
-	RequireGatewayOperationID      bool   `json:"require_gateway_operation_id"`
-	RequireEffectiveProvider      bool   `json:"require_effective_provider"`
-	RequireEffectiveModel         bool   `json:"require_effective_model"`
-	GatewayPolicyDigest            string `json:"gateway_policy_digest"`
-	PrivacyPolicyDigest            string `json:"privacy_policy_digest"`
-	ModelMappingDigest             string `json:"model_mapping_digest"`
-	FutureReceiptSchemaVersion     int    `json:"future_receipt_schema_version"`
+	SchemaVersion              int    `json:"schema_version"`
+	ProviderConfigDigest       string `json:"provider_config_digest"`
+	ContractDigest             string `json:"contract_digest"`
+	RendererContractVersion    int    `json:"renderer_contract_version"`
+	CodexConfigDigest          string `json:"codex_config_digest"`
+	ProviderID                 string `json:"provider_id"`
+	CodexProviderID            string `json:"codex_provider_id"`
+	RequestedModel             string `json:"requested_model"`
+	PromptDigest               string `json:"prompt_digest"`
+	ExpectedOutputDigest       string `json:"expected_output_digest"`
+	MaxModelTurns              int    `json:"max_model_turns"`
+	ReadOnly                   bool   `json:"read_only"`
+	ApprovalPolicy             string `json:"approval_policy"`
+	AllowTools                 bool   `json:"allow_tools"`
+	ToolNetwork                bool   `json:"tool_network"`
+	AllowWebSearch             bool   `json:"allow_web_search"`
+	RequestMaxRetries          int    `json:"request_max_retries"`
+	StreamMaxRetries           int    `json:"stream_max_retries"`
+	MaxOutputBytes             int    `json:"max_output_bytes"`
+	MaxWallTimeMS              int    `json:"max_wall_time_ms"`
+	RequireGatewayOperationID  bool   `json:"require_gateway_operation_id"`
+	RequireEffectiveProvider   bool   `json:"require_effective_provider"`
+	RequireEffectiveModel      bool   `json:"require_effective_model"`
+	GatewayPolicyDigest        string `json:"gateway_policy_digest"`
+	PrivacyPolicyDigest        string `json:"privacy_policy_digest"`
+	ModelMappingDigest         string `json:"model_mapping_digest"`
+	FutureReceiptSchemaVersion int    `json:"future_receipt_schema_version"`
 }
 
 type LiveManifestEnvelope struct {
@@ -134,24 +134,24 @@ func (m LiveManifest) Digest() (string, error) {
 }
 
 type LiveReceiptContract struct {
-	SchemaVersion             int    `json:"schema_version"`
-	ManifestDigest            string `json:"manifest_digest"`
-	ProviderConfigDigest      string `json:"provider_config_digest"`
-	GatewayOperationID        string `json:"gateway_operation_id"`
-	RequestedModel            string `json:"requested_model"`
-	EffectiveProvider         string `json:"effective_provider"`
-	EffectiveModel            string `json:"effective_model"`
-	PromptDigest              string `json:"prompt_digest"`
-	TurnStatus                string `json:"turn_status"`
-	Output                    string `json:"output"`
-	OutputDigest              string `json:"output_digest"`
-	ModelTurns                int    `json:"model_turns"`
-	ApprovalRequests          int    `json:"approval_requests"`
-	UnexpectedToolUse         bool   `json:"unexpected_tool_use"`
-	RequestRetries            int    `json:"request_retries"`
-	StreamRetries             int    `json:"stream_retries"`
-	CredentialAccepted        bool   `json:"credential_accepted"`
-	LiveModelTurnExecuted     bool   `json:"live_model_turn_executed"`
+	SchemaVersion         int    `json:"schema_version"`
+	ManifestDigest        string `json:"manifest_digest"`
+	ProviderConfigDigest  string `json:"provider_config_digest"`
+	GatewayOperationID    string `json:"gateway_operation_id"`
+	RequestedModel        string `json:"requested_model"`
+	EffectiveProvider     string `json:"effective_provider"`
+	EffectiveModel        string `json:"effective_model"`
+	PromptDigest          string `json:"prompt_digest"`
+	TurnStatus            string `json:"turn_status"`
+	Output                string `json:"output"`
+	OutputDigest          string `json:"output_digest"`
+	ModelTurns            int    `json:"model_turns"`
+	ApprovalRequests      int    `json:"approval_requests"`
+	UnexpectedToolUse     bool   `json:"unexpected_tool_use"`
+	RequestRetries        int    `json:"request_retries"`
+	StreamRetries         int    `json:"stream_retries"`
+	CredentialAccepted    bool   `json:"credential_accepted"`
+	LiveModelTurnExecuted bool   `json:"live_model_turn_executed"`
 }
 
 func (r LiveReceiptContract) ValidateAgainst(envelope LiveManifestEnvelope) error {
