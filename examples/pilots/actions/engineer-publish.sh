@@ -58,8 +58,11 @@ for _ in $(seq 1 60); do
 done
 bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/health.sh" "$STACK_ROOT" publisher >/dev/null
 
+test "$(jq -er .version "$STATE_ROOT/model-phase.json")" = 2
 BASE_COMMIT="$(jq -er .base_commit "$STATE_ROOT/model-phase.json")"
 PROFILE_DIGEST="$(jq -er .profile_digest "$STATE_ROOT/model-phase.json")"
+PROVIDER_JSON="$(jq -cS .provider "$STATE_ROOT/model-phase.json")"
+test "$(jq -cS .profile.provider "$PROFILE_FILE")" = "$PROVIDER_JSON"
 
 # Full readiness: after the model exits, publication may now consume the
 # separately scoped job token.
@@ -118,8 +121,9 @@ rm -f "$TOKEN_FILE"
 docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state"   postgres:17-alpine   pg_dump -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     -Fc -f /state/core.dump
 test -s "$STATE_ROOT/core.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --argjson provider "$PROVIDER_JSON"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   '{
+    version:2,
+    provider:$provider,
     pilot:$pilot,
     run_id:$run_id,
     base_commit:$base_commit,
