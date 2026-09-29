@@ -143,8 +143,13 @@ Before admission, a relay implementation must define and prove at least:
 - no hidden downgrade to an unqualified model/provider.
 
 A relay must receive its own compatibility/provider qualification and retained
-provenance. It must not reuse a WIF receipt, saved-login receipt or exact-model
-claim that it cannot independently prove.
+provenance. Repository prequalification is defined by
+`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V2.md`: the future
+Provider v3 `provider_config_digest` binds the non-secret Contract digest,
+renderer contract version and exact generated user-level Codex TOML digest.
+Repository prequalification performs no account/credential validation and does
+not admit `company-relay`. It must not reuse a WIF receipt, saved-login receipt
+or exact-model claim that it cannot independently prove.
 
 ## 4. Provider / credential / execution selection is explicit
 
