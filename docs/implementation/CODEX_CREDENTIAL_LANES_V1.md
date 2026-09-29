@@ -11,6 +11,52 @@ It does not create a new Runtime authority model. All lanes still feed the same
 Core / Worker / Action Gateway / Evidence / Verification / Review / Recovery
 chain.
 
+## 0. Implemented identity authority
+
+Since #108, provider selection is not merely documentation. The Core-bound
+Codex `Profile v3` freezes one explicit provider identity with three orthogonal
+axes plus the provider configuration digest:
+
+```text
+provider_id
+credential_mode
+execution_mode
+provider_config_digest
+```
+
+That identity is part of the Profile digest and therefore part of the existing
+ToolProfile / Action grant / RunInput / execution token authority.
+
+The same provider identity is retained in:
+
+- read-only live qualification receipts;
+- engineering model-turn receipts;
+- retained model/publication state;
+- recovery receipts;
+- Verification state;
+- Review/Closure state.
+
+The Worker no longer owns a second top-level `credential_mode` switch. It derives
+credential execution from the already-authorized Profile v3 identity. This
+prevents a Worker configuration from claiming one credential lane while the Core
+authorized another.
+
+Current code admits exactly two qualified combinations:
+
+| Provider | Credential | Execution | Status |
+| --- | --- | --- | --- |
+| `openai-codex` | `chatgpt-session` | `trusted-self-hosted` | admitted / retained M1 proven |
+| `openai-codex` | `workload-identity` | `unattended` | admitted structurally; live WIF external qualification still pending |
+
+Unknown providers or cross-lane combinations fail closed. For example,
+`chatgpt-session + unattended`, `workload-identity + trusted-self-hosted`,
+and `company-relay` are rejected until an explicit provider qualification and
+admission change exists.
+
+Historical Profile v2 / legacy retained artifacts remain immutable evidence in
+GitHub artifacts and Git history. Current main does not retain a v2 compatibility
+shim.
+
 ## 1. Default internal development lane
 
 The current default for the R&D Ubuntu development environment is:
@@ -100,11 +146,11 @@ A relay must receive its own compatibility/provider qualification and retained
 provenance. It must not reuse a WIF receipt, saved-login receipt or exact-model
 claim that it cannot independently prove.
 
-## 4. Credential selection is explicit
+## 4. Provider / credential / execution selection is explicit
 
-Exactly one credential/provider lane is selected for a Worker execution.
+Exactly one Provider v3 identity is selected and frozen before a Worker execution.
 
-Allowed high-level modes are:
+Allowed high-level combinations are:
 
 | Lane | Current status | Default use |
 | --- | --- | --- |
@@ -112,8 +158,10 @@ Allowed high-level modes are:
 | managed-workspace WIF | **READY, EXTERNAL ADMIN QUALIFICATION PENDING** | unattended/GitHub-hosted workload identity |
 | company relay / model gateway | **NOT YET QUALIFIED** | optional future multi-provider/company-governed execution |
 
-Selection must be explicit in configuration and evidence. Runtime must not
-"try the next credential" after an authentication failure.
+Selection is part of the Core-authorized Profile digest and retained evidence.
+Runtime must not "try the next credential" or provider after an authentication
+failure. Adding a provider means adding a newly qualified provider identity, not
+overloading an existing credential mode.
 
 ## 5. Provider-neutral Core boundary
 
@@ -133,6 +181,8 @@ Every admitted lane must still preserve:
 - fail-closed recovery/reconciliation.
 
 Changing provider authentication does not authorize changing those boundaries.
+A provider/credential/execution change produces a different Profile digest and
+therefore a different execution capability identity.
 
 ## 6. Current product posture
 
