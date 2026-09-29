@@ -98,7 +98,8 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 		"pilot-preflight",
 		"core-pre-publication.dump",
 		"result.bundle",
-		"jq -e '.state==\"FINISHED\"",
+		".state==\"FINISHED\"",
+		".receipt.result.codex.provider.credential_mode==\"workload-identity\"",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("model-phase script missing %q", required)
