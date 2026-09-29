@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 )
 
 func validContract() Contract {
@@ -87,5 +88,24 @@ func TestCommandTokenContractUsesAbsoluteDedicatedCommand(t *testing.T) {
 	contract.AuthCommand = "company-relay-token"
 	if err := contract.Validate(); err == nil {
 		t.Fatal("relative token command accepted")
+	}
+}
+
+
+func TestPrequalificationStillDoesNotAdmitProviderV3(t *testing.T) {
+	contract := validContract()
+	assessment, err := Evaluate(contract)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := provideridentity.Identity{
+		Version:              provideridentity.Version1,
+		ProviderID:           ProviderCompanyRelay,
+		CredentialMode:       "relay-env-key",
+		ExecutionMode:        provideridentity.ExecutionTrustedSelfHosted,
+		ProviderConfigDigest: assessment.ProviderConfigDigest,
+	}
+	if err := identity.Validate(); err == nil {
+		t.Fatal("repository prequalification incorrectly admitted company-relay into Provider v3")
 	}
 }
