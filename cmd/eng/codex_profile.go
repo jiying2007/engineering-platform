@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
@@ -38,10 +39,14 @@ func codexProfile(args []string) error {
 	executable := fs.String("codex", "", "absolute native Codex executable")
 	qualificationFile := fs.String("qualification", "", "compatibility qualification receipt JSON for this exact binary")
 	model := fs.String("model", "", "exact model")
+	providerID := fs.String("provider", "", "exact provider ID")
+	credentialMode := fs.String("credential", "", "exact credential mode")
+	executionMode := fs.String("execution", "", "exact execution mode")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 ||
 		strings.TrimSpace(*executable) == "" || strings.TrimSpace(*qualificationFile) == "" ||
-		strings.TrimSpace(*model) == "" {
-		return fmt.Errorf("usage: eng codex-profile --codex ABSOLUTE_NATIVE_CODEX --qualification RECEIPT.json --model MODEL")
+		strings.TrimSpace(*model) == "" || strings.TrimSpace(*providerID) == "" ||
+		strings.TrimSpace(*credentialMode) == "" || strings.TrimSpace(*executionMode) == "" {
+		return fmt.Errorf("usage: eng codex-profile --codex ABSOLUTE_NATIVE_CODEX --qualification RECEIPT.json --model MODEL --provider PROVIDER --credential CREDENTIAL --execution EXECUTION")
 	}
 	data, err := os.ReadFile(*qualificationFile)
 	if err != nil {
@@ -51,7 +56,11 @@ func codexProfile(args []string) error {
 	if err := strictjson.Decode(data, &qualification); err != nil {
 		return err
 	}
-	output, err := buildCodexProfile(*executable, *model, qualification)
+	provider, err := provideridentity.New(*providerID, *credentialMode, *executionMode)
+	if err != nil {
+		return err
+	}
+	output, err := buildCodexProfile(*executable, *model, qualification, provider)
 	if err != nil {
 		return err
 	}
@@ -59,10 +68,11 @@ func codexProfile(args []string) error {
 	return nil
 }
 
-func buildCodexProfile(executable, model string, qualification codexapp.QualificationReceipt) (codexProfileOutput, error) {
+func buildCodexProfile(executable, model string, qualification codexapp.QualificationReceipt, provider provideridentity.Identity) (codexProfileOutput, error) {
 	var output codexProfileOutput
-	if !filepath.IsAbs(executable) || strings.TrimSpace(model) != model || model == "" || len(model) > 128 {
-		return output, fmt.Errorf("absolute Codex executable and bounded exact model required")
+	if !filepath.IsAbs(executable) || strings.TrimSpace(model) != model || model == "" || len(model) > 128 ||
+		provider.Validate() != nil {
+		return output, fmt.Errorf("absolute Codex executable, bounded exact model and admitted provider identity required")
 	}
 	if err := qualification.Validate(); err != nil || qualification.ThreadStartModel != model {
 		return output, fmt.Errorf("valid compatibility qualification for exact model required")
@@ -134,7 +144,8 @@ func buildCodexProfile(executable, model string, qualification codexapp.Qualific
 	}
 
 	profile := codexexec.Profile{
-		Version:                 2,
+		Version:                 3,
+		Provider:                provider,
 		CodexVersion:            actualVersion,
 		BinaryDigest:            binaryDigest,
 		QualificationDigest:     qualificationDigest,
