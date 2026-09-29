@@ -21,7 +21,9 @@ var skills = []Skill{
 	{ID: "architecture-impact-analysis", OwnerCapability: "embedded.architecture", Purpose: "Analyze subsystem, interface, resource and verification impact of a change.", Maturity: "DEFINED"},
 	{ID: "interface-contract-review", OwnerCapability: "embedded.architecture", Purpose: "Review lifecycle, compatibility, error and version contracts.", Maturity: "DEFINED"},
 	{ID: "linux-bsp-debug", OwnerCapability: "embedded.linux-bsp", Purpose: "Diagnose boot, kernel, storage, driver and system-layer failures using evidence.", Maturity: "DEFINED"},
+	{ID: "linux-bsp-integration", OwnerCapability: "embedded.linux-bsp", Purpose: "Review Linux, BSP, storage and driver integration impact for feature, bring-up and compatibility work.", Maturity: "DEFINED"},
 	{ID: "mcu-rtos-debug", OwnerCapability: "embedded.mcu-rtos", Purpose: "Diagnose MCU startup, fault, memory, concurrency and timing failures.", Maturity: "DEFINED"},
+	{ID: "mcu-rtos-integration", OwnerCapability: "embedded.mcu-rtos", Purpose: "Review MCU, RTOS, control and firmware integration impact for feature, bring-up and compatibility work.", Maturity: "DEFINED"},
 	{ID: "driver-integration-review", OwnerCapability: "embedded.driver-component", Purpose: "Review component integration, lifecycle, recovery and compatibility.", Maturity: "DEFINED"},
 	{ID: "log-triage", OwnerCapability: "embedded.debug-reliability", Purpose: "Build an observed timeline and evidence gaps from raw logs/traces.", Maturity: "DEFINED"},
 	{ID: "verification-plan-builder", OwnerCapability: "embedded.verification", Purpose: "Map acceptance criteria to concrete evidence and verification procedures.", Maturity: "DEFINED"},
@@ -29,8 +31,8 @@ var skills = []Skill{
 
 var capabilities = []Capability{
 	{ID: "embedded.architecture", Name: "Embedded Architecture", Description: "System boundaries, interfaces, compatibility and engineering impact.", SkillIDs: []string{"architecture-impact-analysis", "interface-contract-review"}},
-	{ID: "embedded.linux-bsp", Name: "Linux / BSP", Description: "Boot, kernel, BSP, storage, driver and Linux system integration.", SkillIDs: []string{"linux-bsp-debug"}},
-	{ID: "embedded.mcu-rtos", Name: "MCU / RTOS", Description: "Startup, memory, concurrency, timing, control and MCU firmware.", SkillIDs: []string{"mcu-rtos-debug"}},
+	{ID: "embedded.linux-bsp", Name: "Linux / BSP", Description: "Boot, kernel, BSP, storage, driver and Linux system integration.", SkillIDs: []string{"linux-bsp-debug", "linux-bsp-integration"}},
+	{ID: "embedded.mcu-rtos", Name: "MCU / RTOS", Description: "Startup, memory, concurrency, timing, control and MCU firmware.", SkillIDs: []string{"mcu-rtos-debug", "mcu-rtos-integration"}},
 	{ID: "embedded.driver-component", Name: "Driver / Component", Description: "Peripheral and component integration, lifecycle and recovery.", SkillIDs: []string{"driver-integration-review"}},
 	{ID: "embedded.debug-reliability", Name: "Debug / Reliability", Description: "Evidence-driven failure analysis and regression prevention.", SkillIDs: []string{"log-triage"}},
 	{ID: "embedded.verification", Name: "Verification", Description: "Material readiness, acceptance-to-evidence planning and independent verification.", SkillIDs: []string{"material-readiness", "verification-plan-builder"}},
