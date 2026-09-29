@@ -140,6 +140,7 @@ jq --arg rule "$RULE_ID" '
     codex_executable: .codex_executable,
     credential_mode: "workload_identity",
     federation_rule_id: $rule,
+    qualification: .qualification,
     profile: .profile
   }
 ' "$PROFILE_FILE" > "$WORKER_CODEX"
