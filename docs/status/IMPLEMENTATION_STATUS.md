@@ -81,11 +81,11 @@ to create ClosureReceipt.
 | Workspace | Independent exact-base Git objects, sanitized trusted Git, ownership-safe slots, byte checks and result finalization | Trusted host/source boundary; operational quota/retention |
 | Offline execution | Exact one-shot authority, live Run/recovery/lease checks, constrained container and retained receipt | Offline/read-only lane remains separate from engineering model execution |
 | Codex qualification | Version-independent compatibility contract: actual semver + native hash + generated schema digests + fixed-profile/app-server qualification; deterministic qualification digest frozen into Profile v2 | CI keeps a sentinel baseline, while each real Worker binary must qualify and requalify before execution |
-| Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential mode is explicit and mutually exclusive: trusted self-hosted saved ChatGPT login or managed-workspace WIF. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the M1 phase-1 lane; WIF remains the preferred unattended/GitHub-hosted upgrade. |
+| Core-bound Codex engineering | One reserved engineering turn with a frozen prompt identity and the same retained result chain. Credential/provider lane is explicit and mutually exclusive. Proven lanes are trusted self-hosted saved ChatGPT login and repository-ready managed-workspace WIF; any future relay/provider requires separate qualification. Saved-login mode uses a fresh isolated HOME and deletes the bootstrap auth copy before thread/model work; WIF mode removes the upstream assertion before thread/model work. | Trusted self-hosted mode treats the Linux account/host as trusted and is the default internal R&D lane. Unattended production must separately qualify one explicit machine/provider credential lane; WIF is one candidate and #106 tracks optional relay qualification. |
 | Git/PR publication | Existing Action Gateway ledger; exact Codex result-digest binding; operator target policy; bundle re-hash/verify; frozen-base ancestry; deterministic non-force branch; create/update exact PR; structured operation receipt; observation-only UNKNOWN reconciliation | Requires separately provisioned publisher credential and shared read-only retained-artifact view |
 | Recovery | UNKNOWN reconciliation states, separated reconciler/completer identities, database-generated epoch proof, PG17 restore drill | No new publication-specific Recovery subsystem is required |
 | Engineering delivery | Frozen requirement-bound Delivery/Evidence/Verification; exact PR-head CI, Git and Codex importers; separate verifier/reviewer/closure identities; GitHub-hosted resumable engineering -> verification -> independent-review workflows | Trusted self-hosted M1 phase-1 proof is complete with one real Feature and one real Debug Closure chain; production rollout/SLO evidence remains outside this pilot proof |
-| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; trusted self-hosted saved-login and managed WIF authentication variants; resumable engineering artifacts consumed by the same Verification/Review/Closure chain | Trusted self-hosted phase-1 pilots are complete; managed-workspace WIF remains an unqualified unattended-path upgrade until a real administrator-provisioned live WIF turn succeeds |
+| Pilot operations | Renderable Work/Task/Run/post-model templates; frozen requirement/reproduction ContextRefs; local mTLS/PostgreSQL stack; `eng pilot-preflight`; trusted self-hosted saved-login and managed WIF authentication variants; resumable engineering artifacts consumed by the same Verification/Review/Closure chain | Trusted self-hosted phase-1 pilots are complete and this is the default internal path. #103 tracks optional WIF qualification; #106 tracks optional company-relay qualification; #105 remains blocked until at least one unattended lane is independently qualified. |
 
 ## M1 phase-1 closure evidence
 
@@ -284,8 +284,9 @@ push or PR mutation.
 ## Deployment and next acceptance gates
 
 GitHub main protection is now a live external fact: main is protected and the
-five canonical CI checks are required. Source merge still does not provision a
-publisher credential, a managed-workspace WIF rule, or a production service.
+five canonical CI checks are required. The default internal trusted self-hosted
+lane already has real retained Closure evidence. Source merge still does not
+provision an unattended machine credential/provider or a production service.
 
 M1 phase 1 no longer requires WIF, and the retained proof sequence has now
 completed for both required subjects:
@@ -306,9 +307,11 @@ completed for both required subjects:
    `m1-debug-firmware-identity-closure` closed the WorkItem.
 5. Post-Closure promotion PRs #100 and #101 integrated the already-closed
    retained results onto protected main without mutating the immutable retained
-   result branches. Current main is
+   result branches. The post-Closure code checkpoint was
    `ee0249fe25b860a83beba9fe06b7acdc80cd75c6`; fresh-main CI
-   `36538546170` passed.
+   `36538546170` passed. The current authentication-policy checkpoint is
+   `1b50c17ccf3dbef3b0ac708da574cdfc88871944` (#104), with fresh-main CI
+   `36558089001` PASS.
 6. The original publication transport PRs #91 and #98 are closed as superseded
    evidence transports; their retained result SHAs remain immutable.
 
@@ -342,9 +345,11 @@ and one Debug. This is sufficient to claim the trusted self-hosted **M1 phase-1
 retained vertical slice** as proven for the scoped pilot authority chain.
 
 Repository fixtures/fake app-server tests remain protocol/filesystem evidence
-only and still do not qualify managed-workspace WIF. A real administrator-
-provisioned WIF provider/rule and live WIF model turn are still required before
-the unattended/GitHub-hosted credential lane can be called qualified.
+only and do not qualify any unattended credential/provider lane. For WIF, a real
+administrator-provisioned provider/rule and live WIF model turn are required
+before #103 may close. A future company relay/provider must independently meet
+the #106 qualification contract before it may satisfy the credential prerequisite
+for #105.
 
 **Trusted self-hosted M1 phase 1 is proven. Production/unattended readiness
 remains unclaimed.**
