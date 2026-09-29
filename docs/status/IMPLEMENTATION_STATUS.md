@@ -157,7 +157,10 @@ are available:
   already-materialized v2 contract;
 - `eng relay-render-codex-config --contract CONTRACT.json --out CONFIG.toml`
   renders the exact future user-level Codex provider TOML without any network or
-  credential operation.
+  credential operation;
+- `eng relay-live-manifest --contract CONTRACT.json` freezes the later
+  read-only/no-tool live qualification plan and receipt schema before any
+  account or credential is supplied.
 
 This stage now uses relay prequalification schema v2. The v1 live-tree document
 has been retired with no compatibility shim because no relay was yet
@@ -178,9 +181,15 @@ web search to keep the first provider proof bounded.
 A successful repository prequalification explicitly records
 `account_verified=false`, `live_model_turn_executed=false` and
 `provider_admitted=false`. It therefore cannot satisfy #105 and cannot make
-`company-relay` valid in `internal/provideridentity`. Account/credential
-verification and one read-only no-tool live model turn remain deferred to the
-next #106 gate.
+`company-relay` valid in `internal/provideridentity`.
+
+The future live gate is now pre-frozen by a deterministic manifest digest:
+exactly one model turn, read-only, approval never, no tools/tool-network/web
+search, zero request/stream retries, bounded output/time, exact prompt/output
+digests, and mandatory gateway operation ID plus effective provider/model
+identity. Synthetic receipt tests prove only schema behavior and do not qualify
+the relay. Account/credential verification and the actual live model turn remain
+deferred to the next #106 gate.
 
 ## Managed-workspace WIF unattended gate
 
