@@ -215,4 +215,23 @@ func TestWIFQualificationHelperShellSyntax(t *testing.T) {
 	if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
 		t.Fatalf("qualify.sh syntax: %v: %s", err, out)
 	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{
+		"PROFILE_BINARY_DIGEST",
+		"PROFILE_QUALIFICATION_DIGEST",
+		"codex-compatibility-qualification.json",
+		"LIVE_QUALIFICATION_CANONICAL",
+		"PROFILE_QUALIFICATION_CANONICAL",
+		"live WIF compatibility qualification does not match frozen Codex profile",
+		".binary_digest == $binary_digest",
+		"qualification_digest=$PROFILE_QUALIFICATION_DIGEST",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("qualify.sh missing exact-profile binding %q", required)
+		}
+	}
 }
