@@ -17,6 +17,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -51,7 +52,6 @@ type pilotPreflightResult struct {
 type pilotWorkerCodexConfig struct {
 	Version          int                           `json:"version"`
 	Executable       string                        `json:"codex_executable"`
-	CredentialMode   string                        `json:"credential_mode"`
 	FederationRuleID string                        `json:"federation_rule_id,omitempty"`
 	SavedLoginFile   string                        `json:"saved_login_file,omitempty"`
 	Qualification    codexapp.QualificationReceipt `json:"qualification"`
@@ -109,7 +109,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 		qualificationDigest != profile.Profile.QualificationDigest {
 		return empty, fmt.Errorf("retained Codex profile qualification binding mismatch")
 	}
-	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model, profile.Qualification)
+	current, err := buildCodexProfile(profile.CodexExecutable, profile.Profile.Model, profile.Qualification, profile.Profile.Provider)
 	if err != nil {
 		return empty, err
 	}
@@ -159,8 +159,8 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 	}
 
 	if workerCodex != nil {
-		switch workerCodex.CredentialMode {
-		case codexapp.CredentialModeWorkloadIdentity:
+		switch workerCodex.Profile.Provider.CredentialMode {
+		case provideridentity.CredentialWorkloadIdentity:
 			if options.SavedLoginReceiptFile != "" {
 				return empty, fmt.Errorf("saved-login receipt is incompatible with workload-identity Worker config")
 			}
@@ -171,7 +171,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 				if err != nil {
 					return empty, err
 				}
-				if receipt.CredentialMode != codexapp.CredentialModeWorkloadIdentity ||
+				if receipt.Provider != profile.Profile.Provider ||
 					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
@@ -180,7 +180,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 				}
 				result.ModelExecution = "READY"
 			}
-		case codexapp.CredentialModeSavedChatGPTLogin:
+		case provideridentity.CredentialChatGPTSession:
 			if options.WIFReceiptFile != "" {
 				return empty, fmt.Errorf("WIF receipt is incompatible with saved-login Worker config")
 			}
@@ -192,7 +192,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 				if err != nil {
 					return empty, err
 				}
-				if receipt.CredentialMode != codexapp.CredentialModeSavedChatGPTLogin ||
+				if receipt.Provider != profile.Profile.Provider ||
 					receipt.Version != profile.Profile.CodexVersion ||
 					receipt.BinaryDigest != profile.Profile.BinaryDigest ||
 					receipt.Model != profile.Profile.Model ||
@@ -202,7 +202,7 @@ func checkPilotPreflight(options pilotPreflightOptions) (pilotPreflightResult, e
 			}
 			result.ModelExecution = "READY"
 		default:
-			return empty, fmt.Errorf("unsupported Worker Codex credential mode")
+			return empty, fmt.Errorf("unsupported Worker Codex provider credential mode")
 		}
 	}
 
@@ -415,7 +415,7 @@ func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {
 	if err := strictjson.Decode(data, &config); err != nil {
 		return config, err
 	}
-	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" ||
+	if config.Version != 2 || strings.TrimSpace(config.Executable) == "" ||
 		config.Profile.Validate() != nil || config.Qualification.Validate() != nil {
 		return config, fmt.Errorf("invalid Worker Codex configuration")
 	}
@@ -427,17 +427,17 @@ func readPilotWorkerCodex(path string) (pilotWorkerCodexConfig, error) {
 		config.Qualification.ThreadStartModel != config.Profile.Model {
 		return config, fmt.Errorf("Worker Codex qualification/Profile binding mismatch")
 	}
-	switch config.CredentialMode {
-	case codexapp.CredentialModeWorkloadIdentity:
+	switch config.Profile.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		if strings.TrimSpace(config.FederationRuleID) == "" || config.SavedLoginFile != "" {
 			return config, fmt.Errorf("invalid workload-identity Worker Codex configuration")
 		}
-	case codexapp.CredentialModeSavedChatGPTLogin:
+	case provideridentity.CredentialChatGPTSession:
 		if config.FederationRuleID != "" || strings.TrimSpace(config.SavedLoginFile) == "" {
 			return config, fmt.Errorf("invalid saved-login Worker Codex configuration")
 		}
 	default:
-		return config, fmt.Errorf("unsupported Worker Codex credential mode")
+		return config, fmt.Errorf("unsupported Worker Codex provider credential mode")
 	}
 	return config, nil
 }

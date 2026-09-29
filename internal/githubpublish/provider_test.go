@@ -16,6 +16,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -216,10 +217,10 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 		ProfileDigest: digestOf("profile"), RecoveryEpoch: 0,
 	}
 	codexReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 2, CLI: "codex-cli", Version: "0.157.1",
+		SchemaVersion: 3, CLI: "codex-cli", Version: "0.157.1",
 		BinaryDigest: digestOf("binary"), QualificationDigest: digestOf("qualification"),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
-		CredentialMode:          "workload_identity", FederationRuleID: "rule-1", Model: "gpt-test",
+		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: "rule-1", Model: "gpt-test",
 		PromptDigest: digestOf("prompt"), ThreadID: "thread-1", TurnID: "turn-1",
 		TurnStatus: "completed", Output: "done", OutputDigest: canonical.BytesDigest([]byte("done")),
 		CommandCount: 1, FileChangeCount: 1, ApprovalRequests: 0, AssertionRemovedBeforeTurn: true,

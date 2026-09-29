@@ -10,6 +10,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/workspace"
 )
@@ -33,13 +34,13 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		BundleSize:         int64(len(bundle)),
 	}
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion:              2,
+		SchemaVersion:              3,
 		CLI:                        "codex-cli",
 		Version:                    "0.157.1",
 		BinaryDigest:               "sha256:" + strings.Repeat("7", 64),
 		QualificationDigest:        "sha256:" + strings.Repeat("0", 64),
 		EngineeringConfigDigest:    codexapp.EngineeringConfigDigest(),
-		CredentialMode:             "workload_identity",
+		Provider:                   provideridentity.OpenAIWIFUnattended(),
 		FederationRuleID:           "rule-test",
 		Model:                      "gpt-5.6-sol",
 		PromptDigest:               "sha256:" + strings.Repeat("8", 64),

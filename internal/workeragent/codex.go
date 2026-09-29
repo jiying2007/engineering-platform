@@ -10,13 +10,13 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
 )
 
 type CodexRuntime struct {
 	Executable        string
-	CredentialMode    string
 	FederationRuleID  string
 	IdentityTokenFile string
 	SavedLoginFile    string
@@ -28,17 +28,17 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		runtime.Executable == "" {
 		return receipt, fmt.Errorf("authenticated preparation owner and exact Codex profile/runtime required")
 	}
-	switch runtime.CredentialMode {
-	case codexapp.CredentialModeWorkloadIdentity:
+	switch request.Profile.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		if runtime.FederationRuleID == "" || runtime.IdentityTokenFile == "" || runtime.SavedLoginFile != "" {
 			return receipt, fmt.Errorf("complete workload-identity Codex runtime required")
 		}
-	case codexapp.CredentialModeSavedChatGPTLogin:
+	case provideridentity.CredentialChatGPTSession:
 		if runtime.SavedLoginFile == "" || runtime.FederationRuleID != "" || runtime.IdentityTokenFile != "" {
 			return receipt, fmt.Errorf("isolated saved ChatGPT login Codex runtime required")
 		}
 	default:
-		return receipt, fmt.Errorf("unsupported Codex credential mode")
+		return receipt, fmt.Errorf("unsupported Codex provider credential mode")
 	}
 	var permit codexexec.Permit
 	if err = c.Call(ctx, http.MethodPost, "/api/v1/worker/codex/start", request, &permit); err != nil {
@@ -106,8 +106,8 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		return receipt, err
 	}
 	var codexReceipt codexapp.EngineeringReceipt
-	switch runtime.CredentialMode {
-	case codexapp.CredentialModeWorkloadIdentity:
+	switch request.Profile.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		codexReceipt, err = codexapp.EngineeringWIFTurn(
 			runCtx,
 			runtime.Executable,
@@ -122,7 +122,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 			request.Profile.Model,
 			prompt,
 		)
-	case codexapp.CredentialModeSavedChatGPTLogin:
+	case provideridentity.CredentialChatGPTSession:
 		codexReceipt, err = codexapp.EngineeringSavedLoginTurn(
 			runCtx,
 			runtime.Executable,

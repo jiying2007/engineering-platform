@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 )
 
 func liveAdapter(t *testing.T) (*Adapter, io.ReadWriter) {
@@ -96,12 +97,12 @@ func TestObserveTurnRejectsApprovalAndToolItems(t *testing.T) {
 
 func TestLiveReceiptRejectsTamper(t *testing.T) {
 	r := LiveReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		CLI:                        "codex-cli",
 		Version:                    testCodexVersion,
 		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:             "workload_identity",
+		Provider:                   provideridentity.OpenAIWIFUnattended(),
 		FederationRuleID:           "rule-test",
 		Model:                      "gpt-5.6-sol",
 		PromptDigest:               "sha256:" + strings.Repeat("b", 64),
@@ -173,12 +174,12 @@ func TestWarmWorkloadIdentityUsesAuthenticatedRateLimitReadBeforeThread(t *testi
 
 func TestLiveReceiptRequiresAssertionRemovalFence(t *testing.T) {
 	r := LiveReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		CLI:                        "codex-cli",
 		Version:                    testCodexVersion,
 		BinaryDigest:               "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest: canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:             "workload_identity",
+		Provider:                   provideridentity.OpenAIWIFUnattended(),
 		FederationRuleID:           "rule-test",
 		Model:                      "gpt-5.6-sol",
 		PromptDigest:               canonicalDigestText(LiveProbePrompt),
@@ -203,12 +204,12 @@ func canonicalDigestText(value string) string {
 
 func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
 	r := LiveReceipt{
-		SchemaVersion:                        1,
+		SchemaVersion:                        2,
 		CLI:                                  "codex-cli",
 		Version:                              testCodexVersion,
 		BinaryDigest:                         "sha256:" + strings.Repeat("a", 64),
 		CredentialSafeConfigDigest:           canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialMode:                       CredentialModeSavedChatGPTLogin,
+		Provider:                             provideridentity.OpenAIChatGPTTrustedSelfHosted(),
 		Model:                                "gpt-5.6-sol",
 		PromptDigest:                         canonicalDigestText(LiveProbePrompt),
 		ThreadID:                             "thread-saved",
@@ -259,7 +260,7 @@ func TestLiveSavedLoginProbeDeletesBootstrapBeforeReadOnlyTurn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if receipt.CredentialMode != CredentialModeSavedChatGPTLogin ||
+	if receipt.Provider != provideridentity.OpenAIChatGPTTrustedSelfHosted() ||
 		!receipt.CredentialBootstrapRemovedBeforeTurn ||
 		receipt.AssertionRemovedBeforeTurn ||
 		receipt.Output != LiveProbeExpected {

@@ -113,12 +113,17 @@ jq -e   --arg model "$MODEL"   --arg version "$PROFILE_VERSION"   --arg binary_d
     .thread_start_model == $model
   ' "$QUALIFICATION_SOURCE" >/dev/null
 
-jq -e   --arg model "$MODEL"   --arg rule "$RULE_ID"   --arg version "$PROFILE_VERSION"   --arg binary_digest "$PROFILE_BINARY_DIGEST"   '
-    .schema_version == 1 and
+PROFILE_PROVIDER="$(jq -cS .profile.provider "$PROFILE_FILE")"
+
+jq -e   --arg model "$MODEL"   --arg rule "$RULE_ID"   --arg version "$PROFILE_VERSION"   --arg binary_digest "$PROFILE_BINARY_DIGEST"   --argjson provider "$PROFILE_PROVIDER"   '
+    .schema_version == 2 and
     .cli == "codex-cli" and
     .version == $version and
     .binary_digest == $binary_digest and
-    .credential_mode == "workload_identity" and
+    .provider == $provider and
+    .provider.provider_id == "openai-codex" and
+    .provider.credential_mode == "workload-identity" and
+    .provider.execution_mode == "unattended" and
     .federation_rule_id == $rule and
     .model == $model and
     .turn_status == "completed" and
@@ -136,9 +141,8 @@ install -m 0600 "$QUALIFICATION_SOURCE" "$QUALIFICATION"
 WORKER_CODEX="$OUTPUT_DIR/worker-codex.json"
 jq --arg rule "$RULE_ID" '
   {
-    version: 1,
+    version: 2,
     codex_executable: .codex_executable,
-    credential_mode: "workload_identity",
     federation_rule_id: $rule,
     qualification: .qualification,
     profile: .profile

@@ -98,7 +98,8 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 		"pilot-preflight",
 		"core-pre-publication.dump",
 		"result.bundle",
-		"jq -e '.state==\"FINISHED\"",
+		".state==\"FINISHED\"",
+		".receipt.result.codex.provider.credential_mode==\"workload-identity\"",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("model-phase script missing %q", required)
@@ -778,7 +779,10 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	for _, required := range []string{
 		".protected==true",
 		"Logged in using ChatGPT",
-		"credential_mode:\"saved_chatgpt_login\"",
+		"--provider openai-codex",
+		"--credential chatgpt-session",
+		"--execution trusted-self-hosted",
+		".receipt.result.codex.provider.credential_mode==\"chatgpt-session\"",
 		"publication==\"BLOCKED_EXTERNAL_PUBLISHER\"",
 		"--execute-codex",
 		"credential_bootstrap_removed_before_turn==true",

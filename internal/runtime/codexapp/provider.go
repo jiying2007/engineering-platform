@@ -25,11 +25,6 @@ type Provider struct {
 	savedLoginSource string
 }
 
-const (
-	CredentialModeWorkloadIdentity  = "workload_identity"
-	CredentialModeSavedChatGPTLogin = "saved_chatgpt_login"
-)
-
 const credentialSafeConfig = "cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n"
 const engineeringConfig = `cli_auth_credentials_store = "file"
 

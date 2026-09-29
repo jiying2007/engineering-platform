@@ -211,11 +211,19 @@ fi
 
 "$BIN_DIR/codex-qualifier"   --codex "$CODEX_NATIVE"   --model "$MODEL"   > "$STATE_ROOT/codex-qualification.json"
 
-"$BIN_DIR/eng" codex-profile   --codex "$CODEX_NATIVE"   --qualification "$STATE_ROOT/codex-qualification.json"   --model "$MODEL"   > "$STATE_ROOT/codex-profile.json"
+"$BIN_DIR/eng" codex-profile \
+  --codex "$CODEX_NATIVE" \
+  --qualification "$STATE_ROOT/codex-qualification.json" \
+  --model "$MODEL" \
+  --provider openai-codex \
+  --credential chatgpt-session \
+  --execution trusted-self-hosted \
+  > "$STATE_ROOT/codex-profile.json"
 PROFILE_FILE="$STATE_ROOT/codex-profile.json"
 PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
 QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
 CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
+PROVIDER_JSON="$(jq -cS .profile.provider "$PROFILE_FILE")"
 
 bash "$ROOT/examples/pilots/local-stack/bootstrap.sh" "$STACK_ROOT" "$PROFILE_DIGEST" worker/codex-pilot
 
@@ -336,9 +344,8 @@ checkpoint saved-login-staging
 
 WORKER_CODEX_FILE="$STATE_ROOT/worker-codex.json"
 jq --arg login "$STAGED_LOGIN_FILE" '{
-  version:1,
+  version:2,
   codex_executable:.codex_executable,
-  credential_mode:"saved_chatgpt_login",
   saved_login_file:$login,
   qualification:.qualification,
   profile:.profile
@@ -360,7 +367,9 @@ jq -e '.internal=="READY" and .model_execution=="READY" and .publication=="BLOCK
 jq -e '
   .state=="FINISHED" and
   .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION" and
-  .receipt.result.codex.credential_mode=="saved_chatgpt_login" and
+  .receipt.result.codex.provider.provider_id=="openai-codex" and
+  .receipt.result.codex.provider.credential_mode=="chatgpt-session" and
+  .receipt.result.codex.provider.execution_mode=="trusted-self-hosted" and
   .receipt.result.codex.credential_bootstrap_removed_before_turn==true and
   .receipt.result.codex.assertion_removed_before_turn==false
 ' "$STATE_ROOT/codex-status.json" >/dev/null
@@ -381,10 +390,10 @@ install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core-pre-publication.dump"
 test -s "$STATE_ROOT/core-pre-publication.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg execution_epoch "$EXECUTION_EPOCH"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --argjson provider "$PROVIDER_JSON"   --arg execution_epoch "$EXECUTION_EPOCH"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
+    version:2,
     execution_origin:"trusted_self_hosted",
-    credential_mode:$credential_mode,
+    provider:$provider,
     pilot:$pilot,
     run_id:$run_id,
     base_commit:$base_commit,
@@ -402,7 +411,9 @@ chmod 0600 "$STATE_ROOT"/*.json "$STATE_ROOT/core-pre-publication.dump" "$STATE_
 echo "trusted self-hosted retained pilot model phase: FINISHED"
 echo "pilot=$PILOT"
 echo "base_commit=$BASE_COMMIT"
-echo "credential_mode=saved_chatgpt_login"
+echo "provider_id=$(jq -r .provider_id <<<"$PROVIDER_JSON")"
+echo "credential_mode=$(jq -r .credential_mode <<<"$PROVIDER_JSON")"
+echo "execution_mode=$(jq -r .execution_mode <<<"$PROVIDER_JSON")"
 echo "retained_policy=no model replay after FINISHED; publication failures must reconcile the retained result"
 
 # Only after the model process has exited and the FINISHED Core state/result
@@ -498,10 +509,10 @@ rm -f "$TOKEN_FILE"
 docker exec "$PG_NAME" pg_dump -U postgres -d engineering_platform -Fc > "$STATE_ROOT/core.dump"
 test -s "$STATE_ROOT/core.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --arg credential_mode "saved_chatgpt_login"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg result_digest "$CODEX_RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg profile_digest "$PROFILE_DIGEST"   --arg qualification_digest "$QUALIFICATION_DIGEST"   --arg codex_version "$CODEX_VERSION"   --argjson provider "$PROVIDER_JSON"   --arg pr_url "$PR_URL"   --arg pr_branch "$PUBLISHED_BRANCH"   --argjson pr_number "$PR_NUMBER"   --argjson github_engineering_run_id "$GITHUB_RUN_ID"   --arg debug_reproduction_run_id "$DEBUG_REPRODUCTION_RUN_ID"   --arg debug_reproduction_receipt_digest "$DEBUG_REPRODUCTION_RECEIPT_DIGEST"   '{
+    version:2,
     execution_origin:"trusted_self_hosted",
-    credential_mode:$credential_mode,
+    provider:$provider,
     pilot:$pilot,
     run_id:$run_id,
     base_commit:$base_commit,

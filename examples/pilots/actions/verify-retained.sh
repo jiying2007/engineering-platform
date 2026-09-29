@@ -100,8 +100,15 @@ gh run download "$ENGINEERING_RUN_ID"   --repo "$GITHUB_REPOSITORY"   --name "$a
 
 ENGINEERING_STATE="$ENGINEERING_ROOT/engineering-state.json"
 test -f "$ENGINEERING_STATE"
-test "$(jq -er .version "$ENGINEERING_STATE")" = 1
+test "$(jq -er .version "$ENGINEERING_STATE")" = 2
 test "$(jq -er .pilot "$ENGINEERING_STATE")" = "$PILOT"
+PROVIDER_JSON="$(jq -cS .provider "$ENGINEERING_STATE")"
+printf '%s' "$PROVIDER_JSON" | jq -e '
+  .version==1 and
+  .provider_id=="openai-codex" and
+  ((.credential_mode=="chatgpt-session" and .execution_mode=="trusted-self-hosted") or
+   (.credential_mode=="workload-identity" and .execution_mode=="unattended"))
+' >/dev/null
 test "$(jq -er .run_id "$ENGINEERING_STATE")" = "$RUN_ID"
 test "$(jq -er .github_engineering_run_id "$ENGINEERING_STATE")" = "$ENGINEERING_RUN_ID"
 
@@ -181,15 +188,19 @@ test -s "$ENGINEERING_ROOT/result.bundle"
 test -s "$ENGINEERING_ROOT/core.dump"
 test "sha256:$(sha256sum "$ENGINEERING_ROOT/result.bundle" | awk '{print $1}')" = "$BUNDLE_DIGEST"
 
-jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg result_digest "$RESULT_DIGEST"   --arg bundle "$BUNDLE_DIGEST"   '.state=="FINISHED" and
+jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg result_digest "$RESULT_DIGEST"   --arg bundle "$BUNDLE_DIGEST"   --argjson provider "$PROVIDER_JSON"   '.state=="FINISHED" and
    .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION" and
    .receipt.result_digest==$result_digest and
    .receipt.result.change.base_commit==$base and
    .receipt.result.change.result_commit==$result and
    .receipt.result.change.bundle_digest==$bundle and
+   .receipt.result.codex.provider==$provider and
    .receipt.result.codex.turn_status=="completed" and
    .receipt.result.codex.approval_requests==0 and
-   .receipt.result.codex.credential_bootstrap_removed_before_turn==true'   "$CODEX_STATUS" >/dev/null
+   (if $provider.credential_mode=="chatgpt-session"
+      then (.receipt.result.codex.credential_bootstrap_removed_before_turn==true and .receipt.result.codex.assertion_removed_before_turn==false)
+      else (.receipt.result.codex.assertion_removed_before_turn==true and .receipt.result.codex.credential_bootstrap_removed_before_turn==false)
+    end)'   "$CODEX_STATUS" >/dev/null
 
 test "$(jq -er .publication "$PUBLICATION_PREFLIGHT")" = READY
 test "$(jq -er .result "$PUBLICATION_RECEIPT")" = CONFIRMED
@@ -203,7 +214,8 @@ printf '%s' "$OBSERVED_STATE" | jq -e   --arg base "$BASE_COMMIT"   --arg result
    .pull_request_state=="open"' >/dev/null
 
 if [ -n "$RECOVERY_RECEIPT" ]; then
-  jq -e     --arg pilot "$PILOT"     --arg source_name "$artifact_name"     --arg source_digest "$SOURCE_ARTIFACT_DIGEST"     --arg base "$BASE_COMMIT"     --arg result "$RESULT_COMMIT"     --arg result_digest "$RESULT_DIGEST"     --arg bundle "$BUNDLE_DIGEST"     --arg pr_url "$PR_URL"     --arg pr_branch "$PR_BRANCH"     --argjson source_run "$ENGINEERING_RUN_ID"     --argjson source_artifact_id "$SOURCE_ARTIFACT_ID"     --argjson recovery_run "$ENGINEERING_RECOVERY_RUN_ID"     --argjson pr_number "$PR_NUMBER"     '.version==1 and
+  jq -e     --arg pilot "$PILOT"     --arg source_name "$artifact_name"     --arg source_digest "$SOURCE_ARTIFACT_DIGEST"     --arg base "$BASE_COMMIT"     --arg result "$RESULT_COMMIT"     --arg result_digest "$RESULT_DIGEST"     --arg bundle "$BUNDLE_DIGEST"     --arg pr_url "$PR_URL"     --arg pr_branch "$PR_BRANCH"     --argjson provider "$PROVIDER_JSON"     --argjson source_run "$ENGINEERING_RUN_ID"     --argjson source_artifact_id "$SOURCE_ARTIFACT_ID"     --argjson recovery_run "$ENGINEERING_RECOVERY_RUN_ID"     --argjson pr_number "$PR_NUMBER"     '.version==2 and
+     .provider==$provider and
      .pilot==$pilot and
      .source_engineering_run_id==$source_run and
      .source_artifact.name==$source_name and
@@ -369,8 +381,9 @@ docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state
 
 test -s "$STATE_ROOT/core-verification.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_recovery_run_id "$ENGINEERING_RECOVERY_RUN_ID"   --arg ci_run_id "$CI_RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg delivery_id "$DELIVERY_ID"   --arg verification_id "$VERIFICATION_ID"   --arg pr_url "$PR_URL"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_recovery_run_id "$ENGINEERING_RECOVERY_RUN_ID"   --arg ci_run_id "$CI_RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg delivery_id "$DELIVERY_ID"   --arg verification_id "$VERIFICATION_ID"   --arg pr_url "$PR_URL"   --argjson provider "$PROVIDER_JSON"   '{
+    version:2,
+    provider:$provider,
     pilot:$pilot,
     engineering_run_id:($engineering_run_id|tonumber),
     engineering_recovery_run_id:(if $engineering_recovery_run_id=="" then null else ($engineering_recovery_run_id|tonumber) end),
