@@ -1,15 +1,17 @@
 # Implementation Status
 
-Reviewed base: `ee0249fe25b860a83beba9fe06b7acdc80cd75c6` (#101).
-Stage: **Trusted self-hosted M1 phase 1 is now proven by two real retained
-Closure chains: one Feature and one Debug. Both chains reached real Core-bound
-Codex FINISHED state, independent Action Gateway publication, exact PR-head CI,
-requirement-bound Codex/Git/CI Evidence, PASS Verification, comment-bound
-independent PASS Review and ClosureReceipt; both closed results were then
-promoted separately to protected main and fresh-main CI passed. Managed-workspace
-WIF remains the preferred GitHub-hosted/unattended authentication lane but is
-not yet qualified by a real WIF model turn. Production/unattended readiness
-therefore remains unclaimed.**
+Reviewed base: `1b50c17ccf3dbef3b0ac708da574cdfc88871944` (#104).
+Stage: **Trusted self-hosted M1 phase 1 is proven by two real retained Closure
+chains and is the default internal R&D execution lane. The current internal lane
+uses a trusted Ubuntu host with a ChatGPT-authenticated Codex CLI, exact
+compatibility qualification, isolated Codex HOME, credential-separated
+publication and the same retained Evidence/Verification/Review/Closure chain.
+Managed-workspace WIF is an optional workload-identity enhancement for
+GitHub-hosted/unattended execution; repository mechanics are READY but the
+external administrator provider/rule and first live WIF qualification remain
+pending in #103. A company relay/model gateway, if adopted, is a separate
+provider lane that requires independent qualification and must never be a silent
+WIF fallback. Production/unattended readiness remains unclaimed.**
 
 ## Canonical scope
 
@@ -34,7 +36,9 @@ Requirement / Work / frozen Task
   -> mTLS Worker admission/preparation
   -> independent exact-base workspace
   -> Core-bound Codex engineering execution
-       (trusted self-hosted saved login OR managed-workspace WIF)
+       (explicit credential/provider lane:
+        trusted self-hosted saved login OR managed-workspace WIF
+        OR a separately qualified future provider)
   -> retained result commit + verified Git bundle
   -> Action Gateway publication authority
   -> independent GitHub publisher
@@ -101,10 +105,29 @@ record is `docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`.
   `644127255f615abb753fab5c450ea23caad76b11`; fresh-main CI
   `36540163771` passed all five canonical gates.
 
+## Credential/provider posture
+
+The canonical credential/provider policy is
+`docs/implementation/CODEX_CREDENTIAL_LANES_V1.md`.
+
+- **Default internal lane:** trusted self-hosted saved ChatGPT login on an
+  explicitly trusted Ubuntu host. This lane is already proven by the retained
+  Feature/Debug M1 Closure chains.
+- **Optional unattended lane:** managed-workspace WIF. It is tracked by #103 and
+  is needed only when workload identity / GitHub-hosted unattended execution is
+  selected.
+- **Optional future relay lane:** company relay/model gateway. It is not WIF,
+  does not inherit WIF or saved-login evidence, and must receive its own
+  provider/credential/compatibility/provenance qualification before admission.
+
+Credential selection is explicit and fail-closed. Authentication failure in one
+lane must not cause Runtime to try another credential/provider implicitly.
+
 ## Managed-workspace WIF unattended gate
 
-Trusted self-hosted M1 phase 1 is complete, but managed-workspace WIF remains a
-separate external qualification gate tracked by issue #103.
+Managed-workspace WIF remains a separate **optional unattended** qualification
+gate tracked by issue #103; it is not a blocker for normal internal Ubuntu
+development and is not an M1 phase-1 blocker.
 
 Real live qualification probe `36556354798` was dispatched on protected main
 `644127255f615abb753fab5c450ea23caad76b11`. It failed in the first
@@ -298,8 +321,9 @@ so the saved ChatGPT login does not need to be consumed/refreshed twice before
 the non-replayable retained turn.
 
 The existing managed-workspace WIF/Admin API/GitHub-hosted workflow remains
-supported as the unattended execution lane. It is no longer an M1 phase-1 hard
-blocker and must not be represented as qualified until a real WIF turn exists.
+supported as an unattended workload-identity lane. It is optional for current
+internal development, is no longer an M1 phase-1 blocker, and must not be
+represented as qualified until a real WIF turn exists.
 
 Trusted self-hosted mode has explicit known limits: the host/account itself is
 trusted, and the repository is public. The retained engineering runner therefore
@@ -309,7 +333,9 @@ workflow jobs. Unrelated credentials elsewhere on the host account are outside
 the Codex child-process isolation boundary. The model process receives neither the
 operator HOME nor publisher/API/WIF credential environment, and the isolated
 saved-login bootstrap is deleted before thread/start. Production/unattended
-claims should prefer WIF or a separately reviewed stronger host-isolation design.
+claims require a separately qualified unattended credential/isolation design;
+managed-workspace WIF is one candidate, and a reviewed company relay/provider
+may be another if it independently satisfies the authority contract.
 
 At this checkpoint there are **two real retained Closure chains**: one Feature
 and one Debug. This is sufficient to claim the trusted self-hosted **M1 phase-1
@@ -324,6 +350,7 @@ the unattended/GitHub-hosted credential lane can be called qualified.
 remains unclaimed.**
 
 Contracts:
+- `docs/implementation/CODEX_CREDENTIAL_LANES_V1.md`
 - `docs/implementation/RETAINED_PILOT_RUNBOOK_V1.md`
 - `docs/implementation/GITHUB_PR_PUBLICATION_V1.md`
 - `docs/implementation/CORE_BOUND_CODEX_EXECUTION_V1.md`
