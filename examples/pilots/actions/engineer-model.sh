@@ -50,7 +50,14 @@ test "$remote_main" = "$GITHUB_SHA"
 bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/secure-repository-source.sh" "$GITHUB_WORKSPACE"
 
 "$BIN_DIR/codex-qualifier" --codex "$CODEX_NATIVE" --model "$MODEL" > "$QUALIFICATION_FILE"
-"$ENG" codex-profile --codex "$CODEX_NATIVE" --qualification "$QUALIFICATION_FILE" --model "$MODEL" > "$PROFILE_FILE"
+"$ENG" codex-profile \
+  --codex "$CODEX_NATIVE" \
+  --qualification "$QUALIFICATION_FILE" \
+  --model "$MODEL" \
+  --provider openai-codex \
+  --credential workload-identity \
+  --execution unattended \
+  > "$PROFILE_FILE"
 PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
 QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
 CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
@@ -186,9 +193,8 @@ audit_context="$(jq -cn --arg run_id "$GITHUB_RUN_ID" --arg pilot "$PILOT" --arg
 test ! -e "$live_secret/identity-token"
 
 jq --arg rule "$OPENAI_CODEX_FEDERATION_RULE_ID"   '{
-    version:1,
+    version:2,
     codex_executable:.codex_executable,
-    credential_mode:"workload_identity",
     federation_rule_id:$rule,
     qualification:.qualification,
     profile:.profile
@@ -216,7 +222,13 @@ test ! -e "$engineering_secret/identity-token"
 # shellcheck disable=SC1090
 . "$STACK_ROOT/clients/owner.env"
 "$ENG" api GET "/api/v1/runs/$RUN_ID/codex" > "$STATE_ROOT/codex-status.json"
-jq -e '.state=="FINISHED" and .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION"' "$STATE_ROOT/codex-status.json" >/dev/null
+jq -e '
+  .state=="FINISHED" and
+  .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION" and
+  .receipt.result.codex.provider.provider_id=="openai-codex" and
+  .receipt.result.codex.provider.credential_mode=="workload-identity" and
+  .receipt.result.codex.provider.execution_mode=="unattended"
+' "$STATE_ROOT/codex-status.json" >/dev/null
 
 # The model process is completely gone before any GitHub write credential can be
 # introduced in the next workflow step.
