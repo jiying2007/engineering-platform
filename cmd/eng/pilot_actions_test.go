@@ -63,6 +63,10 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 		"GITHUB_REPOSITORY_ID",
 		"GITHUB_REPOSITORY_OWNER_ID",
 		"codex-wif-live.yml@refs/heads/main",
+		"for name in OPENAI_WIF_AUDIENCE OPENAI_CODEX_FEDERATION_RULE_ID",
+		"repository Actions variable is not configured",
+		"managed-workspace WIF is not provisioned",
+		"examples/pilots/wif/configure-admin-api.sh",
 	} {
 		if !strings.Contains(liveWorkflow, required) {
 			t.Fatalf("live WIF workflow missing %q", required)
@@ -70,6 +74,8 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"subject.startswith",
+		`test -n "${{ vars.OPENAI_WIF_AUDIENCE }}"`,
+		`test -n "${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}"`,
 	} {
 		if strings.Contains(liveWorkflow, forbidden) {
 			t.Fatalf("live WIF workflow retains legacy subject-format assumption %q", forbidden)

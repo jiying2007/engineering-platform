@@ -50,6 +50,7 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 		t.Fatal(err)
 	}
 	profileFile := writePilotJSON(t, root, "codex-profile.json", profile)
+	qualificationFile := writePilotJSON(t, root, "fake-qualification.json", qualification)
 
 	const rule = "rule-pilot-test"
 	receipt := codexapp.LiveReceipt{
@@ -118,6 +119,7 @@ if [ "$1" = run ] && [ "$2" = download ]; then
   test -n "$dest"
   mkdir -p "$dest"
   cp "$FAKE_WIF_RECEIPT" "$dest/codex-wif-live-receipt.json"
+  cp "$FAKE_WIF_QUALIFICATION" "$dest/codex-compatibility-qualification.json"
   exit 0
 fi
 
@@ -140,6 +142,7 @@ exit 1
 		"FAKE_GH_LOG="+logFile,
 		"FAKE_MAIN_SHA="+mainSHA,
 		"FAKE_WIF_RECEIPT="+receiptFile,
+		"FAKE_WIF_QUALIFICATION="+qualificationFile,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -159,6 +162,18 @@ exit 1
 		t.Fatalf("unexpected retained helper receipt: %#v", got)
 	}
 
+	qualificationData, err := os.ReadFile(filepath.Join(outputDir, "codex-compatibility-qualification.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotQualification codexapp.QualificationReceipt
+	if err := json.Unmarshal(qualificationData, &gotQualification); err != nil {
+		t.Fatal(err)
+	}
+	if gotQualification != qualification {
+		t.Fatalf("retained live qualification does not match frozen profile qualification: got %#v want %#v", gotQualification, qualification)
+	}
+
 	workerData, err := os.ReadFile(filepath.Join(outputDir, "worker-codex.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +183,9 @@ exit 1
 		t.Fatal(err)
 	}
 	if worker.Version != 1 || worker.FederationRuleID != rule ||
-		worker.Executable != profile.CodexExecutable || worker.Profile != profile.Profile {
+		worker.Executable != profile.CodexExecutable ||
+		worker.Qualification != qualification ||
+		worker.Profile != profile.Profile {
 		t.Fatalf("unexpected rendered Worker Codex config: %#v", worker)
 	}
 
@@ -199,5 +216,25 @@ func TestWIFQualificationHelperShellSyntax(t *testing.T) {
 	path := filepath.Join("..", "..", "examples", "pilots", "wif", "qualify.sh")
 	if out, err := exec.Command(bash, "-n", path).CombinedOutput(); err != nil {
 		t.Fatalf("qualify.sh syntax: %v: %s", err, out)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{
+		"PROFILE_BINARY_DIGEST",
+		"PROFILE_QUALIFICATION_DIGEST",
+		"codex-compatibility-qualification.json",
+		"LIVE_QUALIFICATION_CANONICAL",
+		"PROFILE_QUALIFICATION_CANONICAL",
+		"live WIF compatibility qualification does not match frozen Codex profile",
+		".binary_digest == $binary_digest",
+		"qualification_digest=$PROFILE_QUALIFICATION_DIGEST",
+		"qualification: .qualification",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("qualify.sh missing exact-profile binding %q", required)
+		}
 	}
 }
