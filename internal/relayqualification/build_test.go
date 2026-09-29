@@ -61,19 +61,18 @@ func TestBuildPackRejectsInvalidAuthSelection(t *testing.T) {
 	}
 }
 
-
 func TestBuildPackCarriesExplicitPrivateHTTPPolicy(t *testing.T) {
 	input := BuildInput{
-		CodexProviderID:           "company-relay-v1",
-		BaseURL:                   "http://192.168.10.100:8317/v1",
-		AllowInsecurePrivateHTTP:  true,
-		AuthMode:                  AuthEnvKey,
-		EnvKey:                    "COMPANY_RELAY_TOKEN",
-		RequestedModel:            "relay-gpt-5.6",
-		StreamIdleTimeoutMS:       30000,
-		GatewayPolicy:             []byte("gateway"),
-		PrivacyPolicy:             []byte("privacy"),
-		ModelMapping:              []byte("mapping"),
+		CodexProviderID:          "company-relay-v1",
+		BaseURL:                  "http://192.168.10.100:8317/v1",
+		AllowInsecurePrivateHTTP: true,
+		AuthMode:                 AuthEnvKey,
+		EnvKey:                   "COMPANY_RELAY_TOKEN",
+		RequestedModel:           "relay-gpt-5.6",
+		StreamIdleTimeoutMS:      30000,
+		GatewayPolicy:            []byte("gateway"),
+		PrivacyPolicy:            []byte("privacy"),
+		ModelMapping:             []byte("mapping"),
 	}
 	pack, err := BuildPack(input)
 	if err != nil {
