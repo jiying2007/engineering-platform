@@ -87,15 +87,15 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 		return err
 	}
 	audit, err := json.Marshal(map[string]string{
-		"run_id":               runID,
-		"worker_subject":       client.Subject(),
-		"worker_profile":       workerProfile,
-		"profile_digest":       profileDigest,
-		"qualification_digest": qualificationDigest,
-		"codex_version":        config.Profile.CodexVersion,
-		"provider_id":          config.Profile.Provider.ProviderID,
-		"credential_mode":      config.Profile.Provider.CredentialMode,
-		"execution_mode":       config.Profile.Provider.ExecutionMode,
+		"run_id":                 runID,
+		"worker_subject":         client.Subject(),
+		"worker_profile":         workerProfile,
+		"profile_digest":         profileDigest,
+		"qualification_digest":   qualificationDigest,
+		"codex_version":          config.Profile.CodexVersion,
+		"provider_id":            config.Profile.Provider.ProviderID,
+		"credential_mode":        config.Profile.Provider.CredentialMode,
+		"execution_mode":         config.Profile.Provider.ExecutionMode,
 		"provider_config_digest": config.Profile.Provider.ProviderConfigDigest,
 	})
 	if err != nil {
@@ -104,7 +104,7 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	receipt, err := workeragent.ExecuteCodex(ctx, client, preparer, codexexec.Start{
 		RunID: runID, WorkerProfile: workerProfile, Profile: config.Profile,
 	}, workeragent.CodexRuntime{
-		Executable: config.Executable,
+		Executable:       config.Executable,
 		FederationRuleID: config.FederationRuleID, IdentityTokenFile: tokenFile,
 		SavedLoginFile: config.SavedLoginFile, AuditContext: string(audit),
 	})

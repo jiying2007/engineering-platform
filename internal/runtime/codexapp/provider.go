@@ -25,7 +25,6 @@ type Provider struct {
 	savedLoginSource string
 }
 
-
 const credentialSafeConfig = "cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n"
 const engineeringConfig = `cli_auth_credentials_store = "file"
 

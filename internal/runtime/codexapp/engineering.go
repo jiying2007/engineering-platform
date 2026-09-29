@@ -77,18 +77,18 @@ type EngineeringReceipt struct {
 	Provider                             provideridentity.Identity `json:"provider"`
 	FederationRuleID                     string                    `json:"federation_rule_id"`
 	Model                                string                    `json:"model"`
-	PromptDigest                         string `json:"prompt_digest"`
-	ThreadID                             string `json:"thread_id"`
-	TurnID                               string `json:"turn_id"`
-	TurnStatus                           string `json:"turn_status"`
-	Output                               string `json:"output"`
-	OutputDigest                         string `json:"output_digest"`
-	CommandCount                         int    `json:"command_count"`
-	FailedCommands                       int    `json:"failed_commands"`
-	FileChangeCount                      int    `json:"file_change_count"`
-	ApprovalRequests                     int    `json:"approval_requests"`
-	AssertionRemovedBeforeTurn           bool   `json:"assertion_removed_before_turn"`
-	CredentialBootstrapRemovedBeforeTurn bool   `json:"credential_bootstrap_removed_before_turn"`
+	PromptDigest                         string                    `json:"prompt_digest"`
+	ThreadID                             string                    `json:"thread_id"`
+	TurnID                               string                    `json:"turn_id"`
+	TurnStatus                           string                    `json:"turn_status"`
+	Output                               string                    `json:"output"`
+	OutputDigest                         string                    `json:"output_digest"`
+	CommandCount                         int                       `json:"command_count"`
+	FailedCommands                       int                       `json:"failed_commands"`
+	FileChangeCount                      int                       `json:"file_change_count"`
+	ApprovalRequests                     int                       `json:"approval_requests"`
+	AssertionRemovedBeforeTurn           bool                      `json:"assertion_removed_before_turn"`
+	CredentialBootstrapRemovedBeforeTurn bool                      `json:"credential_bootstrap_removed_before_turn"`
 }
 
 func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, turnID string) (EngineeringObservation, error) {

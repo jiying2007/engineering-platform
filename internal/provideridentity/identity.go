@@ -12,8 +12,8 @@ const (
 
 	ProviderOpenAICodex = "openai-codex"
 
-	CredentialChatGPTSession    = "chatgpt-session"
-	CredentialWorkloadIdentity  = "workload-identity"
+	CredentialChatGPTSession   = "chatgpt-session"
+	CredentialWorkloadIdentity = "workload-identity"
 
 	ExecutionTrustedSelfHosted = "trusted-self-hosted"
 	ExecutionUnattended        = "unattended"

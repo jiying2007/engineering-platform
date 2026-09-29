@@ -23,15 +23,15 @@ func TestProviderIdentityRejectsCrossLaneAndUnknownProvider(t *testing.T) {
 	}{
 		{
 			name: "saved-login-unattended",
-			id: Identity{Version: Version1, ProviderID: ProviderOpenAICodex, CredentialMode: CredentialChatGPTSession, ExecutionMode: ExecutionUnattended, ProviderConfigDigest: OpenAICodexConfigDigest()},
+			id:   Identity{Version: Version1, ProviderID: ProviderOpenAICodex, CredentialMode: CredentialChatGPTSession, ExecutionMode: ExecutionUnattended, ProviderConfigDigest: OpenAICodexConfigDigest()},
 		},
 		{
 			name: "wif-trusted-self-hosted",
-			id: Identity{Version: Version1, ProviderID: ProviderOpenAICodex, CredentialMode: CredentialWorkloadIdentity, ExecutionMode: ExecutionTrustedSelfHosted, ProviderConfigDigest: OpenAICodexConfigDigest()},
+			id:   Identity{Version: Version1, ProviderID: ProviderOpenAICodex, CredentialMode: CredentialWorkloadIdentity, ExecutionMode: ExecutionTrustedSelfHosted, ProviderConfigDigest: OpenAICodexConfigDigest()},
 		},
 		{
 			name: "unqualified-relay",
-			id: Identity{Version: Version1, ProviderID: "company-relay", CredentialMode: "command-token", ExecutionMode: ExecutionUnattended, ProviderConfigDigest: OpenAICodexConfigDigest()},
+			id:   Identity{Version: Version1, ProviderID: "company-relay", CredentialMode: "command-token", ExecutionMode: ExecutionUnattended, ProviderConfigDigest: OpenAICodexConfigDigest()},
 		},
 	}
 	for _, tc := range cases {
