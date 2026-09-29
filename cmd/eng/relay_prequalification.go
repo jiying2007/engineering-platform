@@ -17,17 +17,9 @@ func relayPrequalification(args []string) error {
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *contractFile == "" {
 		return fmt.Errorf("usage: eng relay-prequalification --contract CONTRACT.json")
 	}
-	info, err := os.Lstat(*contractFile)
-	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 64<<10 {
-		return fmt.Errorf("bounded regular relay contract file required")
-	}
-	data, err := os.ReadFile(*contractFile)
+	contract, err := readRelayContract(*contractFile)
 	if err != nil {
 		return err
-	}
-	var contract relayqualification.Contract
-	if err := strictjson.Decode(data, &contract); err != nil {
-		return fmt.Errorf("strict relay contract: %w", err)
 	}
 	assessment, err := relayqualification.Evaluate(contract)
 	if err != nil {
@@ -35,4 +27,23 @@ func relayPrequalification(args []string) error {
 	}
 	printJSON(assessment)
 	return nil
+}
+
+func readRelayContract(path string) (relayqualification.Contract, error) {
+	var contract relayqualification.Contract
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 64<<10 {
+		return contract, fmt.Errorf("bounded regular relay contract file required")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return contract, err
+	}
+	if err := strictjson.Decode(data, &contract); err != nil {
+		return relayqualification.Contract{}, fmt.Errorf("strict relay contract: %w", err)
+	}
+	if err := contract.Validate(); err != nil {
+		return relayqualification.Contract{}, err
+	}
+	return contract, nil
 }
