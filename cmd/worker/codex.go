@@ -11,6 +11,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
@@ -19,7 +20,6 @@ import (
 type codexConfiguration struct {
 	Version          int                           `json:"version"`
 	Executable       string                        `json:"codex_executable"`
-	CredentialMode   string                        `json:"credential_mode"`
 	FederationRuleID string                        `json:"federation_rule_id,omitempty"`
 	SavedLoginFile   string                        `json:"saved_login_file,omitempty"`
 	Qualification    codexapp.QualificationReceipt `json:"qualification"`
@@ -48,22 +48,22 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	if err = strictjson.Decode(data, &config); err != nil {
 		return err
 	}
-	if config.Version != 1 || strings.TrimSpace(config.Executable) == "" || config.Profile.Validate() != nil {
+	if config.Version != 2 || strings.TrimSpace(config.Executable) == "" || config.Profile.Validate() != nil {
 		return fmt.Errorf("invalid Worker Codex configuration")
 	}
-	switch config.CredentialMode {
-	case "workload_identity":
+	switch config.Profile.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		if strings.TrimSpace(config.FederationRuleID) == "" || config.SavedLoginFile != "" ||
 			tokenFile == "" || federationEnv != "" {
 			return fmt.Errorf("invalid workload-identity Worker Codex configuration")
 		}
-	case "saved_chatgpt_login":
+	case provideridentity.CredentialChatGPTSession:
 		if config.FederationRuleID != "" || strings.TrimSpace(config.SavedLoginFile) == "" ||
 			tokenFile != "" || federationEnv != "" {
 			return fmt.Errorf("invalid saved-login Worker Codex configuration")
 		}
 	default:
-		return fmt.Errorf("unsupported Worker Codex credential mode")
+		return fmt.Errorf("unsupported Worker Codex provider credential mode")
 	}
 	qualificationDigest, err := config.Qualification.Digest()
 	if err != nil ||
@@ -93,6 +93,10 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 		"profile_digest":       profileDigest,
 		"qualification_digest": qualificationDigest,
 		"codex_version":        config.Profile.CodexVersion,
+		"provider_id":          config.Profile.Provider.ProviderID,
+		"credential_mode":      config.Profile.Provider.CredentialMode,
+		"execution_mode":       config.Profile.Provider.ExecutionMode,
+		"provider_config_digest": config.Profile.Provider.ProviderConfigDigest,
 	})
 	if err != nil {
 		return err
@@ -100,7 +104,7 @@ func executeCodex(ctx context.Context, client *controlclient.Client, preparer *p
 	receipt, err := workeragent.ExecuteCodex(ctx, client, preparer, codexexec.Start{
 		RunID: runID, WorkerProfile: workerProfile, Profile: config.Profile,
 	}, workeragent.CodexRuntime{
-		Executable: config.Executable, CredentialMode: config.CredentialMode,
+		Executable: config.Executable,
 		FederationRuleID: config.FederationRuleID, IdentityTokenFile: tokenFile,
 		SavedLoginFile: config.SavedLoginFile, AuditContext: string(audit),
 	})
