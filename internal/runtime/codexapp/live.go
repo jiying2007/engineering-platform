@@ -351,7 +351,7 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 		}
 	}
 	receipt = LiveReceipt{
-		SchemaVersion:                        1,
+		SchemaVersion:                        2,
 		CLI:                                  "codex-cli",
 		Version:                              version,
 		BinaryDigest:                         binaryDigest,
