@@ -436,8 +436,11 @@ jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE
   }' > "$STATE_ROOT/engineering-state.json"
 
 cp "$STACK_ROOT/operator/access-policy.json" "$STATE_ROOT/access-policy.json"
-cp "$PREPARATION_FILE" "$STATE_ROOT/worker-preparation.json"
-cp "$WORKER_CODEX_FILE" "$STATE_ROOT/worker-codex.json"
+# PREPARATION_FILE and WORKER_CODEX_FILE are created directly in STATE_ROOT.
+# Do not copy them onto themselves: GNU cp treats that as an error and would
+# incorrectly fail an otherwise CONFIRMED retained publication.
+test "$PREPARATION_FILE" = "$STATE_ROOT/worker-preparation.json"
+test "$WORKER_CODEX_FILE" = "$STATE_ROOT/worker-codex.json"
 cp "$PILOT_DIR/requirement.md" "$STATE_ROOT/requirement.md"
 chmod 0600 "$STATE_ROOT"/*.json "$STATE_ROOT/core.dump" "$STATE_ROOT/core-pre-publication.dump" "$STATE_ROOT/result.bundle"
 

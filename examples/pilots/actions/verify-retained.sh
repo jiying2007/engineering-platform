@@ -4,6 +4,7 @@ umask 077
 
 : "${PILOT:?feature or debug required}"
 : "${ENGINEERING_RUN_ID:?engineering workflow run id required}"
+ENGINEERING_RECOVERY_RUN_ID="${ENGINEERING_RECOVERY_RUN_ID:-}"
 : "${GH_TOKEN:?GitHub read token required}"
 : "${GITHUB_WORKSPACE:?workspace required}"
 : "${RUNNER_TEMP:?runner temp required}"
@@ -44,20 +45,57 @@ esac
 
 STATE_ROOT="$RUNNER_TEMP/retained-pilot-verification"
 ENGINEERING_ROOT="$STATE_ROOT/engineering"
+RECOVERY_ROOT="$STATE_ROOT/recovery"
 STACK_ROOT="$STATE_ROOT/stack"
 CI_ROOT="$STATE_ROOT/ci"
 RUNTIME_SRC="$RUNNER_TEMP/retained-pilot-base-src"
 BIN_DIR="$RUNNER_TEMP/retained-pilot-base-bin"
 
-install -d -m 0700 "$STATE_ROOT" "$ENGINEERING_ROOT" "$CI_ROOT" "$BIN_DIR"
+install -d -m 0700 "$STATE_ROOT" "$ENGINEERING_ROOT" "$RECOVERY_ROOT" "$CI_ROOT" "$BIN_DIR"
 
 run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RUN_ID")"
 test "$(printf '%s' "$run_json" | jq -er .name)" = "Retained M1 pilot engineering"
 test "$(printf '%s' "$run_json" | jq -er .event)" = "workflow_dispatch"
 test "$(printf '%s' "$run_json" | jq -er .status)" = "completed"
-test "$(printf '%s' "$run_json" | jq -er .conclusion)" = "success"
+test "$(printf '%s' "$run_json" | jq -er .head_branch)" = "main"
+test "$(printf '%s' "$run_json" | jq -er .path)" = ".github/workflows/retained-pilot-self-hosted-engineer.yml"
+ENGINEERING_CONCLUSION="$(printf '%s' "$run_json" | jq -er .conclusion)"
+SOURCE_HEAD_SHA="$(printf '%s' "$run_json" | jq -er .head_sha)"
+[[ "$SOURCE_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+RECOVERY_RECEIPT=""
+case "$ENGINEERING_CONCLUSION" in
+  success)
+    test -z "$ENGINEERING_RECOVERY_RUN_ID"
+    ;;
+  failure)
+    [[ "$ENGINEERING_RECOVERY_RUN_ID" =~ ^[0-9]+$ ]]
+    recovery_run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RECOVERY_RUN_ID")"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .name)" = "Retained M1 pilot engineering recovery"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .event)" = "workflow_dispatch"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .status)" = "completed"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .conclusion)" = "success"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .head_branch)" = "main"
+    test "$(printf '%s' "$recovery_run_json" | jq -er .path)" = ".github/workflows/retained-pilot-recover.yml"
+    recovery_artifact_name="retained-pilot-engineering-recovery-$PILOT-$ENGINEERING_RUN_ID-$ENGINEERING_RECOVERY_RUN_ID"
+    gh run download "$ENGINEERING_RECOVERY_RUN_ID"       --repo "$GITHUB_REPOSITORY"       --name "$recovery_artifact_name"       --dir "$RECOVERY_ROOT"
+    RECOVERY_RECEIPT="$RECOVERY_ROOT/recovery-receipt.json"
+    test -f "$RECOVERY_RECEIPT"
+    ;;
+  *)
+    echo "engineering run has unsupported conclusion $ENGINEERING_CONCLUSION" >&2
+    exit 1
+    ;;
+esac
 
 artifact_name="retained-pilot-engineering-$PILOT-$ENGINEERING_RUN_ID"
+engineering_artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RUN_ID/artifacts?per_page=100")"
+SOURCE_ARTIFACT_ID="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].id else error("engineering artifact identity missing/ambiguous") end')"
+SOURCE_ARTIFACT_DIGEST="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].digest else error("engineering artifact digest missing/ambiguous") end')"
+SOURCE_ARTIFACT_EXPIRED="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].expired else error("engineering artifact expiry missing/ambiguous") end')"
+test "$SOURCE_ARTIFACT_EXPIRED" = false
+[[ "$SOURCE_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+
 gh run download "$ENGINEERING_RUN_ID"   --repo "$GITHUB_REPOSITORY"   --name "$artifact_name"   --dir "$ENGINEERING_ROOT"
 
 ENGINEERING_STATE="$ENGINEERING_ROOT/engineering-state.json"
@@ -83,6 +121,67 @@ PR_URL="$(jq -er .pull_request.url "$ENGINEERING_STATE")"
 [[ "$PROFILE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
 test "$BASE_COMMIT" != "$RESULT_COMMIT"
 test "$PR_URL" = "https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER"
+test "$SOURCE_HEAD_SHA" = "$BASE_COMMIT"
+
+CODEX_STATUS="$ENGINEERING_ROOT/codex-status.json"
+PUBLICATION_RECEIPT="$ENGINEERING_ROOT/publication-receipt.json"
+PUBLICATION_PREFLIGHT="$ENGINEERING_ROOT/preflight-before-publication.json"
+for required in "$CODEX_STATUS" "$PUBLICATION_RECEIPT" "$PUBLICATION_PREFLIGHT" "$ENGINEERING_ROOT/result.bundle" "$ENGINEERING_ROOT/core.dump"; do
+  test -f "$required"
+done
+test -s "$ENGINEERING_ROOT/result.bundle"
+test -s "$ENGINEERING_ROOT/core.dump"
+test "sha256:$(sha256sum "$ENGINEERING_ROOT/result.bundle" | awk '{print $1}')" = "$BUNDLE_DIGEST"
+
+jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg result_digest "$RESULT_DIGEST"   --arg bundle "$BUNDLE_DIGEST"   '.state=="FINISHED" and
+   .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION" and
+   .receipt.result_digest==$result_digest and
+   .receipt.result.change.base_commit==$base and
+   .receipt.result.change.result_commit==$result and
+   .receipt.result.change.bundle_digest==$bundle and
+   .receipt.result.codex.turn_status=="completed" and
+   .receipt.result.codex.approval_requests==0 and
+   .receipt.result.codex.credential_bootstrap_removed_before_turn==true'   "$CODEX_STATUS" >/dev/null
+
+test "$(jq -er .publication "$PUBLICATION_PREFLIGHT")" = READY
+test "$(jq -er .result "$PUBLICATION_RECEIPT")" = CONFIRMED
+test "$(jq -er .external_ref "$PUBLICATION_RECEIPT")" = "$PR_URL"
+OBSERVED_STATE="$(jq -er .observed_state "$PUBLICATION_RECEIPT")"
+printf '%s' "$OBSERVED_STATE" | jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg branch "$PR_BRANCH"   --argjson number "$PR_NUMBER"   '.base_ref=="main" and
+   .base_commit==$base and
+   .result_commit==$result and
+   .branch==$branch and
+   .pull_request_number==$number and
+   .pull_request_state=="open"' >/dev/null
+
+if [ -n "$RECOVERY_RECEIPT" ]; then
+  jq -e     --arg pilot "$PILOT"     --arg source_name "$artifact_name"     --arg source_digest "$SOURCE_ARTIFACT_DIGEST"     --arg base "$BASE_COMMIT"     --arg result "$RESULT_COMMIT"     --arg result_digest "$RESULT_DIGEST"     --arg bundle "$BUNDLE_DIGEST"     --arg pr_url "$PR_URL"     --arg pr_branch "$PR_BRANCH"     --argjson source_run "$ENGINEERING_RUN_ID"     --argjson source_artifact_id "$SOURCE_ARTIFACT_ID"     --argjson recovery_run "$ENGINEERING_RECOVERY_RUN_ID"     --argjson pr_number "$PR_NUMBER"     '.version==1 and
+     .pilot==$pilot and
+     .source_engineering_run_id==$source_run and
+     .source_artifact.name==$source_name and
+     .source_artifact.id==$source_artifact_id and
+     .source_artifact.digest==$source_digest and
+     .model_phase=="FINISHED" and
+     .publication=="CONFIRMED" and
+     .base_commit==$base and
+     .result_commit==$result and
+     .codex_result_digest==$result_digest and
+     .bundle_digest==$bundle and
+     .pull_request.number==$pr_number and
+     .pull_request.url==$pr_url and
+     .pull_request.branch==$pr_branch and
+     .recovery_run_id==$recovery_run and
+     .model_replay==false'     "$RECOVERY_RECEIPT" >/dev/null
+fi
+
+pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")"
+printf '%s' "$pr_json" | jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg branch "$PR_BRANCH"   '.state=="open" and
+   .base.ref=="main" and
+   .base.sha==$base and
+   .head.sha==$result and
+   .head.ref==$branch and
+   .head.repo.id==.base.repo.id' >/dev/null
+test "$(printf '%s' "$pr_json" | jq -er .html_url)" = "$PR_URL"
 
 git -C "$GITHUB_WORKSPACE" cat-file -e "$BASE_COMMIT^{commit}"
 rm -rf "$RUNTIME_SRC"
@@ -222,10 +321,11 @@ docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state
 
 test -s "$STATE_ROOT/core-verification.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg ci_run_id "$CI_RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg delivery_id "$DELIVERY_ID"   --arg verification_id "$VERIFICATION_ID"   --arg pr_url "$PR_URL"   '{
+jq -n   --arg pilot "$PILOT"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_recovery_run_id "$ENGINEERING_RECOVERY_RUN_ID"   --arg ci_run_id "$CI_RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg delivery_id "$DELIVERY_ID"   --arg verification_id "$VERIFICATION_ID"   --arg pr_url "$PR_URL"   '{
     version:1,
     pilot:$pilot,
     engineering_run_id:($engineering_run_id|tonumber),
+    engineering_recovery_run_id:(if $engineering_recovery_run_id=="" then null else ($engineering_recovery_run_id|tonumber) end),
     ci_run_id:($ci_run_id|tonumber),
     base_commit:$base_commit,
     result_commit:$result_commit,
