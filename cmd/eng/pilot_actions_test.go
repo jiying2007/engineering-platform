@@ -178,6 +178,13 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 	for _, required := range []string{
 		"core.dump",
 		"ENGINEERING_RECOVERY_RUN_ID",
+		"debug_reproduction_run_id",
+		"debug_reproduction_receipt_digest",
+		"debug-reproduction-binding.json",
+		"debug-reproduction/reproduction-receipt.json",
+		".material.has_reproduction==true",
+		"Retained Debug firmware identity reproduction",
+		"reproduction_confirmed==true",
 		"expired|tostring",
 		"Retained M1 pilot engineering recovery",
 		".model_replay==false",
@@ -216,6 +223,9 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 	}
 	if strings.Index(verify, "gh run list") > strings.Index(verify, "/api/v1/runs/$RUN_ID/complete") {
 		t.Fatal("Run is completed before exact successful PR-head CI is discovered")
+	}
+	if strings.Index(verify, "debug-reproduction-binding.json") > strings.Index(verify, "/api/v1/runs/$RUN_ID/complete") {
+		t.Fatal("Debug reproduction lineage is not validated before Run completion")
 	}
 	if strings.Index(verify, "import-codex-evidence") > strings.Index(verify, "/api/v1/verifications") ||
 		strings.Index(verify, "import-git-change-evidence") > strings.Index(verify, "/api/v1/verifications") ||
