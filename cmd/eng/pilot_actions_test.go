@@ -746,6 +746,8 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	}
 	for _, required := range []string{
 		"runner_label:",
+		"reproduction_run_id:",
+		"DEBUG_REPRODUCTION_RUN_ID: ${{ inputs.reproduction_run_id }}",
 		"runs-on: ${{ inputs.runner_label }}",
 		"engineering-platform-codex-[0-9a-f]{32}",
 		"GITHUB_REF_PROTECTED",
@@ -786,6 +788,14 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 		"jq --arg login \"$STAGED_LOGIN_FILE\"",
 		"rm -rf -- \"$LOGIN_STAGE_ROOT\"",
 		"PG_NAME=\"engineering-platform-retained-${GITHUB_RUN_ID}-${PPID}\"",
+		"starting debug-reproduction-binding",
+		"Retained Debug firmware identity reproduction",
+		"reproduction_confirmed==true",
+		"expected_status==\"BLOCKED\"",
+		"observed_status==\"READY\"",
+		"debug-reproduction-binding.json",
+		"debug_reproduction_run_id:",
+		"debug_reproduction_receipt_digest:",
 	} {
 		if !strings.Contains(model, required) {
 			t.Fatalf("self-hosted engineer-to-PR phase missing %q", required)
@@ -793,6 +803,12 @@ func TestTrustedSelfHostedPilotModelPhaseCredentialBoundary(t *testing.T) {
 	}
 	if strings.Index(model, "core-pre-publication.dump") > strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("self-hosted model state is marked FINISHED before pre-publication snapshot")
+	}
+	if strings.Index(model, "starting debug-reproduction-binding") > strings.Index(model, "api POST /api/v1/task-contracts") {
+		t.Fatal("Debug reproduction is not validated before retained Task creation")
+	}
+	if strings.Index(model, "starting debug-reproduction-binding") > strings.Index(model, "--execute-codex") {
+		t.Fatal("Debug reproduction is not validated before model execution")
 	}
 	if strings.Index(model, "gh auth status --hostname github.com --show-token") < strings.Index(model, "model_phase:\"FINISHED\"") {
 		t.Fatal("legacy token export occurs before retained model FINISHED state")
