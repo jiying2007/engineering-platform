@@ -149,6 +149,8 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 		"pull-requests: read",
 		"persist-credentials: false",
 		"GH_TOKEN: ${{ github.token }}",
+		"engineering_recovery_run_id:",
+		"ENGINEERING_RECOVERY_RUN_ID: ${{ inputs.engineering_recovery_run_id }}",
 		"name: Resume exact retained subject and produce Verification",
 		"retained-pilot-verification-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}",
 	} {
@@ -171,6 +173,10 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 
 	for _, required := range []string{
 		"core.dump",
+		"ENGINEERING_RECOVERY_RUN_ID",
+		"Retained M1 pilot engineering recovery",
+		".model_replay==false",
+		".publication==\"CONFIRMED\"",
 		"pg_restore",
 		"worktree add --detach",
 		"trusted-ci-evidence-$RESULT_COMMIT",
@@ -210,6 +216,82 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 		strings.Index(verify, "import-git-change-evidence") > strings.Index(verify, "/api/v1/verifications") ||
 		strings.Index(verify, "import-ci-evidence") > strings.Index(verify, "/api/v1/verifications") {
 		t.Fatal("Verification is requested before all three Evidence imports")
+	}
+}
+
+func TestRetainedPilotEngineeringRecoveryWorkflowBoundary(t *testing.T) {
+	root := filepath.Join("..", "..")
+	workflowPath := filepath.Join(root, ".github", "workflows", "retained-pilot-recover.yml")
+	recoveryPath := filepath.Join(root, "examples", "pilots", "actions", "recover-retained-engineering.sh")
+	workflow := readPilotActionFile(t, workflowPath)
+	recovery := readPilotActionFile(t, recoveryPath)
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", recoveryPath).CombinedOutput(); err != nil {
+		t.Fatalf("recover-retained-engineering.sh syntax: %v: %s", err, out)
+	}
+
+	for _, required := range []string{
+		"permissions:",
+		"contents: read",
+		"actions: read",
+		"pull-requests: read",
+		"persist-credentials: false",
+		"GH_TOKEN: ${{ github.token }}",
+		"engineering_run_id:",
+		"name: Validate retained FINISHED subject without model replay",
+		"retained-pilot-engineering-recovery-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Fatalf("engineering recovery workflow missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"contents: write",
+		"pull-requests: write",
+		"id-token: write",
+		"PUBLISH_TOKEN",
+		"--execute-codex",
+		"OPENAI_IDENTITY_TOKEN_FILE",
+	} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("engineering recovery workflow unexpectedly contains %q", forbidden)
+		}
+	}
+
+	for _, required := range []string{
+		"Retained M1 pilot engineering",
+		".github/workflows/retained-pilot-self-hosted-engineer.yml",
+		`test "$(printf '%s' "$run_json" | jq -er .conclusion)" = "failure"`,
+		"engineering-state.json",
+		"model-phase.json",
+		"codex-status.json",
+		"publication-receipt.json",
+		"preflight-before-publication.json",
+		"result.bundle",
+		"core.dump",
+		`test "$(jq -er .model_phase "$MODEL_PHASE")" = FINISHED`,
+		`test "$(jq -er .result "$PUBLICATION_RECEIPT")" = CONFIRMED`,
+		"gh api \"repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER\"",
+		"model_replay:false",
+		"next_gate:\"PASS_EXACT_PR_HEAD_CI\"",
+	} {
+		if !strings.Contains(recovery, required) {
+			t.Fatalf("engineering recovery script missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"--execute-codex",
+		"PUBLISH_TOKEN",
+		"OPENAI_IDENTITY_TOKEN_FILE",
+		"/api/v1/runs/$RUN_ID/actions",
+	} {
+		if strings.Contains(recovery, forbidden) {
+			t.Fatalf("engineering recovery crosses no-replay/read-only boundary with %q", forbidden)
+		}
 	}
 }
 
