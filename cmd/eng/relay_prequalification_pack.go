@@ -13,7 +13,8 @@ func relayPrequalificationPack(args []string) error {
 	fs := flag.NewFlagSet("relay-prequalification-pack", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	codexProvider := fs.String("codex-provider", "", "non-reserved Codex custom provider id")
-	baseURL := fs.String("base-url", "", "exact HTTPS relay base URL")
+	baseURL := fs.String("base-url", "", "exact relay base URL; HTTPS by default")
+	allowPrivateHTTP := fs.Bool("allow-insecure-private-http", false, "allow HTTP only for a literal private/loopback IP relay endpoint")
 	authEnvKey := fs.String("auth-env-key", "", "dedicated relay token environment variable name")
 	authCommand := fs.String("auth-command", "", "absolute command path that returns a relay bearer token")
 	model := fs.String("model", "", "exact requested model")
@@ -47,7 +48,8 @@ func relayPrequalificationPack(args []string) error {
 
 	input := relayqualification.BuildInput{
 		CodexProviderID:     *codexProvider,
-		BaseURL:             *baseURL,
+		BaseURL:                    *baseURL,
+		AllowInsecurePrivateHTTP:   *allowPrivateHTTP,
 		RequestedModel:      *model,
 		StreamIdleTimeoutMS: *streamIdleMS,
 		GatewayPolicy:       gatewayBytes,
