@@ -83,7 +83,6 @@ func TestBuildPackCarriesExplicitPrivateHTTPPolicy(t *testing.T) {
 	}
 }
 
-
 func TestBuildPackCommandAuthCarriesExactTimingPolicy(t *testing.T) {
 	input := BuildInput{
 		CodexProviderID:              "company-relay-v1",
