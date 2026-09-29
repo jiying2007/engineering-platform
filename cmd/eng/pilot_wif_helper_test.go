@@ -50,6 +50,7 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 		t.Fatal(err)
 	}
 	profileFile := writePilotJSON(t, root, "codex-profile.json", profile)
+	qualificationFile := writePilotJSON(t, root, "fake-qualification.json", qualification)
 
 	const rule = "rule-pilot-test"
 	receipt := codexapp.LiveReceipt{
@@ -118,6 +119,7 @@ if [ "$1" = run ] && [ "$2" = download ]; then
   test -n "$dest"
   mkdir -p "$dest"
   cp "$FAKE_WIF_RECEIPT" "$dest/codex-wif-live-receipt.json"
+  cp "$FAKE_WIF_QUALIFICATION" "$dest/codex-compatibility-qualification.json"
   exit 0
 fi
 
@@ -140,6 +142,7 @@ exit 1
 		"FAKE_GH_LOG="+logFile,
 		"FAKE_MAIN_SHA="+mainSHA,
 		"FAKE_WIF_RECEIPT="+receiptFile,
+		"FAKE_WIF_QUALIFICATION="+qualificationFile,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -157,6 +160,18 @@ exit 1
 	}
 	if got.FederationRuleID != rule || got.Model != "gpt-5.6-sol" || got.BinaryDigest != profile.Profile.BinaryDigest {
 		t.Fatalf("unexpected retained helper receipt: %#v", got)
+	}
+
+	qualificationData, err := os.ReadFile(filepath.Join(outputDir, "codex-compatibility-qualification.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotQualification codexapp.QualificationReceipt
+	if err := json.Unmarshal(qualificationData, &gotQualification); err != nil {
+		t.Fatal(err)
+	}
+	if gotQualification != qualification {
+		t.Fatalf("retained live qualification does not match frozen profile qualification: got %#v want %#v", gotQualification, qualification)
 	}
 
 	workerData, err := os.ReadFile(filepath.Join(outputDir, "worker-codex.json"))
