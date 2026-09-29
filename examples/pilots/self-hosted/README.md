@@ -1,14 +1,25 @@
 # Trusted self-hosted retained Codex execution
 
-This directory is the M1 phase-1 authentication path for a trusted Linux host
-where Codex CLI is already logged in with ChatGPT. It changes only the Codex
-authentication source. Core, publication, CI, Evidence, Verification, Review and
-Closure remain the same authorities used by the WIF lane.
+This directory is the **default internal R&D Codex execution lane** for a
+trusted Linux host where Codex CLI is already logged in with ChatGPT. It was the
+authentication lane used to prove trusted self-hosted M1 phase 1 and remains the
+recommended default for current Ubuntu development servers.
+
+It changes only the Codex authentication source. Core, publication, CI,
+Evidence, Verification, Review and Closure remain provider-neutral authorities
+shared with WIF and any future separately qualified provider lane.
 
 ## Trust boundary
 
-The Linux host/account is explicitly trusted for M1 phase 1. This is intentionally
-weaker than managed-workspace WIF for unattended operation.
+The Linux host/account is explicitly trusted. This is appropriate for the
+current internal development environment but is intentionally weaker than a
+machine/workload identity for unattended infrastructure.
+
+The current deployment may use a ChatGPT Pro-authenticated Codex CLI. A specific
+ChatGPT plan is not part of the authority contract: the admitted identity is a
+working ChatGPT-authenticated Codex CLI whose exact executable/profile is
+compatibility-qualified and whose saved-login bootstrap is isolated and removed
+before model-reachable work.
 
 The model process receives:
 
@@ -26,6 +37,20 @@ After the Core-bound Codex turn is FINISHED and the result bundle plus
 pre-publication PostgreSQL snapshot are retained, the Codex process is stopped.
 Only then may the independent Action Gateway publisher read the trusted host's
 `gh` credential.
+
+## When to use another lane
+
+Use managed-workspace WIF only when GitHub-hosted or other unattended workload
+identity is actually required. WIF is not required for normal internal Ubuntu
+development.
+
+A company relay/model gateway is a different provider lane. Do not point this
+saved-login path at an API proxy and call it WIF or saved-login qualification.
+Any relay must be qualified separately under
+`docs/implementation/CODEX_CREDENTIAL_LANES_V1.md`.
+
+Authentication failure is fail-closed. This lane must not silently fall back to
+WIF, API keys or a relay.
 
 ## Runner policy
 
