@@ -4,6 +4,7 @@ umask 077
 
 : "${PILOT:?feature or debug required}"
 : "${VERIFICATION_RUN_ID:?verification workflow run id required}"
+: "${REVIEW_DECISION_COMMENT_ID:?GitHub review decision comment id required}"
 : "${REVIEW_RESULT:?PASS or FAIL required}"
 : "${REVIEW_FINDINGS_JSON:?findings JSON required}"
 : "${REVIEW_KNOWN_LIMITS_JSON:?known limits JSON required}"
@@ -81,14 +82,60 @@ PROFILE_DIGEST="$(jq -er .profile_digest "$ENGINEERING_STATE")"
 
 ENGINEERING_ACTOR="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RUN_ID" --jq .actor.login)"
 test -n "$ENGINEERING_ACTOR"
-if [ "$GITHUB_ACTOR" = "$ENGINEERING_ACTOR" ]; then
-  echo "independent review requires a different GitHub actor from engineering execution" >&2
+[[ "$REVIEW_DECISION_COMMENT_ID" =~ ^[0-9]+$ ]]
+
+PR_URL="$(jq -er .pull_request_url "$VERIFICATION_STATE")"
+PR_NUMBER="$(printf '%s' "$PR_URL" | sed -n 's#^.*/pull/\([0-9][0-9]*\)$#\1#p')"
+test -n "$PR_NUMBER"
+
+verification_run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$VERIFICATION_RUN_ID")"
+VERIFICATION_COMPLETED_AT="$(printf '%s' "$verification_run_json" | jq -er .updated_at)"
+
+decision_comment="$(gh api "repos/$GITHUB_REPOSITORY/issues/comments/$REVIEW_DECISION_COMMENT_ID")"
+test "$(printf '%s' "$decision_comment" | jq -er .issue_url)" = "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER"
+REVIEWER_ACTOR="$(printf '%s' "$decision_comment" | jq -er .user.login)"
+REVIEWER_ASSOCIATION="$(printf '%s' "$decision_comment" | jq -er .author_association)"
+REVIEW_COMMENT_URL="$(printf '%s' "$decision_comment" | jq -er .html_url)"
+REVIEW_COMMENT_CREATED_AT="$(printf '%s' "$decision_comment" | jq -er .created_at)"
+REVIEW_COMMENT_BODY="$(printf '%s' "$decision_comment" | jq -er .body)"
+
+case "$REVIEWER_ASSOCIATION" in
+  OWNER|MEMBER|COLLABORATOR) ;;
+  *) echo "review decision comment author is not an authorized repository actor" >&2; exit 1 ;;
+esac
+if [ "$REVIEWER_ACTOR" = "$ENGINEERING_ACTOR" ]; then
+  echo "independent review requires a different GitHub decision actor from engineering execution" >&2
   exit 1
 fi
+if [[ "$REVIEW_COMMENT_CREATED_AT" < "$VERIFICATION_COMPLETED_AT" ]]; then
+  echo "review decision comment predates successful verification" >&2
+  exit 1
+fi
+
+printf '%s' "$REVIEW_COMMENT_BODY" | jq -e \
+  --arg verification_run_id "$VERIFICATION_RUN_ID" \
+  --arg result_commit "$RESULT_COMMIT" \
+  --arg decision "$REVIEW_RESULT" \
+  '.kind=="engineering-platform.retained-independent-review.v1" and
+   .verification_run_id==($verification_run_id|tonumber) and
+   .result_commit==$result_commit and
+   .decision==$decision and
+   (.findings|type)=="array" and
+   (.known_limits|type)=="array"' >/dev/null
+
+COMMENT_FINDINGS="$(printf '%s' "$REVIEW_COMMENT_BODY" | jq -cS '.findings')"
+INPUT_FINDINGS="$(printf '%s' "$REVIEW_FINDINGS_JSON" | jq -cS '.')"
+COMMENT_LIMITS="$(printf '%s' "$REVIEW_COMMENT_BODY" | jq -cS '.known_limits')"
+INPUT_LIMITS="$(printf '%s' "$REVIEW_KNOWN_LIMITS_JSON" | jq -cS '.')"
+test "$COMMENT_FINDINGS" = "$INPUT_FINDINGS"
+test "$COMMENT_LIMITS" = "$INPUT_LIMITS"
+
 printf '%s
 ' "$ENGINEERING_ACTOR" > "$STATE_ROOT/engineering-actor.txt"
 printf '%s
-' "$GITHUB_ACTOR" > "$STATE_ROOT/reviewer-actor.txt"
+' "$REVIEWER_ACTOR" > "$STATE_ROOT/reviewer-actor.txt"
+printf '%s
+' "$REVIEW_DECISION_COMMENT_ID" > "$STATE_ROOT/review-decision-comment-id.txt"
 
 [[ "$BASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
 [[ "$RESULT_COMMIT" =~ ^[0-9a-f]{40}$ ]]
@@ -180,13 +227,16 @@ docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state
 
 test -s "$STATE_ROOT/core-review.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg verification_run_id "$VERIFICATION_RUN_ID"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_actor "$ENGINEERING_ACTOR"   --arg reviewer_actor "$GITHUB_ACTOR"   --arg review_result "$REVIEW_RESULT"   --arg closure "$CLOSURE_STATE"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   '{
+jq -n   --arg pilot "$PILOT"   --arg verification_run_id "$VERIFICATION_RUN_ID"   --arg engineering_run_id "$ENGINEERING_RUN_ID"   --arg engineering_actor "$ENGINEERING_ACTOR"   --arg reviewer_actor "$REVIEWER_ACTOR"   --arg dispatcher_actor "$GITHUB_ACTOR"   --arg decision_comment_id "$REVIEW_DECISION_COMMENT_ID"   --arg decision_comment_url "$REVIEW_COMMENT_URL"   --arg review_result "$REVIEW_RESULT"   --arg closure "$CLOSURE_STATE"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   '{
     version:1,
     pilot:$pilot,
     verification_run_id:($verification_run_id|tonumber),
     engineering_run_id:($engineering_run_id|tonumber),
     engineering_actor:$engineering_actor,
     reviewer_actor:$reviewer_actor,
+    dispatcher_actor:$dispatcher_actor,
+    decision_comment_id:($decision_comment_id|tonumber),
+    decision_comment_url:$decision_comment_url,
     review_result:$review_result,
     closure:$closure,
     base_commit:$base_commit,
