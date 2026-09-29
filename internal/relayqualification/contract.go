@@ -51,6 +51,7 @@ type Assessment struct {
 	SchemaVersion         int    `json:"schema_version"`
 	Stage                 string `json:"stage"`
 	ProviderConfigDigest  string `json:"provider_config_digest"`
+	CodexConfigDigest     string `json:"codex_config_digest"`
 	ProviderID            string `json:"provider_id"`
 	CodexProviderID       string `json:"codex_provider_id"`
 	RequestedModel        string `json:"requested_model"`
@@ -88,7 +89,7 @@ func (c Contract) Validate() error {
 	default:
 		return fmt.Errorf("unsupported relay auth mode")
 	}
-	if strings.TrimSpace(c.RequestedModel) != c.RequestedModel || c.RequestedModel == "" || len(c.RequestedModel) > 128 {
+	if !validText(c.RequestedModel, 128) {
 		return fmt.Errorf("bounded exact requested_model required")
 	}
 	if c.RequestMaxRetries != 0 || c.StreamMaxRetries != 0 {
@@ -124,10 +125,15 @@ func Evaluate(c Contract) (Assessment, error) {
 	if err != nil {
 		return Assessment{}, err
 	}
+	configDigest, err := c.CodexConfigDigest()
+	if err != nil {
+		return Assessment{}, err
+	}
 	return Assessment{
 		SchemaVersion:         SchemaVersion,
 		Stage:                 StageRepositoryPrequalification,
 		ProviderConfigDigest:  digest,
+		CodexConfigDigest:     configDigest,
 		ProviderID:            c.ProviderID,
 		CodexProviderID:       c.CodexProviderID,
 		RequestedModel:        c.RequestedModel,
@@ -167,4 +173,17 @@ func validAbsoluteCommand(value string) bool {
 		!strings.ContainsAny(value, "\r\n\x00") &&
 		filepath.IsAbs(value) &&
 		filepath.Clean(value) == value
+}
+
+
+func validText(value string, max int) bool {
+	if value == "" || len(value) > max || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return false
+		}
+	}
+	return true
 }
