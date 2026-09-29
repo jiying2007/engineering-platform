@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
 
@@ -67,15 +68,15 @@ type EngineeringObservation struct {
 }
 
 type EngineeringReceipt struct {
-	SchemaVersion                        int    `json:"schema_version"`
-	CLI                                  string `json:"cli"`
-	Version                              string `json:"version"`
-	BinaryDigest                         string `json:"binary_digest"`
-	QualificationDigest                  string `json:"qualification_digest"`
-	EngineeringConfigDigest              string `json:"engineering_config_digest"`
-	CredentialMode                       string `json:"credential_mode"`
-	FederationRuleID                     string `json:"federation_rule_id"`
-	Model                                string `json:"model"`
+	SchemaVersion                        int                       `json:"schema_version"`
+	CLI                                  string                    `json:"cli"`
+	Version                              string                    `json:"version"`
+	BinaryDigest                         string                    `json:"binary_digest"`
+	QualificationDigest                  string                    `json:"qualification_digest"`
+	EngineeringConfigDigest              string                    `json:"engineering_config_digest"`
+	Provider                             provideridentity.Identity `json:"provider"`
+	FederationRuleID                     string                    `json:"federation_rule_id"`
+	Model                                string                    `json:"model"`
 	PromptDigest                         string `json:"prompt_digest"`
 	ThreadID                             string `json:"thread_id"`
 	TurnID                               string `json:"turn_id"`
@@ -288,10 +289,10 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 		}
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 2, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 3, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
-		CredentialMode:          CredentialModeWorkloadIdentity, FederationRuleID: ruleID, Model: model,
+		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: ruleID, Model: model,
 		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
@@ -400,10 +401,10 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 		}
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 2, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 3, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
-		CredentialMode:          CredentialModeSavedChatGPTLogin, FederationRuleID: "", Model: model,
+		Provider:                provideridentity.OpenAIChatGPTTrustedSelfHosted(), FederationRuleID: "", Model: model,
 		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
@@ -416,9 +417,9 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 }
 
 func (r EngineeringReceipt) Validate() error {
-	if r.SchemaVersion != 2 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+	if r.SchemaVersion != 3 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.QualificationDigest) ||
-		r.EngineeringConfigDigest != EngineeringConfigDigest() ||
+		r.EngineeringConfigDigest != EngineeringConfigDigest() || r.Provider.Validate() != nil ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
 		strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 ||
@@ -427,19 +428,19 @@ func (r EngineeringReceipt) Validate() error {
 		r.ApprovalRequests != 0 {
 		return fmt.Errorf("invalid engineering Codex receipt")
 	}
-	switch r.CredentialMode {
-	case CredentialModeWorkloadIdentity:
+	switch r.Provider.CredentialMode {
+	case provideridentity.CredentialWorkloadIdentity:
 		if !validFederationRuleID(r.FederationRuleID) || !r.AssertionRemovedBeforeTurn ||
 			r.CredentialBootstrapRemovedBeforeTurn {
 			return fmt.Errorf("invalid engineering workload-identity receipt")
 		}
-	case CredentialModeSavedChatGPTLogin:
+	case provideridentity.CredentialChatGPTSession:
 		if r.FederationRuleID != "" || r.AssertionRemovedBeforeTurn ||
 			!r.CredentialBootstrapRemovedBeforeTurn {
 			return fmt.Errorf("invalid engineering saved-login receipt")
 		}
 	default:
-		return fmt.Errorf("invalid engineering credential mode")
+		return fmt.Errorf("invalid engineering provider credential mode")
 	}
 	return nil
 }
