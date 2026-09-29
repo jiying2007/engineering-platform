@@ -26,14 +26,16 @@ artifact. Its path must resolve without symlinks to an owner-private regular fil
 inside an owner-private directory. The token path must be outside the worktree and
 Runtime HOME. Errors never include token contents.
 
-Before any thread or model turn is created, the adapter calls the exact stable
-`account/rateLimits/read` RPC. Codex 0.155.0 resolves `AuthManager::auth().await`
-on that path, so a successful response proves that the host-owned WIF assertion
-has been exchanged without starting model/tool execution. The host then unlinks
-the assertion and requires the path to be absent before `thread/start`. The live
-receipt records `assertion_removed_before_turn=true`; missing that fence is
-invalid. A later refresh that requires the upstream assertion therefore fails
-closed instead of making the assertion readable to a model-reachable local tool.
+Before any thread or model turn is created, the adapter calls the stable
+`account/rateLimits/read` RPC. The selected native Codex binary is first
+compatibility-qualified against the repository contract and then rebound by exact
+version and binary digest. A successful authentication read proves that the
+host-owned WIF assertion has been exchanged without starting model/tool
+execution. The host then unlinks the assertion and requires the path to be absent
+before `thread/start`. The live receipt records
+`assertion_removed_before_turn=true`; missing that fence is invalid. A later
+refresh that requires the upstream assertion therefore fails closed instead of
+making the assertion readable to a model-reachable local tool.
 
 This follows Codex credential precedence rather than relying on fallback: the
 presence of either required WIF variable selects WIF, and incomplete WIF must be
@@ -48,10 +50,13 @@ an error rather than silently trying another credential.
 
 The live job requires:
 
-- invocation from `refs/heads/main`;
+- invocation from protected `refs/heads/main`;
 - repository `jiying2007/engineering-platform`;
 - repository variable `OPENAI_WIF_AUDIENCE`;
 - repository variable `OPENAI_CODEX_FEDERATION_RULE_ID`.
+
+Missing repository variables fail before checkout, OIDC minting, federation
+exchange or model execution and name the missing variable explicitly.
 
 It asks GitHub for one signed OIDC JWT using the configured audience, writes it
 with mode 0600 under a dedicated 0700 directory, then locally decodes only the
@@ -76,9 +81,13 @@ not implement a refresh agent.
 
 ## Live-turn acceptance
 
-`cmd/codex-wif-live` launches the already qualified native `codex-cli 0.155.0`
-through `NewPinnedProvider`. It rechecks exact executable bytes and exact
-`codex-cli 0.155.0` before starting app-server.
+`.github/workflows/codex-wif-live.yml` installs the requested bounded semantic
+version of Codex (default currently `0.157.1`), compatibility-qualifies that
+exact native binary without a model turn, and passes its exact binary digest to
+`cmd/codex-wif-live`. The live adapter launches through `NewPinnedProvider`
+and rechecks the exact executable bytes/version before starting app-server. Team
+members do not need one globally fixed Codex version; compatibility qualification
+and retained provenance are the admission authority.
 
 The thread remains:
 
@@ -120,25 +129,47 @@ workspaces and must be enabled/configured by an administrator. Source merge alon
 cannot create the federation provider/rule, principal membership or repository
 variables.
 
-Until an administrator completes that setup and a manual
-`Codex WIF live qualification` workflow succeeds, the repository must continue
-to state:
+Real probe `36556354798` on protected main
+`644127255f615abb753fab5c450ea23caad76b11` failed in the first prerequisite
+step because both repository variables were absent:
 
-**WIF-ready, no retained authenticated model-turn proof.**
+- `OPENAI_WIF_AUDIENCE`;
+- `OPENAI_CODEX_FEDERATION_RULE_ID`.
+
+The failure occurred before checkout, OIDC assertion minting, federation exchange
+or model execution. It therefore consumed no managed-WIF model turn.
+
+Issue #103 is the single external qualification gate. The administrator should
+use `examples/pilots/wif/configure-admin-api.sh` to create/reuse the exact
+provider/rule and optionally write the two repository variables.
+
+Until that setup is complete and one `Codex WIF live qualification` workflow
+succeeds and retains its receipt, the repository must continue to state:
+
+**WIF-ready, managed-workspace WIF not yet qualified.**
 
 ## After the first successful live receipt
 
-A qualification turn is still not a Feature/Debug pilot. The next connected
-runtime increment must:
+A qualification turn proves the managed-workspace **authentication lane**, not a
+new product Feature/Debug result and not production service readiness.
 
-1. bind the live process to a current Core Run/execution lease rather than a
-   workflow-only qualification;
-2. issue fresh WIF assertions through a host credential broker;
-3. allow workspace-write only under the OS execution boundary already established;
-4. route every command/file/network approval through Action Gateway authority;
-5. retain provider output, changed-tree and CI provenance as Run-bound Evidence;
-6. run independent Review, reconciliation/restore, then real Feature and Debug
-   pilots.
+Trusted self-hosted M1 phase 1 is already proven by the retained Feature and
+Debug Closure chains archived in
+`docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`. Do not rerun those
+pilots merely to close the WIF gate.
+
+After the first successful WIF live receipt:
+
+1. close issue #103 with the exact run/artifact/receipt identity;
+2. mark managed-workspace WIF authentication as qualified while preserving the
+   separate trusted self-hosted evidence;
+3. retain the existing fail-closed WIF retained-engineering path for workloads
+   that specifically need GitHub-hosted unattended execution;
+4. treat long-running assertion refresh/credential-broker design, deployment
+   ownership, operational SLOs, rollout/rollback and production service evidence
+   as productionization work rather than M1 requalification;
+5. do not broaden repository/ref/workflow/audience/immutable-ID constraints to
+   make an unattended run start.
 
 References:
 - OpenAI Workload identity federation guide
