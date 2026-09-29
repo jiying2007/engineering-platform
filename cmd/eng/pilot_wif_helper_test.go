@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -45,7 +46,7 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 		t.Fatal(err)
 	}
 	qualification := profileQualificationFixture(t, codex, "0.155.0", "gpt-5.6-sol")
-	profile, err := buildCodexProfile(codex, "gpt-5.6-sol", qualification)
+	profile, err := buildCodexProfile(codex, "gpt-5.6-sol", qualification, provideridentity.OpenAIWIFUnattended())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,12 +55,12 @@ func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
 
 	const rule = "rule-pilot-test"
 	receipt := codexapp.LiveReceipt{
-		SchemaVersion:              1,
+		SchemaVersion:              2,
 		CLI:                        "codex-cli",
 		Version:                    profile.Profile.CodexVersion,
 		BinaryDigest:               profile.Profile.BinaryDigest,
 		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(),
-		CredentialMode:             "workload_identity",
+		Provider:                   profile.Profile.Provider,
 		FederationRuleID:           rule,
 		Model:                      profile.Profile.Model,
 		PromptDigest:               canonical.BytesDigest([]byte(codexapp.LiveProbePrompt)),
@@ -182,7 +183,7 @@ exit 1
 	if err := json.Unmarshal(workerData, &worker); err != nil {
 		t.Fatal(err)
 	}
-	if worker.Version != 1 || worker.FederationRuleID != rule ||
+	if worker.Version != 2 || worker.FederationRuleID != rule ||
 		worker.Executable != profile.CodexExecutable ||
 		worker.Qualification != qualification ||
 		worker.Profile != profile.Profile {
