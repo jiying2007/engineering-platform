@@ -17,6 +17,7 @@ func relayPrequalificationPack(args []string) error {
 	allowPrivateHTTP := fs.Bool("allow-insecure-private-http", false, "allow HTTP only for a literal private/loopback IP relay endpoint")
 	authEnvKey := fs.String("auth-env-key", "", "dedicated relay token environment variable name")
 	authCommand := fs.String("auth-command", "", "absolute command path that returns a relay bearer token")
+	authCommandTimeoutMS := fs.Int("auth-command-timeout-ms", 5000, "bounded token-helper timeout in milliseconds")
 	model := fs.String("model", "", "exact requested model")
 	streamIdleMS := fs.Int("stream-idle-timeout-ms", 30000, "bounded stream idle timeout in milliseconds")
 	gatewayPolicy := fs.String("gateway-policy", "", "gateway protocol/security policy file")
@@ -62,6 +63,8 @@ func relayPrequalificationPack(args []string) error {
 	} else {
 		input.AuthMode = relayqualification.AuthCommandToken
 		input.AuthCommand = *authCommand
+		input.AuthCommandTimeoutMS = *authCommandTimeoutMS
+		input.AuthCommandRefreshIntervalMS = 0
 	}
 	pack, err := relayqualification.BuildPack(input)
 	if err != nil {

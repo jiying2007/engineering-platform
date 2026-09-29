@@ -148,23 +148,32 @@ to another provider, credential mode or execution mode.
 ## Relay repository prequalification
 
 Issue #106 now has a repository-only prequalification stage documented by
-`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V1.md`. Two CLI surfaces
+`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V2.md`. Two CLI surfaces
 are available:
 
 - `eng relay-prequalification-pack` builds the canonical Contract + Assessment
   from non-secret provider parameters and three bounded policy/mapping files;
 - `eng relay-prequalification --contract CONTRACT.json` strictly revalidates an
-  already-materialized contract.
+  already-materialized v2 contract;
+- `eng relay-render-codex-config --contract CONTRACT.json --out CONFIG.toml`
+  renders the exact future user-level Codex provider TOML without any network or
+  credential operation.
 
-This stage freezes one exact Codex custom-provider configuration, its
-credential locator (never credential material), requested model and policy
-digests. HTTPS remains the default. An explicit private-HTTP exception is
+This stage now uses relay prequalification schema v2. The v1 live-tree document
+has been retired with no compatibility shim because no relay was yet
+live-qualified or admitted. v2 freezes one exact Codex custom-provider
+configuration, its credential locator (never credential material), requested
+model and policy digests, plus the renderer contract version and exact rendered
+Codex TOML digest. The final provider_config_digest binds the contract digest,
+renderer version and Codex config digest. HTTPS remains the default. An explicit private-HTTP exception is
 available only for literal private/loopback IP endpoints; public/DNS/link-local
 cleartext endpoints remain fail-closed, and the exception bit is included in the
 provider configuration digest. The operator pack computes policy digests from
 exact file bytes, rejects symlinked/oversized inputs, and performs no network or
-credential operation. Initial qualification disables request/stream retries, WebSockets and
-standalone web search to keep the first provider proof bounded.
+credential operation. Command-token mode additionally binds an explicit
+token-helper timeout and requires refresh_interval_ms=0 for the initial posture.
+Initial qualification disables request/stream retries, WebSockets and standalone
+web search to keep the first provider proof bounded.
 
 A successful repository prequalification explicitly records
 `account_verified=false`, `live_model_turn_executed=false` and

@@ -82,3 +82,29 @@ func TestBuildPackCarriesExplicitPrivateHTTPPolicy(t *testing.T) {
 		t.Fatalf("private HTTP transport policy was not retained: %#v", pack.Contract)
 	}
 }
+
+func TestBuildPackCommandAuthCarriesExactTimingPolicy(t *testing.T) {
+	input := BuildInput{
+		CodexProviderID:              "company-relay-v1",
+		BaseURL:                      "https://relay.example.invalid/v1",
+		AuthMode:                     AuthCommandToken,
+		AuthCommand:                  "/usr/local/bin/company-relay-token",
+		AuthCommandTimeoutMS:         5000,
+		AuthCommandRefreshIntervalMS: 0,
+		RequestedModel:               "relay-gpt-5.6",
+		StreamIdleTimeoutMS:          30000,
+		GatewayPolicy:                []byte("gateway"),
+		PrivacyPolicy:                []byte("privacy"),
+		ModelMapping:                 []byte("mapping"),
+	}
+	pack, err := BuildPack(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Contract.AuthCommandTimeoutMS != 5000 ||
+		pack.Contract.AuthCommandRefreshIntervalMS != 0 ||
+		pack.Assessment.CodexConfigDigest == "" ||
+		pack.Assessment.ProviderConfigDigest == "" {
+		t.Fatalf("command auth policy not bound: %#v", pack)
+	}
+}

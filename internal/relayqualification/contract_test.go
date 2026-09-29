@@ -28,6 +28,14 @@ func validContract() Contract {
 	}
 }
 
+func TestV1ContractFailsClosedOnCurrentMain(t *testing.T) {
+	contract := validContract()
+	contract.SchemaVersion = 1
+	if err := contract.Validate(); err == nil {
+		t.Fatal("superseded relay prequalification v1 accepted")
+	}
+}
+
 func TestEvaluateProducesNonAdmittingDeterministicAssessment(t *testing.T) {
 	contract := validContract()
 	first, err := Evaluate(contract)
@@ -118,12 +126,30 @@ func TestCommandTokenContractUsesAbsoluteDedicatedCommand(t *testing.T) {
 	contract.AuthMode = AuthCommandToken
 	contract.EnvKey = ""
 	contract.AuthCommand = "/usr/local/bin/company-relay-token"
+	contract.AuthCommandTimeoutMS = 5000
+	contract.AuthCommandRefreshIntervalMS = 0
 	if err := contract.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	contract.AuthCommand = "company-relay-token"
 	if err := contract.Validate(); err == nil {
 		t.Fatal("relative token command accepted")
+	}
+}
+
+func TestCommandTokenRequiresBoundedExplicitExecutionPolicy(t *testing.T) {
+	contract := validContract()
+	contract.AuthMode = AuthCommandToken
+	contract.EnvKey = ""
+	contract.AuthCommand = "/usr/local/bin/company-relay-token"
+	contract.AuthCommandTimeoutMS = 0
+	if err := contract.Validate(); err == nil {
+		t.Fatal("command token without explicit timeout accepted")
+	}
+	contract.AuthCommandTimeoutMS = 5000
+	contract.AuthCommandRefreshIntervalMS = 300000
+	if err := contract.Validate(); err == nil {
+		t.Fatal("scheduled token refresh accepted in initial qualification")
 	}
 }
 
