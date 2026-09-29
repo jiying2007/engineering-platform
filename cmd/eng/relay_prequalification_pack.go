@@ -47,14 +47,14 @@ func relayPrequalificationPack(args []string) error {
 	}
 
 	input := relayqualification.BuildInput{
-		CodexProviderID:     *codexProvider,
-		BaseURL:                    *baseURL,
-		AllowInsecurePrivateHTTP:   *allowPrivateHTTP,
-		RequestedModel:      *model,
-		StreamIdleTimeoutMS: *streamIdleMS,
-		GatewayPolicy:       gatewayBytes,
-		PrivacyPolicy:       privacyBytes,
-		ModelMapping:        mappingBytes,
+		CodexProviderID:          *codexProvider,
+		BaseURL:                  *baseURL,
+		AllowInsecurePrivateHTTP: *allowPrivateHTTP,
+		RequestedModel:           *model,
+		StreamIdleTimeoutMS:      *streamIdleMS,
+		GatewayPolicy:            gatewayBytes,
+		PrivacyPolicy:            privacyBytes,
+		ModelMapping:             mappingBytes,
 	}
 	if *authEnvKey != "" {
 		input.AuthMode = relayqualification.AuthEnvKey
