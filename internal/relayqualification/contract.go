@@ -2,6 +2,7 @@ package relayqualification
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -32,6 +33,7 @@ type Contract struct {
 	ProviderID                  string `json:"provider_id"`
 	CodexProviderID             string `json:"codex_provider_id"`
 	BaseURL                     string `json:"base_url"`
+	AllowInsecurePrivateHTTP    bool   `json:"allow_insecure_private_http"`
 	WireAPI                     string `json:"wire_api"`
 	AuthMode                    string `json:"auth_mode"`
 	EnvKey                      string `json:"env_key,omitempty"`
@@ -67,7 +69,7 @@ func (c Contract) Validate() error {
 	if !providerIDPattern.MatchString(c.CodexProviderID) || reservedCodexProviderID(c.CodexProviderID) {
 		return fmt.Errorf("codex_provider_id must be a non-reserved custom provider id")
 	}
-	if err := validateBaseURL(c.BaseURL); err != nil {
+	if err := validateBaseURL(c.BaseURL, c.AllowInsecurePrivateHTTP); err != nil {
 		return err
 	}
 	if c.WireAPI != WireAPIResponses {
@@ -147,13 +149,29 @@ func reservedCodexProviderID(id string) bool {
 	}
 }
 
-func validateBaseURL(value string) error {
+func validateBaseURL(value string, allowInsecurePrivateHTTP bool) error {
 	if strings.TrimSpace(value) != value || value == "" || len(value) > 2048 || strings.ContainsAny(value, "\r\n\x00") {
 		return fmt.Errorf("bounded exact relay base_url required")
 	}
 	u, err := url.Parse(value)
-	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
-		return fmt.Errorf("relay base_url must be HTTPS without credentials, query, fragment or opaque form")
+	if err != nil || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" {
+		return fmt.Errorf("relay base_url must be an absolute provider URL without credentials, query, fragment or opaque form")
+	}
+	switch u.Scheme {
+	case "https":
+		if allowInsecurePrivateHTTP {
+			return fmt.Errorf("allow_insecure_private_http is valid only for an HTTP private-IP endpoint")
+		}
+	case "http":
+		if !allowInsecurePrivateHTTP {
+			return fmt.Errorf("HTTP relay endpoint requires explicit allow_insecure_private_http")
+		}
+		ip := net.ParseIP(u.Hostname())
+		if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
+			return fmt.Errorf("insecure HTTP relay endpoint must use a literal private or loopback IP")
+		}
+	default:
+		return fmt.Errorf("relay base_url must use HTTPS or explicitly allowed private HTTP")
 	}
 	if u.Path != "" && strings.Contains(u.Path, "..") {
 		return fmt.Errorf("relay base_url path must not contain traversal segments")
