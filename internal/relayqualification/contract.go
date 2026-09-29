@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	SchemaVersion            = 2
-	RendererContractVersion  = 1
-	ProviderCompanyRelay     = "company-relay"
-	WireAPIResponses         = "responses"
-	AuthEnvKey               = "env-key"
-	AuthCommandToken         = "command-token"
+	SchemaVersion                   = 2
+	RendererContractVersion         = 1
+	ProviderCompanyRelay            = "company-relay"
+	WireAPIResponses                = "responses"
+	AuthEnvKey                      = "env-key"
+	AuthCommandToken                = "command-token"
 	StageRepositoryPrequalification = "repository-prequalification"
 	NextGateLiveReadOnlyNoTool      = "live-read-only-no-tool-provider-qualification"
 )
@@ -26,42 +26,42 @@ var providerIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 var envKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 
 type Contract struct {
-	SchemaVersion                    int    `json:"schema_version"`
-	ProviderID                       string `json:"provider_id"`
-	CodexProviderID                  string `json:"codex_provider_id"`
-	BaseURL                          string `json:"base_url"`
-	AllowInsecurePrivateHTTP         bool   `json:"allow_insecure_private_http"`
-	WireAPI                          string `json:"wire_api"`
-	AuthMode                         string `json:"auth_mode"`
-	EnvKey                           string `json:"env_key,omitempty"`
-	AuthCommand                      string `json:"auth_command,omitempty"`
-	AuthCommandTimeoutMS             int    `json:"auth_command_timeout_ms,omitempty"`
-	AuthCommandRefreshIntervalMS     int    `json:"auth_command_refresh_interval_ms,omitempty"`
-	RequestedModel                   string `json:"requested_model"`
-	RequestMaxRetries                int    `json:"request_max_retries"`
-	StreamMaxRetries                 int    `json:"stream_max_retries"`
-	StreamIdleTimeoutMS              int    `json:"stream_idle_timeout_ms"`
-	SupportsWebSockets               bool   `json:"supports_websockets"`
-	SupportsStandaloneWebSearch      bool   `json:"supports_standalone_web_search"`
-	GatewayPolicyDigest              string `json:"gateway_policy_digest"`
-	PrivacyPolicyDigest              string `json:"privacy_policy_digest"`
-	ModelMappingDigest               string `json:"model_mapping_digest"`
+	SchemaVersion                int    `json:"schema_version"`
+	ProviderID                   string `json:"provider_id"`
+	CodexProviderID              string `json:"codex_provider_id"`
+	BaseURL                      string `json:"base_url"`
+	AllowInsecurePrivateHTTP     bool   `json:"allow_insecure_private_http"`
+	WireAPI                      string `json:"wire_api"`
+	AuthMode                     string `json:"auth_mode"`
+	EnvKey                       string `json:"env_key,omitempty"`
+	AuthCommand                  string `json:"auth_command,omitempty"`
+	AuthCommandTimeoutMS         int    `json:"auth_command_timeout_ms,omitempty"`
+	AuthCommandRefreshIntervalMS int    `json:"auth_command_refresh_interval_ms,omitempty"`
+	RequestedModel               string `json:"requested_model"`
+	RequestMaxRetries            int    `json:"request_max_retries"`
+	StreamMaxRetries             int    `json:"stream_max_retries"`
+	StreamIdleTimeoutMS          int    `json:"stream_idle_timeout_ms"`
+	SupportsWebSockets           bool   `json:"supports_websockets"`
+	SupportsStandaloneWebSearch  bool   `json:"supports_standalone_web_search"`
+	GatewayPolicyDigest          string `json:"gateway_policy_digest"`
+	PrivacyPolicyDigest          string `json:"privacy_policy_digest"`
+	ModelMappingDigest           string `json:"model_mapping_digest"`
 }
 
 type Assessment struct {
-	SchemaVersion            int    `json:"schema_version"`
-	Stage                    string `json:"stage"`
-	ContractDigest           string `json:"contract_digest"`
-	RendererContractVersion  int    `json:"renderer_contract_version"`
-	CodexConfigDigest        string `json:"codex_config_digest"`
-	ProviderConfigDigest     string `json:"provider_config_digest"`
-	ProviderID               string `json:"provider_id"`
-	CodexProviderID          string `json:"codex_provider_id"`
-	RequestedModel           string `json:"requested_model"`
-	AccountVerified          bool   `json:"account_verified"`
-	LiveModelTurnExecuted    bool   `json:"live_model_turn_executed"`
-	ProviderAdmitted         bool   `json:"provider_admitted"`
-	NextGate                 string `json:"next_gate"`
+	SchemaVersion           int    `json:"schema_version"`
+	Stage                   string `json:"stage"`
+	ContractDigest          string `json:"contract_digest"`
+	RendererContractVersion int    `json:"renderer_contract_version"`
+	CodexConfigDigest       string `json:"codex_config_digest"`
+	ProviderConfigDigest    string `json:"provider_config_digest"`
+	ProviderID              string `json:"provider_id"`
+	CodexProviderID         string `json:"codex_provider_id"`
+	RequestedModel          string `json:"requested_model"`
+	AccountVerified         bool   `json:"account_verified"`
+	LiveModelTurnExecuted   bool   `json:"live_model_turn_executed"`
+	ProviderAdmitted        bool   `json:"provider_admitted"`
+	NextGate                string `json:"next_gate"`
 }
 
 type providerConfigIdentity struct {
