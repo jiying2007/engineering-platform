@@ -52,9 +52,17 @@ CODEX_STATUS="$ENGINEERING_ROOT/codex-status.json"
 PUBLICATION_RECEIPT="$ENGINEERING_ROOT/publication-receipt.json"
 PUBLICATION_PREFLIGHT="$ENGINEERING_ROOT/preflight-before-publication.json"
 
-test "$(jq -er .version "$ENGINEERING_STATE")" = 1
+test "$(jq -er .version "$ENGINEERING_STATE")" = 2
+test "$(jq -er .version "$MODEL_PHASE")" = 2
 test "$(jq -er .pilot "$ENGINEERING_STATE")" = "$PILOT"
 test "$(jq -er .github_engineering_run_id "$ENGINEERING_STATE")" = "$ENGINEERING_RUN_ID"
+PROVIDER_JSON="$(jq -cS .provider "$ENGINEERING_STATE")"
+test "$PROVIDER_JSON" = "$(jq -cS .provider "$MODEL_PHASE")"
+printf '%s' "$PROVIDER_JSON" | jq -e '
+  .provider_id=="openai-codex" and
+  .credential_mode=="chatgpt-session" and
+  .execution_mode=="trusted-self-hosted"
+' >/dev/null
 test "$(jq -er .model_phase "$MODEL_PHASE")" = FINISHED
 test "$(jq -er .publication "$MODEL_PHASE")" = NOT_STARTED
 test "$(jq -er .publication "$PUBLICATION_PREFLIGHT")" = READY
@@ -76,12 +84,13 @@ test "$BASE_COMMIT" = "$SOURCE_HEAD_SHA"
 test "$BASE_COMMIT" != "$RESULT_COMMIT"
 test "sha256:$(sha256sum "$ENGINEERING_ROOT/result.bundle" | awk '{print $1}')" = "$BUNDLE_DIGEST"
 
-jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg result_digest "$RESULT_DIGEST"   --arg bundle "$BUNDLE_DIGEST"   '.state=="FINISHED" and
+jq -e   --arg base "$BASE_COMMIT"   --arg result "$RESULT_COMMIT"   --arg result_digest "$RESULT_DIGEST"   --arg bundle "$BUNDLE_DIGEST"   --argjson provider "$PROVIDER_JSON"   '.state=="FINISHED" and
    .receipt.kind=="WORKER_ATTESTED_CODEX_EXECUTION" and
    .receipt.result_digest==$result_digest and
    .receipt.result.change.base_commit==$base and
    .receipt.result.change.result_commit==$result and
    .receipt.result.change.bundle_digest==$bundle and
+   .receipt.result.codex.provider==$provider and
    .receipt.result.codex.turn_status=="completed" and
    .receipt.result.codex.approval_requests==0 and
    .receipt.result.codex.credential_bootstrap_removed_before_turn==true'   "$CODEX_STATUS" >/dev/null
@@ -110,8 +119,9 @@ OPERATION_ID="$(jq -er .operation_id "$PUBLICATION_RECEIPT")"
 test -n "$ACTION_RECEIPT_ID"
 test -n "$OPERATION_ID"
 
-jq -n   --arg pilot "$PILOT"   --arg source_engineering_run_id "$ENGINEERING_RUN_ID"   --arg source_head_sha "$SOURCE_HEAD_SHA"   --arg source_artifact_name "$artifact_name"   --arg source_artifact_id "$SOURCE_ARTIFACT_ID"   --arg source_artifact_digest "$SOURCE_ARTIFACT_DIGEST"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg codex_result_digest "$RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --arg action_receipt_id "$ACTION_RECEIPT_ID"   --arg operation_id "$OPERATION_ID"   --arg pr_url "$PR_URL"   --arg pr_branch "$PR_BRANCH"   --argjson pr_number "$PR_NUMBER"   --arg recovery_run_id "$GITHUB_RUN_ID"   '{
-    version:1,
+jq -n   --arg pilot "$PILOT"   --arg source_engineering_run_id "$ENGINEERING_RUN_ID"   --arg source_head_sha "$SOURCE_HEAD_SHA"   --arg source_artifact_name "$artifact_name"   --arg source_artifact_id "$SOURCE_ARTIFACT_ID"   --arg source_artifact_digest "$SOURCE_ARTIFACT_DIGEST"   --arg base_commit "$BASE_COMMIT"   --arg result_commit "$RESULT_COMMIT"   --arg codex_result_digest "$RESULT_DIGEST"   --arg bundle_digest "$BUNDLE_DIGEST"   --argjson provider "$PROVIDER_JSON"   --arg action_receipt_id "$ACTION_RECEIPT_ID"   --arg operation_id "$OPERATION_ID"   --arg pr_url "$PR_URL"   --arg pr_branch "$PR_BRANCH"   --argjson pr_number "$PR_NUMBER"   --arg recovery_run_id "$GITHUB_RUN_ID"   '{
+    version:2,
+    provider:$provider,
     pilot:$pilot,
     source_engineering_run_id:($source_engineering_run_id|tonumber),
     source_engineering_head_sha:$source_head_sha,
