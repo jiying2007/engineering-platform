@@ -28,6 +28,14 @@ func validContract() Contract {
 	}
 }
 
+func TestV1ContractFailsClosedOnCurrentMain(t *testing.T) {
+	contract := validContract()
+	contract.SchemaVersion = 1
+	if err := contract.Validate(); err == nil {
+		t.Fatal("superseded relay prequalification v1 accepted")
+	}
+}
+
 func TestEvaluateProducesNonAdmittingDeterministicAssessment(t *testing.T) {
 	contract := validContract()
 	first, err := Evaluate(contract)
