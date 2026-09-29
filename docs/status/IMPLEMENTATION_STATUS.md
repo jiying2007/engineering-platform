@@ -148,12 +148,19 @@ to another provider, credential mode or execution mode.
 ## Relay repository prequalification
 
 Issue #106 now has a repository-only prequalification stage documented by
-`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V1.md` and exposed as
-`eng relay-prequalification --contract CONTRACT.json`.
+`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V1.md`. Two CLI surfaces
+are available:
+
+- `eng relay-prequalification-pack` builds the canonical Contract + Assessment
+  from non-secret provider parameters and three bounded policy/mapping files;
+- `eng relay-prequalification --contract CONTRACT.json` strictly revalidates an
+  already-materialized contract.
 
 This stage freezes one exact HTTPS Codex custom-provider configuration, its
 credential locator (never credential material), requested model and policy
-digests. Initial qualification disables request/stream retries, WebSockets and
+digests. The operator pack computes those policy digests from exact file bytes,
+rejects symlinked/oversized inputs, and performs no network or credential
+operation. Initial qualification disables request/stream retries, WebSockets and
 standalone web search to keep the first provider proof bounded.
 
 A successful repository prequalification explicitly records
