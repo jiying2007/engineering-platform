@@ -317,6 +317,10 @@ func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
 	for _, required := range []string{
 		"contents: read",
 		"actions: read",
+		"issues: read",
+		"pull-requests: read",
+		"decision_comment_id:",
+		"REVIEW_DECISION_COMMENT_ID: ${{ inputs.decision_comment_id }}",
 		"result:",
 		"- PASS",
 		"- FAIL",
@@ -341,7 +345,12 @@ func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
 	}
 
 	for _, required := range []string{
-		"independent review requires a different GitHub actor from engineering execution",
+		"engineering-platform.retained-independent-review.v1",
+		"review decision comment predates successful verification",
+		"independent review requires a different GitHub decision actor from engineering execution",
+		"author_association",
+		"reviewer-actor.txt",
+		"review-decision-comment-id.txt",
 		"clients/reviewer.env",
 		"/api/v1/reviews",
 		"if [ \"$REVIEW_RESULT\" = PASS ]",
@@ -354,8 +363,11 @@ func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
 			t.Fatalf("review script missing %q", required)
 		}
 	}
-	if strings.Index(reviewScript, "GITHUB_ACTOR") > strings.Index(reviewScript, "/api/v1/reviews") {
-		t.Fatal("review is submitted before GitHub actor independence is checked")
+	if strings.Index(reviewScript, "REVIEWER_ACTOR") > strings.Index(reviewScript, "/api/v1/reviews") {
+		t.Fatal("review is submitted before bound GitHub decision actor independence is checked")
+	}
+	if !strings.Contains(reviewScript, `dispatcher_actor:$dispatcher_actor`) {
+		t.Fatal("review state must retain dispatcher actor separately from decision actor")
 	}
 	if strings.Index(reviewScript, "if [ \"$REVIEW_RESULT\" = PASS ]") > strings.Index(reviewScript, "/api/v1/closures") {
 		t.Fatal("Closure is not guarded by PASS review")
