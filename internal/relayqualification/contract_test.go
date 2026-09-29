@@ -91,7 +91,6 @@ func TestCommandTokenContractUsesAbsoluteDedicatedCommand(t *testing.T) {
 	}
 }
 
-
 func TestPrequalificationStillDoesNotAdmitProviderV3(t *testing.T) {
 	contract := validContract()
 	assessment, err := Evaluate(contract)
