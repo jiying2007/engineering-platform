@@ -26,14 +26,27 @@ jobs:
     steps:
       - name: Require protected main workflow invocation
         shell: bash
+        env:
+          OPENAI_WIF_AUDIENCE: ${{ vars.OPENAI_WIF_AUDIENCE }}
+          OPENAI_CODEX_FEDERATION_RULE_ID: ${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
           test "$GITHUB_REF_TYPE" = "branch"
           test "$GITHUB_REF_PROTECTED" = "true"
           test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
-          test -n "${{ vars.OPENAI_WIF_AUDIENCE }}"
-          test -n "${{ vars.OPENAI_CODEX_FEDERATION_RULE_ID }}"
+
+          missing=0
+          for name in OPENAI_WIF_AUDIENCE OPENAI_CODEX_FEDERATION_RULE_ID; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name repository Actions variable is not configured"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::managed-workspace WIF is not provisioned; follow issue #103 / examples/pilots/wif/configure-admin-api.sh"
+            exit 1
+          fi
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
