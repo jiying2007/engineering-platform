@@ -119,7 +119,10 @@ The authoritative live status is
 and provider selection are summarized in
 [Codex credential lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md).
 
-Current execution posture:
+Current execution posture uses **Profile v3**, which freezes
+`provider_id / credential_mode / execution_mode / provider_config_digest` into
+the Core-authorized profile digest. Worker execution, retained receipts,
+Recovery, Verification and Review all carry that same provider identity.
 
 - **default internal development lane:** trusted Ubuntu host with a
   ChatGPT-authenticated Codex CLI, exact compatibility qualification, isolated
@@ -130,7 +133,8 @@ Current execution posture:
   still pending in #103;
 - **optional future company relay/model gateway:** a separate provider lane that
   requires its own compatibility, credential, privacy, retry/UNKNOWN and
-  provenance review. It is not a WIF fallback.
+  provenance review plus an explicitly admitted Provider v3 identity. It is not
+  a WIF fallback and is currently rejected by provider admission.
 
 Feature #54 and Debug #55 are already CLOSED and their retained results were
 promoted to protected main after Verification/Review/Closure. Do not rerun them
