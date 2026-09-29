@@ -27,7 +27,8 @@ contract containing:
 
 - `provider_id=company-relay`;
 - one non-reserved Codex custom provider ID;
-- exact HTTPS base URL without embedded credentials/query/fragment;
+- exact base URL without embedded credentials/query/fragment; HTTPS by default;
+- optional insecure HTTP only when explicitly enabled and the host is a literal private/loopback IP;
 - `wire_api=responses`;
 - exactly one credential *locator*:
   - a dedicated relay environment variable; or
@@ -64,6 +65,13 @@ Use `--auth-command /absolute/path/to/token-helper` instead of
 a host-owned command. The command is recorded only as a credential locator; it
 is not executed by repository prequalification.
 
+For an internal lab relay that intentionally uses cleartext HTTP, the operator
+must add `--allow-insecure-private-http`. That exception is accepted only when
+the URL host is a literal RFC1918/ULA private or loopback IP. Public IPs,
+link-local addresses and DNS hostnames remain rejected under HTTP. The exception
+bit is part of the canonical Contract and therefore changes the
+`provider_config_digest`.
+
 The three policy files are read as bounded regular files (symlinks are rejected)
 and hashed by exact bytes. They should describe, at minimum:
 
@@ -95,7 +103,9 @@ later.
 The v1 prequalification rejects:
 
 - built-in/reserved Codex provider IDs;
-- HTTP or credential-bearing provider URLs;
+- HTTP endpoints unless the explicit private-HTTP exception is enabled for a literal private/loopback IP;
+- public, link-local or DNS-hosted cleartext HTTP endpoints;
+- credential-bearing provider URLs;
 - non-Responses wire modes;
 - reuse of `OPENAI_*` or `CODEX_*` environment credentials for a relay;
 - automatic request/stream retries;
