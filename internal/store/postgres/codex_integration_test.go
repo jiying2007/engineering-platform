@@ -25,7 +25,7 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 	t.Helper()
 	ctx := context.Background()
 	profile := codexexec.Profile{
-		Version: 2, CodexVersion: "0.157.1",
+		Version: 3, Provider: provideridentity.OpenAIWIFUnattended(), CodexVersion: "0.157.1",
 		BinaryDigest:            "sha256:" + strings.Repeat("a", 64),
 		QualificationDigest:     "sha256:" + strings.Repeat("e", 64),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
@@ -93,10 +93,10 @@ func codexResult(t *testing.T, permit codexexec.Permit) codexexec.Result {
 	promptIdentity, err := codexexec.PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	workerOK(t, err)
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 2, CLI: "codex-cli", Version: permit.Profile.CodexVersion,
+		SchemaVersion: 3, CLI: "codex-cli", Version: permit.Profile.CodexVersion,
 		BinaryDigest: permit.Profile.BinaryDigest, QualificationDigest: permit.Profile.QualificationDigest,
 		EngineeringConfigDigest: permit.Profile.EngineeringConfigDigest,
-		CredentialMode:          "workload_identity", FederationRuleID: "rule-test", Model: permit.Profile.Model,
+		Provider:                permit.Profile.Provider, FederationRuleID: "rule-test", Model: permit.Profile.Model,
 		PromptDigest: canonical.BytesDigest([]byte("rendered prompt")), ThreadID: "thread", TurnID: "turn",
 		TurnStatus: "completed", Output: "implemented", OutputDigest: canonical.BytesDigest([]byte("implemented")),
 		CommandCount: 2, FileChangeCount: 1, AssertionRemovedBeforeTurn: true,
