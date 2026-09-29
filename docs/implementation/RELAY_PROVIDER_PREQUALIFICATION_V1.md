@@ -42,6 +42,40 @@ contract containing:
 The contract never contains a bearer token, API key, saved ChatGPT login,
 workload assertion or account identifier.
 
+## Operator pack
+
+Operators do not need to hand-calculate policy digests or hand-author the
+contract. The non-secret pack command derives both the canonical Contract and
+its Assessment:
+
+```sh
+eng relay-prequalification-pack \
+  --codex-provider company-relay-v1 \
+  --base-url https://relay.example.com/v1 \
+  --auth-env-key COMPANY_RELAY_TOKEN \
+  --model relay-model-slug \
+  --gateway-policy ./gateway-policy.md \
+  --privacy-policy ./privacy-policy.md \
+  --model-mapping ./model-mapping.md
+```
+
+Use `--auth-command /absolute/path/to/token-helper` instead of
+`--auth-env-key` when the future live lane will obtain a Bearer token through
+a host-owned command. The command is recorded only as a credential locator; it
+is not executed by repository prequalification.
+
+The three policy files are read as bounded regular files (symlinks are rejected)
+and hashed by exact bytes. They should describe, at minimum:
+
+- gateway protocol/security/version and transformation policy;
+- privacy, retention, operator access and egress policy;
+- requested-model to effective-upstream/model mapping and downgrade policy.
+
+The pack output is deterministic JSON containing both `contract` and
+`assessment`. Redirect it to an operator-controlled file if a retained
+prequalification artifact is desired. The output contains no credential
+material or account identifier.
+
 ## Output semantics
 
 A successful command emits a deterministic assessment containing the
