@@ -301,6 +301,62 @@ func TestRetainedPilotEngineeringRecoveryWorkflowBoundary(t *testing.T) {
 	}
 }
 
+func TestRetainedDebugFirmwareIdentityReproductionWorkflowBoundary(t *testing.T) {
+	root := filepath.Join("..", "..")
+	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-debug-firmware-identity-reproduction.yml"))
+	scriptPath := filepath.Join(root, "examples", "pilots", "debug-firmware-identity", "capture-reproduction.sh")
+	script := readPilotActionFile(t, scriptPath)
+
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	if out, err := exec.Command(bash, "-n", scriptPath).CombinedOutput(); err != nil {
+		t.Fatalf("capture-reproduction.sh syntax: %v: %s", err, out)
+	}
+
+	for _, required := range []string{
+		"workflow_dispatch:",
+		"contents: read",
+		"GITHUB_REF_PROTECTED",
+		"persist-credentials: false",
+		"Capture authoritative failing reproduction",
+		"retained-debug-firmware-identity-reproduction-${{ github.sha }}-${{ github.run_id }}",
+	} {
+		if !strings.Contains(workflow, required) {
+			t.Fatalf("Debug reproduction workflow missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"contents: write",
+		"pull-requests: write",
+		"id-token: write",
+		"--execute-codex",
+	} {
+		if strings.Contains(workflow, forbidden) {
+			t.Fatalf("Debug reproduction workflow unexpectedly contains %q", forbidden)
+		}
+	}
+
+	for _, required := range []string{
+		"FirmwareIdentity:   \"not-a-digest\"",
+		"expected BLOCKED for noncanonical firmware identity, got %s",
+		"test \"$test_rc\" -ne 0",
+		"got READY",
+		"reproduction_confirmed:true",
+		"observed_status \"READY\"",
+		"rm -f \"$TEST_FILE\"",
+		"status --porcelain=v1 --untracked-files=all",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("Debug reproduction script missing %q", required)
+		}
+	}
+	if strings.Contains(script, "git commit") || strings.Contains(script, "git push") {
+		t.Fatal("Debug reproduction capture must not mutate repository history")
+	}
+}
+
 func TestRetainedPilotIndependentReviewWorkflowBoundary(t *testing.T) {
 	root := filepath.Join("..", "..")
 	workflow := readPilotActionFile(t, filepath.Join(root, ".github", "workflows", "retained-pilot-review.yml"))

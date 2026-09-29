@@ -1,0 +1,73 @@
+name: Retained Debug firmware identity reproduction
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    name: capture-pre-task-failing-reproduction
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF_PROTECTED" = "true"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            test "$attempt" -lt 3
+            sleep $((attempt * 2))
+          done
+
+      - name: Capture authoritative failing reproduction
+        shell: bash
+        run: bash examples/pilots/debug-firmware-identity/capture-reproduction.sh
+
+      - name: Retain failing reproduction evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: retained-debug-firmware-identity-reproduction-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-debug-firmware-identity-reproduction
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Summarize Debug pilot gate
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/retained-debug-firmware-identity-reproduction/reproduction-receipt.json"
+          test "$(jq -er .reproduction_confirmed "$receipt")" = true
+          {
+            echo "## Retained Debug firmware identity reproduction"
+            echo
+            echo "- Pre-task reproduction: **CONFIRMED**"
+            echo "- Expected: **BLOCKED**"
+            echo "- Observed current behavior: **READY**"
+            echo "- Base: `$(jq -er .base_commit "$receipt")`"
+            echo "- Next gate: start the retained Debug Task/Run from this exact protected-main base."
+          } >> "$GITHUB_STEP_SUMMARY"
