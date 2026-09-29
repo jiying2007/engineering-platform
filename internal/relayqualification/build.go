@@ -3,17 +3,17 @@ package relayqualification
 import "github.com/jiying2007/engineering-platform/internal/canonical"
 
 type BuildInput struct {
-	CodexProviderID     string
-	BaseURL             string
+	CodexProviderID          string
+	BaseURL                  string
 	AllowInsecurePrivateHTTP bool
-	AuthMode            string
-	EnvKey              string
-	AuthCommand         string
-	RequestedModel      string
-	StreamIdleTimeoutMS int
-	GatewayPolicy       []byte
-	PrivacyPolicy       []byte
-	ModelMapping        []byte
+	AuthMode                 string
+	EnvKey                   string
+	AuthCommand              string
+	RequestedModel           string
+	StreamIdleTimeoutMS      int
+	GatewayPolicy            []byte
+	PrivacyPolicy            []byte
+	ModelMapping             []byte
 }
 
 type Pack struct {
