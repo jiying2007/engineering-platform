@@ -92,7 +92,7 @@ artifact_name="retained-pilot-engineering-$PILOT-$ENGINEERING_RUN_ID"
 engineering_artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ENGINEERING_RUN_ID/artifacts?per_page=100")"
 SOURCE_ARTIFACT_ID="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].id else error("engineering artifact identity missing/ambiguous") end')"
 SOURCE_ARTIFACT_DIGEST="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].digest else error("engineering artifact digest missing/ambiguous") end')"
-SOURCE_ARTIFACT_EXPIRED="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then .[0].expired else error("engineering artifact expiry missing/ambiguous") end')"
+SOURCE_ARTIFACT_EXPIRED="$(printf '%s' "$engineering_artifacts_json" | jq -er --arg n "$artifact_name" '[.artifacts[]|select(.name==$n)] | if length==1 then (. [0].expired|tostring) else error("engineering artifact expiry missing/ambiguous") end')"
 test "$SOURCE_ARTIFACT_EXPIRED" = false
 [[ "$SOURCE_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
 

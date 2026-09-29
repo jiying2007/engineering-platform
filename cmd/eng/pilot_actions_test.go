@@ -174,6 +174,7 @@ func TestRetainedPilotVerificationWorkflowAuthorityBoundary(t *testing.T) {
 	for _, required := range []string{
 		"core.dump",
 		"ENGINEERING_RECOVERY_RUN_ID",
+		"expired|tostring",
 		"Retained M1 pilot engineering recovery",
 		".model_replay==false",
 		".publication==\"CONFIRMED\"",
@@ -271,6 +272,7 @@ func TestRetainedPilotEngineeringRecoveryWorkflowBoundary(t *testing.T) {
 		"codex-status.json",
 		"publication-receipt.json",
 		"preflight-before-publication.json",
+		"expired|tostring",
 		"result.bundle",
 		"core.dump",
 		`test "$(jq -er .model_phase "$MODEL_PHASE")" = FINISHED`,
