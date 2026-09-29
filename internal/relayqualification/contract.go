@@ -21,7 +21,7 @@ const (
 	AuthCommandToken = "command-token"
 
 	StageRepositoryPrequalification = "repository-prequalification"
-	NextGateLiveReadOnlyNoTool       = "live-read-only-no-tool-provider-qualification"
+	NextGateLiveReadOnlyNoTool      = "live-read-only-no-tool-provider-qualification"
 )
 
 var providerIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
