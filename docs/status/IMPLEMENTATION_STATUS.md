@@ -135,12 +135,33 @@ Current admitted combinations:
   unattended`. Repository mechanics are admitted, while real managed-workspace
   WIF qualification remains tracked by #103.
 - **Optional future relay lane:** company relay/model gateway. No relay identity
-  is currently admitted. #106 must first establish exact provider qualification,
-  model/upstream semantics, credential lifecycle, privacy/retention,
-  retry/UNKNOWN behavior and retained provenance.
+  is currently admitted. Repository-side prequalification now validates and
+  deterministically digests the proposed Codex custom-provider contract without
+  using an account, credential or live model turn. #106 must still establish
+  live provider qualification, model/upstream semantics, credential lifecycle,
+  privacy/retention, retry/UNKNOWN behavior and retained provenance before any
+  Provider v3 admission.
 
 Authentication/provider failure is fail-closed. Runtime must not silently move
 to another provider, credential mode or execution mode.
+
+## Relay repository prequalification
+
+Issue #106 now has a repository-only prequalification stage documented by
+`docs/implementation/RELAY_PROVIDER_PREQUALIFICATION_V1.md` and exposed as
+`eng relay-prequalification --contract CONTRACT.json`.
+
+This stage freezes one exact HTTPS Codex custom-provider configuration, its
+credential locator (never credential material), requested model and policy
+digests. Initial qualification disables request/stream retries, WebSockets and
+standalone web search to keep the first provider proof bounded.
+
+A successful repository prequalification explicitly records
+`account_verified=false`, `live_model_turn_executed=false` and
+`provider_admitted=false`. It therefore cannot satisfy #105 and cannot make
+`company-relay` valid in `internal/provideridentity`. Account/credential
+verification and one read-only no-tool live model turn remain deferred to the
+next #106 gate.
 
 ## Managed-workspace WIF unattended gate
 
