@@ -95,8 +95,39 @@ record is `docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`.
   `91d7d9fa068b7667bab5c211f13cd9e0151aeb92`, Verification
   `36536077026`, Review `36536314395`, ClosureReceipt
   `m1-debug-firmware-identity-closure`, post-Closure promotion #101.
-- Current protected main: `ee0249fe25b860a83beba9fe06b7acdc80cd75c6`;
+- Closure/promotion code checkpoint: `ee0249fe25b860a83beba9fe06b7acdc80cd75c6`;
   fresh-main CI `36538546170` passed.
+- Canonical status checkpoint after #102: protected main
+  `644127255f615abb753fab5c450ea23caad76b11`; fresh-main CI
+  `36540163771` passed all five canonical gates.
+
+## Managed-workspace WIF unattended gate
+
+Trusted self-hosted M1 phase 1 is complete, but managed-workspace WIF remains a
+separate external qualification gate tracked by issue #103.
+
+Real live qualification probe `36556354798` was dispatched on protected main
+`644127255f615abb753fab5c450ea23caad76b11`. It failed in the first
+prerequisite step because both non-secret repository Actions variables were
+absent:
+
+- `OPENAI_WIF_AUDIENCE`;
+- `OPENAI_CODEX_FEDERATION_RULE_ID`.
+
+The run stopped before checkout, GitHub OIDC assertion minting, OpenAI
+federation exchange or any model turn. No managed-WIF model call was consumed.
+
+The remaining external action is administrator provisioning through
+`examples/pilots/wif/configure-admin-api.sh`, using a WIF-enabled managed
+ChatGPT workspace, an Admin API key authorized for workload identity, an
+existing workspace principal and a dedicated GitHub OIDC audience. After that
+helper writes the two repository variables, rerun `codex-wif-live.yml` and
+require one retained successful live receipt before calling the unattended
+authentication lane qualified.
+
+Do not reopen Feature/Debug M1 pilots merely to qualify WIF, and do not weaken
+repository/ref/workflow/audience/immutable-ID constraints to make the exchange
+succeed.
 
 ## Retained evidence
 
