@@ -331,39 +331,53 @@ succeed.
   OIDC token claim and must be enforced separately by repository protection plus
   the workflow runtime `GITHUB_REF_PROTECTED` fact.
 
-## Historical divergent branch disposition
+## Superseded branch disposition
 
-Two old implementation branches are now explicitly classified as **superseded
-history**, not pending product work and not retained pilot evidence:
+The following non-retained branches are explicitly classified as
+**superseded history**. They are not pending product work, grant no authority,
+and must not be merged or cherry-picked back into main.
 
-- `feat/github-ci-core-evidence-import` diverged from merge-base
-  `e895fc6dddb509a51897b5fe32b21216312ebb9d` (#43). Its branch-only
-  `cmd/eng/evidence_import.go` / `internal/cievidence/github_import.go`
-  prototype was replaced on main by the dedicated trusted importer delivered by
-  #44 (`cmd/eng/import_ci.go`, `docs/implementation/TRUSTED_CI_IMPORT_V1.md`),
-  then hardened by the engineering evidence bridge (#48) and exact PR-head CI
-  provenance (#51). The historical branch must not be merged or cherry-picked
-  back into main.
-- `feat/independent-review-authority` diverged from merge-base
-  `34ff7d82316d1d095040ce6f62522fe5397dee86` (#44). Its early ReviewReport
-  and migration prototype was replaced by the stricter #46 authority now on
-  main: `db/migrations/0006_review_reports.sql`,
-  `internal/review/review.go`, and
-  `docs/implementation/INDEPENDENT_REVIEW_V1.md`. The canonical successor
-  binds task-contract digest, PASS/FAIL semantics, severity-aware bounded
-  findings, independent reviewer identity and Closure foreign-key authority.
-  The historical branch must not be merged or cherry-picked back into main.
+Older implementation prototypes:
 
-These two branches may therefore be deleted as repository hygiene once the
-operator chooses to remove the refs. Their continued existence is not an
-implementation blocker and grants no authority.
+- `feat/github-ci-core-evidence-import` — replaced by #44 trusted CI import,
+  then hardened by #48 and #51.
+- `feat/independent-review-authority` — replaced by the stricter #46
+  independent Review authority.
+- `docs/retire-superseded-historical-branches` — documentation transport for
+  #110; its content is already on main.
+
+Relay/provider development branches:
+
+- `feat/relay-provider-prequalification` — superseded by #111.
+- `feat/relay-prequalification-operator-pack` — superseded by #112.
+- `feat/relay-private-http-policy` — superseded by #113.
+- `feat/relay-codex-config-renderer` — exploratory renderer branch; superseded
+  by the v2 renderer identity merged in #114.
+- `feat/relay-codex-config-renderer-v2` — no unique commits remain relative to
+  its main checkpoint and it is superseded by #114.
+- `feat/relay-prequalification-v2-renderer` — merged/superseded by #114.
+- `feat/relay-live-handoff-manifest` — merged/superseded by #115.
+
+Current canonical relay progression on main is therefore:
+
+```text
+#111 repository prequalification
+  -> #112 non-secret operator pack
+  -> #113 explicit private-HTTP transport policy
+  -> #114 prequalification v2 + exact Codex renderer identity
+  -> #115 frozen future live qualification manifest
+```
+
+These superseded refs may be deleted as repository hygiene. Their continued
+existence is not an implementation blocker and must not be interpreted as
+parallel supported implementations.
 
 Do **not** apply this disposition to the two retained M1 result branches:
 
 - `engineering-platform/3ac04fc7097e8375e5f7c1f8` — retained Feature result;
 - `engineering-platform/994964383ed085e51545105d` — retained Debug result.
 
-Those branches are immutable evidence references for the already-closed M1
+Those two branches are immutable evidence references for the already-closed M1
 Feature/Debug chains and remain intentionally preserved.
 
 ## Publication authority
