@@ -173,6 +173,44 @@ Changing renderer bytes changes `codex_config_digest` and therefore changes
 `provider_config_digest`, even when the high-level Contract is otherwise the
 same.
 
+## Frozen live handoff manifest
+
+Before any account or relay credential is supplied, operators can freeze the
+future live qualification acceptance plan:
+
+```sh
+eng relay-live-manifest --contract relay-contract-v2.json
+```
+
+The command performs no network access and does not read or execute credential
+material. It emits a deterministic Manifest plus `manifest_digest` bound to the
+exact v2 `provider_config_digest`.
+
+The manifest fixes the later live probe to:
+
+- exactly one model turn;
+- read-only sandbox semantics;
+- `approval_policy=never`;
+- no tools;
+- no tool-network authority;
+- no web search;
+- request retries = 0;
+- stream retries = 0;
+- bounded output and wall time;
+- the exact qualification prompt and expected output digests;
+- mandatory gateway operation/request identity;
+- mandatory effective provider identity;
+- mandatory effective model identity;
+- the exact gateway/privacy/model-mapping policy digests;
+- one exact future receipt schema version.
+
+The repository also defines a future receipt contract verifier. Unit tests use
+synthetic receipts only to prove the schema fails closed; those fixtures are not
+live provider evidence.
+
+This means the later live run is not allowed to invent its own acceptance
+criteria. It must produce a receipt for the exact frozen manifest digest.
+
 ## Deferred live gate
 
 No account or credential validation is required in the current phase.
