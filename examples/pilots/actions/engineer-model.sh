@@ -62,6 +62,7 @@ PROFILE_DIGEST="$(jq -er .profile_digest "$PROFILE_FILE")"
 QUALIFICATION_DIGEST="$(jq -er .qualification_digest "$PROFILE_FILE")"
 CODEX_VERSION="$(jq -er .profile.codex_version "$PROFILE_FILE")"
 BINARY_DIGEST="$(jq -er .profile.binary_digest "$PROFILE_FILE")"
+PROVIDER_JSON="$(jq -cS .profile.provider "$PROFILE_FILE")"
 
 bash "$GITHUB_WORKSPACE/examples/pilots/local-stack/bootstrap.sh"   "$STACK_ROOT" "$PROFILE_DIGEST" "$WORKER_PROFILE"
 
@@ -249,7 +250,9 @@ install -m 0600 "$BUNDLE_SOURCE" "$STATE_ROOT/result.bundle"
 docker run --rm --network host   -e PGPASSWORD=postgres   -v "$STATE_ROOT:/state"   postgres:17-alpine   pg_dump -h 127.0.0.1 -p 55432 -U postgres -d engineering_platform     -Fc -f /state/core-pre-publication.dump
 test -s "$STATE_ROOT/core-pre-publication.dump"
 
-jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
+jq -n   --arg pilot "$PILOT"   --arg run_id "$RUN_ID"   --arg base_commit "$BASE_COMMIT"   --arg profile_digest "$PROFILE_DIGEST"   --argjson provider "$PROVIDER_JSON"   --arg execution_epoch "$EXECUTION_EPOCH"   '{
+    version:2,
+    provider:$provider,
     pilot:$pilot,
     run_id:$run_id,
     base_commit:$base_commit,
