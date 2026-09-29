@@ -2,10 +2,20 @@
 
 Base: `c817876c8c10fddebe21fc38d394fee944f66c47` (#37).
 
-This increment prepares and constrains the first real authenticated Codex model
-turn without storing a long-lived OpenAI/ChatGPT credential. It does not count as
-a live qualification until the manual workflow actually succeeds and retains its
-receipt.
+This document defines the managed-workspace WIF credential lane for Codex. It
+is an **optional unattended/GitHub-hosted workload-identity enhancement**, not
+the default internal development credential and not a prerequisite for the
+already-proven trusted self-hosted M1 phase 1.
+
+The lane prepares and constrains a real authenticated Codex model turn without
+storing a long-lived OpenAI/ChatGPT credential. It does not count as a live
+qualification until the protected-main workflow actually succeeds and retains
+its receipt.
+
+The broader credential/provider selection policy is
+`docs/implementation/CODEX_CREDENTIAL_LANES_V1.md`. WIF is never an automatic
+fallback from the trusted self-hosted lane, and WIF failure must never cause a
+saved login, API key or company relay to be tried implicitly.
 
 ## Authentication contract
 
@@ -139,9 +149,12 @@ step because both repository variables were absent:
 The failure occurred before checkout, OIDC assertion minting, federation exchange
 or model execution. It therefore consumed no managed-WIF model turn.
 
-Issue #103 is the single external qualification gate. The administrator should
-use `examples/pilots/wif/configure-admin-api.sh` to create/reuse the exact
-provider/rule and optionally write the two repository variables.
+Issue #103 is the external qualification gate **only for this optional
+unattended lane**. The administrator should use
+`examples/pilots/wif/configure-admin-api.sh` to create/reuse the exact
+provider/rule and optionally write the two repository variables. Internal Ubuntu
+development may continue on the already-proven trusted self-hosted lane while
+#103 remains open.
 
 Until that setup is complete and one `Codex WIF live qualification` workflow
 succeeds and retains its receipt, the repository must continue to state:
