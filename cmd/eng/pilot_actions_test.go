@@ -63,8 +63,8 @@ func TestRetainedPilotEngineerWorkflowCredentialBoundary(t *testing.T) {
 		"GITHUB_REPOSITORY_ID",
 		"GITHUB_REPOSITORY_OWNER_ID",
 		"codex-wif-live.yml@refs/heads/main",
-		"OPENAI_WIF_AUDIENCE repository Actions variable is not configured",
-		"OPENAI_CODEX_FEDERATION_RULE_ID repository Actions variable is not configured",
+		"for name in OPENAI_WIF_AUDIENCE OPENAI_CODEX_FEDERATION_RULE_ID",
+		"repository Actions variable is not configured",
 		"managed-workspace WIF is not provisioned",
 		"examples/pilots/wif/configure-admin-api.sh",
 	} {
