@@ -77,7 +77,6 @@ func TestContractRejectsUnsafeOrAmbiguousProviderConfiguration(t *testing.T) {
 	}
 }
 
-
 func TestContractAllowsExplicitLiteralPrivateHTTPOnly(t *testing.T) {
 	for _, endpoint := range []string{
 		"http://192.168.2.109:3000/v1",
