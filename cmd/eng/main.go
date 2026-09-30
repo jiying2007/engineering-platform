@@ -41,6 +41,16 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-terminal-plan":
+		if err := productionTerminalPlan(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case "production-slo-report":
+		if err := productionSLOReport(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-status":
 		if err := productionStatus(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -167,6 +177,8 @@ func usage() {
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
+	fmt.Println("  production-terminal-plan                        emit immutable terminal maintenance acceptance contract")
+	fmt.Println("  production-slo-report --observations FILE       summarize measured operational latency evidence without guessed targets")
 	fmt.Println("  production-status [--require-ready]             read authenticated operational status from Control API")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")

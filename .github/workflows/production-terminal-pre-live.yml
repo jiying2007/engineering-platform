@@ -1,0 +1,99 @@
+name: Production terminal pre-live dry run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    name: production-terminal-pre-live-dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Require protected main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "jiying2007/engineering-platform"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_REF_TYPE" = "branch"
+          test "$GITHUB_REF_PROTECTED" = "true"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Download Go modules with bounded retry
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if go mod download; then exit 0; fi
+            test "$attempt" -lt 3
+            sleep $((attempt * 2))
+          done
+
+      - name: Validate terminal acceptance contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test ./internal/production ./internal/api \
+            -run 'TestTerminalPlan|TestSLOReport|TestProductionTerminalMaintenanceTemplatesDryRunToRunning' \
+            -count=1
+
+      - name: Build exact pre-live acceptance artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/production-terminal-pre-live"
+          mkdir -p "$out"
+          chmod 700 "$out"
+          go build -o "$RUNNER_TEMP/eng" ./cmd/eng
+          "$RUNNER_TEMP/eng" production-terminal-plan > "$out/terminal-plan.json"
+          cp examples/production/terminal-maintenance/requirement.md "$out/requirement.md"
+          cp examples/production/terminal-maintenance/qualification.txt "$out/qualification.txt"
+          cp examples/production/terminal-maintenance/work.json.tmpl "$out/work.json.tmpl"
+          cp examples/production/terminal-maintenance/task.json.tmpl "$out/task.json.tmpl"
+          cp examples/production/terminal-maintenance/run.json.tmpl "$out/run.json.tmpl"
+          test "$(cat "$out/qualification.txt")" = PRE_LIVE_READY
+          printf '%s  %s\n' \
+            '01edbdf525937b5cbd5464fc1c3b9e6b4b677af14b5bb802a137fbd70bfd0445' \
+            "$out/requirement.md" | sha256sum --check -
+          (
+            cd "$out"
+            sha256sum terminal-plan.json requirement.md qualification.txt \
+              work.json.tmpl task.json.tmpl run.json.tmpl > SHA256SUMS
+          )
+          chmod 600 "$out"/*
+
+      - name: Retain pre-live dry-run artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-terminal-pre-live-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/production-terminal-pre-live
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Summarize remaining live gate
+        shell: bash
+        run: |
+          {
+            echo "## Production terminal pre-live dry run"
+            echo
+            echo "- Terminal RELEASE fixture contract: **PASS**"
+            echo "- Frozen requirement digest: **PASS**"
+            echo "- Work/Task/Run API dry-run: **PASS**"
+            echo "- Human review requirement: **PRESERVED**"
+            echo "- Provider/account qualification: **NOT EXECUTED**"
+            echo "- Production readiness: **NOT CLAIMED**"
+            echo "- Next state-changing gate: selected unattended provider live qualification, then the exact terminal fixture."
+          } >> "$GITHUB_STEP_SUMMARY"

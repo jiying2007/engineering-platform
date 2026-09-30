@@ -1,0 +1,10 @@
+{
+  "verification_report_id": "production-terminal-maintenance-verification",
+  "delivery_receipt_id": "production-terminal-maintenance-delivery",
+  "verifier": "urn:engineering-platform:verifier:production",
+  "evidence_ids": [
+    "production-terminal-codex-evidence",
+    "production-terminal-git-evidence",
+    "production-terminal-ci-evidence"
+  ]
+}

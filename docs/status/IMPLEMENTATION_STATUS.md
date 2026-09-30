@@ -264,6 +264,33 @@ The evaluation is deterministic and does not guess SLO thresholds:
 This closes the repository-side facts/alerting substrate. Measured latency/SLO
 targets and the terminal maintenance qualification remain later #105 slices.
 
+## Production terminal acceptance
+
+The final #105 acceptance contract is now frozen in
+`docs/implementation/PRODUCTION_TERMINAL_ACCEPTANCE_V1.md`.
+
+Repository-side pre-live assets now include:
+
+- deterministic `eng production-terminal-plan` + plan digest;
+- a one-time RELEASE fixture under
+  `examples/production/terminal-maintenance`;
+- exact requirement digest and marker before/after bytes;
+- Work/Task/Run templates validated through Core;
+- explicit independent human Review and Closure gates;
+- `eng production-slo-report` for measured source-bound
+  count/min/p50/p95/max observations;
+- a manual protected-main `production-terminal-pre-live.yml` dry-run that uses
+  no provider secret and retains the frozen fixture/plan/SHA256SUMS artifact.
+
+The SLO contract requires all non-provider measurements before calling internal
+calibration complete and separately requires the real provider-authentication
+measurement before status can become COMPLETE. No guessed latency thresholds are
+encoded.
+
+This still does not qualify an unattended provider and does not claim production
+readiness. The next external state-changing gate remains one real provider live
+qualification, after the pre-live dry run is retained.
+
 ## Managed-workspace WIF unattended gate
 
 Managed-workspace WIF remains a separate **optional unattended** qualification
