@@ -22,8 +22,8 @@ func (m *operationalMemory) ReadOperationalStatus(context.Context) (production.O
 
 func TestOperationalStatusEndpointUsesStoreAuthority(t *testing.T) {
 	snapshot := production.Snapshot{
-		Version: production.OperationalStatusVersion,
-		CapturedAt: time.Unix(1700000000, 0).UTC(),
+		Version:      production.OperationalStatusVersion,
+		CapturedAt:   time.Unix(1700000000, 0).UTC(),
 		RecoveryMode: "NORMAL",
 	}
 	status, err := production.EvaluateSnapshot(snapshot)
@@ -34,7 +34,7 @@ func TestOperationalStatusEndpointUsesStoreAuthority(t *testing.T) {
 	body := mustRequest(t, h, http.MethodGet, "/api/v1/operations/status", nil, http.StatusOK)
 	var got production.OperationalStatus
 	mustJSON(t, body, &got)
-	if got != status || !got.Ready {
+	if !got.Ready || got.State != status.State || got.Snapshot != status.Snapshot || len(got.Reasons) != 0 {
 		t.Fatalf("unexpected operational status: %#v", got)
 	}
 }
