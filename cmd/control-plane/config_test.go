@@ -26,6 +26,11 @@ func TestStartupFailsBeforeImplicitInsecureOrDurableFallback(t *testing.T) {
 		{"INSECURE_DEV": "1", "DATABASE_URL": "do-not-open"},
 		{"INSECURE_DEV": "1", "AUTO_MIGRATE": "1"},
 		{"INSECURE_DEV": "1", "GITHUB_PUBLISHER_CONFIG_FILE": "do-not-ignore"},
+		{"INSECURE_DEV": "1", "GITHUB_PUBLISHER_PLAN_FILE": "do-not-ignore"},
+		{"INSECURE_DEV": "1", "GITHUB_PUBLISHER_REMOTE_FILE": "do-not-ignore"},
+		{"DATABASE_URL": "db", "CONTROL_TLS_CERT_FILE": "x", "CONTROL_TLS_KEY_FILE": "x", "CONTROL_CLIENT_CA_FILE": "x", "CONTROL_AUTH_POLICY_FILE": "x", "GITHUB_PUBLISHER_PLAN_FILE": "plan-only"},
+		{"DATABASE_URL": "db", "CONTROL_TLS_CERT_FILE": "x", "CONTROL_TLS_KEY_FILE": "x", "CONTROL_CLIENT_CA_FILE": "x", "CONTROL_AUTH_POLICY_FILE": "x", "GITHUB_PUBLISHER_REMOTE_FILE": "remote-only"},
+		{"DATABASE_URL": "db", "CONTROL_TLS_CERT_FILE": "x", "CONTROL_TLS_KEY_FILE": "x", "CONTROL_CLIENT_CA_FILE": "x", "CONTROL_AUTH_POLICY_FILE": "x", "GITHUB_PUBLISHER_CONFIG_FILE": "local", "GITHUB_PUBLISHER_PLAN_FILE": "plan", "GITHUB_PUBLISHER_REMOTE_FILE": "remote"},
 	} {
 		if _, err := loadConfiguration(func(key string) string { return env[key] }); err == nil {
 			t.Fatalf("unsafe startup accepted: %v", env)
