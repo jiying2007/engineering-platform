@@ -67,7 +67,7 @@ func Check(config Config) (Result, error) {
 	}
 	for name, path := range map[string]string{
 		"control_binary": config.ControlBinary,
-		"worker_binary":  config.WorkerBinary,
+		"worker_binary":    config.WorkerBinary,
 		"eng_binary":       config.EngBinary,
 		"publisher_binary": config.PublisherBinary,
 	} {
@@ -235,7 +235,6 @@ func validateControlEnv(values map[string]string) error {
 	}
 	return nil
 }
-
 
 func validatePublisherEnv(values map[string]string) error {
 	required := []string{
