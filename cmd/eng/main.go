@@ -41,6 +41,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-status":
+		if err := productionStatus(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-preflight":
 		if err := productionPreflight(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -162,6 +167,7 @@ func usage() {
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
+	fmt.Println("  production-status [--require-ready]             read authenticated operational status from Control API")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")
 	fmt.Println("  relay-qualification-kit <flags>                materialize immutable offline relay qualification bundle")
