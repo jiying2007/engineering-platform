@@ -15,12 +15,12 @@ import (
 )
 
 type configuration struct {
-	address         string
-	databaseURL     string
-	autoMigrate     bool
-	development     bool
-	tls             *tls.Config
-	policy          *access.Policy
+	address               string
+	databaseURL           string
+	autoMigrate           bool
+	development           bool
+	tls                   *tls.Config
+	policy                *access.Policy
 	publisherConfig       string
 	publisherPlanConfig   string
 	publisherRemoteConfig string
@@ -30,10 +30,10 @@ type configuration struct {
 // implicit plaintext, anonymous identity or memory-persistence fallback.
 func loadConfiguration(env func(string) string) (configuration, error) {
 	c := configuration{
-		address: controlPlaneAddress(env("LISTEN_HOST"), env("PORT")),
-		databaseURL: env("DATABASE_URL"),
-		publisherConfig: env("GITHUB_PUBLISHER_CONFIG_FILE"),
-		publisherPlanConfig: env("GITHUB_PUBLISHER_PLAN_FILE"),
+		address:               controlPlaneAddress(env("LISTEN_HOST"), env("PORT")),
+		databaseURL:           env("DATABASE_URL"),
+		publisherConfig:       env("GITHUB_PUBLISHER_CONFIG_FILE"),
+		publisherPlanConfig:   env("GITHUB_PUBLISHER_PLAN_FILE"),
 		publisherRemoteConfig: env("GITHUB_PUBLISHER_REMOTE_FILE"),
 	}
 	mode, migrate := env("INSECURE_DEV"), env("AUTO_MIGRATE")
