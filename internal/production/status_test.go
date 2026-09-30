@@ -7,8 +7,8 @@ import (
 
 func cleanSnapshot() Snapshot {
 	return Snapshot{
-		Version: OperationalStatusVersion,
-		CapturedAt: time.Unix(1700000000, 0).UTC(),
+		Version:      OperationalStatusVersion,
+		CapturedAt:   time.Unix(1700000000, 0).UTC(),
 		RecoveryMode: "NORMAL",
 	}
 }
