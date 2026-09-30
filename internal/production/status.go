@@ -68,16 +68,20 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 		status.Ready = false
 		status.Reasons = append(status.Reasons, "recovery_reconciliation_active")
 	}
-	for reason, count := range map[string]int64{
-		"expired_worker_leases":    snapshot.ExpiredWorkerLeases,
-		"dead_letter_outbox":       snapshot.DeadLetterOutbox,
-		"unknown_external_actions": snapshot.UnknownOperations,
-		"reconciling_actions":      snapshot.ReconcilingOperations,
-		"manual_actions":           snapshot.ManualOperations,
-		"unknown_codex_executions": snapshot.UnknownCodexExecutions,
-	} {
-		if count > 0 {
-			status.Reasons = append(status.Reasons, reason)
+	checks := []struct {
+		reason string
+		count  int64
+	}{
+		{"expired_worker_leases", snapshot.ExpiredWorkerLeases},
+		{"dead_letter_outbox", snapshot.DeadLetterOutbox},
+		{"unknown_external_actions", snapshot.UnknownOperations},
+		{"reconciling_actions", snapshot.ReconcilingOperations},
+		{"manual_actions", snapshot.ManualOperations},
+		{"unknown_codex_executions", snapshot.UnknownCodexExecutions},
+	}
+	for _, check := range checks {
+		if check.count > 0 {
+			status.Reasons = append(status.Reasons, check.reason)
 		}
 	}
 	if len(status.Reasons) > 0 && status.State == OperationalReady {
