@@ -188,15 +188,31 @@ The next slices must clear these blockers in that order.
 
 Production readiness is not proven by source merge.
 
-The terminal acceptance requires:
+The exact terminal contract is
+`docs/implementation/PRODUCTION_TERMINAL_ACCEPTANCE_V1.md`.
+
+`eng production-terminal-plan` freezes the one-time RELEASE maintenance
+fixture, evidence procedures, human-review requirement and terminal gates before
+provider access exists.
+
+`eng production-slo-report` records measured latency samples with retained
+source digests. Non-provider observations can close before account validation;
+provider authentication measurement remains pending until the selected
+unattended lane is live-qualified. No latency target is guessed in code.
+
+The manual `Production terminal pre-live dry run` workflow must retain one
+protected-main artifact before the live terminal qualification.
+
+Final acceptance still requires:
 
 1. selected unattended provider qualification;
 2. production preflight READY;
-3. one bounded unattended maintenance fixture;
-4. exact Run → model execution → Git/PR → exact-head CI → Evidence →
-   Verification → independent human Review → Closure;
-5. clean service shutdown/restart/recovery evidence;
-6. retained operational/SLO report.
+3. operational status READY;
+4. the exact frozen RELEASE maintenance fixture;
+5. Run → model execution → Git/PR → exact-head CI → Evidence → Verification →
+   independent human Review → Closure;
+6. clean service shutdown/restart/recovery evidence;
+7. provider-inclusive COMPLETE SLO report.
 
 Trusted self-hosted M1 evidence remains separate and is not rerun merely to
 produce production screenshots.
