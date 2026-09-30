@@ -2,6 +2,18 @@ name: Production terminal pre-live dry run
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/production-terminal-pre-live.yml
+      - examples/production/terminal-maintenance/**
+      - internal/production/acceptance.go
+      - internal/production/acceptance_test.go
+      - internal/api/production_terminal_examples_test.go
+      - cmd/eng/production_acceptance.go
+      - cmd/eng/production_acceptance_test.go
+      - docs/implementation/PRODUCTION_TERMINAL_ACCEPTANCE_V1.md
 
 permissions:
   contents: read
