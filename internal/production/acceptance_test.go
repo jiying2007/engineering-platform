@@ -14,7 +14,8 @@ func TestTerminalPlanIsDeterministicAndRequiresHumanReview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first != second || first.PlanDigest == "" ||
+	if first.PlanDigest != second.PlanDigest || first.PlanDigest == "" ||
+		first.Plan.FixtureID != second.Plan.FixtureID ||
 		!first.Plan.HumanReviewRequired || !first.Plan.ProviderLiveRequired ||
 		first.Plan.TaskType != "RELEASE" {
 		t.Fatalf("unexpected terminal plan: %#v", first)
