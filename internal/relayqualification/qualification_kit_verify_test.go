@@ -44,10 +44,22 @@ func TestVerifyQualificationKitRejectsAnyRetainedByteDrift(t *testing.T) {
 	}{
 		{"contract", func(k *QualificationKit) { k.ContractJSON[0] ^= 1 }},
 		{"config", func(k *QualificationKit) { k.CodexConfig = append([]byte{}, k.CodexConfig...); k.CodexConfig[0] ^= 1 }},
-		{"live", func(k *QualificationKit) { k.LiveManifestJSON = append([]byte{}, k.LiveManifestJSON...); k.LiveManifestJSON[0] ^= 1 }},
-		{"handoff", func(k *QualificationKit) { k.RuntimeHandoffJSON = append([]byte{}, k.RuntimeHandoffJSON...); k.RuntimeHandoffJSON[0] ^= 1 }},
-		{"qualification", func(k *QualificationKit) { k.QualificationJSON = append([]byte{}, k.QualificationJSON...); k.QualificationJSON[0] ^= 1 }},
-		{"manifest", func(k *QualificationKit) { k.ManifestJSON = append([]byte{}, k.ManifestJSON...); k.ManifestJSON[0] ^= 1 }},
+		{"live", func(k *QualificationKit) {
+			k.LiveManifestJSON = append([]byte{}, k.LiveManifestJSON...)
+			k.LiveManifestJSON[0] ^= 1
+		}},
+		{"handoff", func(k *QualificationKit) {
+			k.RuntimeHandoffJSON = append([]byte{}, k.RuntimeHandoffJSON...)
+			k.RuntimeHandoffJSON[0] ^= 1
+		}},
+		{"qualification", func(k *QualificationKit) {
+			k.QualificationJSON = append([]byte{}, k.QualificationJSON...)
+			k.QualificationJSON[0] ^= 1
+		}},
+		{"manifest", func(k *QualificationKit) {
+			k.ManifestJSON = append([]byte{}, k.ManifestJSON...)
+			k.ManifestJSON[0] ^= 1
+		}},
 		{"checksums", func(k *QualificationKit) { k.Checksums = append([]byte{}, k.Checksums...); k.Checksums[0] ^= 1 }},
 	}
 	for _, tc := range cases {
