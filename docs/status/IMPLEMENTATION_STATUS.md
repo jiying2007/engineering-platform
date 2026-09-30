@@ -289,9 +289,28 @@ calibration complete and separately requires the real provider-authentication
 measurement before status can become COMPLETE. No guessed latency thresholds are
 encoded.
 
-This still does not qualify an unattended provider and does not claim production
-readiness. The next external state-changing gate remains one real provider live
-qualification, after the pre-live dry run is retained.
+The provider-free terminal preparation is now **PRE_LIVE_COMPLETE**.
+
+Retained checkpoint:
+
+- #124 merge/main: `1e87b6a9abe634bd6eaac08df51c70c8646f2c84`;
+- fresh-main CI `36677548102`: PASS, all five canonical gates;
+- protected-main terminal pre-live run `36677548014`: PASS;
+- retained artifact ID `11080018047`;
+- artifact digest
+  `sha256:2a117a8238cd2de93d402a806bc5e245e3f6634e5ef4dae1ea3ed7d06a867507`;
+- artifact name
+  `production-terminal-pre-live-1e87b6a9abe634bd6eaac08df51c70c8646f2c84-36677548014`.
+
+This checkpoint proves only the provider-free terminal contract/dry-run state.
+It does not qualify an unattended provider and does not claim production
+readiness. Current terminal state is:
+
+`PRE_LIVE_COMPLETE / PROVIDER_PENDING`.
+
+Do not add further generic Provider/Core abstractions merely to create progress.
+The next state-changing gate is one selected unattended Provider v3 live
+qualification followed by the already-frozen terminal maintenance fixture chain.
 
 ## Managed-workspace WIF unattended gate
 
