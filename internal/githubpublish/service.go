@@ -1,7 +1,6 @@
 package githubpublish
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -243,4 +242,3 @@ func writePublisherJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
-var _ = context.Canceled
