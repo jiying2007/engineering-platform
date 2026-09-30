@@ -243,6 +243,55 @@ func (r QualificationReceipt) Digest() (string, error) {
 	return canonical.Digest(r)
 }
 
+// VerifyExecutableQualification re-binds a retained compatibility receipt to
+// the exact native Codex executable without starting a model turn. It checks the
+// executable bytes, semantic version and exact model identity frozen by the
+// qualification receipt.
+func VerifyExecutableQualification(ctx context.Context, executable, model string, receipt QualificationReceipt) error {
+	if err := receipt.Validate(); err != nil {
+		return err
+	}
+	if !validTextModel(model) || receipt.ThreadStartModel != model {
+		return fmt.Errorf("exact qualified model required")
+	}
+	resolved, err := canonicalPath(executable, false)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o022 != 0 || info.Mode().Perm()&0o111 == 0 {
+		return fmt.Errorf("trusted executable required")
+	}
+	digest, err := executableDigest(resolved)
+	if err != nil {
+		return err
+	}
+	if digest != receipt.BinaryDigest {
+		return fmt.Errorf("Codex binary digest does not match qualification")
+	}
+	home, err := os.MkdirTemp("", "engineering-platform-codex-verify-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(home)
+	out, diagnostics, err := codexVersion(ctx, resolved, home)
+	if err != nil {
+		return fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
+	}
+	version, err := ParseCodexVersionOutput(string(out))
+	if err != nil {
+		return err
+	}
+	if version != receipt.Version {
+		return fmt.Errorf("Codex version does not match qualification")
+	}
+	return nil
+}
+
+func validTextModel(model string) bool {
+	return model != "" && len(model) <= 128 && strings.TrimSpace(model) == model && !strings.ContainsAny(model, "\r\n\x00")
+}
+
 func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) error {
 	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
