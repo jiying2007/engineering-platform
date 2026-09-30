@@ -66,7 +66,7 @@ func Check(config Config) (Result, error) {
 		return result, err
 	}
 	for name, path := range map[string]string{
-		"control_binary": config.ControlBinary,
+		"control_binary":   config.ControlBinary,
 		"worker_binary":    config.WorkerBinary,
 		"eng_binary":       config.EngBinary,
 		"publisher_binary": config.PublisherBinary,
