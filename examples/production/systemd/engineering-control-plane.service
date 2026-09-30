@@ -1,7 +1,7 @@
 [Unit]
 Description=Engineering Platform Control Plane
-Wants=network-online.target
-After=network-online.target
+Wants=network-online.target engineering-publisher.service
+After=network-online.target engineering-publisher.service
 
 [Service]
 Type=simple
