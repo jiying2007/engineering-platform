@@ -1,0 +1,6 @@
+{
+  "closure_receipt_id": "production-terminal-maintenance-closure",
+  "delivery_receipt_id": "production-terminal-maintenance-delivery",
+  "verification_report_id": "production-terminal-maintenance-verification",
+  "review_report_id": "production-terminal-maintenance-review"
+}
