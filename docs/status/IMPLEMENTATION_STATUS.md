@@ -163,7 +163,10 @@ are available:
   account or credential is supplied;
 - `eng relay-runtime-handoff` binds that live manifest to one exact
   compatibility-qualified Codex executable/version/binary digest without
-  starting a model turn.
+  starting a model turn;
+- `eng relay-qualification-kit` materializes the normalized Contract, exact
+  Codex TOML, live manifest, runtime handoff, compatibility receipt, cross-bound
+  kit manifest and SHA256SUMS into one new owner-private directory.
 
 This stage now uses relay prequalification schema v2. The v1 live-tree document
 has been retired with no compatibility shim because no relay was yet
@@ -193,9 +196,12 @@ digests, and mandatory gateway operation ID plus effective provider/model
 identity. A separate deterministic runtime handoff re-binds the retained Codex
 compatibility qualification to the exact native binary bytes/version/model using
 only local hashing and `codex --version`; this prevents a later credentialed
-probe from silently swapping the runtime. Synthetic receipt tests prove only
-schema behavior and do not qualify the relay. Account/credential verification
-and the actual live model turn remain deferred to the next #106 gate.
+probe from silently swapping the runtime. The same repository-side facts can now be emitted as one deterministic
+qualification kit with a cross-bound manifest and raw-byte SHA256SUMS, so a
+future credentialed probe must consume the already-frozen artifacts instead of
+reconstructing them ad hoc. Synthetic receipt tests prove only schema behavior
+and do not qualify the relay. Account/credential verification and the actual
+live model turn remain deferred to the next #106 gate.
 
 ## Managed-workspace WIF unattended gate
 

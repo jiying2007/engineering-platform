@@ -206,6 +206,40 @@ credential material, does not contact the relay and does not qualify
 `company-relay`. Its purpose is to ensure the later live gate cannot swap the
 runtime after repository-side acceptance criteria have been frozen.
 
+## Immutable qualification kit
+
+All repository-side relay qualification inputs can be materialized as one
+owner-private immutable handoff directory:
+
+```sh
+eng relay-qualification-kit \
+  --contract relay-contract-v2.json \
+  --codex /absolute/path/to/codex \
+  --qualification codex-compatibility-qualification.json \
+  --out-dir /absolute/path/to/new-kit
+```
+
+The command performs no authentication and no model turn. It creates a new
+directory with mode 0700 and never overwrites an existing path. Every retained
+file is created with mode 0600:
+
+- `relay-contract-v2.json` — normalized Contract bytes;
+- `relay-codex-config.toml` — exact Codex user-level custom-provider config;
+- `relay-live-manifest.json` — frozen future live acceptance plan;
+- `relay-runtime-handoff.json` — exact Codex binary/qualification handoff;
+- `codex-compatibility-qualification.json` — normalized compatibility receipt;
+- `relay-qualification-kit-manifest.json` — cross-binding file and authority
+  identities;
+- `SHA256SUMS` — raw-byte SHA-256 checksums for all retained identity files.
+
+The kit manifest binds provider config, live manifest, runtime handoff, Codex
+qualification, exact Codex binary digest and requested model. Its
+`manifest_digest` is deterministic for the same inputs.
+
+No bearer token, API key value, saved ChatGPT login, WIF assertion or account ID
+belongs in this kit. Future credentialed execution must consume this kit rather
+than rebuilding contract/config/manifest/handoff ad hoc.
+
 ## Frozen live handoff manifest
 
 Before any account or relay credential is supplied, operators can freeze the

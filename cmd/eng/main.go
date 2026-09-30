@@ -41,6 +41,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "relay-qualification-kit":
+		if err := relayQualificationKit(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "relay-runtime-handoff":
 		if err := relayRuntimeHandoff(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -147,6 +152,7 @@ func usage() {
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
+	fmt.Println("  relay-qualification-kit <flags>                materialize immutable offline relay qualification bundle")
 	fmt.Println("  relay-runtime-handoff <flags>                  bind live manifest to exact Codex qualification/binary without model access")
 	fmt.Println("  relay-live-manifest --contract FILE            freeze future read-only/no-tool live qualification plan")
 	fmt.Println("  relay-render-codex-config --contract FILE --out FILE  render exact owner-private user-level Codex provider config")
