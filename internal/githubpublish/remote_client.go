@@ -79,7 +79,7 @@ func NewRemoteClient(config RemoteConfiguration) (Remote, error) {
 	}
 	transport := &http.Transport{
 		TLSClientConfig: tlsConfig, Proxy: nil,
-		DialContext: (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 15 * time.Second,
 		IdleConnTimeout: 30 * time.Second, MaxIdleConns: 2, MaxConnsPerHost: 2,
 		MaxResponseHeaderBytes: 32 << 10, DisableCompression: true,
