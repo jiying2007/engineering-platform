@@ -1,6 +1,8 @@
 package githubpublish
 
 import (
+	"bytes"
+	"crypto/tls"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -76,11 +78,19 @@ func (s *RemoteService) Handler() http.Handler {
 }
 
 func (s *RemoteService) authorized(r *http.Request) bool {
-	if r == nil || r.TLS == nil || !r.TLS.HandshakeComplete || len(r.TLS.PeerCertificates) == 0 {
+	if r == nil || r.TLS == nil || !r.TLS.HandshakeComplete || r.TLS.Version < tls.VersionTLS13 ||
+		len(r.TLS.PeerCertificates) == 0 || len(r.TLS.VerifiedChains) == 0 {
 		return false
 	}
 	leaf := r.TLS.PeerCertificates[0]
-	return leaf != nil && len(leaf.URIs) == 1 && leaf.URIs[0] != nil &&
+	verified := false
+	for _, chain := range r.TLS.VerifiedChains {
+		if len(chain) > 0 && chain[0] != nil && leaf != nil && bytes.Equal(chain[0].Raw, leaf.Raw) {
+			verified = true
+			break
+		}
+	}
+	return verified && leaf != nil && len(leaf.URIs) == 1 && leaf.URIs[0] != nil &&
 		leaf.URIs[0].String() == s.controlSubject
 }
 
