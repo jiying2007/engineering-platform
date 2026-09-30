@@ -1,0 +1,35 @@
+[Unit]
+Description=Engineering Platform GitHub Publisher
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=engineering-publisher
+Group=engineering-platform
+EnvironmentFile=/etc/engineering-platform/publisher.env
+ExecStart=/opt/engineering-platform/bin/publisher-service
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=20s
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/var/lib/engineering-platform/preparation/artifacts
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
