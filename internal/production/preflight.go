@@ -28,13 +28,16 @@ type Config struct {
 	ControlBinary          string `json:"control_binary"`
 	WorkerBinary           string `json:"worker_binary"`
 	EngBinary              string `json:"eng_binary"`
+	PublisherBinary        string `json:"publisher_binary"`
 	ControlEnvFile         string `json:"control_env_file"`
 	AdmissionEnvFile       string `json:"admission_env_file"`
 	PreparationEnvFile     string `json:"preparation_env_file"`
+	PublisherEnvFile       string `json:"publisher_env_file"`
 	BackupDirectory        string `json:"backup_directory"`
 	ControlServiceUser     string `json:"control_service_user"`
 	AdmissionServiceUser   string `json:"admission_service_user"`
 	PreparationServiceUser string `json:"preparation_service_user"`
+	PublisherServiceUser   string `json:"publisher_service_user"`
 }
 
 type Result struct {
@@ -65,7 +68,8 @@ func Check(config Config) (Result, error) {
 	for name, path := range map[string]string{
 		"control_binary": config.ControlBinary,
 		"worker_binary":  config.WorkerBinary,
-		"eng_binary":     config.EngBinary,
+		"eng_binary":       config.EngBinary,
+		"publisher_binary": config.PublisherBinary,
 	} {
 		if err := safeExecutable(path); err != nil {
 			return result, fmt.Errorf("%s: %w", name, err)
@@ -102,20 +106,26 @@ func Check(config Config) (Result, error) {
 	}
 	result.WorkerPreparation = StateReady
 
-	// #105 requires publisher credentials to live under an independent deployment
-	// identity. Current main still assembles githubpublish.Provider in control-plane.
-	// Keep this explicit blocker until the publisher service split is merged.
-	result.Blockers = append(result.Blockers, "publisher_service_separation")
+	publisher, err := readEnvFile(config.PublisherEnvFile)
+	if err != nil {
+		return result, fmt.Errorf("publisher_env_file: %w", err)
+	}
+	if err := validatePublisherEnv(publisher); err != nil {
+		return result, fmt.Errorf("publisher environment: %w", err)
+	}
+	result.Publisher = StateReady
+	result.Internal = StateReady
+	result.Overall = OverallProvider
 	result.Blockers = append(result.Blockers, "unattended_provider_live_qualification")
 	return result, nil
 }
 
 func validateServiceUsers(c Config) error {
-	users := []string{c.ControlServiceUser, c.AdmissionServiceUser, c.PreparationServiceUser}
+	users := []string{c.ControlServiceUser, c.AdmissionServiceUser, c.PreparationServiceUser, c.PublisherServiceUser}
 	seen := map[string]bool{}
 	for _, user := range users {
 		if !serviceUserPattern.MatchString(user) || user == "root" || seen[user] {
-			return fmt.Errorf("control/admission/preparation require distinct non-root service users")
+			return fmt.Errorf("control/admission/preparation/publisher require distinct non-root service users")
 		}
 		seen[user] = true
 	}
@@ -201,6 +211,7 @@ func validateControlEnv(values map[string]string) error {
 	required := []string{
 		"LISTEN_HOST", "PORT", "DATABASE_URL", "AUTO_MIGRATE",
 		"CONTROL_TLS_CERT_FILE", "CONTROL_TLS_KEY_FILE", "CONTROL_CLIENT_CA_FILE", "CONTROL_AUTH_POLICY_FILE",
+		"GITHUB_PUBLISHER_PLAN_FILE", "GITHUB_PUBLISHER_REMOTE_FILE",
 	}
 	for _, key := range required {
 		if values[key] == "" {
@@ -220,6 +231,31 @@ func validateControlEnv(values map[string]string) error {
 	for key := range values {
 		if !allowed[key] {
 			return fmt.Errorf("unexpected control environment key %s", key)
+		}
+	}
+	return nil
+}
+
+
+func validatePublisherEnv(values map[string]string) error {
+	required := []string{
+		"LISTEN_HOST", "PORT", "PUBLISHER_CONFIG_FILE",
+		"PUBLISHER_TLS_CERT_FILE", "PUBLISHER_TLS_KEY_FILE",
+		"PUBLISHER_CLIENT_CA_FILE", "PUBLISHER_CONTROL_SUBJECT",
+	}
+	allowed := map[string]bool{}
+	for _, key := range required {
+		allowed[key] = true
+		if values[key] == "" {
+			return fmt.Errorf("missing %s", key)
+		}
+	}
+	if values["LISTEN_HOST"] != "127.0.0.1" && values["LISTEN_HOST"] != "::1" {
+		return fmt.Errorf("publisher v1 requires literal loopback LISTEN_HOST")
+	}
+	for key := range values {
+		if !allowed[key] {
+			return fmt.Errorf("unexpected publisher environment key %s", key)
 		}
 	}
 	return nil
