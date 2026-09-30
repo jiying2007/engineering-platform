@@ -14,8 +14,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/jiying2007/engineering-platform/internal/action"
 )
 
 type serviceRemote struct {
@@ -144,5 +142,5 @@ func TestRemoteServiceObserveDoesNotNeedPublisherBundle(t *testing.T) {
 	}
 }
 
-var _ action.Provider = (*remoteClient)(nil)
+var _ Remote = (*remoteClient)(nil)
 var _ = time.Second
