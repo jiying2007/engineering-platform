@@ -2,8 +2,8 @@ package githubpublish
 
 import (
 	"bytes"
-	"crypto/tls"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
