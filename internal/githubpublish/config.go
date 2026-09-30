@@ -25,6 +25,12 @@ type TargetPolicy struct {
 	BranchPrefix string `json:"branch_prefix"`
 }
 
+type PlanConfiguration struct {
+	Version      int            `json:"version"`
+	ArtifactRoot string         `json:"artifact_root"`
+	Targets      []TargetPolicy `json:"targets"`
+}
+
 type Configuration struct {
 	Version       int            `json:"version"`
 	ArtifactRoot  string         `json:"artifact_root"`
@@ -50,24 +56,37 @@ func Load(path string, state State) (*Provider, error) {
 }
 
 func New(config Configuration, state State, remote Remote) (*Provider, error) {
+	if _, err := canonicalExecutable(config.GitExecutable); err != nil {
+		return nil, err
+	}
+	if _, err := canonicalSecret(config.TokenFile); err != nil {
+		return nil, err
+	}
+	return NewPlan(PlanConfiguration{
+		Version: config.Version, ArtifactRoot: config.ArtifactRoot, Targets: config.Targets,
+	}, state, remote)
+}
+
+func LoadPlan(path string, state State, remote Remote) (*Provider, error) {
+	data, err := access.ReadConfiguration(path, false)
+	if err != nil {
+		return nil, err
+	}
+	var config PlanConfiguration
+	if err := strictjson.Decode(data, &config); err != nil {
+		return nil, err
+	}
+	return NewPlan(config, state, remote)
+}
+
+func NewPlan(config PlanConfiguration, state State, remote Remote) (*Provider, error) {
 	if config.Version != 1 || state == nil || remote == nil || len(config.Targets) == 0 || len(config.Targets) > 64 {
-		return nil, fmt.Errorf("publisher requires version 1, state, remote and 1..64 targets")
+		return nil, fmt.Errorf("publisher plan requires version 1, state, remote and 1..64 targets")
 	}
 	artifactRoot, info, err := canonicalDirectory(config.ArtifactRoot)
 	if err != nil {
 		return nil, err
 	}
-	git, err := canonicalExecutable(config.GitExecutable)
-	if err != nil {
-		return nil, err
-	}
-	tokenFile, err := canonicalSecret(config.TokenFile)
-	if err != nil {
-		return nil, err
-	}
-	config.ArtifactRoot = artifactRoot
-	config.GitExecutable = git
-	config.TokenFile = tokenFile
 	targets := make(map[string]TargetPolicy, len(config.Targets))
 	for _, target := range config.Targets {
 		if !validRepository(target.Repository) || !validRef(target.BaseRef) ||

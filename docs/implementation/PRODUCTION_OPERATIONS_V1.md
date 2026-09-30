@@ -41,9 +41,9 @@ Required identities:
 - Reviewer;
 - Closure authority.
 
-The first systemd baseline materializes Control, admission and preparation as
-separate non-root service identities. Publisher remains an explicit P0 blocker
-until it is moved out of Control Plane.
+The systemd baseline materializes Control, admission, preparation and Publisher
+as separate non-root service identities. The Publisher service is the only
+production process allowed to read the GitHub publisher token.
 
 Model/Worker processes must never receive:
 
@@ -53,7 +53,9 @@ Model/Worker processes must never receive:
 - unrelated host login state.
 
 Control Plane must not carry `GITHUB_PUBLISHER_CONFIG_FILE` in the production
-profile after publisher separation.
+profile. It carries only a non-secret publication plan and an mTLS remote-client
+configuration. The Publisher service independently rechecks target policy and
+retained bundle digest/size before GitHub mutation.
 
 ## 3. Configuration and secrets
 

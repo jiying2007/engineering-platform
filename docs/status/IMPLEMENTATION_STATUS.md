@@ -224,20 +224,23 @@ The first production baseline adds:
 - `AUTO_MIGRATE=0` for production service startup;
 - `eng production-preflight --config FILE` for host-side static validation.
 
-Production preflight deliberately fails closed if Control Plane carries
-`GITHUB_PUBLISHER_CONFIG_FILE`; current main still assembles the GitHub
-publisher inside Control Plane, so publisher service separation remains an
-explicit internal P0 blocker rather than being hidden by deployment
-configuration.
+Production preflight fails closed if Control Plane carries the legacy
+`GITHUB_PUBLISHER_CONFIG_FILE`. Production now uses an independent
+`publisher-service` under its own Unix identity. Control Plane holds only the
+non-secret publication plan plus mTLS remote-client configuration; the
+Publisher service alone reads the GitHub token and independently rechecks target
+policy and retained bundle identity before GitHub mutation.
 
-The baseline therefore reports two known blockers until later slices clear them:
+The publisher service split preserves the existing Action Gateway operation and
+UNKNOWN/reconciliation authority; mTLS transport failure is not an instruction
+to blindly replay publication.
 
-- `publisher_service_separation`;
+With this internal P0 closed, production preflight can reach `INTERNAL=READY`
+and `OVERALL=PROVIDER_PENDING`. The remaining provider blocker is:
+
 - `unattended_provider_live_qualification`.
 
-This split is intentional: repository, service identity and host hardening can
-be closed without consuming provider credentials. Provider/account validation
-remains a later live gate.
+Provider/account validation remains a later live gate.
 
 ## Managed-workspace WIF unattended gate
 

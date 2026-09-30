@@ -150,3 +150,35 @@ Before reassessing M1:
 
 Repository fake app-server tests remain protocol/filesystem evidence only and
 must not be represented as live model evidence.
+
+
+## Production remote publisher boundary
+
+Production-v1 does not place the GitHub token in Control Plane.
+
+Control Plane retains the existing Action Gateway responsibilities:
+
+- frozen Task/Run/epoch/recovery authorization;
+- exact Codex result and result-digest binding;
+- deterministic publication Plan derivation;
+- retained bundle raw-byte digest/size verification;
+- Action operation/UNKNOWN/reconciliation state.
+
+The credentialed external mutation is delegated through an mTLS
+`githubpublish.Remote` client to the independent `publisher-service`.
+
+The Publisher service:
+
+- runs under a separate Unix identity;
+- is the only production service that can read the GitHub publisher token;
+- accepts only TLS 1.3 clients signed by its configured CA;
+- rechecks the exact configured Control Plane URI subject;
+- rechecks repository/base-ref/branch-prefix target policy;
+- independently re-hashes the retained shared bundle before publication;
+- performs Git/GitHub mutation through the existing GitHub Remote implementation;
+- never receives DATABASE_URL, model/provider credentials, Review or Closure
+  authority.
+
+The mTLS RPC is not a second Action Gateway. A transport failure remains an
+UNKNOWN result at the existing Action operation and is reconciled through
+`Remote.Observe`; the client never automatically retries a publication POST.
