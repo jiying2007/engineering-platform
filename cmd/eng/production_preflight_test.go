@@ -36,12 +36,12 @@ func TestProductionPreflightReportsInternalPublisherBlocker(t *testing.T) {
 	config := production.Config{
 		Version: production.ConfigVersion, DeploymentMode: production.DeploymentMode,
 		ControlBinary: exec("control-plane"), WorkerBinary: exec("worker"), EngBinary: exec("eng"),
-		ControlEnvFile: env("control.env", control),
-		AdmissionEnvFile: env("admission.env", worker),
-		PreparationEnvFile: env("preparation.env", worker+"WORKER_PREPARATION_CONFIG=/etc/engineering-platform/preparation.json\n"),
-		BackupDirectory: backup,
-		ControlServiceUser: "engineering-control",
-		AdmissionServiceUser: "engineering-admission",
+		ControlEnvFile:         env("control.env", control),
+		AdmissionEnvFile:       env("admission.env", worker),
+		PreparationEnvFile:     env("preparation.env", worker+"WORKER_PREPARATION_CONFIG=/etc/engineering-platform/preparation.json\n"),
+		BackupDirectory:        backup,
+		ControlServiceUser:     "engineering-control",
+		AdmissionServiceUser:   "engineering-admission",
 		PreparationServiceUser: "engineering-preparation",
 	}
 	data, err := json.Marshal(config)
