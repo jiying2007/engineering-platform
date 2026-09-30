@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -13,7 +15,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 type serviceRemote struct {
@@ -145,4 +146,3 @@ func TestRemoteServiceObserveDoesNotNeedPublisherBundle(t *testing.T) {
 }
 
 var _ Remote = (*remoteClient)(nil)
-var _ = time.Second
