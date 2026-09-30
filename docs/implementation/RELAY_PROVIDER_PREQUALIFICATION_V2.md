@@ -240,6 +240,39 @@ No bearer token, API key value, saved ChatGPT login, WIF assertion or account ID
 belongs in this kit. Future credentialed execution must consume this kit rather
 than rebuilding contract/config/manifest/handoff ad hoc.
 
+## Independent qualification kit verification
+
+A materialized kit can be re-verified without rebuilding it and without any
+account, credential or network access:
+
+```sh
+eng relay-verify-qualification-kit --dir /absolute/path/to/kit
+```
+
+The verifier requires:
+
+- an absolute normalized non-symlink directory;
+- directory mode 0700;
+- exactly the seven expected kit files and no extras;
+- every file to be a non-symlink regular file with mode 0600;
+- bounded file sizes and stable file identity during read;
+- strict JSON decoding with no duplicate or unknown members;
+- canonical Contract, live-manifest, runtime-handoff, qualification and kit
+  manifest bytes;
+- exact rendered Codex TOML equality with the Contract;
+- exact live-manifest equality with the Contract;
+- exact runtime-handoff binding to the live manifest and Codex qualification;
+- exact cross-binding of provider config, live manifest, runtime handoff,
+  qualification, Codex binary and requested model;
+- exact raw-byte file digests in the kit manifest;
+- exact deterministic `SHA256SUMS`.
+
+Any byte drift or extra entry fails closed.
+
+The verifier intentionally does not re-run a model turn and does not contact the
+relay. It proves only that the existing offline kit is internally intact and
+still represents the exact repository-side qualification authority.
+
 ## Frozen live handoff manifest
 
 Before any account or relay credential is supplied, operators can freeze the

@@ -166,7 +166,10 @@ are available:
   starting a model turn;
 - `eng relay-qualification-kit` materializes the normalized Contract, exact
   Codex TOML, live manifest, runtime handoff, compatibility receipt, cross-bound
-  kit manifest and SHA256SUMS into one new owner-private directory.
+  kit manifest and SHA256SUMS into one new owner-private directory;
+- `eng relay-verify-qualification-kit --dir DIR` independently revalidates the
+  existing kit's exact directory/file modes, canonical JSON/TOML bytes,
+  cross-binding and SHA256SUMS without rebuilding it or contacting any provider.
 
 This stage now uses relay prequalification schema v2. The v1 live-tree document
 has been retired with no compatibility shim because no relay was yet
@@ -199,9 +202,12 @@ only local hashing and `codex --version`; this prevents a later credentialed
 probe from silently swapping the runtime. The same repository-side facts can now be emitted as one deterministic
 qualification kit with a cross-bound manifest and raw-byte SHA256SUMS, so a
 future credentialed probe must consume the already-frozen artifacts instead of
-reconstructing them ad hoc. Synthetic receipt tests prove only schema behavior
-and do not qualify the relay. Account/credential verification and the actual
-live model turn remain deferred to the next #106 gate.
+reconstructing them ad hoc. The kit now has an independent offline verifier that
+rejects extra files, symlinks, permission drift, non-canonical JSON, rendered
+Codex config drift, broken cross-binding or checksum drift. Synthetic receipt
+tests prove only schema behavior and do not qualify the relay.
+Account/credential verification and the actual live model turn remain deferred
+to the next #106 gate.
 
 ## Managed-workspace WIF unattended gate
 
