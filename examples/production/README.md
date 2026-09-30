@@ -61,6 +61,22 @@ The Control API already exposes `GET /healthz`. TLS transport remains required
 by the server. Operational readiness must additionally verify PostgreSQL and
 recovery state; those checks are added by the production observability slice.
 
+## Authenticated operational status
+
+After Control Plane is reachable, load a dedicated operator/read-only mTLS
+client environment and run:
+
+```sh
+eng production-status --require-ready
+```
+
+The command reads `GET /api/v1/operations/status`. Detailed readiness is never
+inferred from anonymous `/healthz` alone.
+
+A nonzero exit from `--require-ready` blocks production mutation until the
+reported Recovery/UNKNOWN/dead-letter/lease condition is reconciled. Do not
+paper over a degraded status by restarting services or replaying a model turn.
+
 ## Restart semantics
 
 systemd may restart admission/preparation/control processes after a crash.
