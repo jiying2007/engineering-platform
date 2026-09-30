@@ -1,0 +1,36 @@
+[Unit]
+Description=Engineering Platform Worker Preparation
+Wants=network-online.target
+After=network-online.target engineering-control-plane.service
+Requires=engineering-control-plane.service
+
+[Service]
+Type=simple
+User=engineering-preparation
+Group=engineering-platform
+EnvironmentFile=/etc/engineering-platform/worker-preparation.env
+ExecStart=/opt/engineering-platform/bin/worker --profile=worker/codex-production --prepare-only
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=20s
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/engineering-platform/preparation
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

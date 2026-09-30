@@ -209,6 +209,36 @@ tests prove only schema behavior and do not qualify the relay.
 Account/credential verification and the actual live model turn remain deferred
 to the next #106 gate.
 
+## Productionization baseline
+
+Issue #105 is now the terminal productionization epic. The canonical operating
+contract is `docs/implementation/PRODUCTION_OPERATIONS_V1.md`.
+
+Production-v1 targets Ubuntu + systemd + PostgreSQL rather than Kubernetes.
+The first production baseline adds:
+
+- hardened systemd units for Control Plane, Worker admission and Worker
+  preparation;
+- distinct non-root Unix service identities for those roles;
+- owner-private EnvironmentFile contracts;
+- `AUTO_MIGRATE=0` for production service startup;
+- `eng production-preflight --config FILE` for host-side static validation.
+
+Production preflight deliberately fails closed if Control Plane carries
+`GITHUB_PUBLISHER_CONFIG_FILE`; current main still assembles the GitHub
+publisher inside Control Plane, so publisher service separation remains an
+explicit internal P0 blocker rather than being hidden by deployment
+configuration.
+
+The baseline therefore reports two known blockers until later slices clear them:
+
+- `publisher_service_separation`;
+- `unattended_provider_live_qualification`.
+
+This split is intentional: repository, service identity and host hardening can
+be closed without consuming provider credentials. Provider/account validation
+remains a later live gate.
+
 ## Managed-workspace WIF unattended gate
 
 Managed-workspace WIF remains a separate **optional unattended** qualification

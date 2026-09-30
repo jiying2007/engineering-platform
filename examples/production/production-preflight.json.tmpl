@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "deployment_mode": "ubuntu-systemd-v1",
+  "control_binary": "/opt/engineering-platform/bin/control-plane",
+  "worker_binary": "/opt/engineering-platform/bin/worker",
+  "eng_binary": "/opt/engineering-platform/bin/eng",
+  "control_env_file": "/etc/engineering-platform/control.env",
+  "admission_env_file": "/etc/engineering-platform/worker-admission.env",
+  "preparation_env_file": "/etc/engineering-platform/worker-preparation.env",
+  "backup_directory": "/var/lib/engineering-platform/backups",
+  "control_service_user": "engineering-control",
+  "admission_service_user": "engineering-admission",
+  "preparation_service_user": "engineering-preparation"
+}
