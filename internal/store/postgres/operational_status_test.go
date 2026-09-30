@@ -42,8 +42,8 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 		RecoveryEpoch: 0, Action: "github.publish-pr",
 		RiskClass: action.ControlledMutation, Capability: "github.publish-pr",
 		ParametersDigest: "sha256:" + strings.Repeat("a", 64),
-		IdempotencyKey: "status-unknown-operation",
-		RequestedBy: "runtime", RequestedAt: now,
+		IdempotencyKey:   "status-unknown-operation",
+		RequestedBy:      "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("b", 64), now)
 	if err := s.Create(*op); err != nil {
