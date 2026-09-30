@@ -98,20 +98,39 @@ shutdown and cancels its relay loop. Worker loops use signal-bound contexts.
 
 ## 5. Health versus readiness
 
-`GET /healthz` proves the HTTP process is serving. It is not sufficient for
-production readiness.
+`GET /healthz` proves only that the HTTP process is serving. It is deliberately
+not the detailed production readiness authority.
 
-Production readiness must eventually combine:
+The authenticated mTLS endpoint
+`GET /api/v1/operations/status` requires `core:read` and reads one
+PostgreSQL-backed operational snapshot containing:
 
-- Control TLS endpoint reachable;
-- PostgreSQL reachable and schema valid;
-- Recovery state NORMAL;
-- Worker mTLS identities usable;
-- publisher service reachable with no credential exposed to Control/Worker;
-- selected provider qualified and not administratively disabled.
+- Recovery epoch/mode;
+- active Runs;
+- pending Worker intents;
+- active and expired Worker leases;
+- pending/leased/dead-letter outbox counts;
+- UNKNOWN/RECONCILING/MANUAL external Action counts;
+- UNKNOWN Core-bound Codex execution count.
 
-The observability slice will turn these facts into a retained machine-readable
-status.
+`eng production-status` reads this endpoint using the existing direct-mTLS
+Control client. `--require-ready` returns nonzero when mutation readiness is
+not clean while still printing the machine-readable status first.
+
+Readiness is fail-closed for structural authority hazards:
+
+- Recovery/Reconciliation mode -> `RECOVERY_REQUIRED`;
+- expired Worker leases;
+- dead-letter outbox messages;
+- UNKNOWN/RECONCILING/MANUAL external operations;
+- UNKNOWN Codex execution -> `DEGRADED`.
+
+Normal pending work/outbox backlog is retained as an observation but is not
+given an arbitrary SLO threshold yet. Latency/backlog thresholds are frozen only
+after measured operational data exists.
+
+Publisher process reachability and selected-provider qualification remain
+separate preflight/live facts; this endpoint does not invent their health.
 
 ## 6. Restart and UNKNOWN policy
 
