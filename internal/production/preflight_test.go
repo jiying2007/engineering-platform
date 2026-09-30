@@ -35,15 +35,15 @@ func validConfig(t *testing.T) Config {
 	worker := "CONTROL_ENDPOINT=https://127.0.0.1:18443\nCONTROL_CLIENT_CERT_FILE=/etc/engineering-platform/tls/worker.crt\nCONTROL_CLIENT_KEY_FILE=/etc/engineering-platform/tls/worker.key\nCONTROL_SERVER_CA_FILE=/etc/engineering-platform/tls/ca.crt\n"
 	return Config{
 		Version: ConfigVersion, DeploymentMode: DeploymentMode,
-		ControlBinary: writeExecutable(t, root, "control-plane"),
-		WorkerBinary: writeExecutable(t, root, "worker"),
-		EngBinary: writeExecutable(t, root, "eng"),
-		ControlEnvFile: writeEnv(t, root, "control.env", control),
-		AdmissionEnvFile: writeEnv(t, root, "admission.env", worker),
-		PreparationEnvFile: writeEnv(t, root, "preparation.env", worker+"WORKER_PREPARATION_CONFIG=/etc/engineering-platform/preparation.json\n"),
-		BackupDirectory: backup,
-		ControlServiceUser: "engineering-control",
-		AdmissionServiceUser: "engineering-admission",
+		ControlBinary:          writeExecutable(t, root, "control-plane"),
+		WorkerBinary:           writeExecutable(t, root, "worker"),
+		EngBinary:              writeExecutable(t, root, "eng"),
+		ControlEnvFile:         writeEnv(t, root, "control.env", control),
+		AdmissionEnvFile:       writeEnv(t, root, "admission.env", worker),
+		PreparationEnvFile:     writeEnv(t, root, "preparation.env", worker+"WORKER_PREPARATION_CONFIG=/etc/engineering-platform/preparation.json\n"),
+		BackupDirectory:        backup,
+		ControlServiceUser:     "engineering-control",
+		AdmissionServiceUser:   "engineering-admission",
 		PreparationServiceUser: "engineering-preparation",
 	}
 }
