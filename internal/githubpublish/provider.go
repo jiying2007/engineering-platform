@@ -68,8 +68,8 @@ const (
 )
 
 type ObserveResult struct {
-	Outcome Observation
-	Receipt PublicationReceipt
+	Outcome Observation        `json:"outcome"`
+	Receipt PublicationReceipt `json:"receipt"`
 }
 
 type Remote interface {
