@@ -1,0 +1,65 @@
+{
+  "contract": {
+    "task_contract_id": "production-terminal-maintenance-task",
+    "work_item_id": "production-terminal-maintenance-work",
+    "task_type": "RELEASE",
+    "allowed_actions": [
+      "worker.codex-execute",
+      "github.publish-pr"
+    ],
+    "expected_outputs": [
+      "Only examples/production/terminal-maintenance/qualification.txt changes",
+      "Exact marker bytes change from PRE_LIVE_READY to TERMINAL_QUALIFIED",
+      "No product behavior, Core authority, provider policy or CI policy changes"
+    ]
+  },
+  "material": {
+    "repository": "jiying2007/engineering-platform",
+    "base_commit": "__BASE_COMMIT__",
+    "target_id": "engineering-platform-production-qualification",
+    "acceptance_criteria": [
+      "The retained result changes only examples/production/terminal-maintenance/qualification.txt from PRE_LIVE_READY to TERMINAL_QUALIFIED and changes no other file.",
+      "The retained result is produced by one authorized Core-bound Codex engineering execution using the exact selected and live-qualified unattended Provider v3 identity.",
+      "The retained Git changed-tree evidence binds the exact frozen base and result commit, and exact PR-head trusted CI passes."
+    ]
+  },
+  "subsystem": "release production qualification",
+  "verification_plan": {
+    "verification_plan_id": "production-terminal-maintenance-vp",
+    "criteria": [
+      {
+        "criterion_id": "terminal-fixture-change",
+        "statement": "The retained result changes only examples/production/terminal-maintenance/qualification.txt from PRE_LIVE_READY to TERMINAL_QUALIFIED and changes no other file.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "terminal-ci",
+            "procedure": "github.actions.trusted-ci.v1",
+            "issuer": "github-actions-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "terminal-unattended-codex",
+        "statement": "The retained result is produced by one authorized Core-bound Codex engineering execution using the exact selected and live-qualified unattended Provider v3 identity.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "terminal-codex",
+            "procedure": "codex.core.execution.v1",
+            "issuer": "codex-execution-importer"
+          }
+        ]
+      },
+      {
+        "criterion_id": "terminal-git-ci",
+        "statement": "The retained Git changed-tree evidence binds the exact frozen base and result commit, and exact PR-head trusted CI passes.",
+        "evidence_requirements": [
+          {
+            "requirement_id": "terminal-git",
+            "procedure": "git.changed-tree.v1",
+            "issuer": "git-change-importer"
+          }
+        ]
+      }
+    ]
+  }
+}
