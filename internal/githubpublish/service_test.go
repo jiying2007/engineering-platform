@@ -27,7 +27,7 @@ func (r *serviceRemote) Publish(_ context.Context, plan Plan, _ string) (Publica
 	return PublicationReceipt{
 		Version: 1, Repository: plan.Repository, BaseRef: plan.BaseRef, BaseCommit: plan.BaseCommit,
 		Branch: plan.Branch, ResultCommit: plan.ResultCommit, PullRequestNumber: 17,
-		PullRequestURL: "https://github.com/" + plan.Repository + "/pull/17",
+		PullRequestURL:   "https://github.com/" + plan.Repository + "/pull/17",
 		PullRequestState: "open", PublicationOutcome: "CREATED",
 	}, nil
 }
@@ -65,11 +65,11 @@ func publisherServiceFixture(t *testing.T) (*RemoteService, Plan) {
 	plan := Plan{
 		Version: 1, RunID: "run-1", Repository: "jiying2007/engineering-platform",
 		BaseRef: "main", BaseCommit: strings.Repeat("1", 40),
-		Branch: "engineering-platform/" + execution[:24],
-		ResultCommit: strings.Repeat("2", 40),
-		ResultDigest: "sha256:" + strings.Repeat("3", 64),
+		Branch:        "engineering-platform/" + execution[:24],
+		ResultCommit:  strings.Repeat("2", 40),
+		ResultDigest:  "sha256:" + strings.Repeat("3", 64),
 		ReceiptDigest: "sha256:" + strings.Repeat("4", 64),
-		BundleDigest: bundleDigest, BundleSize: int64(len(bundle)), ExecutionID: execution,
+		BundleDigest:  bundleDigest, BundleSize: int64(len(bundle)), ExecutionID: execution,
 	}
 	return service, plan
 }
@@ -86,7 +86,7 @@ func authorizedPublisherRequest(t *testing.T, method, path string, body []byte) 
 	req.TLS = &tls.ConnectionState{
 		HandshakeComplete: true, Version: tls.VersionTLS13,
 		PeerCertificates: []*x509.Certificate{cert},
-		VerifiedChains: [][]*x509.Certificate{{cert}},
+		VerifiedChains:   [][]*x509.Certificate{{cert}},
 	}
 	return req
 }
