@@ -173,6 +173,39 @@ Changing renderer bytes changes `codex_config_digest` and therefore changes
 `provider_config_digest`, even when the high-level Contract is otherwise the
 same.
 
+## Exact Codex runtime handoff
+
+Before any account or relay credential is supplied, operators can bind the
+frozen relay qualification plan to one exact compatibility-qualified Codex
+runtime:
+
+```sh
+eng relay-runtime-handoff \
+  --contract relay-contract-v2.json \
+  --codex /absolute/path/to/codex \
+  --qualification codex-compatibility-qualification.json
+```
+
+This command does not start a model turn. It:
+
+- validates the v2 relay Contract and recomputes the live manifest digest;
+- validates the retained Codex compatibility qualification receipt;
+- re-hashes the exact native Codex executable;
+- runs only `codex --version` in an isolated temporary HOME;
+- requires binary digest, semantic version and exact requested model to match
+  the retained qualification;
+- binds the live manifest digest, provider config digest, Codex qualification
+  digest, Codex version, Codex binary digest and requested model into one
+  deterministic `handoff_digest`.
+
+Changing the Codex binary bytes, version, qualification receipt, requested model
+or relay provider configuration produces a different or invalid handoff.
+
+The runtime handoff still has no authentication authority. It contains no
+credential material, does not contact the relay and does not qualify
+`company-relay`. Its purpose is to ensure the later live gate cannot swap the
+runtime after repository-side acceptance criteria have been frozen.
+
 ## Frozen live handoff manifest
 
 Before any account or relay credential is supplied, operators can freeze the
