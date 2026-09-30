@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
+	"github.com/jiying2007/engineering-platform/internal/production"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/review"
 	"github.com/jiying2007/engineering-platform/internal/routing"
@@ -69,6 +70,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("GET /api/v1/capabilities", s.handleCapabilities)
 	s.mux.HandleFunc("GET /api/v1/recovery", s.handleGetRecovery)
+	s.mux.HandleFunc("GET /api/v1/operations/status", s.handleOperationalStatus)
 	s.mux.HandleFunc("POST /api/v1/recovery/begin", s.handleBeginRecovery)
 	s.mux.HandleFunc("POST /api/v1/recovery/complete", s.handleCompleteRecovery)
 	s.mux.HandleFunc("POST /api/v1/recovery/proofs", s.handleCreateRecoveryProof)
@@ -114,6 +116,24 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, _ *http.Request) {
 		"capabilities": embedded.Capabilities(),
 		"skills":       embedded.Skills(),
 	})
+}
+
+type operationalStatusReader interface {
+	ReadOperationalStatus(context.Context) (production.OperationalStatus, error)
+}
+
+func (s *Server) handleOperationalStatus(w http.ResponseWriter, r *http.Request) {
+	reader, ok := s.store.(operationalStatusReader)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "operational status is unavailable")
+		return
+	}
+	status, err := reader.ReadOperationalStatus(r.Context())
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, "operational status read failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, status)
 }
 
 func (s *Server) handleGetRecovery(w http.ResponseWriter, _ *http.Request) {

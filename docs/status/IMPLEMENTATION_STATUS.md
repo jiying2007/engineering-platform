@@ -242,6 +242,28 @@ and `OVERALL=PROVIDER_PENDING`. The remaining provider blocker is:
 
 Provider/account validation remains a later live gate.
 
+## Production operational readiness
+
+Production-v1 now has an authenticated operational-status authority rather than
+using process liveness as readiness.
+
+`GET /api/v1/operations/status` requires the existing mTLS identity and
+`core:read` capability. PostgreSQL returns one bounded snapshot of Recovery,
+Run, Worker lease/inbox, outbox, external Action and Core-bound Codex UNKNOWN
+facts. `eng production-status [--require-ready]` exposes that status to
+operators without provider credentials.
+
+The evaluation is deterministic and does not guess SLO thresholds:
+
+- Recovery/Reconciliation -> `RECOVERY_REQUIRED`;
+- expired Worker lease, dead-letter outbox, UNKNOWN/RECONCILING/MANUAL Action or
+  UNKNOWN Codex execution -> `DEGRADED`;
+- benign pending work remains observable but does not fail readiness merely
+  because a guessed queue/latency threshold was exceeded.
+
+This closes the repository-side facts/alerting substrate. Measured latency/SLO
+targets and the terminal maintenance qualification remain later #105 slices.
+
 ## Managed-workspace WIF unattended gate
 
 Managed-workspace WIF remains a separate **optional unattended** qualification
