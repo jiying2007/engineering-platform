@@ -279,8 +279,10 @@ Repository-side pre-live assets now include:
 - explicit independent human Review and Closure gates;
 - `eng production-slo-report` for measured source-bound
   count/min/p50/p95/max observations;
-- a manual protected-main `production-terminal-pre-live.yml` dry-run that uses
-  no provider secret and retains the frozen fixture/plan/SHA256SUMS artifact.
+- a protected-main `production-terminal-pre-live.yml` dry-run that automatically
+  runs when the terminal contract/fixture changes (and remains manually
+  dispatchable), uses no provider secret, and retains the frozen
+  fixture/plan/SHA256SUMS artifact.
 
 The SLO contract requires all non-provider measurements before calling internal
 calibration complete and separately requires the real provider-authentication

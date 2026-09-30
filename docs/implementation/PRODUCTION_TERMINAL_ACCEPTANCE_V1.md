@@ -54,8 +54,9 @@ Feature/Debug M1 pilots.
 
 ## Pre-live dry run
 
-`.github/workflows/production-terminal-pre-live.yml` is manual-only and uses no
-provider secret.
+`.github/workflows/production-terminal-pre-live.yml` uses no provider secret. It
+runs automatically on protected-main changes to the terminal contract/fixture
+and also supports explicit `workflow_dispatch`.
 
 On protected main it:
 
