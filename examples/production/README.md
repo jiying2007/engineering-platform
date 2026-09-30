@@ -12,7 +12,7 @@ Create distinct non-login service identities:
 - `engineering-control`
 - `engineering-admission`
 - `engineering-preparation`
-- a later dedicated publisher identity after the publisher-service split
+- `engineering-publisher` for the credentialed GitHub mutation service
 
 Do not run production services as `root`, and do not reuse one Unix identity
 for multiple authority roles.
@@ -39,21 +39,21 @@ After installing binaries/configuration:
   --config /etc/engineering-platform/production-preflight.json
 ```
 
-At the #120 checkpoint the expected result is intentionally:
+After the publisher-service split the expected repository-side result is:
 
 - Control Plane: READY
 - Worker admission: READY
 - Worker preparation: READY
-- Publisher: BLOCKED
+- Publisher: READY
 - Provider: PENDING
-- Overall: INTERNAL_BLOCKED
+- Overall: PROVIDER_PENDING
 
-The publisher blocker is not a configuration mistake. Current pre-#121 main
-still assembles the GitHub publisher inside Control Plane; #105 requires a
-separate deployment identity. The next production slice removes that blocker.
+Control Plane receives only the publisher plan plus an mTLS remote-client
+configuration. The `engineering-publisher` service alone can read the GitHub
+token file and execute Git/GitHub mutation.
 
 Do not add `GITHUB_PUBLISHER_CONFIG_FILE` to `control.env`; preflight rejects
-that configuration.
+the legacy in-process production configuration.
 
 ## Health
 
