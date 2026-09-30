@@ -11,13 +11,13 @@ import (
 const RuntimeHandoffSchemaVersion = 1
 
 type RuntimeHandoff struct {
-	SchemaVersion             int    `json:"schema_version"`
-	LiveManifestDigest        string `json:"live_manifest_digest"`
-	ProviderConfigDigest      string `json:"provider_config_digest"`
-	CodexQualificationDigest  string `json:"codex_qualification_digest"`
-	CodexVersion              string `json:"codex_version"`
-	CodexBinaryDigest         string `json:"codex_binary_digest"`
-	RequestedModel            string `json:"requested_model"`
+	SchemaVersion            int    `json:"schema_version"`
+	LiveManifestDigest       string `json:"live_manifest_digest"`
+	ProviderConfigDigest     string `json:"provider_config_digest"`
+	CodexQualificationDigest string `json:"codex_qualification_digest"`
+	CodexVersion             string `json:"codex_version"`
+	CodexBinaryDigest        string `json:"codex_binary_digest"`
+	RequestedModel           string `json:"requested_model"`
 }
 
 type RuntimeHandoffEnvelope struct {
