@@ -58,9 +58,9 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 	}
 
 	status := OperationalStatus{
-		Version: OperationalStatusVersion,
-		State:   OperationalReady,
-		Ready:   true,
+		Version:  OperationalStatusVersion,
+		State:    OperationalReady,
+		Ready:    true,
 		Snapshot: snapshot,
 	}
 	if snapshot.RecoveryMode != "NORMAL" {
