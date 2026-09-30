@@ -160,7 +160,10 @@ are available:
   credential operation;
 - `eng relay-live-manifest --contract CONTRACT.json` freezes the later
   read-only/no-tool live qualification plan and receipt schema before any
-  account or credential is supplied.
+  account or credential is supplied;
+- `eng relay-runtime-handoff` binds that live manifest to one exact
+  compatibility-qualified Codex executable/version/binary digest without
+  starting a model turn.
 
 This stage now uses relay prequalification schema v2. The v1 live-tree document
 has been retired with no compatibility shim because no relay was yet
@@ -187,9 +190,12 @@ The future live gate is now pre-frozen by a deterministic manifest digest:
 exactly one model turn, read-only, approval never, no tools/tool-network/web
 search, zero request/stream retries, bounded output/time, exact prompt/output
 digests, and mandatory gateway operation ID plus effective provider/model
-identity. Synthetic receipt tests prove only schema behavior and do not qualify
-the relay. Account/credential verification and the actual live model turn remain
-deferred to the next #106 gate.
+identity. A separate deterministic runtime handoff re-binds the retained Codex
+compatibility qualification to the exact native binary bytes/version/model using
+only local hashing and `codex --version`; this prevents a later credentialed
+probe from silently swapping the runtime. Synthetic receipt tests prove only
+schema behavior and do not qualify the relay. Account/credential verification
+and the actual live model turn remain deferred to the next #106 gate.
 
 ## Managed-workspace WIF unattended gate
 
