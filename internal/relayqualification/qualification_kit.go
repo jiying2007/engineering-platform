@@ -13,13 +13,13 @@ import (
 const QualificationKitSchemaVersion = 1
 
 const (
-	KitContractFile      = "relay-contract-v2.json"
-	KitCodexConfigFile   = "relay-codex-config.toml"
-	KitLiveManifestFile  = "relay-live-manifest.json"
+	KitContractFile       = "relay-contract-v2.json"
+	KitCodexConfigFile    = "relay-codex-config.toml"
+	KitLiveManifestFile   = "relay-live-manifest.json"
 	KitRuntimeHandoffFile = "relay-runtime-handoff.json"
-	KitQualificationFile = "codex-compatibility-qualification.json"
-	KitManifestFile      = "relay-qualification-kit-manifest.json"
-	KitChecksumsFile     = "SHA256SUMS"
+	KitQualificationFile  = "codex-compatibility-qualification.json"
+	KitManifestFile       = "relay-qualification-kit-manifest.json"
+	KitChecksumsFile      = "SHA256SUMS"
 )
 
 type QualificationKitFile struct {
@@ -28,14 +28,14 @@ type QualificationKitFile struct {
 }
 
 type QualificationKitManifest struct {
-	SchemaVersion             int                    `json:"schema_version"`
-	ProviderConfigDigest      string                 `json:"provider_config_digest"`
-	LiveManifestDigest        string                 `json:"live_manifest_digest"`
-	RuntimeHandoffDigest      string                 `json:"runtime_handoff_digest"`
-	CodexQualificationDigest  string                 `json:"codex_qualification_digest"`
-	CodexBinaryDigest         string                 `json:"codex_binary_digest"`
-	RequestedModel            string                 `json:"requested_model"`
-	Files                     []QualificationKitFile `json:"files"`
+	SchemaVersion            int                    `json:"schema_version"`
+	ProviderConfigDigest     string                 `json:"provider_config_digest"`
+	LiveManifestDigest       string                 `json:"live_manifest_digest"`
+	RuntimeHandoffDigest     string                 `json:"runtime_handoff_digest"`
+	CodexQualificationDigest string                 `json:"codex_qualification_digest"`
+	CodexBinaryDigest        string                 `json:"codex_binary_digest"`
+	RequestedModel           string                 `json:"requested_model"`
+	Files                    []QualificationKitFile `json:"files"`
 }
 
 type QualificationKit struct {
