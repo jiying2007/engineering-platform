@@ -48,7 +48,7 @@ func TestRelayRuntimeHandoffUsesOnlyQualifiedLocalRuntimeFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	qualification := codexapp.QualificationReceipt{
-		SchemaVersion:                2,
+		SchemaVersion:                3,
 		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -68,6 +68,10 @@ func TestRelayRuntimeHandoffUsesOnlyQualifiedLocalRuntimeFacts(t *testing.T) {
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
+		IsolationMechanism:           "linux-user-pid-namespace-init-v1",
+		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		IsolatedEngineeringStartup:   true,
+		NamespaceInitReaped:          true,
 	}
 	qualificationBytes, err := json.Marshal(qualification)
 	if err != nil {
@@ -115,7 +119,7 @@ func TestRelayRuntimeHandoffRejectsQualificationForDifferentModel(t *testing.T) 
 	_ = os.WriteFile(contractPath, contractBytes, 0o600)
 	binaryBytes, _ := os.ReadFile(executable)
 	qualification := codexapp.QualificationReceipt{
-		SchemaVersion:                2,
+		SchemaVersion:                3,
 		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -135,6 +139,10 @@ func TestRelayRuntimeHandoffRejectsQualificationForDifferentModel(t *testing.T) 
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
+		IsolationMechanism:           "linux-user-pid-namespace-init-v1",
+		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		IsolatedEngineeringStartup:   true,
+		NamespaceInitReaped:          true,
 	}
 	qualificationBytes, _ := json.Marshal(qualification)
 	qualificationPath := filepath.Join(root, "qualification.json")

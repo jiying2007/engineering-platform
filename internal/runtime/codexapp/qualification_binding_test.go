@@ -16,7 +16,7 @@ func executableQualificationFixture(t *testing.T, executable, version, model str
 		t.Fatal(err)
 	}
 	return QualificationReceipt{
-		SchemaVersion:                2,
+		SchemaVersion:                3,
 		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      version,
@@ -36,6 +36,10 @@ func executableQualificationFixture(t *testing.T, executable, version, model str
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
+		IsolationMechanism:           "linux-user-pid-namespace-init-v1",
+		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		IsolatedEngineeringStartup:   true,
+		NamespaceInitReaped:          true,
 	}
 }
 

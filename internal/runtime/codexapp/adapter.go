@@ -14,7 +14,7 @@ var ErrLifecycle = errors.New("invalid app-server protocol lifecycle")
 
 // Adapter maps one connection to one provider thread. It is NOT Core Run/epoch
 // authority. The host must authorize each operation and persist exact identities.
-// This first profile is read-only and never approves a server tool request.
+// Read-only and engineering profiles share this adapter; neither approves server tool requests.
 type Adapter struct {
 	client          *Client
 	gate            chan struct{}
