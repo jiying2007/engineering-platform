@@ -1,0 +1,32 @@
+name: Audit source snapshot
+on:
+  pull_request:
+    paths: ['.github/workflows/audit-source-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Retain exact source without host configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/audit-source"
+          mkdir -p "$out"
+          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
+          git bundle create "$out/source.bundle" --all
+          git rev-parse HEAD > "$out/COMMIT"
+          (cd "$out" && sha256sum source.bundle source.tar.gz COMMIT > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-source
+          if-no-files-found: error
+          retention-days: 7
