@@ -1,0 +1,29 @@
+name: Audit source snapshot
+on:
+  pull_request:
+    paths: ['.github/workflows/audit-source-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Retain source only
+        run: |
+          set -eu
+          mkdir "$RUNNER_TEMP/audit-source"
+          git bundle create "$RUNNER_TEMP/audit-source/source.bundle" --all
+          git rev-parse HEAD > "$RUNNER_TEMP/audit-source/COMMIT"
+          (cd "$RUNNER_TEMP/audit-source" && sha256sum source.bundle COMMIT > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-source
+          if-no-files-found: error
+          retention-days: 7
