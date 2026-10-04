@@ -379,6 +379,9 @@ func (m *Memory) CreateExecution(value run.Run, sess session.Session, input core
 }
 
 func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
+	if input.Continuation != nil {
+		return ErrConflict
+	}
 	inputDigest, err := input.Digest()
 	if err != nil {
 		return err

@@ -22,20 +22,22 @@ const Kind = "WORKER_ATTESTED_PREPARATION"
 var gitSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type Facts struct {
-	Version          int                    `json:"version"`
-	IntentDigest     string                 `json:"intent_digest"`
-	InputDigest      string                 `json:"run_input_manifest_digest"`
-	TaskDigest       string                 `json:"task_contract_digest"`
-	ApprovalDigest   string                 `json:"approval_digest"`
-	BaseCommit       string                 `json:"base_commit"`
-	TreeCommit       string                 `json:"tree_commit"`
-	WorkspaceRecipe  string                 `json:"workspace_recipe"`
-	SourceDigest     string                 `json:"source_digest"`
-	ConfigDigest     string                 `json:"git_config_digest"`
-	BundleDigest     string                 `json:"bundle_digest"`
-	Context          contextbundle.Manifest `json:"context_manifest"`
-	ExecutionStarted bool                   `json:"execution_started"`
-	OSIsolated       bool                   `json:"os_isolated"`
+	SeedSourceDigest     string                 `json:"seed_source_digest,omitempty"`
+	SeedCheckpointDigest string                 `json:"seed_checkpoint_digest,omitempty"`
+	Version              int                    `json:"version"`
+	IntentDigest         string                 `json:"intent_digest"`
+	InputDigest          string                 `json:"run_input_manifest_digest"`
+	TaskDigest           string                 `json:"task_contract_digest"`
+	ApprovalDigest       string                 `json:"approval_digest"`
+	BaseCommit           string                 `json:"base_commit"`
+	TreeCommit           string                 `json:"tree_commit"`
+	WorkspaceRecipe      string                 `json:"workspace_recipe"`
+	SourceDigest         string                 `json:"source_digest"`
+	ConfigDigest         string                 `json:"git_config_digest"`
+	BundleDigest         string                 `json:"bundle_digest"`
+	Context              contextbundle.Manifest `json:"context_manifest"`
+	ExecutionStarted     bool                   `json:"execution_started"`
+	OSIsolated           bool                   `json:"os_isolated"`
 }
 
 // Check re-computes identity/manifest hashes, not remote filesystem bytes. The
@@ -45,6 +47,13 @@ func (f Facts) Check(a workerqueue.Assignment) error {
 		return err
 	}
 	if f.Version != 1 || f.ExecutionStarted || f.OSIsolated || f.WorkspaceRecipe != workspace.Recipe || f.BaseCommit != strings.ToLower(a.Task.BaseCommit) || !gitSHA.MatchString(f.TreeCommit) || f.InputDigest != a.Intent.InputDigest || f.TaskDigest != a.Intent.TaskDigest || f.IntentDigest != a.IntentDigest {
+		return workerqueue.ErrIdentity
+	}
+	if a.Input.Continuation == nil {
+		if f.SeedSourceDigest != "" || f.SeedCheckpointDigest != "" {
+			return workerqueue.ErrIdentity
+		}
+	} else if !canonical.ValidDigest(f.SeedSourceDigest) || f.SeedCheckpointDigest != a.Input.Continuation.CheckpointDigest {
 		return workerqueue.ErrIdentity
 	}
 	for _, digest := range []string{f.SourceDigest, f.ConfigDigest, f.BundleDigest, f.ApprovalDigest} {

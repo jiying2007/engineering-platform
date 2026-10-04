@@ -326,6 +326,9 @@ func (s *Store) CreateExecutionAndUpdateWork(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	if inputManifest.Continuation != nil {
+		return corestore.ErrConflict
+	}
 	inputDigest, err := inputManifest.Digest()
 	if err != nil {
 		return err
@@ -341,10 +344,6 @@ func (s *Store) CreateExecutionAndUpdateWork(
 		work.ActiveTaskContractDigest != value.TaskContractDigest ||
 		work.ActiveRunID != value.ID {
 		return corestore.ErrConflict
-	}
-	manifestJSON, err := encodeJSON(inputManifest)
-	if err != nil {
-		return err
 	}
 	payload := struct {
 		Run     run.Run               `json:"run"`
@@ -393,53 +392,8 @@ FOR UPDATE`
 				return corestore.ErrNotFound
 			}
 
-			const insertInput = `
-INSERT INTO run_input_manifests (
-    run_input_manifest_digest,run_id,task_contract_digest,runtime_profile,
-    tool_profile,worker_profile,policy_profile,manifest_json
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`
-			if _, err := tx.Exec(
-				ctx, insertInput,
-				inputDigest, inputManifest.RunID, inputManifest.TaskContractDigest,
-				inputManifest.RuntimeProfile, inputManifest.ToolProfile,
-				inputManifest.WorkerProfile, inputManifest.PolicyProfile,
-				string(manifestJSON),
-			); err != nil {
-				return mapWriteError(err)
-			}
-
-			const insertRun = `
-INSERT INTO runs (
-    run_id,task_contract_digest,run_input_manifest_digest,state,version,current_epoch,
-    current_attempt_id,control_owner
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
-			if _, err := tx.Exec(
-				ctx, insertRun,
-				value.ID, value.TaskContractDigest, value.RunInputManifestDigest,
-				string(value.State), value.Version, value.CurrentEpoch,
-				nullIfEmpty(value.CurrentAttemptID), value.ControlOwner,
-			); err != nil {
-				return mapWriteError(err)
-			}
-
-			const insertAttempt = `
-INSERT INTO run_attempts (run_id,attempt_id,execution_epoch,worker_id,disposition,started_at,ended_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`
-			if _, err := tx.Exec(
-				ctx, insertAttempt,
-				value.ID, attempt.ID, attempt.Epoch, nil, nil, attempt.StartedAt, nil,
-			); err != nil {
-				return mapWriteError(err)
-			}
-
-			const insertSession = `
-INSERT INTO sessions (run_id,execution_epoch,control_owner,last_steering_sequence,paused)
-VALUES ($1,$2,$3,$4,$5)`
-			if _, err := tx.Exec(
-				ctx, insertSession,
-				sess.RunID, sess.ExecutionEpoch, string(sess.Owner), sess.LastSequence, sess.Paused,
-			); err != nil {
-				return mapWriteError(err)
+			if err := insertExecution(ctx, tx, value, attempt, sess, inputManifest); err != nil {
+				return err
 			}
 
 			const updateWork = `
@@ -474,6 +428,69 @@ WHERE work_item_id=$4 AND version=$5`
 		}},
 	})
 	return err
+}
+
+// insertExecution is the common atomic Run/Attempt/Session insertion. Callers
+// must first lock and authorize the corresponding Work transition.
+func insertExecution(ctx context.Context, tx pgx.Tx, value run.Run, attempt run.Attempt, sess session.Session, inputManifest core.RunInputManifest) error {
+	inputDigest, err := inputManifest.Digest()
+	if err != nil {
+		return err
+	}
+	manifestJSON, err := encodeJSON(inputManifest)
+	if err != nil {
+		return err
+	}
+	const insertInput = `
+INSERT INTO run_input_manifests (
+    run_input_manifest_digest,run_id,task_contract_digest,runtime_profile,
+    tool_profile,worker_profile,policy_profile,manifest_json
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`
+	if _, err := tx.Exec(
+		ctx, insertInput,
+		inputDigest, inputManifest.RunID, inputManifest.TaskContractDigest,
+		inputManifest.RuntimeProfile, inputManifest.ToolProfile,
+		inputManifest.WorkerProfile, inputManifest.PolicyProfile,
+		string(manifestJSON),
+	); err != nil {
+		return mapWriteError(err)
+	}
+
+	const insertRun = `
+INSERT INTO runs (
+    run_id,task_contract_digest,run_input_manifest_digest,state,version,current_epoch,
+    current_attempt_id,control_owner
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
+	if _, err := tx.Exec(
+		ctx, insertRun,
+		value.ID, value.TaskContractDigest, value.RunInputManifestDigest,
+		string(value.State), value.Version, value.CurrentEpoch,
+		nullIfEmpty(value.CurrentAttemptID), value.ControlOwner,
+	); err != nil {
+		return mapWriteError(err)
+	}
+
+	const insertAttempt = `
+INSERT INTO run_attempts (run_id,attempt_id,execution_epoch,worker_id,disposition,started_at,ended_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7)`
+	if _, err := tx.Exec(
+		ctx, insertAttempt,
+		value.ID, attempt.ID, attempt.Epoch, nil, nil, attempt.StartedAt, nil,
+	); err != nil {
+		return mapWriteError(err)
+	}
+
+	const insertSession = `
+INSERT INTO sessions (run_id,execution_epoch,control_owner,last_steering_sequence,paused)
+VALUES ($1,$2,$3,$4,$5)`
+	if _, err := tx.Exec(
+		ctx, insertSession,
+		sess.RunID, sess.ExecutionEpoch, string(sess.Owner), sess.LastSequence, sess.Paused,
+	); err != nil {
+		return mapWriteError(err)
+	}
+
+	return nil
 }
 
 func (s *Store) GetExecution(id string) (run.Run, session.Session, error) {

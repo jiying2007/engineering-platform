@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
@@ -22,6 +23,7 @@ const (
 	Authorized = "AUTHORIZED"
 	Finished   = "FINISHED"
 	Unknown    = "UNKNOWN"
+	Stopped    = "STOPPED_NO_DELIVERY"
 )
 
 var tokenID = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -100,19 +102,20 @@ func (p Permit) Check(subject string, request Start) error {
 }
 
 type PromptIdentity struct {
-	Version            int      `json:"version"`
-	RunID              string   `json:"run_id"`
-	TaskContractDigest string   `json:"task_contract_digest"`
-	RunInputDigest     string   `json:"run_input_manifest_digest"`
-	TaskType           string   `json:"task_type"`
-	Repository         string   `json:"repository"`
-	BaseCommit         string   `json:"base_commit"`
-	TargetID           string   `json:"target_id,omitempty"`
-	CapabilityIDs      []string `json:"capability_ids,omitempty"`
-	SkillIDs           []string `json:"skill_ids,omitempty"`
-	AcceptanceCriteria []string `json:"acceptance_criteria"`
-	ExpectedOutputs    []string `json:"expected_outputs,omitempty"`
-	BundleDigest       string   `json:"context_bundle_digest"`
+	Continuation       *core.ContinuationRef `json:"continuation,omitempty"`
+	Version            int                   `json:"version"`
+	RunID              string                `json:"run_id"`
+	TaskContractDigest string                `json:"task_contract_digest"`
+	RunInputDigest     string                `json:"run_input_manifest_digest"`
+	TaskType           string                `json:"task_type"`
+	Repository         string                `json:"repository"`
+	BaseCommit         string                `json:"base_commit"`
+	TargetID           string                `json:"target_id,omitempty"`
+	CapabilityIDs      []string              `json:"capability_ids,omitempty"`
+	SkillIDs           []string              `json:"skill_ids,omitempty"`
+	AcceptanceCriteria []string              `json:"acceptance_criteria"`
+	ExpectedOutputs    []string              `json:"expected_outputs,omitempty"`
+	BundleDigest       string                `json:"context_bundle_digest"`
 }
 
 func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptIdentity, string, error) {
@@ -124,7 +127,7 @@ func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptI
 		return PromptIdentity{}, "", workerqueue.ErrIdentity
 	}
 	identity := PromptIdentity{
-		Version: 1, RunID: a.Intent.RunID, TaskContractDigest: a.Intent.TaskDigest,
+		Continuation: a.Input.Continuation, Version: 1, RunID: a.Intent.RunID, TaskContractDigest: a.Intent.TaskDigest,
 		RunInputDigest: a.Intent.InputDigest, TaskType: a.Task.TaskType,
 		Repository: a.Task.Repository, BaseCommit: strings.ToLower(a.Task.BaseCommit),
 		TargetID: a.Task.TargetID, CapabilityIDs: append([]string(nil), a.Task.CapabilityIDs...),
@@ -155,6 +158,9 @@ func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath strin
 	fmt.Fprintf(&b, "Modify only the current repository workspace. Do not commit, push, fetch, install packages, or use network access.\n")
 	fmt.Fprintf(&b, "Use local tools/tests as needed. Finish with a concise summary of changes and tests.\n\n")
 	fmt.Fprintf(&b, "Run: %s\nTask type: %s\nRepository: %s\nBase commit: %s\n", identity.RunID, identity.TaskType, identity.Repository, identity.BaseCommit)
+	if identity.Continuation != nil {
+		fmt.Fprintf(&b, "Explicit source continuation from stopped Run %s, checkpoint %s.\nThe workspace includes that unfinished source. This is a NEW model turn, not replay/resume of prior model memory. Recheck ALL acceptance criteria and all source changes against the original base.\n", identity.Continuation.SourceRunID, identity.Continuation.CheckpointDigest)
+	}
 	if identity.TargetID != "" {
 		fmt.Fprintf(&b, "Target: %s\n", identity.TargetID)
 	}

@@ -276,3 +276,14 @@ private source checkpoints. The authenticated execution status exposes the exact
 descriptor; `eng source-checkpoint verify|restore` can recover bytes to a new
 private directory without account access or a model replay. This is not automatic
 resume or takeover. See [the source-checkpoint contract](docs/implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).
+
+### Explicit source continuation
+
+After a proven requested interruption, `eng run-continue authorize|status`
+connects the retained private source to one new Run under the existing Work,
+frozen Task and original Git base. It requires the authenticated Work owner,
+RunStart + RunControl, exact checkpoint/version/epoch bindings and a new host
+preparation approval. Old execution is stopped without successful Delivery;
+it is not replayed. The new turn rechecks the complete inherited diff.
+See [source continuation contract](docs/implementation/SOURCE_CONTINUATION_V1.md).
+This does not implement model-memory resume, Human Takeover or production qualification.

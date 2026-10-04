@@ -19,12 +19,13 @@ import (
 )
 
 type Approval struct {
-	RunID          string            `json:"run_id"`
-	TaskDigest     string            `json:"task_contract_digest"`
-	InputDigest    string            `json:"run_input_manifest_digest"`
-	Repository     string            `json:"repository"`
-	RepositoryPath string            `json:"repository_path"`
-	Refs           []core.ContextRef `json:"context_refs"`
+	ContinuationArchive string            `json:"continuation_archive,omitempty"`
+	RunID               string            `json:"run_id"`
+	TaskDigest          string            `json:"task_contract_digest"`
+	InputDigest         string            `json:"run_input_manifest_digest"`
+	Repository          string            `json:"repository"`
+	RepositoryPath      string            `json:"repository_path"`
+	Refs                []core.ContextRef `json:"context_refs"`
 }
 type Configuration struct {
 	Version       int        `json:"version"`
@@ -81,6 +82,9 @@ func New(c Configuration) (*Preparer, error) {
 		if _, exists := p.approvals[a.InputDigest]; exists {
 			return nil, contextbundle.ErrDenied
 		}
+		if a.ContinuationArchive != "" && !filepath.IsAbs(a.ContinuationArchive) {
+			return nil, contextbundle.ErrDenied
+		}
 		a.Refs = append([]core.ContextRef(nil), a.Refs...)
 		p.approvals[a.InputDigest] = a
 		approvals = append(approvals, contextbundle.LocalApproval{Subject: contextbundle.Subject{RunID: a.RunID, TaskContractDigest: a.TaskDigest, RunInputDigest: a.InputDigest}, Refs: a.Refs})
@@ -115,7 +119,15 @@ func New(c Configuration) (*Preparer, error) {
 }
 func (p *Preparer) Close() error    { return errors.Join(p.bundles.Close(), p.source.Close()) }
 func (p *Preparer) Subject() string { return p.worker }
-func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.Assignment) (result Result, err error) {
+
+// SourceRestorer is a host-side byte verifier, not a model callback. A
+// continuation without a verifier and explicit per-input archive approval fails.
+type SourceRestorer func(context.Context, workerqueue.Assignment, string, string) error
+
+func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.Assignment) (Result, error) {
+	return p.PrepareWithSource(ctx, subject, a, nil)
+}
+func (p *Preparer) PrepareWithSource(ctx context.Context, subject string, a workerqueue.Assignment, restore SourceRestorer) (result Result, err error) {
 	if p == nil || subject != p.worker {
 		return result, contextbundle.ErrDenied
 	}
@@ -124,6 +136,9 @@ func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.As
 	}
 	approved, ok := p.approvals[a.Intent.InputDigest]
 	if !ok || approved.RunID != a.Intent.RunID || approved.TaskDigest != a.Intent.TaskDigest || approved.Repository != a.Task.Repository || len(approved.Refs) != len(a.Input.ContextRefs) {
+		return result, contextbundle.ErrDenied
+	}
+	if (a.Input.Continuation == nil) != (approved.ContinuationArchive == "") || (a.Input.Continuation != nil && restore == nil) {
 		return result, contextbundle.ErrDenied
 	}
 	for i, ref := range a.Input.ContextRefs {
@@ -162,6 +177,18 @@ func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.As
 			err = errors.Join(err, p.manager.Cleanup(context.Background(), w))
 		}
 	}()
+	seedCheckpoint := ""
+	if a.Input.Continuation != nil {
+		destination := filepath.Join(p.root, "workspaces", w.ID, "seed-restore")
+		if err = restore(ctx, a, approved.ContinuationArchive, destination); err != nil {
+			return result, err
+		}
+		w, err = p.manager.AdoptRestoredSource(ctx, w)
+		if err != nil {
+			return result, err
+		}
+		seedCheckpoint = a.Input.Continuation.CheckpointDigest
+	}
 	bundle, err := p.bundles.Materialize(ctx, a.Input, w.WorktreePath)
 	if errors.Is(err, contextbundle.ErrExists) {
 		bundle, err = p.bundles.Verify(ctx, a.Input)
@@ -180,7 +207,7 @@ func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.As
 	if !clean {
 		return result, workspace.ErrDirtyWorkspace
 	}
-	result = Result{Workspace: w, BundlePath: checked.Path, Facts: Facts{Version: 1, IntentDigest: a.IntentDigest, InputDigest: a.Intent.InputDigest, TaskDigest: a.Intent.TaskDigest, ApprovalDigest: approvalDigest, BaseCommit: w.BaseCommit, TreeCommit: w.TreeCommit, WorkspaceRecipe: workspace.Recipe, SourceDigest: w.SourceDigest, ConfigDigest: w.ConfigDigest, BundleDigest: checked.Digest, Context: checked.Manifest}}
+	result = Result{Workspace: w, BundlePath: checked.Path, Facts: Facts{SeedSourceDigest: w.SeedSourceDigest, SeedCheckpointDigest: seedCheckpoint, Version: 1, IntentDigest: a.IntentDigest, InputDigest: a.Intent.InputDigest, TaskDigest: a.Intent.TaskDigest, ApprovalDigest: approvalDigest, BaseCommit: w.BaseCommit, TreeCommit: w.TreeCommit, WorkspaceRecipe: workspace.Recipe, SourceDigest: w.SourceDigest, ConfigDigest: w.ConfigDigest, BundleDigest: checked.Digest, Context: checked.Manifest}}
 	if err := result.Facts.Check(a); err != nil {
 		return result, err
 	}
@@ -212,7 +239,7 @@ func (p *Preparer) Prepare(ctx context.Context, subject string, a workerqueue.As
 	return result, nil
 }
 func (p *Preparer) Recheck(ctx context.Context, a workerqueue.Assignment, result Result) error {
-	if result.Facts.SourceDigest != result.Workspace.SourceDigest || result.Facts.ConfigDigest != result.Workspace.ConfigDigest || result.Facts.TreeCommit != result.Workspace.TreeCommit {
+	if result.Facts.SeedSourceDigest != result.Workspace.SeedSourceDigest || result.Facts.SourceDigest != result.Workspace.SourceDigest || result.Facts.ConfigDigest != result.Workspace.ConfigDigest || result.Facts.TreeCommit != result.Workspace.TreeCommit {
 		return workerqueue.ErrIdentity
 	}
 	if err := result.Facts.Check(a); err != nil {

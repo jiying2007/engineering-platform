@@ -403,6 +403,10 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
+	if req.RunInput.Continuation != nil {
+		writeError(w, http.StatusBadRequest, "source continuation requires the authorized continuation endpoint")
+		return
+	}
 	if req.RunID == "" || req.TaskContractDigest == "" || req.AttemptID == "" {
 		writeError(w, http.StatusBadRequest, "run_id, task_contract_digest and attempt_id are required")
 		return

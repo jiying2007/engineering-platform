@@ -35,16 +35,17 @@ type Spec struct {
 	BaseCommit string `json:"base_commit"`
 }
 type Workspace struct {
-	ID             string    `json:"workspace_id"`
-	RepositoryRoot string    `json:"repository_root"`
-	WorktreePath   string    `json:"worktree_path"`
-	HomePath       string    `json:"home_path"`
-	BaseCommit     string    `json:"base_commit"`
-	TreeCommit     string    `json:"tree_commit"`
-	SourceDigest   string    `json:"source_digest"`
-	ConfigDigest   string    `json:"git_config_digest"`
-	Ownership      string    `json:"ownership"`
-	CreatedAt      time.Time `json:"created_at"`
+	SeedSourceDigest string    `json:"seed_source_digest,omitempty"`
+	ID               string    `json:"workspace_id"`
+	RepositoryRoot   string    `json:"repository_root"`
+	WorktreePath     string    `json:"worktree_path"`
+	HomePath         string    `json:"home_path"`
+	BaseCommit       string    `json:"base_commit"`
+	TreeCommit       string    `json:"tree_commit"`
+	SourceDigest     string    `json:"source_digest"`
+	ConfigDigest     string    `json:"git_config_digest"`
+	Ownership        string    `json:"ownership"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 type Manager struct {
 	root     string
@@ -309,7 +310,11 @@ func (m *Manager) IsClean(ctx context.Context, w Workspace) (bool, error) {
 		return false, err
 	}
 	digest, err := snapshotDigest(ctx, w.WorktreePath)
-	return err == nil && digest == w.SourceDigest, err
+	expected := w.SourceDigest
+	if w.SeedSourceDigest != "" {
+		expected = w.SeedSourceDigest
+	}
+	return err == nil && digest == expected, err
 }
 func overlaps(a, b string) bool {
 	inside := func(parent, path string) bool {

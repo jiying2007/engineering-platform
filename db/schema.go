@@ -32,6 +32,9 @@ var codexControlsMigration string
 //go:embed migrations/0010_codex_source_checkpoints.sql
 var codexSourceCheckpointsMigration string
 
+//go:embed migrations/0011_codex_continuations.sql
+var codexContinuationsMigration string
+
 func CoreMigration() string {
-	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration + "\n" + codexExecutionMigration + "\n" + codexControlsMigration + "\n" + codexSourceCheckpointsMigration
+	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration + "\n" + codexExecutionMigration + "\n" + codexControlsMigration + "\n" + codexSourceCheckpointsMigration + "\n" + codexContinuationsMigration
 }

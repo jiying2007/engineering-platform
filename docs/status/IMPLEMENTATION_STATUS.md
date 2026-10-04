@@ -21,7 +21,7 @@ rerun to manufacture production or alternate-provider evidence.
 | Area | Current implementation | Boundary |
 | --- | --- | --- |
 | Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, epochs and Recovery | Live service operating acceptance remains separate |
-| Worker | mTLS admission/preparation, independent workspace, one non-replayable Core-bound engineering turn with actual steering/interrupt delivery and sealed control transcript | Durable pause/resume, quiescent checkpoints and Human Takeover remain a required next slice |
+| Worker | mTLS admission/preparation, independent workspace, one non-replayable Core-bound engineering turn with actual steering/interrupt delivery and sealed control transcript | Kernel-backed stop, private checkpoints and explicit new-Run source continuation are implemented; model-memory resume and Human Takeover remain separate |
 | Provider | Profile v3 binds provider, credential, execution mode and configuration digest | WIF #103 and relay #106 live qualification remain deferred |
 | Publisher | Independent mTLS service; production startup rejects in-process publisher | Explicit pilot-only local publisher remains for historical pilot tooling |
 | Delivery | One six-executable contract in `internal/distribution/binaries.txt`; CI and evidence import use that contract | Archive authenticity still requires the authenticated distribution digest |
@@ -29,7 +29,7 @@ rerun to manufacture production or alternate-provider evidence.
 | Production preflight | v2 binds expected source SHA; default checks actual host facts and references | CONFIG_VALIDATED and HOST_VALIDATED are not operational READY |
 | Operational status | Authenticated PostgreSQL snapshot for recovery/leases/outbox/actions/Codex UNKNOWN | Does not invent publisher reachability or provider health |
 | SLO | v2 distinguishes unverified summaries from content-addressed, subject-bound source readback | Neither state grants provider or production qualification; real provenance/targets require Verification/Review |
-| CLI | `eng run-control` submits exact live inputs and reads receipts; unknown/missing commands fail nonzero | Operator-oriented CLI is not a completed WorkBuddy UX |
+| CLI | `eng run-control`, `source-checkpoint` and `run-continue` expose explicit controls, source readback and new-Run decisions | Operator-oriented CLI is not a completed WorkBuddy UX |
 
 ## Production terminal acceptance
 
@@ -73,7 +73,7 @@ still need their own retained artifact policy. No production claim follows.
 ## Remaining remediation
 
 Full engineering-artifact retention/restore, historical branch disposition and
-full interactive pause/resume/checkpoint/takeover still require independent tested closeout.
+model-memory resume, Human Takeover and WorkBuddy UX still require independent tested closeout. Source checkpoint/continuation is not full model-session restoration.
 The two retained M1 result refs are evidence subjects, not cleanup candidates.
 Do not equate zero open PRs with repository hygiene or delivery maturity.
 
@@ -97,11 +97,12 @@ PostgreSQL, the Worker and app-server RPC. Exact sequence/epoch/lease/turn bindi
 persist-before-dispatch, no UNKNOWN replay, ACK-versus-terminal observations and
 sealed transcript binding are enforced. New result publication and Evidence
 import require that transcript. The existing metadata-only pause/resume/takeover
-API rejects Codex Runs; process exit is not proof of descendant quiescence.
+API rejects Codex Runs. Bare process exit is insufficient; receipt v4/transcript v2
+now require the separately described kernel namespace-reap proof.
 
 The real local subprocess used in integration tests is a fake provider protocol,
-not an actual account or model. Live provider qualification, pause/resume and
-quiescent checkpoint/takeover remain unproven. This is a bounded working control
+not an actual account or model. Live provider qualification, in-process pause/model-memory resume and
+Human Takeover remain unproven. This is a bounded working control
 slice, not a declaration of complete production or interactive maturity.
 
 ## Process-tree lifecycle
@@ -109,7 +110,7 @@ slice, not a declaration of complete production or interactive maturity.
 Core-bound engineering now requires a dedicated user/PID namespace and binds
 its actual init-reap proof to receipt schema 4 and transcript v2. No missing
 namespace or process-group fallback is admitted. The local account-free probe
-and kernel tests cover this boundary; full pause/resume/checkpoint/takeover and
+and kernel tests cover this boundary; full pause/model-memory resume/takeover and
 real-provider compatibility are not inferred from those tests. See
 [process containment](../implementation/PROCESS_NAMESPACE_CONTAINMENT_V1.md).
 
@@ -129,3 +130,19 @@ and not automatically uploaded: full model/binary/Git/database artifact retentio
 and genuine pause/resume/controlled takeover remain separate unfinished work.
 
 The detailed contract is [Stopped source checkpoint v1](../implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).
+
+## Explicit source continuation
+
+[Stopped-source continuation](../implementation/SOURCE_CONTINUATION_V1.md) now
+connects a proven requested stop to a new authorized Run. The mTLS Work owner
+must hold both RunStart and RunControl and bind exact versions/epochs/checkpoint.
+One atomic decision fences the old Run, records STOPPED_NO_DELIVERY without
+changing its transcript, creates one successor and normal outbox intent. Lost
+control replies and unresolved effects remain ineligible; exact retries only
+observe the original decision. Generic Run creation cannot inject this lineage.
+
+A new exact host approval supplies the private archive. Preparer verifies raw
+bytes, restores an owned fresh slot, binds its seed and preserves original Git
+base/configuration. Normal Worker authorization launches a NEW model turn;
+final diff includes inherited unfinished work. This is not automatic replay,
+model-memory/session resume, Human Takeover or live provider qualification.
