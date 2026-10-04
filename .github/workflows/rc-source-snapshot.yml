@@ -1,33 +1,49 @@
-name: RC source snapshot
+name: RC source materialization
 on:
   pull_request:
-    paths: ['.github/workflows/rc-source-snapshot.yml']
+    paths: ['.github/workflows/rc-source-snapshot.yml', '.rc-source-w01/**']
 permissions:
   contents: read
 jobs:
-  source:
+  materialize:
+    if: github.repository == 'jiying2007/engineering-platform' && github.event.pull_request.head.repo.id == 1383377268 && github.event.pull_request.head.ref == 'fix/rc-w01-status-provenance'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: c4eaa7aee68776999c789794839bb1c294891073
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          persist-credentials: false
-      - name: Export public repository source only
+      - name: Materialize only the exact locally tested source
         shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = c4eaa7aee68776999c789794839bb1c294891073
-          out="$RUNNER_TEMP/rc-source"
-          mkdir "$out"
-          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
-          git bundle create "$out/source.bundle" --all
-          git rev-parse HEAD > "$out/COMMIT"
-          (cd "$out" && sha256sum source.tar.gz source.bundle COMMIT > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rc-source-c4eaa7ae-${{ github.run_id }}
-          path: ${{ runner.temp }}/rc-source
-          if-no-files-found: error
-          retention-days: 7
+          test "$GITHUB_REPOSITORY" = jiying2007/engineering-platform
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor c4eaa7aee68776999c789794839bb1c294891073 HEAD
+          python3 - <<'PY'
+          import base64,gzip,hashlib,io,os,pathlib
+          root=pathlib.Path('.rc-source-w01')
+          assert sorted(p.name for p in root.iterdir()) == [f'{i}.b64' for i in range(6)]
+          text=b''.join((root/f'{i}.b64').read_bytes() for i in range(6))
+          assert len(text)==12532
+          with gzip.GzipFile(fileobj=io.BytesIO(base64.b64decode(text,validate=True))) as z:
+              patch=z.read(65537)
+          assert len(patch)<=65536
+          assert hashlib.sha256(patch).hexdigest()=='ba4b6be7ad10a3da7d24812169d9afcf762ea4746bb23579307037ffb5538ba3'
+          assert b'diff --git a/.github/' not in patch
+          pathlib.Path(os.environ['RUNNER_TEMP'],'w01.patch').write_bytes(patch)
+          PY
+          git apply --check "$RUNNER_TEMP/w01.patch"
+          git apply --index "$RUNNER_TEMP/w01.patch"
+          staged="$(git write-tree)"
+          index="$RUNNER_TEMP/product-index"
+          GIT_INDEX_FILE="$index" git read-tree "$staged"
+          GIT_INDEX_FILE="$index" git update-index --force-remove .github/workflows/rc-source-snapshot.yml .rc-source-w01/{0,1,2,3,4,5}.b64
+          test "$(GIT_INDEX_FILE="$index" git write-tree)" = 99c724723c6cde8aaa5d0de7295890d05584f3cd
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(rc): materialize exact tested status and provenance source'
+          git push --force-with-lease="refs/heads/fix/rc-w01-status-provenance:$EXPECTED_HEAD" origin HEAD:refs/heads/fix/rc-w01-status-provenance
