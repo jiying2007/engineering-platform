@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
@@ -82,6 +85,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/steer", s.handleSteer)
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/interrupt", s.handleInterrupt)
+	s.mux.HandleFunc("GET /api/v1/steering/{id}/delivery", s.handleControlDelivery)
 	s.mux.HandleFunc("GET /api/v1/steering/{id}", s.handleGetSteering)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/pause", s.handlePause)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/resume", s.handleResume)
@@ -514,53 +519,10 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	s.writeExecution(w, r.PathValue("id"))
 }
 
-type steerRequest struct {
-	ID             string `json:"steering_command_id"`
-	ExecutionEpoch uint64 `json:"execution_epoch"`
-	Sequence       uint64 `json:"sequence"`
-	Actor          string `json:"actor"`
-	ContentDigest  string `json:"content_digest"`
-}
+type steerRequest = codexexec.ControlInput
 
 func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
-	var req steerRequest
-	if !decodeJSON(w, r, &req) {
-		return
-	}
-	if req.ID == "" || req.ExecutionEpoch == 0 || req.Sequence == 0 || req.Actor == "" || req.ContentDigest == "" {
-		writeError(w, http.StatusBadRequest, "steering_command_id, execution_epoch, sequence, actor and content_digest are required")
-		return
-	}
-
-	runID := r.PathValue("id")
-	value, sess, err := s.store.GetExecution(runID)
-	if err != nil {
-		writeStoreError(w, err)
-		return
-	}
-	expectedVersion := value.Version
-	cmd := session.SteeringCommand{
-		ID:             req.ID,
-		RunID:          runID,
-		ExecutionEpoch: req.ExecutionEpoch,
-		Sequence:       req.Sequence,
-		Actor:          req.Actor,
-		ContentDigest:  req.ContentDigest,
-		CreatedAt:      s.now(),
-	}
-	if err := value.CheckEpoch(req.ExecutionEpoch); err != nil {
-		writeMutationError(w, err)
-		return
-	}
-	if err := sess.ApplySteering(cmd); err != nil {
-		writeMutationError(w, err)
-		return
-	}
-	if err := s.store.RecordSteering(runID, expectedVersion, value, sess, cmd); err != nil {
-		writeMutationError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, cmd)
+	s.handleLiveControl(w, r, codexexec.ControlSteer)
 }
 
 func (s *Server) handleGetSteering(w http.ResponseWriter, r *http.Request) {
@@ -1233,6 +1195,13 @@ func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) 
 	value, sess, err := s.store.GetExecution(id)
 	if err != nil {
 		return err
+	}
+	input, err := s.store.GetRunInputByDigest(value.RunInputManifestDigest)
+	if err != nil {
+		return err
+	}
+	if strings.HasPrefix(input.ToolProfile, "codex/sha256:") {
+		return fmt.Errorf("%w: Codex pause/resume/takeover needs a quiescent checkpoint protocol; interrupt is cancellation only", store.ErrConflict)
 	}
 	expectedVersion := value.Version
 	if err := fn(&value, &sess); err != nil {

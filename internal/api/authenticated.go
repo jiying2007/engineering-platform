@@ -46,6 +46,8 @@ var routeCapabilities = map[string]string{
 	"POST /api/v1/runs":                   access.RunStart,
 	"GET /api/v1/runs/{id}":               access.Read,
 	"POST /api/v1/runs/{id}/steer":        access.RunControl,
+	"POST /api/v1/runs/{id}/interrupt":    access.RunControl,
+	"GET /api/v1/steering/{id}/delivery":  access.Read,
 	"GET /api/v1/steering/{id}":           access.Read,
 	"POST /api/v1/runs/{id}/pause":        access.RunControl,
 	"POST /api/v1/runs/{id}/resume":       access.RunControl,
@@ -145,7 +147,7 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 		if body.Material.DegradationApprovedBy != "" && (!id.Allows(access.MaterialDegrade) || body.Material.DegradationApprovedBy != id.Subject() || !strictjson.NonBlank(body.Material.DegradationReason)) {
 			return http.StatusForbidden
 		}
-	case "POST /api/v1/runs/{id}/steer":
+	case "POST /api/v1/runs/{id}/steer", "POST /api/v1/runs/{id}/interrupt":
 		var body steerRequest
 		if strictjson.Decode(data, &body) != nil {
 			return http.StatusBadRequest

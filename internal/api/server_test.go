@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
+	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/store"
 )
 
@@ -87,33 +89,7 @@ func TestPauseSteerAndTakeover(t *testing.T) {
 		},
 	}, http.StatusCreated)
 
-	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/steer", map[string]any{
-		"steering_command_id": "steer-1",
-		"execution_epoch":     1,
-		"sequence":            1,
-		"actor":               "engineer",
-		"content_digest":      "sha256:steer",
-	}, http.StatusAccepted)
-
-	steerBody := mustRequest(t, h, http.MethodGet, "/api/v1/steering/steer-1", nil, http.StatusOK)
-	var storedSteer struct {
-		ID             string `json:"steering_command_id"`
-		RunID          string `json:"run_id"`
-		ExecutionEpoch uint64 `json:"execution_epoch"`
-		Sequence       uint64 `json:"sequence"`
-	}
-	mustJSON(t, steerBody, &storedSteer)
-	if storedSteer.ID != "steer-1" || storedSteer.RunID != "run-s" || storedSteer.ExecutionEpoch != 1 || storedSteer.Sequence != 1 {
-		t.Fatalf("unexpected persisted steering command: %#v", storedSteer)
-	}
-
-	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/steer", map[string]any{
-		"steering_command_id": "steer-duplicate-sequence",
-		"execution_epoch":     1,
-		"sequence":            1,
-		"actor":               "engineer",
-		"content_digest":      "sha256:duplicate",
-	}, http.StatusConflict)
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/steer", map[string]any{"steering_command_id": "steer-1", "execution_epoch": 1, "sequence": 1, "actor": "engineer", "text": "do not dispatch without authentication", "thread_id": "thread", "expected_turn_id": "turn"}, http.StatusForbidden)
 
 	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-s/pause", map[string]any{
 		"execution_epoch": 1,
@@ -131,7 +107,7 @@ func TestPauseSteerAndTakeover(t *testing.T) {
 		"sequence":            2,
 		"actor":               "runtime",
 		"content_digest":      "sha256:late",
-	}, http.StatusConflict)
+	}, http.StatusForbidden)
 }
 
 func TestDeliveryRequiresCompletedRun(t *testing.T) {
@@ -728,21 +704,30 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 		},
 	}, http.StatusCreated)
 
-	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-steer-id/steer", map[string]any{
-		"steering_command_id": "steer-fixed",
-		"execution_epoch":     1,
-		"sequence":            1,
-		"actor":               "engineer",
-		"content_digest":      "sha256:first",
-	}, http.StatusAccepted)
-
-	mustRequest(t, h, http.MethodPost, "/api/v1/runs/run-steer-id/steer", map[string]any{
-		"steering_command_id": "steer-fixed",
-		"execution_epoch":     1,
-		"sequence":            2,
-		"actor":               "engineer",
-		"content_digest":      "sha256:second",
-	}, http.StatusConflict)
+	value, sess, err := s.store.GetExecution("run-steer-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := session.SteeringCommand{ID: "steer-fixed", RunID: value.ID, ExecutionEpoch: 1, Sequence: 1, Actor: "engineer", ContentDigest: "sha256:first", CreatedAt: time.Now()}
+	if err = sess.ApplySteering(first); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.store.RecordSteering(value.ID, value.Version, value, sess, first); err != nil {
+		t.Fatal(err)
+	}
+	value, sess, err = s.store.GetExecution(value.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.Sequence = 2
+	second.ContentDigest = "sha256:second"
+	if err = sess.ApplySteering(second); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.store.RecordSteering(value.ID, value.Version, value, sess, second); err == nil {
+		t.Fatal("historical metadata overwritten")
+	}
 
 	body := mustRequest(t, h, http.MethodGet, "/api/v1/steering/steer-fixed", nil, http.StatusOK)
 	var stored struct {

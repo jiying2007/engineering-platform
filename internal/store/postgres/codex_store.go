@@ -67,8 +67,8 @@ func (s *Store) StartCodex(ctx context.Context, subject string, req codexexec.St
 	}
 	defer rollbackOutbox(tx)
 	var ready bool
-	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM core_schema_migrations WHERE version=8) AND to_regclass('worker_codex_executions') IS NOT NULL`).Scan(&ready); err != nil || !ready {
-		return empty, fmt.Errorf("Codex execution schema version 8 is unavailable")
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM core_schema_migrations WHERE version=9) AND to_regclass('worker_codex_executions') IS NOT NULL`).Scan(&ready); err != nil || !ready {
+		return empty, fmt.Errorf("Codex execution schema version 9 is unavailable")
 	}
 	epoch, mode, err := lockWorkerPlatform(ctx, tx)
 	if err != nil {
@@ -245,6 +245,11 @@ func (s *Store) FinishCodex(ctx context.Context, subject string, report codexexe
 	if report.Result.Validate(row.profile, permit) != nil {
 		return empty, workerqueue.ErrIdentity
 	}
+	runtime, err := controlRuntime(tx.QueryRow(ctx, `SELECT `+runtimeColumns+` FROM worker_codex_runtime WHERE execution_id=$1 FOR UPDATE`, report.Token.ID))
+	if err != nil || runtime.State != "SEALED" || runtime.Digest != report.Result.ControlTranscriptDigest || !runtime.Transcript.AllowsDelivery() || runtime.Binding.ThreadID != report.Result.Codex.ThreadID || runtime.Binding.TurnID != report.Result.Codex.TurnID {
+		return empty, workerqueue.ErrIdentity
+	}
+
 	digest, err := canonical.Digest(report.Result)
 	if err != nil {
 		return empty, err
@@ -331,5 +336,9 @@ func (s *Store) GetCodex(ctx context.Context, runID string) (codexexec.Status, e
 			state = "EXPIRED_UNRECONCILED"
 		}
 	}
-	return codexexec.Status{Token: row.token, State: state, LeaseUntil: row.until, Receipt: row.receipt}, nil
+	runtime, err := s.GetCodexControlRuntime(ctx, runID)
+	if err != nil {
+		return codexexec.Status{}, err
+	}
+	return codexexec.Status{Token: row.token, State: state, LeaseUntil: row.until, Receipt: row.receipt, Runtime: runtime}, nil
 }

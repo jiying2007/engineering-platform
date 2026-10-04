@@ -50,7 +50,7 @@ func VerifyCodexImport(req CodexImportRequest) (core.EvidenceRef, error) {
 	if err := verifyDelivery(req.Delivery); err != nil {
 		return empty, err
 	}
-	if req.Execution.State != codexexec.Finished || req.Execution.Receipt == nil {
+	if req.Execution.VerifyFinishedControls() != nil {
 		return empty, fmt.Errorf("Core-bound Codex execution is not FINISHED")
 	}
 	receipt := *req.Execution.Receipt
@@ -114,7 +114,7 @@ func validateCodexReceipt(receipt codexexec.Receipt) error {
 		return fmt.Errorf("Core-bound Codex result digest mismatch")
 	}
 	result := receipt.Result
-	if !canonical.ValidDigest(result.PromptIdentityDigest) || result.Codex.Validate() != nil {
+	if !canonical.ValidDigest(result.ControlTranscriptDigest) || !canonical.ValidDigest(result.PromptIdentityDigest) || result.Codex.Validate() != nil {
 		return fmt.Errorf("invalid Codex model-turn receipt")
 	}
 	change := result.Change

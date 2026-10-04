@@ -183,15 +183,16 @@ func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath strin
 }
 
 type Result struct {
-	PromptIdentityDigest string                      `json:"prompt_identity_digest"`
-	Codex                codexapp.EngineeringReceipt `json:"codex"`
-	Change               workspace.ChangeFacts       `json:"change"`
+	ControlTranscriptDigest string                      `json:"control_transcript_digest,omitempty"`
+	PromptIdentityDigest    string                      `json:"prompt_identity_digest"`
+	Codex                   codexapp.EngineeringReceipt `json:"codex"`
+	Change                  workspace.ChangeFacts       `json:"change"`
 }
 
 func (r Result) Validate(p Profile, permit Permit) error {
 	pd, err := p.Digest()
 	expectedPrompt, promptErr := PromptIdentityDigest(permit.Assignment, permit.Preparation)
-	if err != nil || promptErr != nil || permit.Token.ProfileDigest != pd ||
+	if !canonical.ValidDigest(r.ControlTranscriptDigest) || err != nil || promptErr != nil || permit.Token.ProfileDigest != pd ||
 		r.PromptIdentityDigest != expectedPrompt ||
 		r.Codex.Validate() != nil || r.Codex.Provider != p.Provider ||
 		r.Codex.Version != p.CodexVersion ||
@@ -238,10 +239,11 @@ func (r Receipt) Verify(subject string, p Permit, result Result) error {
 }
 
 type Status struct {
-	Token      Token     `json:"token"`
-	State      string    `json:"state"`
-	LeaseUntil time.Time `json:"lease_until"`
-	Receipt    *Receipt  `json:"receipt,omitempty"`
+	Runtime    *ControlRuntime `json:"runtime,omitempty"`
+	Token      Token           `json:"token"`
+	State      string          `json:"state"`
+	LeaseUntil time.Time       `json:"lease_until"`
+	Receipt    *Receipt        `json:"receipt,omitempty"`
 }
 
 type Repository interface {

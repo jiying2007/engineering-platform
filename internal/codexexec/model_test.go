@@ -214,7 +214,7 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 		BundleDigest:       "sha256:" + strings.Repeat("c", 64),
 		BundleSize:         100,
 	}
-	r := Result{PromptIdentityDigest: promptDigest, Codex: codex, Change: change}
+	r := Result{ControlTranscriptDigest: canonical.BytesDigest([]byte("test-only-control-transcript")), PromptIdentityDigest: promptDigest, Codex: codex, Change: change}
 	if err := r.Validate(p, permit); err != nil {
 		t.Fatal(err)
 	}

@@ -235,6 +235,8 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 			BundleDigest: bundleDigest, BundleSize: int64(len(bundleBytes)),
 		},
 	}
+	transcript := codexexec.ControlTranscript{Version: 1, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenValue, ExecutionEpoch: 1, ThreadID: codexReceipt.ThreadID, TurnID: codexReceipt.TurnID}, TurnStatus: "completed", RuntimeExited: true}, Deliveries: []codexexec.ControlDelivery{}}
+	result.ControlTranscriptDigest, _ = transcript.Digest()
 	resultDigest, err := canonical.Digest(result)
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +256,7 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 			Repository: "jiying2007/engineering-platform", BaseCommit: base,
 			AllowedActions: []string{Action}, Revision: 1,
 		},
-		status: codexexec.Status{Token: tokenValue, State: codexexec.Finished, Receipt: &receipt},
+		status: codexexec.Status{Token: tokenValue, State: codexexec.Finished, Receipt: &receipt, Runtime: &codexexec.ControlRuntime{Binding: transcript.Close.Binding, State: "SEALED", Transcript: &transcript, Digest: result.ControlTranscriptDigest}},
 	}
 	config := Configuration{
 		Version: 1, ArtifactRoot: artifactRoot, GitExecutable: git, TokenFile: token,

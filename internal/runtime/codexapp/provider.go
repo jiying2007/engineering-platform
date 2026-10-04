@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
@@ -286,6 +287,7 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	// the managed daemon/proxy path is intentionally not used.
 	cmd := exec.CommandContext(ctx, executable, "app-server", "--stdio")
 	cmd.Dir = work
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Env = env
 	return cmd, nil
 }

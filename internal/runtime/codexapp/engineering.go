@@ -160,6 +160,9 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 				return out, ErrProtocol
 			}
 			out.Status = p.Turn.Status
+			if out.Status == "interrupted" {
+				return out, ErrEngineeringInterrupted
+			}
 			if out.Status != "completed" {
 				return out, fmt.Errorf("engineering turn ended %q", out.Status)
 			}
@@ -172,8 +175,7 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 	}
 }
 
-func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, ruleID, tokenFile, auditContext, model, prompt string) (EngineeringReceipt, error) {
-	var receipt EngineeringReceipt
+func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, ruleID, tokenFile, auditContext, model, prompt string, controller EngineeringController) (receipt EngineeringReceipt, runErr error) {
 	if !ValidCodexVersion(qualifiedVersion) || !canonical.ValidDigest(binaryDigest) ||
 		!canonical.ValidDigest(qualificationDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
 		strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > 64<<10 {
@@ -237,6 +239,8 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
 	processJoined := false
+	controlStarted := false
+	var observation EngineeringObservation
 	defer func() {
 		_ = client.Close()
 		cancel()
@@ -246,6 +250,20 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 			case <-time.After(5 * time.Second):
 				_ = cmd.Process.Kill()
 				<-waitDone
+			}
+			processJoined = true
+		}
+		if controller != nil && controlStarted {
+			terminal := observation.Status
+			if terminal == "" {
+				terminal = "unknown"
+			}
+			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
+			closeErr := controller.Close(reportCtx, terminal, processJoined)
+			reportCancel()
+			if closeErr != nil && runErr == nil {
+				receipt = EngineeringReceipt{}
+				runErr = closeErr
 			}
 		}
 	}()
@@ -273,7 +291,8 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	if err != nil {
 		return receipt, fmt.Errorf("turn/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
 	}
-	observation, err := ObserveEngineeringTurn(runCtx, adapter, threadID, turnID)
+	controlStarted = true
+	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
 	if err != nil {
 		return receipt, err
 	}
@@ -304,8 +323,7 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	return receipt, receipt.Validate()
 }
 
-func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, savedLoginFile, model, prompt string) (EngineeringReceipt, error) {
-	var receipt EngineeringReceipt
+func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, savedLoginFile, model, prompt string, controller EngineeringController) (receipt EngineeringReceipt, runErr error) {
 	if !ValidCodexVersion(qualifiedVersion) || !canonical.ValidDigest(binaryDigest) ||
 		!canonical.ValidDigest(qualificationDigest) || strings.TrimSpace(model) == "" || len(model) > 128 ||
 		strings.TrimSpace(prompt) == "" || !utf8.ValidString(prompt) || len(prompt) > 64<<10 {
@@ -348,6 +366,8 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
 	processJoined := false
+	controlStarted := false
+	var observation EngineeringObservation
 	defer func() {
 		_ = client.Close()
 		cancel()
@@ -357,6 +377,20 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 			case <-time.After(5 * time.Second):
 				_ = cmd.Process.Kill()
 				<-waitDone
+			}
+			processJoined = true
+		}
+		if controller != nil && controlStarted {
+			terminal := observation.Status
+			if terminal == "" {
+				terminal = "unknown"
+			}
+			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
+			closeErr := controller.Close(reportCtx, terminal, processJoined)
+			reportCancel()
+			if closeErr != nil && runErr == nil {
+				receipt = EngineeringReceipt{}
+				runErr = closeErr
 			}
 		}
 	}()
@@ -385,7 +419,8 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	if err != nil {
 		return receipt, fmt.Errorf("turn/start: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
 	}
-	observation, err := ObserveEngineeringTurn(runCtx, adapter, threadID, turnID)
+	controlStarted = true
+	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
 	if err != nil {
 		return receipt, err
 	}

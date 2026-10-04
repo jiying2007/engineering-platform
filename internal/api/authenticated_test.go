@@ -163,10 +163,14 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	}
 	mustJSON(t, taskBody, &task)
 	secureCall(t, engineer, base+"/runs", map[string]any{"run_id": "run-auth", "task_contract_digest": task.Digest, "attempt_id": "attempt-auth", "run_input": map[string]any{"runtime_profile": "test", "tool_profile": "test", "worker_profile": "test", "policy_profile": "test"}}, http.StatusCreated)
-	steer := map[string]any{"steering_command_id": "steer-auth", "execution_epoch": 1, "sequence": 1, "actor": ciSubject, "content_digest": "sha256:test"}
+	steer := map[string]any{"steering_command_id": "steer-auth", "execution_epoch": 1, "sequence": 1, "actor": ciSubject, "thread_id": "thread", "expected_turn_id": "turn", "text": "test input"}
 	secureCall(t, engineer, base+"/runs/run-auth/steer", steer, http.StatusForbidden)
 	steer["actor"] = engineerSubject
-	secureCall(t, engineer, base+"/runs/run-auth/steer", steer, http.StatusAccepted)
+	wantSteer := http.StatusServiceUnavailable
+	if _, ok := backend.(*pgstore.Store); ok {
+		wantSteer = http.StatusNotFound
+	}
+	secureCall(t, engineer, base+"/runs/run-auth/steer", steer, wantSteer)
 	secureCall(t, engineer, base+"/runs/run-auth/complete", map[string]any{"execution_epoch": 1}, http.StatusOK)
 	secureCall(t, engineer, base+"/deliveries", map[string]any{"delivery_receipt_id": "delivery-auth", "run_id": "run-auth", "result_commit": strings.Repeat("b", 40)}, http.StatusCreated)
 	evidence := map[string]any{"evidence_id": "evidence-auth", "requirement_id": "ci", "issuer": "test-ci", "procedure": "ci.test", "result": "PASS", "applicable": true}

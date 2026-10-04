@@ -11,27 +11,35 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
-	"POST /api/v1/worker/codex/start":    access.ActionExecute,
-	"POST /api/v1/worker/codex/renew":    access.ActionExecute,
-	"POST /api/v1/worker/codex/report":   access.ActionExecute,
-	"POST /api/v1/worker/codex/fail":     access.ActionExecute,
-	"GET /api/v1/runs/{id}/codex":        access.Read,
-	"POST /api/v1/worker/offline/start":  access.ActionExecute,
-	"POST /api/v1/worker/offline/renew":  access.ActionExecute,
-	"POST /api/v1/worker/offline/report": access.ActionExecute,
-	"POST /api/v1/worker/offline/fail":   access.ActionExecute,
-	"GET /api/v1/runs/{id}/offline":      access.Read,
-	"POST /api/v1/worker/prepare-claim":  access.WorkerPrepare,
-	"POST /api/v1/worker/prepared":       access.WorkerPrepare,
-	"GET /api/v1/runs/{id}/preparation":  access.Read,
-	"POST /api/v1/worker/claim":          access.WorkerPoll,
-	"POST /api/v1/worker/renew":          access.WorkerPoll,
-	"POST /api/v1/worker/report":         access.WorkerReport,
-	"GET /api/v1/runs/{id}/inbox":        access.Read,
+	"POST /api/v1/worker/codex/controls/bind":   access.ActionExecute,
+	"POST /api/v1/worker/codex/controls/claim":  access.ActionExecute,
+	"POST /api/v1/worker/codex/controls/report": access.ActionExecute,
+	"POST /api/v1/worker/codex/controls/close":  access.ActionExecute,
+	"POST /api/v1/worker/codex/start":           access.ActionExecute,
+	"POST /api/v1/worker/codex/renew":           access.ActionExecute,
+	"POST /api/v1/worker/codex/report":          access.ActionExecute,
+	"POST /api/v1/worker/codex/fail":            access.ActionExecute,
+	"GET /api/v1/runs/{id}/codex":               access.Read,
+	"POST /api/v1/worker/offline/start":         access.ActionExecute,
+	"POST /api/v1/worker/offline/renew":         access.ActionExecute,
+	"POST /api/v1/worker/offline/report":        access.ActionExecute,
+	"POST /api/v1/worker/offline/fail":          access.ActionExecute,
+	"GET /api/v1/runs/{id}/offline":             access.Read,
+	"POST /api/v1/worker/prepare-claim":         access.WorkerPrepare,
+	"POST /api/v1/worker/prepared":              access.WorkerPrepare,
+	"GET /api/v1/runs/{id}/preparation":         access.Read,
+	"POST /api/v1/worker/claim":                 access.WorkerPoll,
+	"POST /api/v1/worker/renew":                 access.WorkerPoll,
+	"POST /api/v1/worker/report":                access.WorkerReport,
+	"GET /api/v1/runs/{id}/inbox":               access.Read,
 }
 
 // Only the authenticated constructor registers these routes.
 func (s *Server) workerRoutes() {
+	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/bind", s.handleControlBind)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/claim", s.handleControlClaim)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/report", s.handleControlReport)
+	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/close", s.handleControlClose)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/start", s.handleCodexStart)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/renew", s.handleCodexRenew)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/report", s.handleCodexReport)

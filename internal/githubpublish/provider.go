@@ -169,7 +169,7 @@ func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, param
 	if err != nil {
 		return empty, "", err
 	}
-	if status.State != codexexec.Finished || status.Receipt == nil || status.Token.RunID != runID {
+	if status.VerifyFinishedControls() != nil || status.Token.RunID != runID {
 		return empty, "", fmt.Errorf("publication requires one FINISHED Core-bound Codex result")
 	}
 	receipt := *status.Receipt

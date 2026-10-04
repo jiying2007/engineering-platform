@@ -258,3 +258,13 @@ Neither grants production qualification. WorkBuddy integration and the complete
 interactive Worker control path must not be inferred from adapter methods alone.
 See [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) for the current
 remaining gates.
+
+## Live engineering controls
+
+`eng run-control inspect|status|steer|interrupt` uses the existing direct-mTLS
+Control API to bind operator input to the actual authorized thread/turn.
+Steering acceptance, cancellation ACK, interrupted event and app-server process
+exit are separate observations. Missing or UNKNOWN receipts block successful
+delivery and are never replayed. See
+[Live Codex controls v1](docs/implementation/LIVE_CODEX_CONTROLS_V1.md).
+This does not yet provide durable pause/resume or quiescent Human Takeover.

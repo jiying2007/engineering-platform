@@ -196,7 +196,7 @@ func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T
 	receipt, err := EngineeringWIFTurn(
 		ctx, executable, testCodexVersion, digest, "sha256:"+strings.Repeat("a", 64), work, home,
 		"rule-engineering-test", token, `{"run_id":"fixture"}`,
-		"gpt-test", "Modify the fixture workspace.",
+		"gpt-test", "Modify the fixture workspace.", nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -244,7 +244,7 @@ func TestEngineeringSavedLoginTurnDeletesBootstrapBeforeModelReachableWork(t *te
 	defer cancel()
 	receipt, err := EngineeringSavedLoginTurn(
 		ctx, executable, testCodexVersion, digest, "sha256:"+strings.Repeat("a", 64), work, home, login,
-		"gpt-test", "Modify the fixture workspace.",
+		"gpt-test", "Modify the fixture workspace.", nil,
 	)
 	if err != nil {
 		t.Fatal(err)
