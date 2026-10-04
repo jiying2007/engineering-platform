@@ -1,0 +1,34 @@
+name: Recovery readback source
+on:
+  pull_request:
+    paths: ['.github/workflows/rc-readback-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'jiying2007/engineering-platform' && github.event.pull_request.head.repo.id == 1383377268 && github.event.pull_request.head.ref == 'feat/rc-execution-readback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 9d0e2650dd5f305b0d2803cf7e64dec3bb581137
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export only the fixed repository objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 9d0e2650dd5f305b0d2803cf7e64dec3bb581137
+          out="$RUNNER_TEMP/readback-source"
+          mkdir "$out"
+          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
+          git bundle create "$out/source.bundle" --all
+          git rev-parse HEAD > "$out/COMMIT"
+          (cd "$out" && sha256sum source.tar.gz source.bundle COMMIT > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readback-source-9d0e2650-${{ github.run_id }}
+          path: ${{ runner.temp }}/readback-source
+          if-no-files-found: error
+          retention-days: 7
