@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -118,6 +119,14 @@ func (m *Manager) Finalize(ctx context.Context, w Workspace, artifactRoot, artif
 		return result, fmt.Errorf("result workspace is not clean after commit")
 	}
 
+	// Git cleanliness does not imply that the committed tree reproduces the
+	// observed source. Ignored files, empty directories and attribute transforms
+	// can disappear/change while status is clean. Read an independent checkout
+	// before issuing a bundle; never force-add private files or drop source.
+	if err := m.verifyResultReadback(ctx, w, artifactRoot, resultCommit, resultTree, resultDigest); err != nil {
+		return result, err
+	}
+
 	bundlePath := filepath.Join(artifactRoot, artifactID+".bundle")
 	if _, err := os.Lstat(bundlePath); err == nil || !os.IsNotExist(err) {
 		return result, ErrWorkspaceExists
@@ -156,4 +165,36 @@ func (m *Manager) Finalize(ctx context.Context, w Workspace, artifactRoot, artif
 		BundlePath: bundlePath,
 	}
 	return result, nil
+}
+
+// verifyResultReadback uses the same trusted Git and snapshot recipe in a fresh
+// private object database. It never executes source scripts or imports HOME,
+// hooks/configuration/credentials, and only removes its own temporary directory.
+func (m *Manager) verifyResultReadback(ctx context.Context, source Workspace, artifactRoot, commit, tree, digest string) (err error) {
+	dir, err := os.MkdirTemp(artifactRoot, ".result-readback-")
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
+	verifier, err := NewWithGit(filepath.Join(dir, "managed"), m.git)
+	if err != nil {
+		return err
+	}
+	observed, err := verifier.Create(ctx, Spec{ID: "result", Repository: source.WorktreePath, BaseCommit: commit})
+	if err != nil {
+		return fmt.Errorf("independent result checkout failed: %w", err)
+	}
+	if observed.TreeCommit != tree || observed.SourceDigest != digest {
+		return fmt.Errorf("committed result does not reproduce retained source bytes; resolve ignored files, empty directories or Git attribute transformations explicitly")
+	}
+	// Do not accept a successful readback if source or HEAD changed during it.
+	after, err := snapshotDigest(ctx, source.WorktreePath)
+	if err != nil || after != digest {
+		return fmt.Errorf("source changed during result readback")
+	}
+	head, err := m.gitOutput(ctx, source.WorktreePath, source.HomePath, "rev-parse", "--verify", "HEAD^{commit}")
+	if err != nil || strings.TrimSpace(head) != commit {
+		return fmt.Errorf("result identity changed during readback")
+	}
+	return nil
 }
