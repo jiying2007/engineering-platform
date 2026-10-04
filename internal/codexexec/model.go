@@ -239,11 +239,12 @@ func (r Receipt) Verify(subject string, p Permit, result Result) error {
 }
 
 type Status struct {
-	Runtime    *ControlRuntime `json:"runtime,omitempty"`
-	Token      Token           `json:"token"`
-	State      string          `json:"state"`
-	LeaseUntil time.Time       `json:"lease_until"`
-	Receipt    *Receipt        `json:"receipt,omitempty"`
+	SourceCheckpoint *SourceCheckpoint `json:"source_checkpoint,omitempty"`
+	Runtime          *ControlRuntime   `json:"runtime,omitempty"`
+	Token            Token             `json:"token"`
+	State            string            `json:"state"`
+	LeaseUntil       time.Time         `json:"lease_until"`
+	Receipt          *Receipt          `json:"receipt,omitempty"`
 }
 
 type Repository interface {

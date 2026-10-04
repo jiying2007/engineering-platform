@@ -114,3 +114,12 @@ Human Takeover, interactive WorkBuddy UX and their live qualification remain
 separate work. Full raw engineering artifact retention/restore remains separate
 from the already-retained terminal fact records. No M1 pilot is rerun and no
 production/provider/device qualification is granted by these tests.
+
+## Stopped source preservation
+
+[Stopped source checkpoints](STOPPED_SOURCE_CHECKPOINT_V1.md) add private exact
+byte capture on the actual Worker's unsuccessful turn path, only after a sealed
+quiescent scope. The Core descriptor and new-directory restore preserve work;
+they do not resume the old execution, change UNKNOWN to FINISHED, or transfer
+workspace ownership. Inspect the retained `source_checkpoint` descriptor through
+`eng run-control inspect` before using the local verify/restore CLI.

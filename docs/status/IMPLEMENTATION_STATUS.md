@@ -112,3 +112,20 @@ namespace or process-group fallback is admitted. The local account-free probe
 and kernel tests cover this boundary; full pause/resume/checkpoint/takeover and
 real-provider compatibility are not inferred from those tests. See
 [process containment](../implementation/PROCESS_NAMESPACE_CONTAINMENT_V1.md).
+
+## Stopped source checkpoints
+
+The actual Worker now attempts bounded private source capture after an unsuccessful
+turn only when Core sealed the exact quiescent runtime transcript. Preparation
+ownership, base/config and approved Context are rechecked before capturing changed,
+untracked and ignored source bytes. Migration 0010 records an immutable descriptor
+and exact retry/readback; this never promotes the execution to FINISHED.
+
+`eng source-checkpoint verify|restore` checks the externally anchored archive and
+Run identity and restores only to a fresh private directory. It launches no model
+and grants no execution or takeover permission. Local raw bytes survive a failed
+registration reply without a blind retry. The archive is source-only, private,
+and not automatically uploaded: full model/binary/Git/database artifact retention
+and genuine pause/resume/controlled takeover remain separate unfinished work.
+
+The detailed contract is [Stopped source checkpoint v1](../implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).

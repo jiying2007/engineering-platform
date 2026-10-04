@@ -340,5 +340,12 @@ func (s *Store) GetCodex(ctx context.Context, runID string) (codexexec.Status, e
 	if err != nil {
 		return codexexec.Status{}, err
 	}
-	return codexexec.Status{Token: row.token, State: state, LeaseUntil: row.until, Receipt: row.receipt, Runtime: runtime}, nil
+	checkpoint, err := s.getCodexCheckpoint(ctx, row.token.ID)
+	if err != nil {
+		return codexexec.Status{}, err
+	}
+	if checkpoint != nil && (checkpoint.Binding.Token != row.token || runtime == nil || runtime.State != "SEALED" || runtime.Transcript == nil || runtime.Binding != checkpoint.Binding || runtime.Digest != checkpoint.TranscriptDigest || !runtime.Transcript.Close.ProcessScope.Quiescent()) {
+		return codexexec.Status{}, workerqueue.ErrIdentity
+	}
+	return codexexec.Status{Token: row.token, State: state, LeaseUntil: row.until, Receipt: row.receipt, Runtime: runtime, SourceCheckpoint: checkpoint}, nil
 }

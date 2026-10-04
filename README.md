@@ -268,3 +268,11 @@ exit are separate observations. Missing or UNKNOWN receipts block successful
 delivery and are never replayed. See
 [Live Codex controls v1](docs/implementation/LIVE_CODEX_CONTROLS_V1.md).
 This does not yet provide durable pause/resume or quiescent Human Takeover.
+
+### Stopped source recovery
+
+Interrupted/failed engineering turns with a sealed quiescent scope can retain
+private source checkpoints. The authenticated execution status exposes the exact
+descriptor; `eng source-checkpoint verify|restore` can recover bytes to a new
+private directory without account access or a model replay. This is not automatic
+resume or takeover. See [the source-checkpoint contract](docs/implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).
