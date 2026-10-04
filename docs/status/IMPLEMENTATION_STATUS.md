@@ -1,148 +1,128 @@
 # Implementation Status
 
-Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b98b`.
-This file is the single live status authority. Historical CI checkpoints remain
-in Git history and the retained M1 proof record, not parallel live checklists.
+This is the single live implementation-status authority. Detailed contracts are
+linked below; historical checkpoints and receipts remain in Git/PR history, not
+parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b98b`.
 
 ## Maturity boundary
 
-**Trusted self-hosted M1 phase 1 is proven. Production/unattended operation is
-not qualified.** The default internal lane remains trusted Ubuntu with a saved
-ChatGPT Codex session. This project is independent of digital-worker; no old
-schema/runtime compatibility obligation is inherited.
+**Trusted self-hosted M1 phase 1 has historical proof. Current repository
+implementation and automated tests are not production/unattended qualification.**
+The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
+session. This project is independent of digital-worker and inherits no old
+schema/runtime compatibility obligation.
 
-The fixed historical proof is
-[M1 retained phase-1 closure](M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md): Feature
-#54 and Debug #55 have separate real retained Closure chains. They must not be
-rerun to manufacture production or alternate-provider evidence.
+[The fixed M1 proof](M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md) records real Feature
+#54 and Debug #55 closure. It does not qualify later runtime changes. Do not rerun
+those subjects or rewrite their receipts to manufacture current production proof.
 
-## Current code contracts
+## Current contracts and limits
 
-| Area | Current implementation | Boundary |
+| Area | Implemented | Not implied |
 | --- | --- | --- |
-| Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, epochs and Recovery | Live service operating acceptance remains separate |
-| Worker | mTLS admission/preparation, independent workspace, one non-replayable Core-bound engineering turn with actual steering/interrupt delivery and sealed control transcript | Kernel-backed stop, private checkpoints and explicit new-Run source continuation are implemented; model-memory resume and Human Takeover remain separate |
-| Provider | Profile v3 binds provider, credential, execution mode and configuration digest | WIF #103 and relay #106 live qualification remain deferred |
-| Publisher | Independent mTLS service; production startup rejects in-process publisher | Explicit pilot-only local publisher remains for historical pilot tooling |
-| Delivery | One six-executable contract in `internal/distribution/binaries.txt`; CI and evidence import use that contract | Archive authenticity still requires the authenticated distribution digest |
-| Distribution verification | Delivered `eng distribution-verify` checks exact files, checksums, build roles and one clean source revision; no rebuild fallback | Byte consistency is not deployment or production qualification |
-| Production preflight | v2 binds expected source SHA; default checks actual host facts and references | CONFIG_VALIDATED and HOST_VALIDATED are not operational READY |
-| Operational status | Authenticated PostgreSQL snapshot for recovery/leases/outbox/actions/Codex UNKNOWN | Does not invent publisher reachability or provider health |
-| SLO | v2 distinguishes unverified summaries from content-addressed, subject-bound source readback | Neither state grants provider or production qualification; real provenance/targets require Verification/Review |
-| CLI | `eng run-control`, `source-checkpoint` and `run-continue` expose explicit controls, source readback and new-Run decisions | Operator-oriented CLI is not a completed WorkBuddy UX |
+| Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, execution and Recovery epochs | Production service operating acceptance |
+| Live controls | mTLS RunControl, durable one-shot steering/interrupt, exact actor/sequence/epoch/turn binding and sealed transcript | ACK means stopped; accepted input means objective fulfilled |
+| Process lifetime | Dedicated Linux user/PID namespace; receipt v4 and transcript v2 bind kernel-observed init reap | Complete filesystem/resource isolation or control of unrelated host processes |
+| Stopped source | Private exact-byte source archive after confirmed stop, immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
+| Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run is fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
+| Result finalization | Independent trusted-Git checkout must reproduce the recorded complete source/tree before a result bundle is issued | Clean Git status alone proves all source was delivered |
+| Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
+| Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
+| Distribution | One six-role list in `internal/distribution/binaries.txt`; build, exact-byte verification and Evidence import use it | Package checksums authenticate an untrusted download by themselves |
+| Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
+| Operational status | Authenticated PostgreSQL view of Recovery/leases/outbox/actions/Codex UNKNOWN | Invented publisher reachability or provider health |
+| SLO | v2 separates unverified summaries from exact, subject-bound source readback | Either report status grants production qualification or calibrated targets |
+| Operator CLI | `run-control`, `runtime-isolation-probe`, `source-checkpoint`, `run-continue` and delivery checks | Completed WorkBuddy UX or a Human Takeover interface |
 
-## Production terminal acceptance
+## Actual execution and continuation
 
-Issue #105 remains open. Repository changes are not a production decision.
-Terminal plan schema v2 keeps the one-time RELEASE maintenance fixture but
-requires `production_host_validated` and
-`source_verified_slo_evidence_accepted`, rather than ambiguous READY/COMPLETE
-labels. Retain a fresh v2 provider-free dry run after canonical CI succeeds;
-the earlier PRE_LIVE_COMPLETE v1 artifact is historical only.
+[Live controls](../implementation/LIVE_CODEX_CONTROLS_V1.md) persist DISPATCHING
+before the provider effect. Ambiguous delivery is not replayed. Input acceptance,
+interrupt acknowledgement, matching terminal event and
+[kernel-backed stop](../implementation/PROCESS_NAMESPACE_CONTAINMENT_V1.md) are
+distinct observations; Core Finish, Publisher and Evidence enforce their binding.
+No plain-process or missing-proof fallback is admitted for current execution.
 
-Actual completion still requires an independently qualified unattended provider,
-service lifecycle/recovery evidence, exact-head delivery/CI evidence, calibrated
-SLO targets, independent human Review and Closure. No mock, synthetic source
-record, green CI run or offline archive verification can replace those gates.
+[Stopped source capture](../implementation/STOPPED_SOURCE_CHECKPOINT_V1.md) runs
+synchronously on the unsuccessful ExecuteCodex path only after sealed quiescence.
+The Preparer rechecks ownership, frozen Task/input/preparation, base/configuration
+and approved Context. Modified/untracked/ignored source is preserved within the
+bounded archive; missing proof prevents capture. One immutable registration
+attempt retains ambiguous readback without replay or promotion to FINISHED.
+Core stores a Worker attestation, not a claim it downloaded private host bytes.
 
-## Provider/credential posture
+Source restore requires externally anchored digest and Run identity, a new
+private destination, full byte/mode/link/tree readback and fsync. It never
+imports .git/HOME/login state or launches a model. SOURCE_BYTES_RESTORED grants
+`execution_authorized=false`.
 
-[Codex credential lanes](../implementation/CODEX_CREDENTIAL_LANES_V1.md) remain
-canonical. Admitted code combinations are `openai-codex / chatgpt-session /
-trusted-self-hosted` and `openai-codex / workload-identity / unattended`.
-Admission mechanics are not live qualification of WIF. No relay identity or
-silent credential/provider fallback is admitted. Existing relay prequalification
-assets are frozen until a concrete live provider contract is supplied.
+[Explicit continuation](../implementation/SOURCE_CONTINUATION_V1.md) separately
+requires the authenticated Work owner, both capabilities, exact versions/epochs
+and checkpoint, requested observed interruption, and no unresolved effects or
+prior Delivery. One transaction retires the old Run without success, creates one
+new Run/Attempt/Session and emits normal run.started intent. Concurrent decisions
+and late action creation share the source fence; exact retry only observes the
+original decision. Generic Run creation cannot inject continuation lineage.
 
-## Retained terminal facts
+A new exact host approval supplies the private archive. The fresh prepared slot
+retains the original Git base and binds its restored seed. A NEW model turn gets
+explicit source-continuation context, not invented memory. Final diff/bundle must
+include both inherited and new representable source changes against the original
+Task base. Independent result checkout rejects ignored-file/empty-directory loss
+and attribute transformations that contradict the recorded source. It neither
+force-adds private files nor deletes them. A failed Finalize can leave a local
+commit; reconcile the failed execution instead of blindly retrying it.
 
-Terminal review uploads now contain only a bounded allowlisted fact archive,
-not the disposable stack, PKI, environment files, logs or database dumps.
-Verification destroys its bootstrap-only PKI after stopping Control; downstream
-Review already creates fresh identities. Intermediate database/result-artifact
-transport remains separate from the terminal fact archive.
+## Provider and production acceptance
 
-[Two fixed historical fact archives](../evidence/m1-terminal-facts/README.md)
-retain original member bytes from the actual Feature/Debug review artifacts and
-are independently checked in canonical CI. Source ZIP IDs/digests remain bound;
-historical schema bytes, review decisions and result refs are not rewritten.
-These small Git-retained records outlive Actions retention, but are explicitly
-not full runtime backups: original model output, binaries and Git bundle bytes
-still need their own retained artifact policy. No production claim follows.
+[Credential lanes](../implementation/CODEX_CREDENTIAL_LANES_V1.md) remain
+canonical: `openai-codex / chatgpt-session / trusted-self-hosted` and
+`openai-codex / workload-identity / unattended`. No relay identity or silent
+credential/provider fallback is admitted. WIF #103 and relay #106 live
+qualification remain deferred; additional speculative relay tooling is frozen.
 
-## Remaining remediation
+**Production #105 remains open.** Terminal plan v2 requires
+`production_host_validated` and `source_verified_slo_evidence_accepted`, not the
+old READY/COMPLETE labels. A fresh provider-free v2 dry run remains distinct from
+live acceptance; historical PRE_LIVE_COMPLETE v1 evidence is not promoted.
+Completion needs an independently qualified unattended provider, real lifecycle
+and recovery measurements, exact-head delivery/CI, calibrated SLO targets,
+independent human Review and Closure. Namespace/control/continuation integration
+uses local protocol fixtures; real PostgreSQL, kernel and container tests do not
+turn those fixtures into live model or provider evidence.
 
-Full engineering-artifact retention/restore, historical branch disposition and
-model-memory resume, Human Takeover and WorkBuddy UX still require independent tested closeout. Source checkpoint/continuation is not full model-session restoration.
-The two retained M1 result refs are evidence subjects, not cleanup candidates.
-Do not equate zero open PRs with repository hygiene or delivery maturity.
+## Retained evidence and repository hygiene
 
-Historical immutable result subjects:
+[Two historical terminal fact archives](../evidence/m1-terminal-facts/README.md)
+retain original selected bytes and source ZIP/artifact/run identities in Git.
+Terminal Review uploads allowlisted facts rather than PKI, dumps, environment or
+logs. Verification deletes its disposable bootstrap PKI after Control stops;
+required intermediate database transport is separate. Historical schemas and
+decisions are preserved, not silently admitted as current runtime proof.
 
-- Feature: `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
+These records and private source checkpoints are NOT full runtime/raw-artifact
+backups. Model output, binaries, Git bundles and database bytes still require a
+complete long-term retention and independently tested restore policy. Private
+source/steering must not be automatically published.
+
+[Branch disposition](../reviews/BRANCH_DISPOSITION_2026-10-04.md) distinguishes
+integrated working refs from unmatched prototypes and retained M1 subjects.
+The maintenance manifest is a bounded candidate list, never a deletion receipt.
+Only the executed atomic SHA-guarded maintenance result and remote readback prove
+cleanup; zero open PRs does not imply every branch has been retired.
+
+Preserve these historical result subjects unchanged:
+
+- Feature `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
   `engineering-platform/3ac04fc7097e8375e5f7c1f8`.
-- Debug: `91d7d9fa068b7667bab5c211f13cd9e0151aeb92`,
+- Debug `91d7d9fa068b7667bab5c211f13cd9e0151aeb92`,
   `engineering-platform/994964383ed085e51545105d`.
 
-The October 4 audit found non-provider-blocked implementation gaps. The current
-priority is delivery correctness, explicit validation semantics, safe retained
-evidence and the real engineering interaction path, not additional speculative
-qualification tooling or architecture expansion.
+## Remaining implementation work
 
-## Live control implementation boundary
-
-[Core-bound live Codex controls](../implementation/LIVE_CODEX_CONTROLS_V1.md)
-connects real steering text and interrupt requests from RunControl through
-PostgreSQL, the Worker and app-server RPC. Exact sequence/epoch/lease/turn binding,
-persist-before-dispatch, no UNKNOWN replay, ACK-versus-terminal observations and
-sealed transcript binding are enforced. New result publication and Evidence
-import require that transcript. The existing metadata-only pause/resume/takeover
-API rejects Codex Runs. Bare process exit is insufficient; receipt v4/transcript v2
-now require the separately described kernel namespace-reap proof.
-
-The real local subprocess used in integration tests is a fake provider protocol,
-not an actual account or model. Live provider qualification, in-process pause/model-memory resume and
-Human Takeover remain unproven. This is a bounded working control
-slice, not a declaration of complete production or interactive maturity.
-
-## Process-tree lifecycle
-
-Core-bound engineering now requires a dedicated user/PID namespace and binds
-its actual init-reap proof to receipt schema 4 and transcript v2. No missing
-namespace or process-group fallback is admitted. The local account-free probe
-and kernel tests cover this boundary; full pause/model-memory resume/takeover and
-real-provider compatibility are not inferred from those tests. See
-[process containment](../implementation/PROCESS_NAMESPACE_CONTAINMENT_V1.md).
-
-## Stopped source checkpoints
-
-The actual Worker now attempts bounded private source capture after an unsuccessful
-turn only when Core sealed the exact quiescent runtime transcript. Preparation
-ownership, base/config and approved Context are rechecked before capturing changed,
-untracked and ignored source bytes. Migration 0010 records an immutable descriptor
-and exact retry/readback; this never promotes the execution to FINISHED.
-
-`eng source-checkpoint verify|restore` checks the externally anchored archive and
-Run identity and restores only to a fresh private directory. It launches no model
-and grants no execution or takeover permission. Local raw bytes survive a failed
-registration reply without a blind retry. The archive is source-only, private,
-and not automatically uploaded: full model/binary/Git/database artifact retention
-and genuine pause/resume/controlled takeover remain separate unfinished work.
-
-The detailed contract is [Stopped source checkpoint v1](../implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).
-
-## Explicit source continuation
-
-[Stopped-source continuation](../implementation/SOURCE_CONTINUATION_V1.md) now
-connects a proven requested stop to a new authorized Run. The mTLS Work owner
-must hold both RunStart and RunControl and bind exact versions/epochs/checkpoint.
-One atomic decision fences the old Run, records STOPPED_NO_DELIVERY without
-changing its transcript, creates one successor and normal outbox intent. Lost
-control replies and unresolved effects remain ineligible; exact retries only
-observe the original decision. Generic Run creation cannot inject this lineage.
-
-A new exact host approval supplies the private archive. Preparer verifies raw
-bytes, restores an owned fresh slot, binds its seed and preserves original Git
-base/configuration. Normal Worker authorization launches a NEW model turn;
-final diff includes inherited unfinished work. This is not automatic replay,
-model-memory/session resume, Human Takeover or live provider qualification.
+Controlled Human Takeover/ownership transfer, WorkBuddy UX, full raw-artifact
+retention/restore, unmatched prototype disposition and evidence-ref protection
+remain unclosed. Model-memory resume is not provided by source continuation.
+Live runtime/provider, production-host lifecycle/SLO and device qualification
+remain separate from these internal gaps. Prioritize actual user journeys and
+verifiable delivery, not another parallel authority or checklist framework.
