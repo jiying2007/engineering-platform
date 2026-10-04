@@ -39,12 +39,13 @@ States are intentionally distinct:
 | NOT_APPLIED | Input was not dispatched, or was locally rejected before the RPC |
 | UNKNOWN | A dispatch outcome is ambiguous; no replay or successful delivery |
 
-A separate terminal observation records only the app-server process exit.
-It does **not** prove that every background tool/descendant has quiesced. No
-Human Takeover permission follows from either the ACK or that process exit.
+A separate terminal observation now binds the dedicated PID namespace init
+reap and its exact namespace identity. This covers descendants in that process
+subtree, not external work. No Human Takeover permission follows from the ACK
+or from quiescence alone. See PROCESS_NAMESPACE_CONTAINMENT_V1.md.
 
 After the event reader and control pump join, the Worker terminates/joins its
-app-server process and seals a deterministic control transcript in Core. The
+app-server namespace and seals a deterministic control transcript in Core. The
 transcript retains exact input bytes/digests, actors, sequence, identities and
 outcomes. Untouched queued inputs become NOT_APPLIED; dispatched inputs without
 an outcome become UNKNOWN. Only acknowledged interruption plus the exact
@@ -52,7 +53,7 @@ interrupted event becomes TURN_INTERRUPTED. Terminal observations may be saved
 after revocation, but they cannot restore execution authority.
 
 A new FINISHED result must bind the sealed transcript digest, matching actual
-thread/turn, successful completion and process exit. Every retained input must
+thread/turn, successful completion and a matching kernel-observed quiescence proof. Every retained input must
 be STEER_ACCEPTED. Interrupt, late/unapplied input, missing/ambiguous outcome or
 failed sealing blocks successful result delivery. Publication and Codex Evidence
 import independently check that same binding. A transcript is not Verification
@@ -108,7 +109,7 @@ Recovery fencing, immutable retry, transcript binding and cancellation capacity.
 Fake provider output and fixture credentials are not account/model evidence.
 
 This slice does not claim full interactive completion. Durable pause/resume,
-quiescent process-tree proof, a verified workspace checkpoint, controlled
+a verified workspace checkpoint, controlled
 Human Takeover, interactive WorkBuddy UX and their live qualification remain
 separate work. Full raw engineering artifact retention/restore remains separate
 from the already-retained terminal fact records. No M1 pilot is rerun and no

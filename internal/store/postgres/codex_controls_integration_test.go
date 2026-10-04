@@ -75,7 +75,7 @@ func TestCodexControlsOneShotAndExactTranscript(t *testing.T) {
 	if _, err = s.SettleCodexControl(ctx, codexTestWorker, r); err == nil {
 		t.Fatal("terminal receipt overwritten")
 	}
-	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "completed", RuntimeExited: true})
+	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()})
 	workerOK(t, err)
 	if !transcript.AllowsDelivery() {
 		t.Fatal("accepted input did not permit delivery")
@@ -115,7 +115,7 @@ func TestCodexControlsUnknownNotReplayedAndLateQueueRejected(t *testing.T) {
 				_, err = s.ClaimCodexControl(ctx, codexTestWorker, b)
 				workerOK(t, err)
 			}
-			c := codexexec.ControlClose{Binding: b, TurnStatus: "completed", RuntimeExited: true}
+			c := codexexec.ControlClose{Binding: b, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()}
 			transcript, err := s.CloseCodexControl(ctx, codexTestWorker, c)
 			workerOK(t, err)
 			want := codexexec.ControlNotApplied
@@ -190,7 +190,7 @@ func TestCodexControlsAuthorityFencesAndInterruptEvidence(t *testing.T) {
 	if _, err = s.QueueCodexControl(ctx, p.Token.RunID, codexexec.ControlSteer, i); err == nil {
 		t.Fatal("implicit resume accepted")
 	}
-	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "interrupted", RuntimeExited: true})
+	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "interrupted", ProcessScope: testsupport.ProcessScopeFixture()})
 	workerOK(t, err)
 	if transcript.Deliveries[0].State != codexexec.ControlInterrupted || transcript.AllowsDelivery() {
 		t.Fatal("interruption became successful delivery")
@@ -246,6 +246,7 @@ func TestCodexControlsWirePolicyWithoutDatabase(t *testing.T) {
 }
 
 func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	for _, mode := range []string{"steer", "interrupt", "lost-reply", "recovery"} {
 		t.Run(mode, func(t *testing.T) {
 			s := integrationStore(t)
@@ -378,7 +379,7 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 				if status.State != codexexec.Unknown || status.Receipt != nil {
 					t.Fatal("non-deliverable turn promoted")
 				}
-				if mode == "interrupt" && (status.Runtime.Transcript.Deliveries[0].State != codexexec.ControlInterrupted || !status.Runtime.Transcript.Close.RuntimeExited) {
+				if mode == "interrupt" && (status.Runtime.Transcript.Deliveries[0].State != codexexec.ControlInterrupted || !status.Runtime.Transcript.Close.ProcessScope.Quiescent()) {
 					t.Fatal("missing actual interrupt/exit observations")
 				}
 				if mode == "lost-reply" && status.Runtime.Transcript.Deliveries[0].State != codexexec.ControlUnknown {
@@ -442,7 +443,7 @@ func TestCodexControlsReserveInterruptCapacityAndRejectExpiredLease(t *testing.T
 	if _, err = s.ClaimCodexControl(ctx, codexTestWorker, b); err == nil {
 		t.Fatal("expired lease dispatched a control")
 	}
-	tr, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "unknown", RuntimeExited: true})
+	tr, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: b, TurnStatus: "unknown", ProcessScope: testsupport.ProcessScopeFixture()})
 	workerOK(t, err)
 	if len(tr.Deliveries) != codexexec.MaxControls || tr.AllowsDelivery() {
 		t.Fatal("expired execution lost its control ledger")

@@ -1,0 +1,10 @@
+# Optional Ubuntu host policy for a worker installed at this exact path.
+# Load explicitly as an administrator after verifying the deployment package.
+# Do not disable apparmor_restrict_unprivileged_userns globally.
+abi <abi/4.0>,
+profile engineering-worker /opt/engineering-platform/bin/worker flags=(unconfined) {
+  userns,
+}
+profile engineering-eng /opt/engineering-platform/bin/eng flags=(unconfined) {
+  userns,
+}

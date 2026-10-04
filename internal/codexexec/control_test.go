@@ -2,6 +2,7 @@ package codexexec
 
 import (
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"strings"
 	"testing"
 	"time"
@@ -53,8 +54,8 @@ func TestControlExactInputAndOutcomeValidation(t *testing.T) {
 }
 func TestTranscriptCannotTurnACKOrMissingControlsIntoQualification(t *testing.T) {
 	d := controlFixture()
-	c := ControlClose{Binding: d.Payload.Binding, TurnStatus: "completed", RuntimeExited: true}
-	tr := ControlTranscript{Version: 1, Close: c, Deliveries: []ControlDelivery{d}}
+	c := ControlClose{Binding: d.Payload.Binding, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()}
+	tr := ControlTranscript{Version: 2, Close: c, Deliveries: []ControlDelivery{d}}
 	if !tr.AllowsDelivery() {
 		t.Fatal("valid transcript rejected")
 	}
@@ -63,7 +64,7 @@ func TestTranscriptCannotTurnACKOrMissingControlsIntoQualification(t *testing.T)
 		t.Fatal(err)
 	}
 	for _, change := range []func(*ControlTranscript){
-		func(v *ControlTranscript) { v.Close.RuntimeExited = false },
+		func(v *ControlTranscript) { v.Close.ProcessScope.InitReaped = false },
 		func(v *ControlTranscript) { v.Close.TurnStatus = "interrupted" },
 		func(v *ControlTranscript) { v.Deliveries[0].State = ControlUnknown },
 		func(v *ControlTranscript) { v.Deliveries[0].State = ControlNotApplied },
@@ -86,6 +87,7 @@ func TestTranscriptCannotTurnACKOrMissingControlsIntoQualification(t *testing.T)
 		t.Fatal("duplicate command in transcript")
 	}
 	receipt := Receipt{Token: c.Binding.Token, Result: Result{ControlTranscriptDigest: hash}}
+	receipt.Result.Codex.ProcessScope = c.ProcessScope
 	receipt.Result.Codex.ThreadID = "thread"
 	receipt.Result.Codex.TurnID = "turn"
 	status := Status{State: Finished, Token: c.Binding.Token, Receipt: &receipt, Runtime: &ControlRuntime{State: "SEALED", Binding: c.Binding, Transcript: &tr, Digest: hash}}

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -217,7 +218,7 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 		ProfileDigest: digestOf("profile"), RecoveryEpoch: 0,
 	}
 	codexReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 3, CLI: "codex-cli", Version: "0.157.1",
+		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: "0.157.1",
 		BinaryDigest: digestOf("binary"), QualificationDigest: digestOf("qualification"),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: "rule-1", Model: "gpt-test",
@@ -235,7 +236,7 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 			BundleDigest: bundleDigest, BundleSize: int64(len(bundleBytes)),
 		},
 	}
-	transcript := codexexec.ControlTranscript{Version: 1, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenValue, ExecutionEpoch: 1, ThreadID: codexReceipt.ThreadID, TurnID: codexReceipt.TurnID}, TurnStatus: "completed", RuntimeExited: true}, Deliveries: []codexexec.ControlDelivery{}}
+	transcript := codexexec.ControlTranscript{Version: 2, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenValue, ExecutionEpoch: 1, ThreadID: codexReceipt.ThreadID, TurnID: codexReceipt.TurnID}, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()}, Deliveries: []codexexec.ControlDelivery{}}
 	result.ControlTranscriptDigest, _ = transcript.Digest()
 	resultDigest, err := canonical.Digest(result)
 	if err != nil {

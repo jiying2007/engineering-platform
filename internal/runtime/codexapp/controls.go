@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type EngineeringController interface {
 	Bind(context.Context, string, string) error
 	Claim(context.Context) (*LiveControl, error)
 	Report(context.Context, string, string) error
-	Close(context.Context, string, bool) error
+	Close(context.Context, string, processscope.Proof) error
 }
 
 func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, turnID string, c EngineeringController) (EngineeringObservation, error) {

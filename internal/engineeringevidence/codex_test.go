@@ -1,6 +1,7 @@
 package engineeringevidence
 
 import (
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,7 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		BundleSize:         int64(len(bundle)),
 	}
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion:              3,
+		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(),
 		CLI:                        "codex-cli",
 		Version:                    "0.157.1",
 		BinaryDigest:               "sha256:" + strings.Repeat("7", 64),
@@ -61,7 +62,7 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		Change:               change,
 	}
 	tokenForControl := codexexec.Token{ID: strings.Repeat("a", 64), RunID: "run-codex", WorkerProfile: "worker/codex", ProfileDigest: "sha256:" + strings.Repeat("b", 64), RecoveryEpoch: 1}
-	transcript := codexexec.ControlTranscript{Version: 1, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenForControl, ExecutionEpoch: 1, ThreadID: modelReceipt.ThreadID, TurnID: modelReceipt.TurnID}, TurnStatus: "completed", RuntimeExited: true}, Deliveries: []codexexec.ControlDelivery{}}
+	transcript := codexexec.ControlTranscript{Version: 2, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenForControl, ExecutionEpoch: 1, ThreadID: modelReceipt.ThreadID, TurnID: modelReceipt.TurnID}, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()}, Deliveries: []codexexec.ControlDelivery{}}
 	result.ControlTranscriptDigest, _ = transcript.Digest()
 	resultDigest, err := canonical.Digest(result)
 	if err != nil {
