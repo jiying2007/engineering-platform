@@ -17,7 +17,7 @@ func (p *Preparer) CheckpointPaths(ctx context.Context, subject string, a worker
 		return "", "", workerqueue.ErrIdentity
 	}
 	d, err := canonical.Digest(prepared.Facts)
-	if err != nil || d != preparationDigest || prepared.Facts.SourceDigest != prepared.Workspace.SourceDigest || prepared.Facts.ConfigDigest != prepared.Workspace.ConfigDigest || prepared.Facts.TreeCommit != prepared.Workspace.TreeCommit {
+	if err != nil || d != preparationDigest || prepared.Facts.SeedSourceDigest != prepared.Workspace.SeedSourceDigest || prepared.Facts.SourceDigest != prepared.Workspace.SourceDigest || prepared.Facts.ConfigDigest != prepared.Workspace.ConfigDigest || prepared.Facts.TreeCommit != prepared.Workspace.TreeCommit {
 		return "", "", workerqueue.ErrIdentity
 	}
 	head, err := p.manager.Head(ctx, prepared.Workspace)

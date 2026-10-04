@@ -102,7 +102,9 @@ verify authorization, revocation-safe recording, immutable registration, audit,
 and restored bytes. The model endpoint is a deliberate local protocol fixture:
 these tests are not live provider, account or production-host qualification.
 
-Remaining: authorized continuation/resume and ownership transfer with a new
-explicit execution decision, process/session reconstruction, WorkBuddy UX, full
-raw engineering-artifact retention and live production acceptance. None is
-implicitly granted by `SOURCE_BYTES_RESTORED` or the existence of a checkpoint.
+A separate [explicit source continuation](SOURCE_CONTINUATION_V1.md) decision
+can create a new authorized Run for an unambiguous requested stop. It needs the
+Work owner, both permissions and new host approval; the standalone restore
+command still grants no authority. Model-memory resume, ownership transfer,
+WorkBuddy UX, full raw artifact retention and live production acceptance remain
+separate; none follows from `SOURCE_BYTES_RESTORED`.

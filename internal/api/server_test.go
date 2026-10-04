@@ -793,3 +793,13 @@ func TestEvidenceMustBindExactFrozenRequirement(t *testing.T) {
 		},
 	}, http.StatusUnprocessableEntity)
 }
+
+func TestGenericRunCannotInjectSourceContinuation(t *testing.T) {
+	h := NewServer(store.NewMemory()).Handler()
+	d := canonical.BytesDigest([]byte("test-only"))
+	mustRequest(t, h, http.MethodPost, "/api/v1/runs", map[string]any{
+		"run_id": "next", "task_contract_digest": d, "attempt_id": "attempt",
+		"run_input": map[string]any{"continuation": core.ContinuationRef{SourceRunID: "old", CheckpointDigest: d, ArchiveDigest: d, ArchiveSize: 1, SnapshotDigest: d}},
+	}, http.StatusBadRequest)
+	mustRequest(t, h, http.MethodGet, "/api/v1/runs/next", nil, http.StatusNotFound)
+}

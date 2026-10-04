@@ -89,6 +89,11 @@ func (m *RunInputManifest) UnmarshalJSON(data []byte) error {
 	if err := ValidateContextRefs(value.ContextRefs); err != nil {
 		return err
 	}
+	if value.Continuation != nil {
+		if err := value.Continuation.Validate(value.RunID); err != nil {
+			return err
+		}
+	}
 	*m = RunInputManifest(value)
 	return nil
 }

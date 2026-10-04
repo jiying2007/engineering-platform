@@ -11,6 +11,8 @@ import (
 )
 
 var workerRouteCapabilities = map[string]string{
+	"POST /api/v1/runs/{id}/continue":             access.RunStart,
+	"GET /api/v1/runs/{id}/continuation":          access.Read,
 	"POST /api/v1/worker/codex/source-checkpoint": access.ActionExecute,
 	"POST /api/v1/worker/codex/controls/bind":     access.ActionExecute,
 	"POST /api/v1/worker/codex/controls/claim":    access.ActionExecute,
@@ -37,6 +39,8 @@ var workerRouteCapabilities = map[string]string{
 
 // Only the authenticated constructor registers these routes.
 func (s *Server) workerRoutes() {
+	s.mux.HandleFunc("POST /api/v1/runs/{id}/continue", s.handleCodexContinue)
+	s.mux.HandleFunc("GET /api/v1/runs/{id}/continuation", s.handleCodexContinuation)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/source-checkpoint", s.handleCodexSourceCheckpoint)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/bind", s.handleControlBind)
 	s.mux.HandleFunc("POST /api/v1/worker/codex/controls/claim", s.handleControlClaim)

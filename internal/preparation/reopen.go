@@ -31,6 +31,9 @@ func (p *Preparer) Reopen(ctx context.Context, subject string, a workerqueue.Ass
 	if !ok || approved.RunID != a.Intent.RunID || approved.TaskDigest != a.Intent.TaskDigest || approved.Repository != a.Task.Repository || len(approved.Refs) != len(a.Input.ContextRefs) {
 		return r, contextbundle.ErrDenied
 	}
+	if (a.Input.Continuation == nil) != (approved.ContinuationArchive == "") {
+		return r, contextbundle.ErrDenied
+	}
 	for i, ref := range a.Input.ContextRefs {
 		if ref != approved.Refs[i] || ref.Trust != core.ContextApproved {
 			return r, contextbundle.ErrDenied

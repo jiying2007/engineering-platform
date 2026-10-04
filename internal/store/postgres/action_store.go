@@ -33,6 +33,20 @@ func (s *Store) Create(op action.Operation) error {
 	}
 	_, err = s.Mutate(bg(), Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			// Serialize a previously authorized action with source continuation.
+			// Validation before this transaction cannot prevent a stale request
+			// from arriving after the source Run has been fenced.
+			var epoch uint64
+			if err := tx.QueryRow(ctx, "SELECT current_epoch FROM runs WHERE run_id=$1 FOR SHARE", op.RunID).Scan(&epoch); err != nil {
+				return err
+			}
+			var continued bool
+			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM codex_continuations WHERE source_run_id=$1)", op.RunID).Scan(&continued); err != nil {
+				return err
+			}
+			if epoch != op.ExecutionEpoch || continued {
+				return action.ErrDenied
+			}
 			const q = `
 INSERT INTO external_operations (
     operation_id,run_id,execution_epoch,recovery_epoch,action,risk_class,capability,

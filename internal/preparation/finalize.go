@@ -31,7 +31,7 @@ func (p *Preparer) FinalizeChangedWorkspace(ctx context.Context, subject string,
 	}
 	actual, err := canonical.Digest(prepared.Facts)
 	if err != nil || actual != preparationDigest ||
-		prepared.Facts.SourceDigest != prepared.Workspace.SourceDigest ||
+		prepared.Facts.SeedSourceDigest != prepared.Workspace.SeedSourceDigest || prepared.Facts.SourceDigest != prepared.Workspace.SourceDigest ||
 		prepared.Facts.ConfigDigest != prepared.Workspace.ConfigDigest ||
 		prepared.Facts.TreeCommit != prepared.Workspace.TreeCommit {
 		return result, workerqueue.ErrIdentity

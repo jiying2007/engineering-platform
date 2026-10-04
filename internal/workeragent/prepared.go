@@ -77,7 +77,7 @@ func PrepareOnce(ctx context.Context, c Transport, profile string, p *preparatio
 			}
 		}
 	}()
-	result, prepareErr := p.Prepare(opctx, c.Subject(), a)
+	result, prepareErr := p.PrepareWithSource(opctx, c.Subject(), a, RestoreContinuationSource)
 	close(stopRenew)
 	leaseErr := <-done
 	if prepareErr != nil || leaseErr != nil {
