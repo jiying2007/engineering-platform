@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,6 +54,22 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	root := t.TempDir()
+	// Context bundles are deliberately read-only in production. Restore only
+	// this test's own directory modes after both Preparers have been closed,
+	// before testing.TempDir removes its tree as the non-root CI user.
+	t.Cleanup(func() {
+		if e := filepath.WalkDir(root, func(path string, d fs.DirEntry, e error) error {
+			if e != nil {
+				return e
+			}
+			if d.IsDir() {
+				return os.Chmod(path, 0700)
+			}
+			return nil
+		}); e != nil {
+			t.Errorf("test directory cleanup: %v", e)
+		}
+	})
 	workerOK(t, os.Chmod(root, 0700))
 	repo, objects, preparedRoot := filepath.Join(root, "repository"), filepath.Join(root, "context"), filepath.Join(root, "prepared")
 	for _, p := range []string{repo, objects, preparedRoot} {
@@ -202,8 +219,17 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	nextRequest.RunID = q.RunID
 	final, e := workeragent.ExecuteCodex(ctx, worker, nextPreparer, nextRequest, runtime)
 	workerOK(t, e)
-	if final.Kind != codexexec.Kind || final.Token.RunID != q.RunID || final.Token.ID == old.Token.ID || final.Result.Change.BaseCommit != base || final.Result.Change.BaseSourceDigest != prep.Facts.SourceDigest || final.Result.Codex.ProcessScope.NamespaceID == old.Runtime.Transcript.Close.ProcessScope.NamespaceID {
-		t.Fatal("new execution or full-base lineage lost")
+	if final.Kind != codexexec.Kind || final.Token.RunID != q.RunID || final.Token.ID == old.Token.ID || final.Result.Change.BaseCommit != base || final.Result.Change.BaseSourceDigest != prep.Facts.SourceDigest {
+		t.Fatalf("new execution or full-base lineage lost: token=%+v change=%+v expected source=%s", final.Token, final.Result.Change, prep.Facts.SourceDigest)
+	}
+	// A namespace inode is a live kernel object identity, not a never-reused
+	// execution UUID. Prove a fresh lifecycle after the old one was reaped and
+	// keep exact execution-token/transcript binding; do not require global inode
+	// uniqueness across two disjoint namespace lifetimes.
+	beforeScope := old.Runtime.Transcript.Close.ProcessScope
+	afterScope := final.Result.Codex.ProcessScope
+	if !beforeScope.Quiescent() || !afterScope.Quiescent() || !afterScope.StartedAt.After(beforeScope.ReapedAt) {
+		t.Fatalf("fresh stopped lifecycle missing: before=%+v after=%+v", beforeScope, afterScope)
 	}
 	sourceNow, e := s.GetCodex(ctx, input.RunID)
 	workerOK(t, e)
