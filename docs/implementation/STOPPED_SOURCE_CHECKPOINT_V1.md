@@ -1,6 +1,7 @@
 # Stopped source checkpoint v1
 
-This is exact source preservation after a stopped unsuccessful engineering turn.
+This is exact source preservation after a stopped engineering execution whose
+completion was not confirmed by the Worker (including post-turn failure).
 It is not a paused process, a model session snapshot, automatic resume, successful
 Delivery, or a Human Takeover grant. It extends the existing Worker attestation
 and stopped control transcript rather than introducing a second authority.
@@ -8,7 +9,7 @@ and stopped control transcript rather than introducing a second authority.
 ## Actual execution path
 
 `ExecuteCodex` first validates/reopens the prepared workspace, then runs the
-existing namespaced app-server and live controls. When that turn returns an
+existing namespaced app-server and live controls. When the turn or its post-processing returns an
 error, a valid sealed control transcript with a quiescent process-scope proof
 permits a bounded attempt to capture the now-stopped source. Missing proof or
 failed sealing cannot initiate capture. Capture still runs synchronously before
@@ -27,8 +28,10 @@ captured source tree, raw archive digest and size. The Worker saves a local
 reconciliation record then attempts exactly one authenticated Core registration.
 Lost replies and changed readback are errors, not retries or successful saves.
 The error returned to the operator preserves the archive path/digest and whether
-Core registration was confirmed. The original execution still follows its
-unsuccessful/UNKNOWN path; no model result is finalized or published.
+Core registration was confirmed. A local failure is not a new Core decision. An unreported execution follows its
+unsuccessful/UNKNOWN path, while a report already committed in Core remains
+FINISHED even if its reply was lost. No model call is replayed, and no failure
+checkpoint itself finalizes or publishes a result.
 
 Migration 0010 adds one immutable source-checkpoint record per execution. Core
 registration checks the same Worker, prepared Task/input/base, sealed runtime
@@ -108,3 +111,38 @@ Work owner, both permissions and new host approval; the standalone restore
 command still grants no authority. Model-memory resume, ownership transfer,
 WorkBuddy UX, full raw artifact retention and live production acceptance remain
 separate; none follows from `SOURCE_BYTES_RESTORED`.
+
+## Completed-turn post-processing failure
+
+The actual Worker writes a bounded, immutable local ENTERED record before
+TURN_RECEIPT, FINALIZE, RESULT_PERSIST, REPORT_RENEW, RESULT_REPORT and
+RECEIPT_VERIFY work. These records bind the exact execution/Task/input/transcript
+and, once available, the expected result digest. Both file and directory are
+fsynced through the existing private reconciliation store. A failed journal write
+prevents the next phase; old files are never overwritten.
+
+A catchable post-turn failure triggers synchronous bounded source preservation
+and one Core checkpoint registration. Before Finalize, the ordinary original-base
+check applies. After Finalize was entered, preservation-only inspection accepts
+the original detached base or one raw commit with exactly that direct parent;
+Git configuration, ownership, hooks/alternates/grafts and the original shallow
+boundary are rechecked. Normal Head/Reopen remains original-base-only. Preserved
+source still binds the original Task base, not an invented replacement baseline.
+
+The terminal local record reports FAILED_UNCONFIRMED, phase, any retained source
+descriptor and registration observation. No raw error/secret is added to that
+record, and nothing is automatically uploaded. Capture or registration failure is
+reported distinctly; disk-full, bad paths or unsafe Git cannot become a false
+successful archive. Success does not make an unnecessary source copy.
+
+A completed turn is NOT an explicit interrupted turn, so its checkpoint cannot
+pass the existing interruption-only continuation gate. A Core report can have
+committed despite a lost response. Query the same Run/execution/result digest;
+never turn the local error into permission to replay the model or a new Run.
+The existing bounded idempotent report retries do not repeat a model turn.
+
+Limits: ENTERED is not proof of phase completion. Abrupt Worker/host death can
+leave only the last phase entry; this slice does not add a crash-recovery daemon,
+automatic capture after restart, full Git/model/binary/database backups, or an
+automatically approved recovery decision. Local write exhaustion may prevent
+both capture and journaling; the error remains explicit rather than a success.

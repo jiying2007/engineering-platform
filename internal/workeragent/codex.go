@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
@@ -108,12 +109,38 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, retainStoppedSource(c, p, permit, prepared, transcript, err)
 	}
+	phase, expectedResult := "TURN_RECEIPT", ""
+	finalizeEntered := false
+	// RunCodexTurn already sealed actual process quiescence. Any later failure
+	// preserves source without granting continuation or changing a Core receipt.
+	defer func() {
+		if err != nil {
+			if !joined {
+				stopRun(nil)
+				<-done
+				joined = true
+			}
+			receipt = codexexec.Receipt{}
+			err = retainPostTurnFailure(c, p, permit, prepared, transcript, phase, expectedResult, finalizeEntered, err)
+		}
+	}()
+	phaseStart := func(next string) error {
+		phase = next
+		return savePostTurnPhase(p, permit, prepared, transcript, phase, expectedResult)
+	}
+	if err = phaseStart("TURN_RECEIPT"); err != nil {
+		return receipt, err
+	}
 	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":turn"))[7:], codexReceipt); err != nil {
 		return receipt, err
 	}
 	if cause := context.Cause(runCtx); cause != nil {
 		return receipt, cause
 	}
+	if err = phaseStart("FINALIZE"); err != nil {
+		return receipt, err
+	}
+	finalizeEntered = true
 	finalized, err := p.FinalizeChangedWorkspace(runCtx, c.Subject(), permit.Assignment, prepared, permit.Preparation.FactsDigest, permit.Token.ID)
 	if err != nil {
 		return receipt, err
@@ -126,6 +153,13 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err = result.Validate(request.Profile, permit); err != nil {
 		return receipt, err
 	}
+	expectedResult, err = canonical.Digest(result)
+	if err != nil {
+		return receipt, err
+	}
+	if err = phaseStart("RESULT_PERSIST"); err != nil {
+		return receipt, err
+	}
 	local := struct {
 		Result     codexexec.Result `json:"result"`
 		BundlePath string           `json:"bundle_path"`
@@ -136,10 +170,19 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	stopRun(nil)
 	<-done
 	joined = true
+	if err = phaseStart("REPORT_RENEW"); err != nil {
+		return receipt, err
+	}
 	var renewal struct {
 		LeaseUntil time.Time `json:"lease_until"`
 	}
 	if err = c.Call(ctx, http.MethodPost, "/api/v1/worker/codex/renew", permit.Token, &renewal); err != nil {
+		return receipt, err
+	}
+	if renewal.LeaseUntil.IsZero() {
+		return receipt, fmt.Errorf("empty final Codex execution lease")
+	}
+	if err = phaseStart("RESULT_REPORT"); err != nil {
 		return receipt, err
 	}
 	report := codexexec.Report{Token: permit.Token, Result: result}
@@ -150,6 +193,9 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		}
 	}
 	if err != nil {
+		return receipt, err
+	}
+	if err = phaseStart("RECEIPT_VERIFY"); err != nil {
 		return receipt, err
 	}
 	if err = receipt.Verify(c.Subject(), permit, result); err != nil {
