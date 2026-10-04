@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"strings"
 	"testing"
 	"time"
@@ -99,7 +100,7 @@ func codexResult(t *testing.T, permit codexexec.Permit) codexexec.Result {
 	promptIdentity, err := codexexec.PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	workerOK(t, err)
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 3, CLI: "codex-cli", Version: permit.Profile.CodexVersion,
+		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: permit.Profile.CodexVersion,
 		BinaryDigest: permit.Profile.BinaryDigest, QualificationDigest: permit.Profile.QualificationDigest,
 		EngineeringConfigDigest: permit.Profile.EngineeringConfigDigest,
 		Provider:                permit.Profile.Provider, FederationRuleID: "rule-test", Model: permit.Profile.Model,
@@ -133,7 +134,7 @@ func TestCodexStoreFreshGrantReplayAndMigration(t *testing.T) {
 	result := codexResult(t, permit)
 	binding := codexexec.ControlBinding{Token: permit.Token, ExecutionEpoch: 1, ThreadID: result.Codex.ThreadID, TurnID: result.Codex.TurnID}
 	workerOK(t, s.BindCodexControl(ctx, codexTestWorker, binding))
-	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: binding, TurnStatus: "completed", RuntimeExited: true})
+	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: binding, TurnStatus: "completed", ProcessScope: testsupport.ProcessScopeFixture()})
 	workerOK(t, err)
 	result.ControlTranscriptDigest, err = transcript.Digest()
 	workerOK(t, err)

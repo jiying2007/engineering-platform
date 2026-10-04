@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
@@ -62,8 +63,8 @@ func (c *codexController) Report(ctx context.Context, id, outcome string) error 
 	}
 	return nil
 }
-func (c *codexController) Close(ctx context.Context, status string, exited bool) error {
-	request := codexexec.ControlClose{Binding: c.binding, TurnStatus: status, RuntimeExited: exited}
+func (c *codexController) Close(ctx context.Context, status string, proof processscope.Proof) error {
+	request := codexexec.ControlClose{Binding: c.binding, TurnStatus: status, ProcessScope: proof}
 	var transcript codexexec.ControlTranscript
 	if err := c.transport.Call(ctx, http.MethodPost, "/api/v1/worker/codex/controls/close", request, &transcript); err != nil {
 		return err

@@ -77,8 +77,25 @@ jobs:
             gofmt -d .
             exit 1
           fi
+      - name: Require kernel process-scope tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Test-only AppArmor userns permission, scoped to this job's Go test
+          # executables. Never disable the host-wide userns restriction.
+          tmp="$RUNNER_TEMP/ep-namespace-go-tmp"
+          mkdir "$tmp"
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            command -v apparmor_parser >/dev/null
+            printf 'abi <abi/4.0>,\nprofile ep-namespace-go-tests %s/go-build*/b*/*.test flags=(unconfined) {\n  userns,\n}\n' "$tmp" > "$RUNNER_TEMP/ep-namespace-tests.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/ep-namespace-tests.apparmor"
+          fi
+          echo "TMPDIR=$tmp" >> "$GITHUB_ENV"
+          echo "EP_REQUIRE_PID_NAMESPACE_TESTS=1" >> "$GITHUB_ENV"
       - name: Test
         run: go test -race -timeout 5m ./...
+      - name: Kernel process-tree regression
+        run: go test -race -count=10 -timeout 1m ./internal/processscope
       - name: Outbox authority repeated regression
         run: |
           go test -race -count=20 -timeout 1m ./internal/outbox

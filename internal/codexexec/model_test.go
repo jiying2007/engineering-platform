@@ -2,6 +2,7 @@ package codexexec
 
 import (
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"strings"
 	"testing"
 	"time"
@@ -184,7 +185,7 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 	p, permit := contractFixture(t)
 	promptDigest, _ := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	codex := codexapp.EngineeringReceipt{
-		SchemaVersion:              3,
+		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(),
 		CLI:                        "codex-cli",
 		Version:                    p.CodexVersion,
 		BinaryDigest:               p.BinaryDigest,

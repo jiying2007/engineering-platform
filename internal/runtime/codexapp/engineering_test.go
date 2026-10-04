@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"io"
 	"os"
 	"path/filepath"
@@ -165,6 +166,7 @@ func TestObserveEngineeringTurnRejectsExternalTools(t *testing.T) {
 }
 
 func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	work := filepath.Join(root, "work")
 	home := filepath.Join(root, "home")
@@ -215,6 +217,7 @@ func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T
 }
 
 func TestEngineeringSavedLoginTurnDeletesBootstrapBeforeModelReachableWork(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	work := filepath.Join(root, "work")
 	home := filepath.Join(root, "home")

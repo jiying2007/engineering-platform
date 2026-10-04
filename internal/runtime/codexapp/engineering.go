@@ -1,7 +1,6 @@
 package codexapp
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -13,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
@@ -68,6 +68,7 @@ type EngineeringObservation struct {
 }
 
 type EngineeringReceipt struct {
+	ProcessScope                         processscope.Proof        `json:"process_scope"`
 	SchemaVersion                        int                       `json:"schema_version"`
 	CLI                                  string                    `json:"cli"`
 	Version                              string                    `json:"version"`
@@ -230,28 +231,30 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	if err != nil {
 		return receipt, err
 	}
-	var stderr bytes.Buffer
+	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
-	if err := cmd.Start(); err != nil {
+	scope, err := processscope.Start(cmd)
+	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
 		return receipt, err
 	}
-	waitDone := make(chan error, 1)
-	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
-	processJoined := false
+	var proof processscope.Proof
 	controlStarted := false
 	var observation EngineeringObservation
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !processJoined {
-			select {
-			case <-waitDone:
-			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
-				<-waitDone
+		if !proof.Quiescent() {
+			stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			var stopErr error
+			proof, stopErr = scope.Stop(stopCtx)
+			stop()
+			if !proof.Quiescent() {
+				receipt = EngineeringReceipt{}
+				runErr = fmt.Errorf("runtime process-tree termination unconfirmed: %v", stopErr)
 			}
-			processJoined = true
 		}
 		if controller != nil && controlStarted {
 			terminal := observation.Status
@@ -259,7 +262,7 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 				terminal = "unknown"
 			}
 			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
-			closeErr := controller.Close(reportCtx, terminal, processJoined)
+			closeErr := controller.Close(reportCtx, terminal, proof)
 			reportCancel()
 			if closeErr != nil && runErr == nil {
 				receipt = EngineeringReceipt{}
@@ -297,18 +300,14 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 		return receipt, err
 	}
 	_ = client.Close()
-	select {
-	case <-time.After(5 * time.Second):
-		cancel()
-		return receipt, fmt.Errorf("app-server did not stop after engineering turn")
-	case waitErr := <-waitDone:
-		processJoined = true
-		if waitErr != nil {
-			return receipt, fmt.Errorf("app-server exited after engineering turn: %w", waitErr)
-		}
+	joinCtx, joinCancel := context.WithTimeout(ctx, 5*time.Second)
+	proof, err = scope.Wait(joinCtx)
+	joinCancel()
+	if err != nil || !proof.Quiescent() {
+		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 3, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 4, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: ruleID, Model: model,
@@ -357,28 +356,30 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	if err != nil {
 		return receipt, err
 	}
-	var stderr bytes.Buffer
+	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
-	if err := cmd.Start(); err != nil {
+	scope, err := processscope.Start(cmd)
+	if err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
 		return receipt, err
 	}
-	waitDone := make(chan error, 1)
-	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
-	processJoined := false
+	var proof processscope.Proof
 	controlStarted := false
 	var observation EngineeringObservation
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !processJoined {
-			select {
-			case <-waitDone:
-			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
-				<-waitDone
+		if !proof.Quiescent() {
+			stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+			var stopErr error
+			proof, stopErr = scope.Stop(stopCtx)
+			stop()
+			if !proof.Quiescent() {
+				receipt = EngineeringReceipt{}
+				runErr = fmt.Errorf("runtime process-tree termination unconfirmed: %v", stopErr)
 			}
-			processJoined = true
 		}
 		if controller != nil && controlStarted {
 			terminal := observation.Status
@@ -386,7 +387,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 				terminal = "unknown"
 			}
 			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
-			closeErr := controller.Close(reportCtx, terminal, processJoined)
+			closeErr := controller.Close(reportCtx, terminal, proof)
 			reportCancel()
 			if closeErr != nil && runErr == nil {
 				receipt = EngineeringReceipt{}
@@ -425,18 +426,14 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 		return receipt, err
 	}
 	_ = client.Close()
-	select {
-	case <-time.After(5 * time.Second):
-		cancel()
-		return receipt, fmt.Errorf("app-server did not stop after engineering turn")
-	case waitErr := <-waitDone:
-		processJoined = true
-		if waitErr != nil {
-			return receipt, fmt.Errorf("app-server exited after engineering turn: %w", waitErr)
-		}
+	joinCtx, joinCancel := context.WithTimeout(ctx, 5*time.Second)
+	proof, err = scope.Wait(joinCtx)
+	joinCancel()
+	if err != nil || !proof.Quiescent() {
+		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 3, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 4, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIChatGPTTrustedSelfHosted(), FederationRuleID: "", Model: model,
@@ -452,7 +449,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 }
 
 func (r EngineeringReceipt) Validate() error {
-	if r.SchemaVersion != 3 || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+	if r.SchemaVersion != 4 || !r.ProcessScope.Quiescent() || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.QualificationDigest) ||
 		r.EngineeringConfigDigest != EngineeringConfigDigest() || r.Provider.Validate() != nil ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||

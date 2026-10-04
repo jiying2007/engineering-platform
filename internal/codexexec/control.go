@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/session"
 )
 
@@ -140,12 +141,12 @@ type ControlSettlement struct {
 type ControlClose struct {
 	Binding    ControlBinding `json:"binding"`
 	TurnStatus string         `json:"turn_status"`
-	// This is only the app-server process, not proof of descendant quiescence.
-	RuntimeExited bool `json:"runtime_process_exited"`
+	// Only a kernel-observed dedicated namespace reap can permit capture/delivery.
+	ProcessScope processscope.Proof `json:"process_scope"`
 }
 
 func (c ControlClose) Validate() error {
-	if c.Binding.Validate() != nil {
+	if c.Binding.Validate() != nil || (c.ProcessScope != (processscope.Proof{}) && c.ProcessScope.Validate() != nil) {
 		return fmt.Errorf("invalid closure binding")
 	}
 	switch c.TurnStatus {
@@ -162,7 +163,7 @@ type ControlTranscript struct {
 }
 
 func (t ControlTranscript) Digest() (string, error) {
-	if t.Version != 1 || t.Close.Validate() != nil || len(t.Deliveries) > MaxControls {
+	if t.Version != 2 || t.Close.Validate() != nil || len(t.Deliveries) > MaxControls {
 		return "", fmt.Errorf("invalid control transcript")
 	}
 	var last uint64
@@ -177,7 +178,7 @@ func (t ControlTranscript) Digest() (string, error) {
 	return canonical.Digest(t)
 }
 func (t ControlTranscript) AllowsDelivery() bool {
-	if _, err := t.Digest(); err != nil || t.Close.TurnStatus != "completed" || !t.Close.RuntimeExited {
+	if _, err := t.Digest(); err != nil || t.Close.TurnStatus != "completed" || !t.Close.ProcessScope.Quiescent() {
 		return false
 	}
 	for _, d := range t.Deliveries {
@@ -212,7 +213,7 @@ func (s Status) VerifyFinishedControls() error {
 	}
 	t := s.Runtime.Transcript
 	digest, err := t.Digest()
-	if err != nil || !t.AllowsDelivery() || t.Close.Binding != s.Runtime.Binding || s.Runtime.Binding.Token != s.Token || s.Runtime.Binding.ThreadID != s.Receipt.Result.Codex.ThreadID || s.Runtime.Binding.TurnID != s.Receipt.Result.Codex.TurnID || digest != s.Runtime.Digest || digest != s.Receipt.Result.ControlTranscriptDigest {
+	if err != nil || !t.AllowsDelivery() || t.Close.Binding != s.Runtime.Binding || s.Runtime.Binding.Token != s.Token || s.Runtime.Binding.ThreadID != s.Receipt.Result.Codex.ThreadID || s.Runtime.Binding.TurnID != s.Receipt.Result.Codex.TurnID || t.Close.ProcessScope != s.Receipt.Result.Codex.ProcessScope || digest != s.Runtime.Digest || digest != s.Receipt.Result.ControlTranscriptDigest {
 		return fmt.Errorf("finished result/control transcript mismatch")
 	}
 	return nil

@@ -3,6 +3,7 @@ package codexapp
 import (
 	"context"
 	"errors"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,11 +55,11 @@ func (c *fixtureController) Report(_ context.Context, id, outcome string) error 
 	}
 	return nil
 }
-func (c *fixtureController) Close(_ context.Context, status string, exited bool) error {
+func (c *fixtureController) Close(_ context.Context, status string, proof processscope.Proof) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed = status
-	c.exited = exited
+	c.exited = proof.Quiescent()
 	if c.closeFailure {
 		return errors.New("fixture Core seal unavailable")
 	}
@@ -66,6 +67,7 @@ func (c *fixtureController) Close(_ context.Context, status string, exited bool)
 }
 
 func TestEngineeringActualProcessControls(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	for _, mode := range []string{"steer", "interrupt", "lost-reply", "report-failure", "close-failure", "foreign-turn"} {
 		t.Run(mode, func(t *testing.T) {
 			python, err := exec.LookPath("python3")

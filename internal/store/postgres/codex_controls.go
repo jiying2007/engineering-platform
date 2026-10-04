@@ -330,7 +330,7 @@ func (s *Store) CloseCodexControl(ctx context.Context, subject string, c codexex
 	if err != nil {
 		return empty, err
 	}
-	t := codexexec.ControlTranscript{Version: 1, Close: c, Deliveries: []codexexec.ControlDelivery{}}
+	t := codexexec.ControlTranscript{Version: 2, Close: c, Deliveries: []codexexec.ControlDelivery{}}
 	for rows.Next() {
 		d, e := scanControl(rows)
 		if e != nil {

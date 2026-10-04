@@ -246,7 +246,7 @@ func (s *Store) FinishCodex(ctx context.Context, subject string, report codexexe
 		return empty, workerqueue.ErrIdentity
 	}
 	runtime, err := controlRuntime(tx.QueryRow(ctx, `SELECT `+runtimeColumns+` FROM worker_codex_runtime WHERE execution_id=$1 FOR UPDATE`, report.Token.ID))
-	if err != nil || runtime.State != "SEALED" || runtime.Digest != report.Result.ControlTranscriptDigest || !runtime.Transcript.AllowsDelivery() || runtime.Binding.ThreadID != report.Result.Codex.ThreadID || runtime.Binding.TurnID != report.Result.Codex.TurnID {
+	if err != nil || runtime.State != "SEALED" || runtime.Transcript == nil || runtime.Digest != report.Result.ControlTranscriptDigest || !runtime.Transcript.AllowsDelivery() || runtime.Transcript.Close.ProcessScope != report.Result.Codex.ProcessScope || runtime.Binding.ThreadID != report.Result.Codex.ThreadID || runtime.Binding.TurnID != report.Result.Codex.TurnID {
 		return empty, workerqueue.ErrIdentity
 	}
 

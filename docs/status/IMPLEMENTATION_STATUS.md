@@ -103,3 +103,12 @@ The real local subprocess used in integration tests is a fake provider protocol,
 not an actual account or model. Live provider qualification, pause/resume and
 quiescent checkpoint/takeover remain unproven. This is a bounded working control
 slice, not a declaration of complete production or interactive maturity.
+
+## Process-tree lifecycle
+
+Core-bound engineering now requires a dedicated user/PID namespace and binds
+its actual init-reap proof to receipt schema 4 and transcript v2. No missing
+namespace or process-group fallback is admitted. The local account-free probe
+and kernel tests cover this boundary; full pause/resume/checkpoint/takeover and
+real-provider compatibility are not inferred from those tests. See
+[process containment](../implementation/PROCESS_NAMESPACE_CONTAINMENT_V1.md).
