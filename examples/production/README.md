@@ -67,15 +67,25 @@ After Control Plane is reachable, load a dedicated operator/read-only mTLS
 client environment and run:
 
 ```sh
-eng production-status --require-ready
+eng production-status
+# Only check database authority, NOT service availability:
+eng production-status --require-authority-clear
 ```
 
 The command reads `GET /api/v1/operations/status`. Detailed readiness is never
 inferred from anonymous `/healthz` alone.
 
-A nonzero exit from `--require-ready` blocks production mutation until the
-reported Recovery/UNKNOWN/dead-letter/lease condition is reconciled. Do not
-paper over a degraded status by restarting services or replaying a model turn.
+Operational status v2 exposes database authority separately from service
+readiness. Empty queues or recent database progress do not prove a consumer or
+publisher is alive. This slice returns `service_readiness=NOT_OBSERVED` and
+`ready=false`; `--require-ready` therefore fails until actual service observation
+is implemented. Never replace a production readiness gate with
+`--require-authority-clear` merely to make it pass. A nonzero authority check
+requires reconciliation of Recovery/UNKNOWN/dead-letter/lease facts, not a restart
+or model replay. Queue ages and last admission/dispatch timestamps are database
+observations, not heartbeats or calibrated SLOs. Clients rederive the full response
+and reject snapshots older than 30 seconds or more than 5 seconds in the future;
+these transport freshness bounds are not production performance targets.
 
 ## Restart semantics
 

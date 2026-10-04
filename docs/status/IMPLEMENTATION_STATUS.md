@@ -30,7 +30,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
 | Distribution | One six-role list in `internal/distribution/binaries.txt`; build, exact-byte verification and Evidence import use it | Package checksums authenticate an untrusted download by themselves |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
-| Operational status | Authenticated PostgreSQL view of Recovery/leases/outbox/actions/Codex UNKNOWN | Invented publisher reachability or provider health |
+| Operational status | v2 separates database authority and unobserved service readiness; exact response/freshness validation, pending ages and last database progress | No inferred consumer/publisher health, capacity or production readiness |
 | SLO | v2 separates unverified summaries from exact, subject-bound source readback | Either report status grants production qualification or calibrated targets |
 | Operator CLI | `run-control`, `runtime-isolation-probe`, `source-checkpoint`, `run-continue` and delivery checks | Completed WorkBuddy UX or a Human Takeover interface |
 
@@ -126,3 +126,24 @@ remain unclosed. Model-memory resume is not provided by source continuation.
 Live runtime/provider, production-host lifecycle/SLO and device qualification
 remain separate from these internal gaps. Prioritize actual user journeys and
 verifiable delivery, not another parallel authority or checklist framework.
+
+## Approved internal RC implementation sequence
+
+W01-W10 remain the approved scope; external accounts, production hosts, devices
+and human decisions are separate gates. This is not a new authority framework.
+
+- W01 implemented slice: status v2 no longer claims READY from database counts;
+  CLI rederives and freshness-checks every field. Pre-live binds the event SHA,
+  actual tree, plan v2 and an exact nonempty no-skip test inventory. Actual
+  component heartbeats/capacity and measured progress thresholds remain open.
+- W02: real Codex through the actual isolated launch path without account/model
+  calls; W03: preservation/reconciliation for post-turn failures.
+- W04/W05/W06: source/build-output boundary, complete private raw-artifact
+  retention and fresh-host install/upgrade/restore.
+- W07/W08: normal authorized user journey and representative board-free embedded
+  build/evidence scenarios. No tenant or hardware integration is implied.
+- W09/W10: fault/load/security regression and exact RC delivery/ref governance.
+
+Implemented code is not completion evidence. Each slice requires exact-head CI,
+fresh-main readback and delivered artifacts; no earlier green run qualifies new
+source. Historical M1 remains immutable, and production #105 remains open.

@@ -34,7 +34,7 @@ func TestOperationalStatusEndpointUsesStoreAuthority(t *testing.T) {
 	body := mustRequest(t, h, http.MethodGet, "/api/v1/operations/status", nil, http.StatusOK)
 	var got production.OperationalStatus
 	mustJSON(t, body, &got)
-	if !got.Ready || got.State != status.State || got.Snapshot != status.Snapshot || len(got.Reasons) != 0 {
+	if got.Ready || !got.AuthorityClear || got.State != status.State || got.Snapshot != status.Snapshot || len(got.Reasons) != 1 {
 		t.Fatalf("unexpected operational status: %#v", got)
 	}
 }
