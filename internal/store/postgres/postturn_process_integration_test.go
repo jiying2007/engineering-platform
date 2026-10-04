@@ -231,6 +231,30 @@ func TestPostTurnFailureMTLSRetainsWithoutDowngradingCoreReceipt(t *testing.T) {
 					t.Fatal("ignored raw bytes missing")
 				}
 			}
+			// Read back the actual private Worker records and the actual mTLS Core.
+			// This observes facts only, even when Core committed before reply loss.
+			permits, e := filepath.Glob(filepath.Join(preparedRoot, "workspaces", "*", "codex-"+state.Token.ID+".json"))
+			workerOK(t, e)
+			if len(permits) != 1 {
+				t.Fatal("missing unique execution permit", permits)
+			}
+			permitBytes, e := os.ReadFile(permits[0])
+			workerOK(t, e)
+			readbackRequest := workeragent.PostTurnReadbackRequest{Records: filepath.Dir(permits[0]), RunID: input.RunID, ExecutionID: state.Token.ID, PermitDigest: canonical.BytesDigest(permitBytes), Archive: retained.Artifact.Path}
+			if mode != "finalize" {
+				readbackRequest.Bundle = filepath.Join(preparedRoot, "artifacts", state.Token.ID+".bundle")
+			}
+			local, e := workeragent.InspectPostTurn(ctx, readbackRequest)
+			workerOK(t, e)
+			if local.CoreObservation != "NOT_OBSERVED" || local.LocalObservation != "FAILED_UNCONFIRMED" || local.SourceBytes != "BYTES_VERIFIED" {
+				t.Fatal("local readback invented Core authority", local)
+			}
+			observed, e := workeragent.ObservePostTurnCore(ctx, engineer, local)
+			workerOK(t, e)
+			if observed.CoreObservation != state.State || observed.CoreCheckpoint != "MATCHES_LOCAL_DESCRIPTOR" || observed.LocalObservation != local.LocalObservation || observed.ExecutionAuthorized || observed.ReplayAuthorized || observed.ProductionQualified || observed.LocalRegistrationClaim != (mode != "checkpoint-lost") {
+				t.Fatal("readback conflated local error with Core state", observed)
+			}
+
 			// The original interruption-only continuation policy must still reject a
 			// completed turn, regardless of whether its local packaging/report failed.
 			current, _, e := s.GetExecution(input.RunID)
