@@ -6,24 +6,81 @@ permissions:
   contents: read
 jobs:
   source:
+    if: >-
+      github.repository == 'jiying2007/engineering-platform' &&
+      github.event.pull_request.number == 129 &&
+      github.event.pull_request.head.repo.id == 1383377268 &&
+      github.event.pull_request.head.ref == 'feat/interactive-worker-control'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Retain source only
+      - name: Stage bounded authenticated patch as Git objects only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          set -eu
-          mkdir "$RUNNER_TEMP/audit-source"
-          git bundle create "$RUNNER_TEMP/audit-source/source.bundle" --all
-          git rev-parse HEAD > "$RUNNER_TEMP/audit-source/COMMIT"
-          (cd "$RUNNER_TEMP/audit-source" && sha256sum source.bundle COMMIT > SHA256SUMS)
+          set -euo pipefail
+          python3 -S - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          repo = 'jiying2007/engineering-platform'
+          baseline = '674f44941446585b238f97cd1a2a7e02f625bb01'
+          base_tree = 'e3e4c51ffe45e00c90423832a3a3cf5de1fa3a28'
+          expected = '9b82ee6c8a6434ba6e4a448207f1c7843773fa0b'
+          chunks = ['465de291b7b531e6138779067655810cf79bba99', '7143299d7debe187d76da723fa37a2ca74e93546', '6073129a4f1396be4421a4a059cf0ad0a6178f8d', 'e5414c846e64327e07addd0c4b3c335cbb34eaf6']
+          def command(*args, cwd=None):
+              return subprocess.run(args, cwd=cwd, check=True, capture_output=True, timeout=90).stdout
+          raw = b''
+          for sha in chunks:
+              blob = json.loads(command('gh', 'api', 'repos/'+repo+'/git/blobs/'+sha))
+              assert blob['encoding'] == 'base64' and blob['sha'] == sha and blob['size'] <= 7000
+              data = base64.b64decode(blob['content'])
+              assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest() == sha
+              raw += data
+          payload_digest = hashlib.sha256(raw).hexdigest()
+          assert len(raw) == 27824 and payload_digest == 'af3639098bbf83254e9e696199f29a9c3986041fb84fd64ab69e9959d25ef598'
+          decoder = lzma.LZMADecompressor(memlimit=128*1024*1024)
+          patch = decoder.decompress(raw, max_length=1024*1024)
+          assert decoder.eof and not decoder.unused_data and len(patch) == 132395
+          tmp = pathlib.Path(os.environ['RUNNER_TEMP'])
+          work = tmp/'candidate-tree'
+          command('git', 'worktree', 'add', '--detach', str(work), baseline)
+          patch_file = tmp/'candidate.patch'
+          patch_file.write_bytes(patch)
+          command('git', 'apply', '--index', '--whitespace=error', str(patch_file), cwd=work)
+          local_tree = command('git', 'write-tree', cwd=work).decode().strip()
+          assert local_tree == expected
+          paths = command('git', 'diff', '--cached', '--name-only', '-z', baseline, cwd=work).decode().strip('\0').split('\0')
+          assert 0 < len(paths) <= 50
+          entries = []
+          for name in paths:
+              assert name == 'README.md' or name.startswith(('cmd/', 'db/', 'docs/', 'internal/'))
+              assert str(pathlib.PurePosixPath(name)) == name and '..' not in pathlib.PurePosixPath(name).parts
+              path = work/name
+              if not path.exists():
+                  entries.append({'path':name, 'mode':'100644', 'type':'blob', 'sha':None})
+                  continue
+              assert path.is_file() and not path.is_symlink() and path.stat().st_size <= 256*1024
+              mode = command('git', 'ls-files', '-s', '--', name, cwd=work).decode().split()[0]
+              assert mode in ('100644','100755')
+              entries.append({'path':name,'mode':mode,'type':'blob','content':path.read_bytes().decode('utf-8')})
+          request = tmp/'tree-request.json'
+          request.write_text(json.dumps({'base_tree':base_tree,'tree':entries}))
+          result = json.loads(command('gh', 'api', '--method', 'POST', 'repos/'+repo+'/git/trees', '--input', str(request)))
+          assert result['sha'] == expected
+          report = {'version':1, 'repository':repo, 'base_commit':baseline, 'tree':result['sha'], 'patch_sha256':payload_digest, 'changed_files':len(paths), 'candidate_executed':False, 'ref_updated':False}
+          (tmp/'tree-staging.json').write_text(json.dumps(report, indent=2)+'\n')
+          print(json.dumps(report, indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: audit-source-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/audit-source
+          name: interactive-tree-staging-${{ github.run_id }}
+          path: ${{ runner.temp }}/tree-staging.json
           if-no-files-found: error
           retention-days: 7
