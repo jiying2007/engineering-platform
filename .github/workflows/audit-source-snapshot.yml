@@ -1,0 +1,45 @@
+name: Audit source snapshot
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/audit-source-snapshot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Package exact source and offline dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/audit-source"
+          mkdir -p "$out/source"
+          git archive HEAD | tar -x -C "$out/source"
+          go mod download
+          go mod vendor -o "$out/source/vendor"
+          git bundle create "$out/source.bundle" --all
+          git rev-parse HEAD > "$out/COMMIT"
+          go version > "$out/TOOLCHAIN"
+          tar -czf "$out/source.tar.gz" -C "$out/source" .
+          rm -rf "$out/source"
+          (cd "$out" && sha256sum source.bundle source.tar.gz COMMIT TOOLCHAIN > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-source
+          if-no-files-found: error
+          retention-days: 7
