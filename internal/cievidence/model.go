@@ -9,9 +9,10 @@ import (
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/distribution"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 var (
 	sha40    = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -121,12 +122,9 @@ func (r Receipt) Validate() error {
 	if !seenArtifact["codex"] || !seenArtifact["binaries"] {
 		return fmt.Errorf("required artifacts missing")
 	}
-	requiredFiles := map[string]bool{
-		"codex-qualifier": false,
-		"control-plane":   false,
-		"eng":             false,
-		"sandbox-guard":   false,
-		"worker":          false,
+	requiredFiles := map[string]bool{}
+	for _, name := range distribution.Names() {
+		requiredFiles[name] = false
 	}
 	last = ""
 	for _, f := range r.Files {

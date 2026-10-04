@@ -1,8 +1,8 @@
 # Production Operations v1
 
-Date: 2026-09-30
+Date: 2026-10-04
 
-Status: **PRODUCTIONIZATION BASELINE — PROVIDER QUALIFICATION PENDING**
+Status: **STATIC BASELINE IMPLEMENTED — LIVE OPERATING QUALIFICATION PENDING**
 
 This document is the canonical operating contract for issue #105. It does not
 create a new authority model. Production uses the existing Task / Run /
@@ -83,10 +83,10 @@ Expected startup order:
 
 1. PostgreSQL ready;
 2. explicit migration/check step;
-3. Control Plane;
-4. Worker admission;
-5. Worker preparation;
-6. independent Publisher;
+3. independent Publisher;
+4. Control Plane;
+5. Worker admission;
+6. Worker preparation;
 7. provider-specific execution workers only when an authorized Run exists.
 
 systemd may restart long-running admission/preparation/control processes after a
@@ -175,14 +175,26 @@ Emergency stops must include:
 `eng production-preflight --config FILE` verifies the host-side static
 production baseline independently of provider authentication.
 
-At this checkpoint it deliberately reports two blockers:
+Preflight configuration version 2 requires `expected_source_commit`. The default
+check validates the complete six-role distribution, actual distinct non-root
+UIDs, configuration ownership/references, TLS pairs, listener/endpoint/DSN
+syntax and publisher policy consistency. Its highest static result is
+`HOST_VALIDATED`, with `operationally_ready=false`.
 
-- `publisher_service_separation`;
-- `unattended_provider_live_qualification`.
+`--config-only` is an explicit outer-contract inspection mode. It returns
+`CONFIG_VALIDATED` and does not check or admit a deployed host. Missing accounts
+and services must never be described as ready based on this mode.
 
-This is preferable to silently marking production ready.
+After host validation the remaining gates are explicit:
 
-The next slices must clear these blockers in that order.
+- `unattended_provider_live_qualification`;
+- `live_service_operational_qualification`.
+
+The production systemd unit uses `control-plane --production`. That startup
+path rejects local publisher configuration, migration-on-start and insecure
+mode before opening the database. The old in-process publisher is restricted to
+explicit `DEPLOYMENT_MODE=pilot` and the local pilot helper; it is not a second
+supported production architecture.
 
 ## 10. Terminal acceptance
 
@@ -195,10 +207,13 @@ The exact terminal contract is
 fixture, evidence procedures, human-review requirement and terminal gates before
 provider access exists.
 
-`eng production-slo-report` records measured latency samples with retained
-source digests. Non-provider observations can close before account validation;
-provider authentication measurement remains pending until the selected
-unattended lane is live-qualified. No latency target is guessed in code.
+`eng production-slo-report` v2 never grants qualification. With only observations
+it emits `UNVERIFIED_SUMMARY`. To read back exact collector records, supply
+`--source-root DIR --run RUN_ID --subject SUBJECT_DIGEST --require-verified`.
+A successful readback emits `SOURCE_BYTES_VERIFIED`, binding the procedure,
+collector digest, time window and exact samples. Source files alone can still be
+synthetic; provenance and operational acceptance belong to the existing
+Evidence/Verification/Review chain. No latency target is guessed in code.
 
 The manual `Production terminal pre-live dry run` workflow must retain one
 protected-main artifact before the live terminal qualification.
@@ -206,13 +221,14 @@ protected-main artifact before the live terminal qualification.
 Final acceptance still requires:
 
 1. selected unattended provider qualification;
-2. production preflight READY;
+2. production preflight HOST_VALIDATED for the admitted source commit;
 3. operational status READY;
 4. the exact frozen RELEASE maintenance fixture;
 5. Run → model execution → Git/PR → exact-head CI → Evidence → Verification →
    independent human Review → Closure;
 6. clean service shutdown/restart/recovery evidence;
-7. provider-inclusive COMPLETE SLO report.
+7. source-verified, provider-inclusive SLO evidence accepted by the existing
+   Verification/independent Review chain against measured, explicitly frozen targets.
 
 Trusted self-hosted M1 evidence remains separate and is not rerun merely to
 produce production screenshots.

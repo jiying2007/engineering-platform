@@ -13,9 +13,20 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		usage()
-		return
+		os.Exit(2)
 	}
 	switch os.Args[1] {
+	case "help", "--help", "-h":
+		if len(os.Args) != 2 {
+			fmt.Fprintln(os.Stderr, "help takes no arguments")
+			os.Exit(2)
+		}
+		usage()
+	case "distribution-verify":
+		if err := distributionVerify(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "api":
 		if err := remoteAPI(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -158,7 +169,9 @@ func main() {
 			os.Exit(3)
 		}
 	default:
+		fmt.Fprintln(os.Stderr, "unknown command:", os.Args[1])
 		usage()
+		os.Exit(2)
 	}
 }
 
@@ -172,6 +185,7 @@ func printJSON(value any) {
 
 func usage() {
 	fmt.Println("eng <command>")
+	fmt.Println("  distribution-verify --dir DIRECTORY       verify complete delivered executable roles and exact bytes")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
 	fmt.Println("  offline-receipt-digest --run ID          compute immutable Worker execution receipt artifact digest")

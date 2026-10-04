@@ -15,6 +15,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/distribution"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -279,11 +280,11 @@ func verifyBinaryArchive(path string, expected []File) error {
 	for name := range want {
 		allowed[name] = true
 	}
-	if len(want) != 5 {
-		return fmt.Errorf("expected five retained executable facts")
+	if len(want) != len(distribution.Names()) {
+		return fmt.Errorf("expected complete current distribution executable facts")
 	}
 	seen := map[string]bool{}
-	var manifest []byte
+	var manifest, sums []byte
 	for _, entry := range reader.File {
 		if entry.FileInfo().IsDir() {
 			continue
@@ -294,6 +295,13 @@ func verifyBinaryArchive(path string, expected []File) error {
 		seen[entry.Name] = true
 		if entry.Name == "file-manifest.json" {
 			manifest, err = readZipEntry(entry, 1<<20)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+		if entry.Name == "SHA256SUMS" {
+			sums, err = readZipEntry(entry, 64<<10)
 			if err != nil {
 				return err
 			}
@@ -323,6 +331,13 @@ func verifyBinaryArchive(path string, expected []File) error {
 	sort.Slice(got, func(i, j int) bool { return got[i].Path < got[j].Path })
 	expectedCopy := append([]File(nil), expected...)
 	sort.Slice(expectedCopy, func(i, j int) bool { return expectedCopy[i].Path < expectedCopy[j].Path })
+	var expectedSums strings.Builder
+	for _, fact := range expectedCopy {
+		fmt.Fprintf(&expectedSums, "%s  %s\n", strings.TrimPrefix(fact.Digest, "sha256:"), fact.Path)
+	}
+	if !bytes.Equal(sums, []byte(expectedSums.String())) {
+		return fmt.Errorf("binary SHA256SUMS differs from retained executable facts")
+	}
 	if !equalFiles(got, expectedCopy) {
 		return fmt.Errorf("binary file manifest does not match CI envelope")
 	}

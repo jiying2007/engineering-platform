@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	TerminalPlanVersion = 1
-	SLOReportVersion    = 1
+	TerminalPlanVersion = 2
+	SLOReportVersion    = 2
 
-	SLOStatusNonProviderComplete = "NON_PROVIDER_COMPLETE"
-	SLOStatusComplete            = "COMPLETE"
+	SLOStatusUnverified     = "UNVERIFIED_SUMMARY"
+	SLOStatusSourceVerified = "SOURCE_BYTES_VERIFIED"
 )
 
 type TerminalPlan struct {
@@ -53,7 +53,7 @@ func BuildTerminalPlan() (TerminalPlanEnvelope, error) {
 			"github.actions.trusted-ci.v1",
 		},
 		RequiredGates: []string{
-			"production_preflight_ready",
+			"production_host_validated",
 			"operational_status_ready",
 			"provider_live_qualified",
 			"publisher_independent",
@@ -62,7 +62,7 @@ func BuildTerminalPlan() (TerminalPlanEnvelope, error) {
 			"independent_human_review_pass",
 			"closure_created",
 			"shutdown_restart_recovery_proven",
-			"slo_report_complete",
+			"source_verified_slo_evidence_accepted",
 		},
 		HumanReviewRequired:  true,
 		ProviderLiveRequired: true,
@@ -103,7 +103,7 @@ func (p TerminalPlan) Validate() error {
 		}
 	}
 	expectedGates := []string{
-		"production_preflight_ready",
+		"production_host_validated",
 		"operational_status_ready",
 		"provider_live_qualified",
 		"publisher_independent",
@@ -112,7 +112,7 @@ func (p TerminalPlan) Validate() error {
 		"independent_human_review_pass",
 		"closure_created",
 		"shutdown_restart_recovery_proven",
-		"slo_report_complete",
+		"source_verified_slo_evidence_accepted",
 	}
 	for i := range expectedGates {
 		if p.RequiredGates[i] != expectedGates[i] {
@@ -139,10 +139,14 @@ type SLOMeasurement struct {
 }
 
 type SLOReport struct {
-	Version         int              `json:"version"`
-	Status          string           `json:"status"`
-	ProviderPending bool             `json:"provider_pending"`
-	Measurements    []SLOMeasurement `json:"measurements"`
+	Version                    int              `json:"version"`
+	Status                     string           `json:"status"`
+	ProviderMeasurementPresent bool             `json:"provider_measurement_present"`
+	SourceBytesVerified        bool             `json:"source_bytes_verified"`
+	QualificationGranted       bool             `json:"qualification_granted"`
+	RunID                      string           `json:"run_id,omitempty"`
+	SubjectDigest              string           `json:"subject_digest,omitempty"`
+	Measurements               []SLOMeasurement `json:"measurements"`
 }
 
 type SLOReportEnvelope struct {
@@ -180,7 +184,7 @@ func BuildSLOReport(observations []SLOObservation) (SLOReportEnvelope, error) {
 		byName[observation.Name] = observation
 	}
 
-	report := SLOReport{Version: SLOReportVersion, Status: SLOStatusNonProviderComplete, ProviderPending: true}
+	report := SLOReport{Version: SLOReportVersion, Status: SLOStatusUnverified}
 	order := append(append([]string{}, nonProviderSLOs...), providerSLO)
 	for _, name := range order {
 		observation, exists := byName[name]
@@ -193,8 +197,7 @@ func BuildSLOReport(observations []SLOObservation) (SLOReportEnvelope, error) {
 		report.Measurements = append(report.Measurements, summarizeSLO(observation))
 	}
 	if _, exists := byName[providerSLO]; exists {
-		report.Status = SLOStatusComplete
-		report.ProviderPending = false
+		report.ProviderMeasurementPresent = true
 	}
 	if len(byName) != len(report.Measurements) {
 		return SLOReportEnvelope{}, fmt.Errorf("unknown SLO observation name")

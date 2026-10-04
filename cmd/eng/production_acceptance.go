@@ -33,6 +33,10 @@ func productionSLOReport(args []string) error {
 	fs := flag.NewFlagSet("production-slo-report", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	inputFile := fs.String("observations", "", "measured production SLO observations JSON")
+	sourceRoot := fs.String("source-root", "", "read back retained content-addressed collector records")
+	runID := fs.String("run", "", "exact measured run identity")
+	subject := fs.String("subject", "", "exact measured subject digest")
+	requireVerified := fs.Bool("require-verified", false, "reject a summary without source byte verification")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *inputFile == "" {
 		return fmt.Errorf("usage: eng production-slo-report --observations FILE")
 	}
@@ -50,12 +54,23 @@ func productionSLOReport(args []string) error {
 		return fmt.Errorf("strict SLO observations: %w", err)
 	}
 	if input.Version != production.SLOReportVersion {
-		return fmt.Errorf("SLO observations require version 1")
+		return fmt.Errorf("SLO observations require version 2")
 	}
-	envelope, err := production.BuildSLOReport(input.Observations)
+	if *sourceRoot == "" && (*runID != "" || *subject != "") {
+		return fmt.Errorf("run/subject require source-root")
+	}
+	var envelope production.SLOReportEnvelope
+	if *sourceRoot == "" {
+		envelope, err = production.BuildSLOReport(input.Observations)
+	} else {
+		envelope, err = production.VerifySLOReport(input.Observations, *sourceRoot, *runID, *subject)
+	}
 	if err != nil {
 		return err
 	}
 	printJSON(envelope)
+	if *requireVerified && !envelope.Report.SourceBytesVerified {
+		return fmt.Errorf("SLO report is unverified; no qualification is granted")
+	}
 	return nil
 }

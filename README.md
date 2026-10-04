@@ -162,9 +162,11 @@ M0 freezes only contracts required by the first real engineering loop:
 
 PLM, MES, RMA, DPP, GS1, manufacturing, PSIRT, certification, privacy, fleet and other lifecycle research are **not** M0 blockers.
 
-## M1
+## M1 design journeys
 
-M1 proves two real vertical slices:
+The following are the canonical product journeys. The retained phase-1 proof
+covers bounded engineering-to-Closure execution, not every interactive control
+in these journeys:
 
 ### Feature pilot
 
@@ -198,24 +200,13 @@ Issue/log
 
 Only after these work reliably does the project move to M2 Device/HIL.
 
-## M1 infrastructure
+## Current implementation stack
 
-Default:
-- Go
-- PostgreSQL
-- Temporal
-- OPA
-- S3/MinIO-compatible Artifact store
-- OpenTelemetry
-- Git/CI
-- Ubuntu Worker
-- Codex
-
-Test-only:
-- Toxiproxy
-- disposable integration dependencies where practical
-
-Do not add a service because a future extension might need it.
+Implemented: Go, PostgreSQL, direct mTLS, Ubuntu Worker, Codex app-server,
+Git/GitHub Actions, an independent Publisher and exact retained evidence.
+Temporal, OPA, S3/MinIO and OpenTelemetry remain design candidates, not deployed
+services or prerequisites of the current small-team baseline. Add a service only
+when a measured implementation gap justifies it.
 
 ## Extensions and research
 
@@ -243,14 +234,27 @@ These are not inherited into Core automatically.
 
 ## Repository maturity
 
-Current stage:
+**Trusted self-hosted M1 phase 1 is proven; production/unattended qualification
+is not granted.** The Feature and Debug retained chains are historical proof,
+not pending WIF prerequisites and not a substitute for production acceptance.
 
-> **retained-pilot-ready (external WIF-gated)**
+The current delivery contract includes all six executables, including
+`publisher-service`. After extracting an authenticated CI artifact and restoring
+its executable modes, verify it without rebuilding missing components:
 
-Internal M1 execution mechanics are assembled, but M1 is not claimed until the
-real retained Feature and Debug pilots complete. The next maturity milestone is
-not another architecture profile. It is:
+```sh
+/path/to/bin/eng distribution-verify --dir /path/to/bin
+```
 
-> **one real Feature pilot and one real Debug pilot completed through the new Core with exact Evidence and Verification.**
+Production preflight v2 binds the expected source commit, real host identities,
+configuration/TLS references and binary roles. `--config-only` yields only
+`CONFIG_VALIDATED`; default preflight can yield `HOST_VALIDATED`, never live
+operational qualification. The systemd Control Plane launches with
+`--production`, which prohibits the in-process publisher regardless of a
+conflicting EnvironmentFile.
 
-Further architecture research should be targeted only by gaps discovered during implementation or real product pilots.
+SLO report v2 distinguishes `UNVERIFIED_SUMMARY` from `SOURCE_BYTES_VERIFIED`.
+Neither grants production qualification. WorkBuddy integration and the complete
+interactive Worker control path must not be inferred from adapter methods alone.
+See [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) for the current
+remaining gates.

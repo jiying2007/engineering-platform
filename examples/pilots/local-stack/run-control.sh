@@ -34,4 +34,11 @@ if [ -n "$AUTO_MIGRATE_OVERRIDE" ]; then
   esac
 fi
 
+if [ -n "${GITHUB_PUBLISHER_CONFIG_FILE:-}" ]; then
+  if [ -n "${DEPLOYMENT_MODE:-}" ] && [ "$DEPLOYMENT_MODE" != pilot ]; then
+    echo "pilot helper refuses conflicting deployment mode" >&2
+    exit 2
+  fi
+  export DEPLOYMENT_MODE=pilot
+fi
 exec "$CONTROL"

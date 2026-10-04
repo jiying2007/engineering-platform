@@ -37,6 +37,16 @@ func loadConfiguration(env func(string) string) (configuration, error) {
 		publisherRemoteConfig: env("GITHUB_PUBLISHER_REMOTE_FILE"),
 	}
 	mode, migrate := env("INSECURE_DEV"), env("AUTO_MIGRATE")
+	deployment := env("DEPLOYMENT_MODE")
+	if deployment != "" && deployment != "pilot" && deployment != "production" {
+		return c, fmt.Errorf("unknown deployment mode")
+	}
+	if c.publisherConfig != "" && deployment != "pilot" {
+		return c, fmt.Errorf("in-process publisher is restricted to explicit pilot mode")
+	}
+	if deployment == "production" && (mode != "" || migrate != "0" || c.publisherConfig != "" || c.publisherPlanConfig == "" || c.publisherRemoteConfig == "") {
+		return c, fmt.Errorf("production requires remote publisher, AUTO_MIGRATE=0 and no development mode")
+	}
 	if mode != "" && mode != "0" && mode != "1" {
 		return c, fmt.Errorf("INSECURE_DEV must be 0 or 1")
 	}
