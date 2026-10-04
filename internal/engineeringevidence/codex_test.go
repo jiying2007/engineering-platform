@@ -60,6 +60,9 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		Codex:                modelReceipt,
 		Change:               change,
 	}
+	tokenForControl := codexexec.Token{ID: strings.Repeat("a", 64), RunID: "run-codex", WorkerProfile: "worker/codex", ProfileDigest: "sha256:" + strings.Repeat("b", 64), RecoveryEpoch: 1}
+	transcript := codexexec.ControlTranscript{Version: 1, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: tokenForControl, ExecutionEpoch: 1, ThreadID: modelReceipt.ThreadID, TurnID: modelReceipt.TurnID}, TurnStatus: "completed", RuntimeExited: true}, Deliveries: []codexexec.ControlDelivery{}}
+	result.ControlTranscriptDigest, _ = transcript.Digest()
 	resultDigest, err := canonical.Digest(result)
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +108,7 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		ReceiptArtifactID: "codex-receipt",
 		BundleArtifactID:  "codex-bundle",
 		Delivery:          delivery,
-		Execution:         codexexec.Status{Token: token, State: codexexec.Finished, Receipt: &receipt},
+		Execution:         codexexec.Status{Token: token, State: codexexec.Finished, Receipt: &receipt, Runtime: &codexexec.ControlRuntime{Binding: transcript.Close.Binding, State: "SEALED", Transcript: &transcript, Digest: result.ControlTranscriptDigest}},
 		BundlePath:        bundlePath,
 	}
 }

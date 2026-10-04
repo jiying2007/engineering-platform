@@ -22,6 +22,11 @@ func main() {
 			os.Exit(2)
 		}
 		usage()
+	case "run-control":
+		if err := runControl(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "distribution-verify":
 		if err := distributionVerify(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -185,6 +190,7 @@ func printJSON(value any) {
 
 func usage() {
 	fmt.Println("eng <command>")
+	fmt.Println("  run-control inspect|status|steer|interrupt <flags>  explicit live control and receipt readback")
 	fmt.Println("  distribution-verify --dir DIRECTORY       verify complete delivered executable roles and exact bytes")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")

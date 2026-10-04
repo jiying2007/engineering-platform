@@ -11,7 +11,6 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
-	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
 )
 
@@ -105,37 +104,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	var codexReceipt codexapp.EngineeringReceipt
-	switch request.Profile.Provider.CredentialMode {
-	case provideridentity.CredentialWorkloadIdentity:
-		codexReceipt, err = codexapp.EngineeringWIFTurn(
-			runCtx,
-			runtime.Executable,
-			request.Profile.CodexVersion,
-			request.Profile.BinaryDigest,
-			request.Profile.QualificationDigest,
-			prepared.Workspace.WorktreePath,
-			prepared.Workspace.HomePath,
-			runtime.FederationRuleID,
-			runtime.IdentityTokenFile,
-			runtime.AuditContext,
-			request.Profile.Model,
-			prompt,
-		)
-	case provideridentity.CredentialChatGPTSession:
-		codexReceipt, err = codexapp.EngineeringSavedLoginTurn(
-			runCtx,
-			runtime.Executable,
-			request.Profile.CodexVersion,
-			request.Profile.BinaryDigest,
-			request.Profile.QualificationDigest,
-			prepared.Workspace.WorktreePath,
-			prepared.Workspace.HomePath,
-			runtime.SavedLoginFile,
-			request.Profile.Model,
-			prompt,
-		)
-	}
+	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt)
 	if err != nil {
 		return receipt, err
 	}
@@ -149,7 +118,11 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	result := codexexec.Result{PromptIdentityDigest: promptIdentityDigest, Codex: codexReceipt, Change: finalized.Facts}
+	controlDigest, err := transcript.Digest()
+	if err != nil || !transcript.AllowsDelivery() {
+		return receipt, fmt.Errorf("control transcript not eligible for delivery")
+	}
+	result := codexexec.Result{ControlTranscriptDigest: controlDigest, PromptIdentityDigest: promptIdentityDigest, Codex: codexReceipt, Change: finalized.Facts}
 	if err = result.Validate(request.Profile, permit); err != nil {
 		return receipt, err
 	}

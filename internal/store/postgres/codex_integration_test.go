@@ -22,7 +22,9 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/workspace"
 )
 
-func codexFixture(t *testing.T, s *Store) codexexec.Start {
+const codexTestWorker = "urn:engineering-platform:worker:codex-test"
+
+func codexFixture(t *testing.T, s *Store, profiles ...codexexec.Profile) codexexec.Start {
 	t.Helper()
 	ctx := context.Background()
 	profile := codexexec.Profile{
@@ -31,6 +33,9 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 		QualificationDigest:     "sha256:" + strings.Repeat("e", 64),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Model:                   "gpt-test", Sandbox: "workspace-write", ApprovalPolicy: "never",
+	}
+	if len(profiles) > 0 {
+		profile = profiles[0]
 	}
 	pd, err := profile.Digest()
 	workerOK(t, err)
@@ -67,7 +72,7 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 	work.ActiveRunID = value.ID
 	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, version, work))
 	relayWorkerFixture(t, s)
-	claimed, err := s.ClaimInput(ctx, "codex-worker", "worker/codex")
+	claimed, err := s.ClaimInput(ctx, codexTestWorker, "worker/codex")
 	workerOK(t, err)
 	if claimed == nil {
 		t.Fatal("expected Codex assignment")
@@ -84,7 +89,7 @@ func codexFixture(t *testing.T, s *Store) codexexec.Start {
 		SourceDigest: canonical.BytesDigest([]byte("source")), ConfigDigest: canonical.BytesDigest([]byte("config")),
 		BundleDigest: canonical.BytesDigest(raw), Context: manifest,
 	}
-	_, err = s.ReportPrepared(ctx, "codex-worker", preparation.Report{Input: inputReport, Facts: facts})
+	_, err = s.ReportPrepared(ctx, codexTestWorker, preparation.Report{Input: inputReport, Facts: facts})
 	workerOK(t, err)
 	return codexexec.Start{RunID: input.RunID, WorkerProfile: input.WorkerProfile, Profile: profile}
 }
@@ -119,20 +124,26 @@ func TestCodexStoreFreshGrantReplayAndMigration(t *testing.T) {
 	s := integrationStore(t)
 	req := codexFixture(t, s)
 	ctx := context.Background()
-	permit, err := s.StartCodex(ctx, "codex-worker", req)
+	permit, err := s.StartCodex(ctx, codexTestWorker, req)
 	workerOK(t, err)
-	workerOK(t, permit.Check("codex-worker", req))
-	if _, err = s.StartCodex(ctx, "codex-worker", req); err == nil {
+	workerOK(t, permit.Check(codexTestWorker, req))
+	if _, err = s.StartCodex(ctx, codexTestWorker, req); err == nil {
 		t.Fatal("duplicate Codex start allowed")
 	}
 	result := codexResult(t, permit)
-	report := codexexec.Report{Token: permit.Token, Result: result}
-	first, err := s.FinishCodex(ctx, "codex-worker", report)
+	binding := codexexec.ControlBinding{Token: permit.Token, ExecutionEpoch: 1, ThreadID: result.Codex.ThreadID, TurnID: result.Codex.TurnID}
+	workerOK(t, s.BindCodexControl(ctx, codexTestWorker, binding))
+	transcript, err := s.CloseCodexControl(ctx, codexTestWorker, codexexec.ControlClose{Binding: binding, TurnStatus: "completed", RuntimeExited: true})
 	workerOK(t, err)
-	workerOK(t, first.Verify("codex-worker", permit, result))
+	result.ControlTranscriptDigest, err = transcript.Digest()
+	workerOK(t, err)
+	report := codexexec.Report{Token: permit.Token, Result: result}
+	first, err := s.FinishCodex(ctx, codexTestWorker, report)
+	workerOK(t, err)
+	workerOK(t, first.Verify(codexTestWorker, permit, result))
 	_, err = s.BeginRecovery(permit.Token.RecoveryEpoch)
 	workerOK(t, err)
-	second, err := s.FinishCodex(ctx, "codex-worker", report)
+	second, err := s.FinishCodex(ctx, codexTestWorker, report)
 	workerOK(t, err)
 	a, _ := json.Marshal(first)
 	b, _ := json.Marshal(second)
@@ -141,7 +152,7 @@ func TestCodexStoreFreshGrantReplayAndMigration(t *testing.T) {
 	}
 	report.Result.Codex.Output = "changed"
 	report.Result.Codex.OutputDigest = canonical.BytesDigest([]byte("changed"))
-	if _, err = s.FinishCodex(ctx, "codex-worker", report); !errors.Is(err, workerqueue.ErrIdentity) {
+	if _, err = s.FinishCodex(ctx, codexTestWorker, report); !errors.Is(err, workerqueue.ErrIdentity) {
 		t.Fatalf("altered Codex replay accepted: %v", err)
 	}
 	workerOK(t, s.ApplyCoreMigration(ctx))
@@ -161,10 +172,10 @@ func TestCodexStoreUnknownBlocksRecoveryAndReplay(t *testing.T) {
 	s := integrationStore(t)
 	req := codexFixture(t, s)
 	ctx := context.Background()
-	permit, err := s.StartCodex(ctx, "codex-worker", req)
+	permit, err := s.StartCodex(ctx, codexTestWorker, req)
 	workerOK(t, err)
-	workerOK(t, s.FailCodex(ctx, "codex-worker", permit.Token))
-	if _, err := s.StartCodex(ctx, "codex-worker", req); err == nil {
+	workerOK(t, s.FailCodex(ctx, codexTestWorker, permit.Token))
+	if _, err := s.StartCodex(ctx, codexTestWorker, req); err == nil {
 		t.Fatal("UNKNOWN Codex execution was replayed")
 	}
 	recoveryState, err := s.BeginRecovery(permit.Token.RecoveryEpoch)
@@ -180,10 +191,10 @@ func TestCodexStoreLeaseAndIdentityFailClosed(t *testing.T) {
 			s := integrationStore(t)
 			req := codexFixture(t, s)
 			ctx := context.Background()
-			permit, err := s.StartCodex(ctx, "codex-worker", req)
+			permit, err := s.StartCodex(ctx, codexTestWorker, req)
 			workerOK(t, err)
 			token := permit.Token
-			subject := "codex-worker"
+			subject := codexTestWorker
 			switch kind {
 			case "foreign":
 				subject = "other"

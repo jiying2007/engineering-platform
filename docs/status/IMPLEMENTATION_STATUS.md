@@ -21,7 +21,7 @@ rerun to manufacture production or alternate-provider evidence.
 | Area | Current implementation | Boundary |
 | --- | --- | --- |
 | Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, epochs and Recovery | Live service operating acceptance remains separate |
-| Worker | mTLS admission/preparation, independent workspace, one non-replayable Core-bound engineering execution | Full interactive steering/pause/resume/checkpoint/takeover transport remains a required next slice |
+| Worker | mTLS admission/preparation, independent workspace, one non-replayable Core-bound engineering turn with actual steering/interrupt delivery and sealed control transcript | Durable pause/resume, quiescent checkpoints and Human Takeover remain a required next slice |
 | Provider | Profile v3 binds provider, credential, execution mode and configuration digest | WIF #103 and relay #106 live qualification remain deferred |
 | Publisher | Independent mTLS service; production startup rejects in-process publisher | Explicit pilot-only local publisher remains for historical pilot tooling |
 | Delivery | One six-executable contract in `internal/distribution/binaries.txt`; CI and evidence import use that contract | Archive authenticity still requires the authenticated distribution digest |
@@ -29,7 +29,7 @@ rerun to manufacture production or alternate-provider evidence.
 | Production preflight | v2 binds expected source SHA; default checks actual host facts and references | CONFIG_VALIDATED and HOST_VALIDATED are not operational READY |
 | Operational status | Authenticated PostgreSQL snapshot for recovery/leases/outbox/actions/Codex UNKNOWN | Does not invent publisher reachability or provider health |
 | SLO | v2 distinguishes unverified summaries from content-addressed, subject-bound source readback | Neither state grants provider or production qualification; real provenance/targets require Verification/Review |
-| CLI | Unknown/missing commands fail nonzero; explicit help succeeds | Operator-oriented CLI is not a completed WorkBuddy UX |
+| CLI | `eng run-control` submits exact live inputs and reads receipts; unknown/missing commands fail nonzero | Operator-oriented CLI is not a completed WorkBuddy UX |
 
 ## Production terminal acceptance
 
@@ -73,7 +73,7 @@ still need their own retained artifact policy. No production claim follows.
 ## Remaining remediation
 
 Full engineering-artifact retention/restore, historical branch disposition and
-end-to-end interactive Worker control still require independent tested closeout.
+full interactive pause/resume/checkpoint/takeover still require independent tested closeout.
 The two retained M1 result refs are evidence subjects, not cleanup candidates.
 Do not equate zero open PRs with repository hygiene or delivery maturity.
 
@@ -88,3 +88,18 @@ The October 4 audit found non-provider-blocked implementation gaps. The current
 priority is delivery correctness, explicit validation semantics, safe retained
 evidence and the real engineering interaction path, not additional speculative
 qualification tooling or architecture expansion.
+
+## Live control implementation boundary
+
+[Core-bound live Codex controls](../implementation/LIVE_CODEX_CONTROLS_V1.md)
+connects real steering text and interrupt requests from RunControl through
+PostgreSQL, the Worker and app-server RPC. Exact sequence/epoch/lease/turn binding,
+persist-before-dispatch, no UNKNOWN replay, ACK-versus-terminal observations and
+sealed transcript binding are enforced. New result publication and Evidence
+import require that transcript. The existing metadata-only pause/resume/takeover
+API rejects Codex Runs; process exit is not proof of descendant quiescence.
+
+The real local subprocess used in integration tests is a fake provider protocol,
+not an actual account or model. Live provider qualification, pause/resume and
+quiescent checkpoint/takeover remain unproven. This is a bounded working control
+slice, not a declaration of complete production or interactive maturity.
