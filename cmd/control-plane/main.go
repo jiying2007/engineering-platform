@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -25,7 +27,24 @@ func main() {
 	}
 }
 func serve() error {
-	config, err := loadConfiguration(os.Getenv)
+	productionMode := flag.Bool("production", false, "enforce the production startup boundary")
+	flag.Parse()
+	if flag.NArg() != 0 {
+		return fmt.Errorf("unexpected control-plane arguments")
+	}
+	env := os.Getenv
+	if *productionMode {
+		if mode := os.Getenv("DEPLOYMENT_MODE"); mode != "" && mode != "production" {
+			return fmt.Errorf("production startup rejects conflicting deployment mode")
+		}
+		env = func(key string) string {
+			if key == "DEPLOYMENT_MODE" {
+				return "production"
+			}
+			return os.Getenv(key)
+		}
+	}
+	config, err := loadConfiguration(env)
 	if err != nil {
 		return err
 	}

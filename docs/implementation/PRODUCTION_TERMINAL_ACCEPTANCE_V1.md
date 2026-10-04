@@ -1,6 +1,6 @@
 # Production Terminal Acceptance v1
 
-Date: 2026-09-30
+Date: 2026-10-04
 
 Status: **PRE-LIVE CONTRACT FROZEN — PROVIDER LIVE QUALIFICATION PENDING**
 
@@ -28,7 +28,7 @@ The plan fixes:
 - independent human Review PASS;
 - ClosureReceipt;
 - shutdown/restart/recovery proof;
-- complete SLO report.
+- source-verified SLO evidence and independent acceptance.
 
 Human Review and provider live qualification are mandatory and cannot be
 replaced by synthetic fixtures.
@@ -91,8 +91,16 @@ The report computes deterministic sample count/min/p50/p95/max values. It does
 not invent pass/fail latency targets.
 
 Before provider access exists, all six non-provider observations produce
-`NON_PROVIDER_COMPLETE`. After the real provider observation is retained, the
-report becomes `COMPLETE`.
+`UNVERIFIED_SUMMARY`, even if a provider measurement is supplied.
+
+Report/input version 2 removes the old COMPLETE status. Source readback requires
+`--source-root DIR --run RUN_ID --subject SUBJECT_DIGEST --require-verified`.
+Each source is `<raw-sha256>.json` and binds version 1, metric name, exact run
+and subject, `engineering-platform.slo.<name>.v1` procedure, collector digest,
+start/completion window and the same sample array. It produces
+`SOURCE_BYTES_VERIFIED`, with `qualification_granted=false`. Offline hashes do
+not authenticate a collector or prove a real provider call. The existing
+Evidence/Verification/independent Review must accept the provenance and targets.
 
 Final production SLO thresholds are frozen only from real operational
 measurements; they are not guessed in source code.
@@ -101,7 +109,7 @@ measurements; they are not guessed in source code.
 
 After one unattended provider identity is independently qualified:
 
-1. production preflight must be INTERNAL=READY;
+1. production preflight must be HOST_VALIDATED for the admitted source commit;
 2. operational status must be READY;
 3. exact terminal plan/fixture bytes are frozen;
 4. one Core-authorized unattended engineering execution changes only the marker;
@@ -112,7 +120,8 @@ After one unattended provider identity is independently qualified:
 9. an independent human reviewer records PASS;
 10. ClosureReceipt is created;
 11. clean shutdown/restart/recovery evidence is retained;
-12. provider-inclusive SLO report is COMPLETE.
+12. source-verified provider-inclusive SLO evidence is accepted against frozen,
+    measured targets by Verification and independent Review.
 
 Only then may issue #105 and production readiness be closed.
 
@@ -125,3 +134,12 @@ A FAIL human review prevents Closure.
 
 A degraded operational status prevents starting or closing terminal
 qualification until reconciled.
+
+## Audit revision
+
+Terminal plan schema version 2 replaces the preflight-ready and SLO-complete
+labels with `production_host_validated` and
+`source_verified_slo_evidence_accepted`. The one-time maintenance fixture is
+unchanged. The earlier v1 pre-live artifact remains historical evidence and
+must not be reused as a v2 qualification; retain a new provider-free dry run for
+this exact plan digest before any live attempt.

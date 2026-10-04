@@ -35,8 +35,8 @@ func TestSLOReportAllowsProviderPendingButRequiresAllInternalMeasurements(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if envelope.Report.Status != SLOStatusNonProviderComplete ||
-		!envelope.Report.ProviderPending ||
+	if envelope.Report.Status != SLOStatusUnverified ||
+		envelope.Report.ProviderMeasurementPresent ||
 		len(envelope.Report.Measurements) != len(nonProviderSLOs) {
 		t.Fatalf("unexpected provider-pending report: %#v", envelope)
 	}
@@ -48,7 +48,7 @@ func TestSLOReportAllowsProviderPendingButRequiresAllInternalMeasurements(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if envelope.Report.Status != SLOStatusComplete || envelope.Report.ProviderPending {
+	if envelope.Report.Status != SLOStatusUnverified || !envelope.Report.ProviderMeasurementPresent {
 		t.Fatalf("provider measurement did not complete report: %#v", envelope)
 	}
 }

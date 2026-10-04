@@ -1,8 +1,8 @@
 # Trusted GitHub CI Evidence Import v1
 
-Base: `e895fc6dddb509a51897b5fe32b21216312ebb9d` (#43).
+Updated: 2026-10-04. Import procedure v1 consumes the current CI envelope schema v2.
 
-This increment converts already-retained GitHub CI provenance into one exact
+This importer converts already-retained GitHub CI provenance into one exact
 Core Evidence item without creating a second evidence domain or trusting a
 caller-supplied PASS string.
 
@@ -28,7 +28,7 @@ issuer, subject and delivery artifact binding introduced by #43.
 
 ## Accepted provenance
 
-v1 is intentionally narrow and self-hosted. It accepts only repository
+The import policy is intentionally narrow. It accepts only repository
 `jiying2007/engineering-platform`, workflow `CI` at
 `.github/workflows/ci.yml`, completed/successful exact GitHub run/attempt, and
 one of two strict provenance modes:
@@ -60,7 +60,7 @@ The importer requires the live run to be completed/successful and rechecks:
   identical base/result `.github/workflows/ci.yml` blob SHA;
 - the exact successful `go`, `offline-container-integration`,
   `postgres-authority-restore-drill`, and
-  `codex-app-server-0.155.0-qualification` jobs;
+  `codex-app-server-qualification` jobs;
 - each job's live `head_sha`;
 - live GitHub artifact IDs, names, sizes and GitHub SHA-256 digests;
 - non-expired artifacts belonging to the exact run/head SHA.
@@ -74,7 +74,7 @@ The operator downloads three artifacts from the same run:
 
 1. `trusted-ci-evidence-<sha>`
 2. `engineering-binaries-<sha>`
-3. `codex-0.155.0-qualification-<sha>`
+3. `codex-compatibility-qualification-<sha>`
 
 The importer does not follow artifact download redirects itself. Each supplied
 ZIP must be a regular local file whose complete bytes match the GitHub-reported
@@ -84,13 +84,14 @@ The trusted envelope ZIP must contain only `ci-evidence-envelope.json`. Its
 canonical receipt digest is reverified.
 
 The binary ZIP is independently checked again instead of trusting the workflow
-that produced the envelope. It must contain exactly the five retained executable
-facts plus `file-manifest.json` and `SHA256SUMS`; every executable byte size
+that produced the envelope. It must contain exactly the current six retained executable
+facts from `internal/distribution/binaries.txt` plus `file-manifest.json` and `SHA256SUMS`; every executable byte size
 and raw SHA-256 must match the envelope, and the manifest must contain the same
-sorted facts.
+sorted facts, and `SHA256SUMS` must equal their canonical raw-byte hashes.
+Current envelopes require schema v2; historical v1 uses its original verifier.
 
 The Codex ZIP must contain the qualification receipt and npm integrity file. The
-receipt must still match the pinned 0.155.0 qualification contract: exact release
+receipt must still match the version-independent qualification contract: actual version
 identity, raw binary/schema digests, fresh stdio process, no daemon/per-thread
 config override, successful initialize/thread-start, stable/experimental checks,
 and credential-safe profile proof.
@@ -169,17 +170,14 @@ derives the mode from retained/live facts and callers cannot choose a weaker
 trust mode. It does not by itself mean the whole VerificationPlan passes, the
 engineering change is correct, independent Review passed, or the Work may close.
 
-## Remaining closure work
+## Maturity boundary
 
-After this importer lands, the remaining platform-level gaps are materially
-smaller:
+The retained trusted-self-hosted Feature and Debug pilots have completed; see
+`docs/status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md`. Those original receipts
+retain their original schema and verifier. The current importer does not grant
+production or unattended provider qualification and does not reopen those pilots.
 
-1. configure managed-workspace Codex WIF and retain the first real authenticated
-   read-only model-turn receipt;
-2. bind real Codex execution to a Core Run lease and workspace-write sandbox;
-3. add changed-tree/model-output evidence procedures and independent Review;
-4. exercise UNKNOWN reconciliation plus backup/restore;
-5. retain one real Feature pilot and one real Debug pilot.
-
-No production deployment, certificate issuance, database migration, WIF admin
-change or Evidence import occurs merely by merging this source change.
+Live operating acceptance remains tracked by #105, with optional WIF #103 and
+relay #106 qualification separate. No production deployment, certificate issuance,
+database migration, provider change or Evidence import occurs merely by merging
+source. Current status belongs to `docs/status/IMPLEMENTATION_STATUS.md`.

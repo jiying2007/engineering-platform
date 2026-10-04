@@ -24,6 +24,7 @@ for multiple authority roles.
 - mutable preparation data: `/var/lib/engineering-platform/preparation`
 - backups: `/var/lib/engineering-platform/backups`
 
+The Control Plane unit invokes `--production`; do not remove this startup fence.
 Environment files must be owner-private mode 0600. Secret values are provisioned
 out of band and must not be committed.
 
@@ -39,14 +40,13 @@ After installing binaries/configuration:
   --config /etc/engineering-platform/production-preflight.json
 ```
 
-After the publisher-service split the expected repository-side result is:
+Render the preflight v2 template with the admitted full source commit. The
+default host check rejects missing Unix identities, wrong binary roles/digests,
+invalid TLS/configuration references and policy drift. Its successful result is
+`HOST_VALIDATED`, not READY, and still lists provider/live-service acceptance.
 
-- Control Plane: READY
-- Worker admission: READY
-- Worker preparation: READY
-- Publisher: READY
-- Provider: PENDING
-- Overall: PROVIDER_PENDING
+`--config-only` is available for outer-contract inspection before deployment;
+it cannot admit the host or satisfy terminal acceptance.
 
 Control Plane receives only the publisher plan plus an mTLS remote-client
 configuration. The `engineering-publisher` service alone can read the GitHub
@@ -59,7 +59,7 @@ the legacy in-process production configuration.
 
 The Control API already exposes `GET /healthz`. TLS transport remains required
 by the server. Operational readiness must additionally verify PostgreSQL and
-recovery state; those checks are added by the production observability slice.
+recovery state; the authenticated operational status below supplies those database facts.
 
 ## Authenticated operational status
 

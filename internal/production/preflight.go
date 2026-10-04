@@ -10,19 +10,21 @@ import (
 )
 
 const (
-	ConfigVersion   = 1
-	DeploymentMode  = "ubuntu-systemd-v1"
-	StateReady      = "READY"
-	StateBlocked    = "BLOCKED"
-	StatePending    = "PENDING"
-	OverallInternal = "INTERNAL_BLOCKED"
-	OverallProvider = "PROVIDER_PENDING"
+	ConfigVersion        = 2
+	DeploymentMode       = "ubuntu-systemd-v1"
+	StateConfigValidated = "CONFIG_VALIDATED"
+	StateHostValidated   = "HOST_VALIDATED"
+	StateBlocked         = "BLOCKED"
+	StatePending         = "PENDING"
+	OverallInternal      = "INTERNAL_BLOCKED"
+	OverallLive          = "LIVE_QUALIFICATION_PENDING"
 )
 
 var serviceUserPattern = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 var envKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,63}$`)
 
 type Config struct {
+	ExpectedSourceCommit   string `json:"expected_source_commit"`
 	Version                int    `json:"version"`
 	DeploymentMode         string `json:"deployment_mode"`
 	ControlBinary          string `json:"control_binary"`
@@ -41,26 +43,34 @@ type Config struct {
 }
 
 type Result struct {
-	Version           int      `json:"version"`
-	DeploymentMode    string   `json:"deployment_mode"`
-	ControlPlane      string   `json:"control_plane"`
-	WorkerAdmission   string   `json:"worker_admission"`
-	WorkerPreparation string   `json:"worker_preparation"`
-	Publisher         string   `json:"publisher"`
-	Provider          string   `json:"provider"`
-	Internal          string   `json:"internal"`
-	Overall           string   `json:"overall"`
-	Blockers          []string `json:"blockers,omitempty"`
+	HostValidated      bool     `json:"host_validated"`
+	OperationallyReady bool     `json:"operationally_ready"`
+	SourceCommit       string   `json:"source_commit,omitempty"`
+	Version            int      `json:"version"`
+	DeploymentMode     string   `json:"deployment_mode"`
+	ControlPlane       string   `json:"control_plane"`
+	WorkerAdmission    string   `json:"worker_admission"`
+	WorkerPreparation  string   `json:"worker_preparation"`
+	Publisher          string   `json:"publisher"`
+	Provider           string   `json:"provider"`
+	Internal           string   `json:"internal"`
+	Overall            string   `json:"overall"`
+	Blockers           []string `json:"blockers,omitempty"`
 }
 
-func Check(config Config) (Result, error) {
+// CheckConfiguration only validates the outer configuration contract. It is
+// deliberately not deployment admission or operational readiness.
+func CheckConfiguration(config Config) (Result, error) {
 	result := Result{
 		Version: ConfigVersion, DeploymentMode: DeploymentMode,
 		ControlPlane: StateBlocked, WorkerAdmission: StateBlocked, WorkerPreparation: StateBlocked,
 		Publisher: StateBlocked, Provider: StatePending, Internal: StateBlocked, Overall: OverallInternal,
 	}
 	if config.Version != ConfigVersion || config.DeploymentMode != DeploymentMode {
-		return result, fmt.Errorf("production preflight requires config version 1 and ubuntu-systemd-v1")
+		return result, fmt.Errorf("production preflight requires config version 2 and ubuntu-systemd-v1")
+	}
+	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(config.ExpectedSourceCommit) {
+		return result, fmt.Errorf("exact expected distribution source commit required")
 	}
 	if err := validateServiceUsers(config); err != nil {
 		return result, err
@@ -86,7 +96,7 @@ func Check(config Config) (Result, error) {
 	if err := validateControlEnv(control); err != nil {
 		return result, err
 	}
-	result.ControlPlane = StateReady
+	result.ControlPlane = StateConfigValidated
 
 	admission, err := readEnvFile(config.AdmissionEnvFile)
 	if err != nil {
@@ -95,7 +105,7 @@ func Check(config Config) (Result, error) {
 	if err := validateWorkerEnv(admission, false); err != nil {
 		return result, fmt.Errorf("admission worker environment: %w", err)
 	}
-	result.WorkerAdmission = StateReady
+	result.WorkerAdmission = StateConfigValidated
 
 	preparation, err := readEnvFile(config.PreparationEnvFile)
 	if err != nil {
@@ -104,7 +114,7 @@ func Check(config Config) (Result, error) {
 	if err := validateWorkerEnv(preparation, true); err != nil {
 		return result, fmt.Errorf("preparation worker environment: %w", err)
 	}
-	result.WorkerPreparation = StateReady
+	result.WorkerPreparation = StateConfigValidated
 
 	publisher, err := readEnvFile(config.PublisherEnvFile)
 	if err != nil {
@@ -113,10 +123,10 @@ func Check(config Config) (Result, error) {
 	if err := validatePublisherEnv(publisher); err != nil {
 		return result, fmt.Errorf("publisher environment: %w", err)
 	}
-	result.Publisher = StateReady
-	result.Internal = StateReady
-	result.Overall = OverallProvider
-	result.Blockers = append(result.Blockers, "unattended_provider_live_qualification")
+	result.Publisher = StateConfigValidated
+	result.Internal = StateConfigValidated
+	result.Overall = OverallLive
+	result.Blockers = []string{"host_validation", "unattended_provider_live_qualification", "live_service_operational_qualification"}
 	return result, nil
 }
 
@@ -189,7 +199,7 @@ func readEnvFile(path string) (map[string]string, error) {
 		}
 		key, value, ok := strings.Cut(line, "=")
 		if !ok || !envKeyPattern.MatchString(key) || value == "" || strings.TrimSpace(key) != key ||
-			strings.ContainsAny(value, "\r\n\x00") {
+			strings.ContainsAny(value, "\r\n\x00\"'\\") || strings.TrimSpace(value) != value {
 			return nil, fmt.Errorf("invalid EnvironmentFile entry")
 		}
 		if _, exists := values[key]; exists {
@@ -208,8 +218,14 @@ func readEnvFile(path string) (map[string]string, error) {
 }
 
 func validateControlEnv(values map[string]string) error {
+	if err := validateListen(values); err != nil {
+		return err
+	}
+	if err := validateDatabaseURL(values["DATABASE_URL"]); err != nil {
+		return err
+	}
 	required := []string{
-		"LISTEN_HOST", "PORT", "DATABASE_URL", "AUTO_MIGRATE",
+		"LISTEN_HOST", "PORT", "DATABASE_URL", "AUTO_MIGRATE", "DEPLOYMENT_MODE",
 		"CONTROL_TLS_CERT_FILE", "CONTROL_TLS_KEY_FILE", "CONTROL_CLIENT_CA_FILE", "CONTROL_AUTH_POLICY_FILE",
 		"GITHUB_PUBLISHER_PLAN_FILE", "GITHUB_PUBLISHER_REMOTE_FILE",
 	}
@@ -217,6 +233,9 @@ func validateControlEnv(values map[string]string) error {
 		if values[key] == "" {
 			return fmt.Errorf("control environment missing %s", key)
 		}
+	}
+	if values["DEPLOYMENT_MODE"] != "production" {
+		return fmt.Errorf("production deployment mode required")
 	}
 	if values["AUTO_MIGRATE"] != "0" {
 		return fmt.Errorf("production control plane requires AUTO_MIGRATE=0")
@@ -237,6 +256,9 @@ func validateControlEnv(values map[string]string) error {
 }
 
 func validatePublisherEnv(values map[string]string) error {
+	if err := validateListen(values); err != nil {
+		return err
+	}
 	required := []string{
 		"LISTEN_HOST", "PORT", "PUBLISHER_CONFIG_FILE",
 		"PUBLISHER_TLS_CERT_FILE", "PUBLISHER_TLS_KEY_FILE",
@@ -261,6 +283,9 @@ func validatePublisherEnv(values map[string]string) error {
 }
 
 func validateWorkerEnv(values map[string]string, preparation bool) error {
+	if err := validateEndpoint(values["CONTROL_ENDPOINT"]); err != nil {
+		return err
+	}
 	required := []string{"CONTROL_ENDPOINT", "CONTROL_CLIENT_CERT_FILE", "CONTROL_CLIENT_KEY_FILE", "CONTROL_SERVER_CA_FILE"}
 	if preparation {
 		required = append(required, "WORKER_PREPARATION_CONFIG")

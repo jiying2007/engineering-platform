@@ -7,7 +7,7 @@ import (
 
 func fixture() Receipt {
 	return Receipt{
-		SchemaVersion: 1,
+		SchemaVersion: SchemaVersion,
 		Repository:    "jiying2007/engineering-platform",
 		Workflow:      "CI",
 		Event:         "pull_request",
@@ -30,6 +30,7 @@ func fixture() Receipt {
 			{Path: "codex-qualifier", Digest: "sha256:" + strings.Repeat("1", 64), Size: 1},
 			{Path: "control-plane", Digest: "sha256:" + strings.Repeat("2", 64), Size: 1},
 			{Path: "eng", Digest: "sha256:" + strings.Repeat("3", 64), Size: 1},
+			{Path: "publisher-service", Digest: "sha256:" + strings.Repeat("6", 64), Size: 1},
 			{Path: "sandbox-guard", Digest: "sha256:" + strings.Repeat("4", 64), Size: 1},
 			{Path: "worker", Digest: "sha256:" + strings.Repeat("5", 64), Size: 1},
 		},
@@ -80,5 +81,23 @@ func TestSortMakesOrderCanonical(t *testing.T) {
 	Sort(&r)
 	if err := r.Validate(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCurrentEvidenceRejectsHistoricalFiveRoleSchema(t *testing.T) {
+	r := fixture()
+	r.SchemaVersion = 1
+	if err := r.Validate(); err == nil {
+		t.Fatal("historical schema admitted as current evidence")
+	}
+	r = fixture()
+	for i, f := range r.Files {
+		if f.Path == "publisher-service" {
+			r.Files = append(r.Files[:i], r.Files[i+1:]...)
+			break
+		}
+	}
+	if err := r.Validate(); err == nil {
+		t.Fatal("publisher missing from current evidence")
 	}
 }

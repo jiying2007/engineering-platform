@@ -3,6 +3,7 @@ package cievidence
 import (
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/distribution"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -20,7 +22,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 	commit := strings.Repeat("a", 40)
 	files := []File{}
 	binaryMembers := map[string][]byte{}
-	for i, name := range []string{"codex-qualifier", "control-plane", "eng", "sandbox-guard", "worker"} {
+	for i, name := range distribution.Names() {
 		data := []byte(strings.Repeat(string(rune('A'+i)), i+3))
 		binaryMembers[name] = data
 		files = append(files, File{Path: name, Digest: canonical.BytesDigest(data), Size: int64(len(data))})
@@ -31,7 +33,11 @@ func fixtureImport(t *testing.T) ImportRequest {
 		t.Fatal(err)
 	}
 	binaryMembers["file-manifest.json"] = manifest
-	binaryMembers["SHA256SUMS"] = []byte("fixture\n")
+	var sums strings.Builder
+	for _, f := range files {
+		fmt.Fprintf(&sums, "%s  %s\n", f.Digest[7:], f.Path)
+	}
+	binaryMembers["SHA256SUMS"] = []byte(sums.String())
 	binaryZip := writeFixtureZip(t, root, "binaries.zip", binaryMembers)
 	binaryInfo, _ := os.Stat(binaryZip)
 	binaryDigest := digestFixtureFile(t, binaryZip)

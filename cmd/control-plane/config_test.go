@@ -102,3 +102,18 @@ func TestCommandAssemblyUsesRealMTLSAndPolicy(t *testing.T) {
 		t.Fatal("anonymous TLS accepted by command assembly")
 	}
 }
+
+func TestProductionBoundaryRejectsLegacyPublisherBeforeOpeningConfiguration(t *testing.T) {
+	for _, env := range []map[string]string{
+		{"GITHUB_PUBLISHER_CONFIG_FILE": "must-not-read"},
+		{"DEPLOYMENT_MODE": "production", "GITHUB_PUBLISHER_CONFIG_FILE": "must-not-read", "AUTO_MIGRATE": "0"},
+		{"DEPLOYMENT_MODE": "production", "AUTO_MIGRATE": "1"},
+		{"DEPLOYMENT_MODE": "production", "AUTO_MIGRATE": "0", "INSECURE_DEV": "1"},
+		{"DEPLOYMENT_MODE": "production", "AUTO_MIGRATE": "0"},
+		{"DEPLOYMENT_MODE": "unknown"},
+	} {
+		if _, err := loadConfiguration(func(k string) string { return env[k] }); err == nil {
+			t.Fatalf("unsafe production boundary accepted: %v", env)
+		}
+	}
+}

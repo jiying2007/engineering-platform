@@ -14,6 +14,7 @@ func productionPreflight(args []string) error {
 	fs := flag.NewFlagSet("production-preflight", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	configFile := fs.String("config", "", "production preflight configuration JSON")
+	configOnly := fs.Bool("config-only", false, "validate outer configuration only; never host or live readiness")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *configFile == "" {
 		return fmt.Errorf("usage: eng production-preflight --config CONFIG.json")
 	}
@@ -30,7 +31,12 @@ func productionPreflight(args []string) error {
 	if err := strictjson.Decode(data, &config); err != nil {
 		return fmt.Errorf("strict production config: %w", err)
 	}
-	result, err := production.Check(config)
+	var result production.Result
+	if *configOnly {
+		result, err = production.CheckConfiguration(config)
+	} else {
+		result, err = production.Check(config)
+	}
 	if err != nil {
 		return err
 	}
