@@ -17,8 +17,8 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Ready || status.State != "READY" {
-		t.Fatalf("fresh store should be READY: %#v", status)
+	if status.Ready || !status.AuthorityClear || status.State != "OBSERVATION_REQUIRED" {
+		t.Fatalf("fresh store only establishes database authority health: %#v", status)
 	}
 
 	if _, err := s.pool.Exec(ctx, `UPDATE platform_state SET recovery_mode='RECOVERY_RECONCILIATION' WHERE singleton_id=true`); err != nil {

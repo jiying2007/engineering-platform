@@ -2,15 +2,19 @@ package production
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 )
 
 const (
-	OperationalStatusVersion = 1
+	OperationalStatusVersion = 2
 
-	OperationalReady            = "READY"
-	OperationalDegraded         = "DEGRADED"
-	OperationalRecoveryRequired = "RECOVERY_REQUIRED"
+	OperationalObservationRequired = "OBSERVATION_REQUIRED"
+	OperationalAuthorityClear      = "CLEAR"
+	OperationalScope               = "database-authority-snapshot"
+	ServiceReadinessUnobserved     = "NOT_OBSERVED"
+	OperationalDegraded            = "DEGRADED"
+	OperationalRecoveryRequired    = "RECOVERY_REQUIRED"
 )
 
 type Snapshot struct {
@@ -29,14 +33,24 @@ type Snapshot struct {
 	ReconcilingOperations  int64     `json:"reconciling_operations"`
 	ManualOperations       int64     `json:"manual_operations"`
 	UnknownCodexExecutions int64     `json:"unknown_codex_executions"`
+	// Database observations, not component heartbeats or capacity claims.
+	OldestPendingWorkerAt *time.Time `json:"oldest_pending_worker_at"`
+	OldestPendingOutboxAt *time.Time `json:"oldest_pending_outbox_at"`
+	LastWorkerAdmissionAt *time.Time `json:"last_worker_admission_at"`
+	LastOutboxDispatchAt  *time.Time `json:"last_outbox_dispatch_at"`
 }
 
 type OperationalStatus struct {
-	Version  int      `json:"version"`
-	State    string   `json:"state"`
-	Ready    bool     `json:"ready"`
-	Reasons  []string `json:"reasons,omitempty"`
-	Snapshot Snapshot `json:"snapshot"`
+	Version             int      `json:"version"`
+	Scope               string   `json:"scope"`
+	AuthorityState      string   `json:"authority_state"`
+	AuthorityClear      bool     `json:"authority_clear"`
+	ServiceReadiness    string   `json:"service_readiness"`
+	ProductionQualified bool     `json:"production_qualified"`
+	State               string   `json:"state"`
+	Ready               bool     `json:"ready"`
+	Reasons             []string `json:"reasons,omitempty"`
+	Snapshot            Snapshot `json:"snapshot"`
 }
 
 func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
@@ -57,15 +71,28 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 		}
 	}
 
+	for _, at := range []*time.Time{snapshot.OldestPendingWorkerAt, snapshot.OldestPendingOutboxAt, snapshot.LastWorkerAdmissionAt, snapshot.LastOutboxDispatchAt} {
+		if at != nil && (at.IsZero() || at.After(snapshot.CapturedAt)) {
+			return OperationalStatus{}, fmt.Errorf("invalid database observation time")
+		}
+	}
+	if (snapshot.PendingWorkerIntents > 0) != (snapshot.OldestPendingWorkerAt != nil) || (snapshot.PendingOutbox > 0) != (snapshot.OldestPendingOutboxAt != nil) {
+		return OperationalStatus{}, fmt.Errorf("queue count/oldest observation mismatch")
+	}
 	status := OperationalStatus{
-		Version:  OperationalStatusVersion,
-		State:    OperationalReady,
-		Ready:    true,
-		Snapshot: snapshot,
+		Version:          OperationalStatusVersion,
+		Scope:            OperationalScope,
+		AuthorityState:   OperationalAuthorityClear,
+		AuthorityClear:   true,
+		ServiceReadiness: ServiceReadinessUnobserved,
+		State:            OperationalObservationRequired,
+		Ready:            false,
+		Snapshot:         snapshot,
 	}
 	if snapshot.RecoveryMode != "NORMAL" {
 		status.State = OperationalRecoveryRequired
-		status.Ready = false
+		status.AuthorityState = OperationalRecoveryRequired
+		status.AuthorityClear = false
 		status.Reasons = append(status.Reasons, "recovery_reconciliation_active")
 	}
 	checks := []struct {
@@ -84,9 +111,29 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 			status.Reasons = append(status.Reasons, check.reason)
 		}
 	}
-	if len(status.Reasons) > 0 && status.State == OperationalReady {
+	if len(status.Reasons) > 0 && status.AuthorityState == OperationalAuthorityClear {
 		status.State = OperationalDegraded
-		status.Ready = false
+		status.AuthorityState = OperationalDegraded
+		status.AuthorityClear = false
 	}
+	// Even an idle database does not prove admission/preparation/execution/publisher
+	// availability. Leases and historical progress must never stand in for heartbeats.
+	status.Reasons = append(status.Reasons, "service_health_and_capacity_not_observed")
 	return status, nil
+}
+
+// ValidateAt rederives every status field from the bound database facts and rejects
+// stale or future observations. These are transport freshness limits, NOT SLOs.
+func (s OperationalStatus) ValidateAt(now time.Time) error {
+	expected, err := EvaluateSnapshot(s.Snapshot)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(s, expected) {
+		return fmt.Errorf("operational status contradicts its snapshot or scope")
+	}
+	if now.IsZero() || s.Snapshot.CapturedAt.After(now.Add(5*time.Second)) || now.Sub(s.Snapshot.CapturedAt) > 30*time.Second {
+		return fmt.Errorf("operational snapshot stale or clock skewed")
+	}
+	return nil
 }
