@@ -1,0 +1,70 @@
+name: W02 source objects
+on:
+  pull_request:
+    paths: ['.github/workflows/rc-w02-materialize.yml', '.rc-source-w02/**']
+permissions:
+  contents: read
+jobs:
+  objects:
+    if: github.repository == 'jiying2007/engineering-platform' && github.event.pull_request.head.repo.id == 1383377268 && github.event.pull_request.head.ref == 'fix/rc-w02-isolated-qualification'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Construct only exact tested unreachable Git objects
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          python3 - <<'PY'
+          import base64,gzip,hashlib,io,json,os,pathlib,subprocess
+          def git(*args): return subprocess.check_output(['git',*args]).decode().strip()
+          base='cdf7c1281437163fc1813c8c75228bf74e8c9d9c'
+          expected='51afeb736b2e0af871156e53a4b6a1656ece5e3a'
+          assert git('rev-parse',base+'^{tree}')=='3976120a7fb17174352661cdd0f17d2cdf1e32a7'
+          root=pathlib.Path('.rc-source-w02')
+          assert sorted(p.name for p in root.iterdir())==[f'{i}.b64' for i in range(5)]
+          encoded=b''.join((root/f'{i}.b64').read_bytes() for i in range(5))
+          assert len(encoded)==11292
+          with gzip.GzipFile(fileobj=io.BytesIO(base64.b64decode(encoded,validate=True))) as z: patch=z.read(65537)
+          assert len(patch)==35318 and hashlib.sha256(patch).hexdigest()=='2a6599158ee18652003a36a8b24e64ced63a44dcf23fd981c776f06001bbc647'
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          git('update-index','--force-remove','.github/workflows/rc-w02-materialize.yml',*[f'.rc-source-w02/{i}.b64' for i in range(5)])
+          assert git('write-tree')==expected
+          def api(route,value):
+              p=subprocess.run(['gh','api','--method','POST','repos/jiying2007/engineering-platform/git/'+route,'--input','-'],input=json.dumps(value),text=True,stdout=subprocess.PIPE,check=True,timeout=60)
+              return json.loads(p.stdout)
+          entries=[]
+          changed=git('diff','--cached','--name-only',base).splitlines()
+          assert len(changed)==17
+          for path in changed:
+              fields=git('ls-files','--stage','--',path).split()
+              mode,sha,stage=fields[:3]
+              assert mode in ['100644','100755'] and stage=='0'
+              raw=subprocess.check_output(['git','cat-file','blob',sha])
+              assert len(raw)<1048576
+              result=api('blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})
+              assert result['sha']==sha
+              entries.append({'path':path,'mode':mode,'type':'blob','sha':sha})
+          result=api('trees',{'base_tree':'3976120a7fb17174352661cdd0f17d2cdf1e32a7','tree':entries})
+          assert result['sha']==expected
+          report={'source_head':os.environ['EXPECTED_HEAD'],'base':base,'tree':expected,'members':entries,'ref_mutated':False,'product_validation':False}
+          out=pathlib.Path(os.environ['RUNNER_TEMP'],'source-objects.json')
+          out.write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
+          print('EXACT_SOURCE_TREE='+expected)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: w02-source-objects-${{ github.run_id }}
+          path: ${{ runner.temp }}/source-objects.json
+          if-no-files-found: error
+          retention-days: 7
