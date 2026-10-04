@@ -22,6 +22,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/sourcecheckpoint"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
 )
@@ -385,6 +386,35 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 				if mode == "lost-reply" && status.Runtime.Transcript.Deliveries[0].State != codexexec.ControlUnknown {
 					t.Fatal("lost control reply hidden")
 				}
+
+				// Real stopped-subprocess source -> immutable local bytes ->
+				// actual mTLS/PG artifact observation -> fresh restore/readback.
+				artifactRoot := filepath.Join(base, "checkpoint-artifacts")
+				workerOK(t, os.Mkdir(artifactRoot, 0700))
+				artifact, e := sourcecheckpoint.Capture(checkCtx, work, artifactRoot, permit, result.transcript)
+				workerOK(t, e)
+				var checkpoint codexexec.SourceCheckpoint
+				expectHTTP(t, reader.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, nil), http.StatusForbidden)
+				workerOK(t, worker.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, &checkpoint))
+				if checkpoint != artifact.Facts {
+					t.Fatal("checkpoint observation changed")
+				}
+				workerOK(t, worker.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, &checkpoint))
+				changed := artifact.Facts
+				changed.ArchiveDigest = canonical.BytesDigest([]byte("substituted artifact"))
+				expectHTTP(t, worker.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", changed, nil), http.StatusConflict)
+				workerOK(t, os.Chmod(base, 0700))
+				restored, e := sourcecheckpoint.Restore(checkCtx, artifact.Path, checkpoint.ArchiveDigest, req.RunID, filepath.Join(base, "recovery-copy"))
+				workerOK(t, e)
+				if restored != artifact.Facts {
+					t.Fatal("recovery source drift")
+				}
+				status, e = s.GetCodex(checkCtx, req.RunID)
+				workerOK(t, e)
+				if status.State != codexexec.Unknown || status.Receipt != nil || status.SourceCheckpoint == nil || *status.SourceCheckpoint != artifact.Facts {
+					t.Fatal("checkpoint granted execution or lost readback")
+				}
+				assertCount(t, s, "SELECT count(*) FROM audit_events WHERE event_type='worker.codex.source-checkpoint-retained'", 1)
 			}
 			if mode != "recovery" {
 				raw, e := os.ReadFile(filepath.Join(work, "requests.jsonl"))

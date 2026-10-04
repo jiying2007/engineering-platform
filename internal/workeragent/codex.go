@@ -106,7 +106,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	}
 	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt)
 	if err != nil {
-		return receipt, err
+		return receipt, retainStoppedSource(c, p, permit, prepared, transcript, err)
 	}
 	if err = p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":turn"))[7:], codexReceipt); err != nil {
 		return receipt, err
