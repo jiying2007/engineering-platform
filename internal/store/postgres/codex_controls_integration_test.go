@@ -206,6 +206,45 @@ func TestCodexControlsAuthorityFencesAndInterruptEvidence(t *testing.T) {
 // evidence. The rest is the production mTLS API, PG store, Worker turn segment,
 // real process pipes and JSON-RPC adapter. No fixture credential leaves the host.
 
+// Keep fixture authorization construction independently runnable without PG.
+// Preparation still requires the existing poll/report/profile grants; tests must
+// satisfy that contract rather than relax production policy to fit the fixture.
+func controlWirePolicy(operator, viewer, workerProfile, profileDigest string) access.Document {
+	return access.Document{Version: 1, Principals: []access.PrincipalSpec{
+		{Subject: operator, Scope: "platform", Capabilities: []string{access.Read, access.RunControl}},
+		{Subject: viewer, Scope: "platform", Capabilities: []string{access.Read}},
+		{Subject: codexTestWorker, Scope: "platform", Capabilities: []string{access.Read, access.WorkerPoll, access.WorkerReport, access.WorkerPrepare, access.ActionExecute}, WorkerProfiles: []string{workerProfile}, Actions: []access.ActionGrant{{Action: codexexec.Action, RiskClass: "CONTROLLED_MUTATION", Capability: profileDigest}}},
+	}}
+}
+
+func TestCodexControlsWirePolicyWithoutDatabase(t *testing.T) {
+	build := func() access.Document {
+		return controlWirePolicy("urn:engineering-platform:engineer:control-test", "urn:engineering-platform:viewer:test", "worker/codex", canonical.BytesDigest([]byte("fixture-profile")))
+	}
+	if _, err := access.New(build()); err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range []string{access.WorkerPoll, access.WorkerReport} {
+		doc := build()
+		worker := &doc.Principals[2]
+		var kept []string
+		for _, capability := range worker.Capabilities {
+			if capability != missing {
+				kept = append(kept, capability)
+			}
+		}
+		worker.Capabilities = kept
+		if _, err := access.New(doc); err == nil {
+			t.Fatalf("fixture accepted without %s", missing)
+		}
+	}
+	doc := build()
+	doc.Principals[2].WorkerProfiles = nil
+	if _, err := access.New(doc); err == nil {
+		t.Fatal("fixture accepted without exact worker profile")
+	}
+}
+
 func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 	for _, mode := range []string{"steer", "interrupt", "lost-reply", "recovery"} {
 		t.Run(mode, func(t *testing.T) {
@@ -230,11 +269,7 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 			workerOK(t, err)
 			operator := "urn:engineering-platform:engineer:control-test"
 			viewer := "urn:engineering-platform:viewer:test"
-			policy, err := access.New(access.Document{Version: 1, Principals: []access.PrincipalSpec{
-				{Subject: operator, Scope: "platform", Capabilities: []string{access.Read, access.RunControl}},
-				{Subject: viewer, Scope: "platform", Capabilities: []string{access.Read}},
-				{Subject: codexTestWorker, Scope: "platform", Capabilities: []string{access.Read, access.WorkerPrepare, access.ActionExecute}, WorkerProfiles: []string{req.WorkerProfile}, Actions: []access.ActionGrant{{Action: codexexec.Action, RiskClass: "CONTROLLED_MUTATION", Capability: pd}}},
-			}})
+			policy, err := access.New(controlWirePolicy(operator, viewer, req.WorkerProfile, pd))
 			workerOK(t, err)
 			handler, err := api.NewAuthenticatedHandler(s, nil, policy, api.AuthenticatedOptions{})
 			workerOK(t, err)
