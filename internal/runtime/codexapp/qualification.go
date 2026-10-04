@@ -14,13 +14,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
-	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 )
 
-const CompatibilityContractVersion = 1
+const CompatibilityContractVersion = 2
+
+const QualificationSchemaVersion = 3
 
 var codexVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
@@ -45,6 +46,12 @@ type QualificationReceipt struct {
 	CredentialSafeProfileChecked bool   `json:"credential_safe_profile_checked"`
 	EngineeringConfigDigest      string `json:"engineering_config_digest"`
 	EngineeringProfileChecked    bool   `json:"engineering_profile_checked"`
+	IsolationMechanism           string `json:"isolation_mechanism"`
+	IsolationEnvironmentDigest   string `json:"isolation_environment_digest"`
+	IsolatedEngineeringStartup   bool   `json:"isolated_engineering_startup"`
+	NamespaceInitReaped          bool   `json:"namespace_init_reaped"`
+	ModelTurnExecuted            bool   `json:"model_turn_executed"`
+	CredentialUsed               bool   `json:"credential_used"`
 }
 
 // Qualify exercises the actual Codex binary without making a model turn.
@@ -128,53 +135,20 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 			return receipt, err
 		}
 	}
-	provider, err := NewPinnedProvider(executable, digest)
+	environment, err := qualificationEnvironmentDigest()
 	if err != nil {
 		return receipt, err
 	}
-	probeCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
-	defer cancel()
-	cmd, err := provider.Command(probeCtx, runtimeprovider.LaunchSpec{Dir: work, Env: []string{"HOME=" + home}})
-	if err != nil {
+	if err := qualifyIsolatedEngineeringStartup(ctx, executable, digest, model, work, home); err != nil {
 		return receipt, err
 	}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return receipt, err
+	afterEnvironment, err := qualificationEnvironmentDigest()
+	if err != nil || afterEnvironment != environment {
+		return receipt, fmt.Errorf("qualification environment changed during probe")
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return receipt, err
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
-	if err := cmd.Start(); err != nil {
-		return receipt, err
-	}
-	client := NewClient(stdout, stdin)
-	defer client.Close()
-	adapter, err := NewAdapter(client, work)
-	if err != nil {
-		cancel()
-		_ = cmd.Wait()
-		return receipt, err
-	}
-	if err := adapter.Initialize(probeCtx, "engineering-platform-codex-qualification-v1"); err != nil {
-		cancel()
-		_ = cmd.Wait()
-		return receipt, fmt.Errorf("real app-server initialize failed: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
-	}
-	if _, err := adapter.StartThread(probeCtx, model); err != nil {
-		cancel()
-		_ = cmd.Wait()
-		return receipt, fmt.Errorf("real app-server thread/start failed: %w; stderr=%s", err, strings.TrimSpace(stderr.String()))
-	}
-	_ = client.Close()
-	cancel()
-	_ = cmd.Wait()
 
 	receipt = QualificationReceipt{
-		SchemaVersion:                2,
+		SchemaVersion:                QualificationSchemaVersion,
 		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      version,
@@ -194,6 +168,10 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
+		IsolationMechanism:           processscope.Mechanism,
+		IsolationEnvironmentDigest:   environment,
+		IsolatedEngineeringStartup:   true,
+		NamespaceInitReaped:          true,
 	}
 	if err := receipt.Validate(); err != nil {
 		return QualificationReceipt{}, err
@@ -219,7 +197,7 @@ func ParseCodexVersionOutput(output string) (string, error) {
 }
 
 func (r QualificationReceipt) Validate() error {
-	if r.SchemaVersion != 2 || r.CompatibilityContractVersion != CompatibilityContractVersion ||
+	if r.SchemaVersion != QualificationSchemaVersion || r.CompatibilityContractVersion != CompatibilityContractVersion ||
 		r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.StableSchemaDigest) ||
 		!canonical.ValidDigest(r.ExperimentalSchemaDigest) || r.Transport != "stdio" ||
@@ -230,7 +208,9 @@ func (r QualificationReceipt) Validate() error {
 		r.CredentialSafeConfigDigest != CredentialSafeConfigDigest() ||
 		!r.CredentialSafeProfileChecked ||
 		r.EngineeringConfigDigest != EngineeringConfigDigest() ||
-		!r.EngineeringProfileChecked {
+		!r.EngineeringProfileChecked || r.IsolationMechanism != processscope.Mechanism ||
+		!canonical.ValidDigest(r.IsolationEnvironmentDigest) || !r.IsolatedEngineeringStartup ||
+		!r.NamespaceInitReaped || r.ModelTurnExecuted || r.CredentialUsed {
 		return fmt.Errorf("invalid Codex compatibility qualification receipt")
 	}
 	return nil

@@ -19,7 +19,7 @@ func profileQualificationFixture(t *testing.T, binary, version, model string) co
 		t.Fatal(err)
 	}
 	return codexapp.QualificationReceipt{
-		SchemaVersion: 2, CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
+		SchemaVersion: 3, CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI: "codex-cli", Version: version, BinaryDigest: canonical.BytesDigest(data),
 		StableSchemaDigest:       canonical.BytesDigest([]byte("stable")),
 		ExperimentalSchemaDigest: canonical.BytesDigest([]byte("experimental")),
@@ -30,6 +30,10 @@ func profileQualificationFixture(t *testing.T, binary, version, model string) co
 		CredentialSafeProfileChecked: true,
 		EngineeringConfigDigest:      codexapp.EngineeringConfigDigest(),
 		EngineeringProfileChecked:    true,
+		IsolationMechanism:           "linux-user-pid-namespace-init-v1",
+		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		IsolatedEngineeringStartup:   true,
+		NamespaceInitReaped:          true,
 	}
 }
 

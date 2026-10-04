@@ -94,8 +94,12 @@ jobs:
             --model "$LIVE_MODEL" \
             > "$RUNNER_TEMP/codex-compatibility-qualification.json"
           jq -e --arg digest "$CODEX_DIGEST" '
-            .schema_version == 2 and
-            .compatibility_contract_version == 1 and
+            .schema_version == 3 and
+            .compatibility_contract_version == 2 and
+            .isolated_engineering_startup == true and
+            .namespace_init_reaped == true and
+            .model_turn_executed == false and
+            .credential_used == false and
             .binary_digest == $digest
           ' "$RUNNER_TEMP/codex-compatibility-qualification.json" >/dev/null
       - name: Mint and verify one GitHub OIDC assertion

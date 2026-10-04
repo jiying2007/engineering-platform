@@ -309,10 +309,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go run ./cmd/codex-qualifier \
-            --codex "$CODEX_NATIVE" \
-            --model gpt-5.6-sol \
-            > "$RUNNER_TEMP/codex-qualification.json"
+          qualifier="$RUNNER_TEMP/isolated-codex-qualifier"
+          go build -trimpath -o "$qualifier" ./cmd/codex-qualifier
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            printf 'abi <abi/4.0>,\nprofile ep-real-codex-qualification %s flags=(unconfined) {\n  userns,\n}\n' "$qualifier" > "$RUNNER_TEMP/ep-real-codex-qualification.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/ep-real-codex-qualification.apparmor"
+          fi
+          "$qualifier" --codex "$CODEX_NATIVE" --model gpt-5.6-sol > "$RUNNER_TEMP/codex-qualification.json"
+          # Qualification identity must be stable across distinct scoped lifetimes.
+          "$qualifier" --codex "$CODEX_NATIVE" --model gpt-5.6-sol > "$RUNNER_TEMP/codex-qualification-repeat.json"
+          cmp "$RUNNER_TEMP/codex-qualification.json" "$RUNNER_TEMP/codex-qualification-repeat.json"
           cat "$RUNNER_TEMP/codex-qualification.json"
       - name: Retain Codex qualification receipt
         uses: actions/upload-artifact@v4

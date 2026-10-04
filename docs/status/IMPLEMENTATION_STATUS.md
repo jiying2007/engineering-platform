@@ -147,3 +147,20 @@ and human decisions are separate gates. This is not a new authority framework.
 Implemented code is not completion evidence. Each slice requires exact-head CI,
 fresh-main readback and delivered artifacts; no earlier green run qualifies new
 source. Historical M1 remains immutable, and production #105 remains open.
+
+## W02 account-free isolated startup qualification
+
+Current qualification schema 3/compatibility contract 2 launches the exact native
+Codex binary in the same user/PID namespace mechanism as engineering, with the
+exact workspace-write config and fresh credential-free HOME. It sends only
+initialize/initialized/thread-start, then requires actual init reaping. It does
+not warm credentials or start a model turn. Missing isolation/config/reap checks
+cannot fall back to ordinary process startup or old schema qualification.
+
+The receipt binds the stable isolation mechanism, configuration and a bounded
+kernel/architecture/UID/GID environment digest. PIDs/inodes/timestamps are not
+stable qualification identity; each actual Worker CLI execution still repeats
+qualification and compares the entire receipt. CI repeats the real native probe
+twice to test deterministic identity. This is not live model/tool/provider
+qualification, a resource sandbox, or production approval. Regenerate current
+qualification/Profile identity; do not rewrite historical M1 records.

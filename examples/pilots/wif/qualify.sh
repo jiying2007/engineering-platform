@@ -105,8 +105,12 @@ fi
 unset LIVE_QUALIFICATION_CANONICAL PROFILE_QUALIFICATION_CANONICAL
 
 jq -e   --arg model "$MODEL"   --arg version "$PROFILE_VERSION"   --arg binary_digest "$PROFILE_BINARY_DIGEST"   '
-    .schema_version == 2 and
-    .compatibility_contract_version == 1 and
+    .schema_version == 3 and
+    .compatibility_contract_version == 2 and
+    .isolated_engineering_startup == true and
+    .namespace_init_reaped == true and
+    .model_turn_executed == false and
+    .credential_used == false and
     .cli == "codex-cli" and
     .version == $version and
     .binary_digest == $binary_digest and

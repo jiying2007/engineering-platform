@@ -19,11 +19,12 @@ import (
 )
 
 type Provider struct {
-	executable       string
-	digest           string
-	credentialSafe   bool
-	engineeringMode  bool
-	savedLoginSource string
+	executable        string
+	digest            string
+	credentialSafe    bool
+	engineeringMode   bool
+	savedLoginSource  string
+	qualificationOnly bool // private no-credential startup probe; never an execution lane
 }
 
 const credentialSafeConfig = "cli_auth_credentials_store = \"file\"\n\n[features]\nshell_tool = false\nview_image = false\n"
@@ -161,6 +162,9 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 		}
 		values[key] = val
 	}
+	if p.qualificationOnly && (p.credentialSafe || !p.engineeringMode || p.savedLoginSource != "" || len(values) != 1) {
+		return nil, fmt.Errorf("qualification probe accepts only a fresh HOME and no credentials")
+	}
 	home, err := canonicalPath(values["HOME"], true)
 	if err != nil {
 		return nil, err
@@ -250,7 +254,7 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if key, ok := values["OPENAI_API_KEY"]; ok {
 		env = append(env, "OPENAI_API_KEY="+key)
 	}
-	if p.credentialSafe {
+	if p.credentialSafe || p.qualificationOnly {
 		configPath := filepath.Join(home, ".codex", "config.toml")
 		config := credentialSafeConfig
 		if p.engineeringMode {
