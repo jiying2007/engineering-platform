@@ -1,0 +1,50 @@
+name: Retire integrated branches
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: integrated-branch-retirement
+  cancel-in-progress: false
+jobs:
+  retire:
+    if: >-
+      github.repository == 'jiying2007/engineering-platform' &&
+      github.event.workflow_run.head_repository.id == 1383377268 &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Apply only exact integrated refs after successful main CI
+        shell: bash
+        env:
+          VERIFIED_MAIN: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_REF_PROTECTED" = true
+          python3 -B scripts/retire_integrated_branches.py \
+            --manifest .github/retired-branches.json \
+            --expected-main "$VERIFIED_MAIN" --apply \
+            > "$RUNNER_TEMP/branch-retirement.json"
+          cat "$RUNNER_TEMP/branch-retirement.json"
+      - name: Retain exact maintenance receipt only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-retirement-${{ github.run_id }}
+          path: ${{ runner.temp }}/branch-retirement.json
+          if-no-files-found: error
+          retention-days: 90

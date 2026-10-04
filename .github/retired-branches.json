@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "repository": "jiying2007/engineering-platform",
+  "branches": [
+    {
+      "branch": "ci/production-terminal-auto-dry-run",
+      "expected_head": "36ccce0185587a4facb950db7022fb54d80c1b25",
+      "integrated_commit": "1e87b6a9abe634bd6eaac08df51c70c8646f2c84",
+      "tree": "42bdce1acacc1030e7697e3de06275331c386485"
+    },
+    {
+      "branch": "docs/classify-superseded-relay-branches",
+      "expected_head": "a3b3440e35ca7e148870bab2d11366de2609aa0e",
+      "integrated_commit": "1cf10c39e34a11913a97ed1dc7d7a911102b5681",
+      "tree": "fe0746612e6bd8da9e8e8340316a87ec44a4e1ed"
+    },
+    {
+      "branch": "docs/pre-live-complete-checkpoint",
+      "expected_head": "17560466f9d355d0515348ae1a630a6ca9daf450",
+      "integrated_commit": "e4ca13e254c883d336ec990e1767f8cc85b8b98b",
+      "tree": "bcc45077d9626c5f2fc0532bd6ebdb02ac2fa169"
+    },
+    {
+      "branch": "docs/retire-superseded-historical-branches",
+      "expected_head": "302a1f2e241564a5355805b8c45b99501b12b4e7",
+      "integrated_commit": "c7f01e4e2940961b135bca82de0ab0290cd24dbf",
+      "tree": "e000f8f69dca3fbc3768b64876ded21f11e4eb02"
+    },
+    {
+      "branch": "feat/independent-publisher-service-v2",
+      "expected_head": "bf85daa5c46601cff52e0e1bb782617da3073d05",
+      "integrated_commit": "5040656c64a26a0bb32ee8bf2bf89e316221553e",
+      "tree": "9afce67a6298e11cedc884008c3ab7cd7ffdd44d"
+    },
+    {
+      "branch": "feat/production-operational-readiness",
+      "expected_head": "5040656c64a26a0bb32ee8bf2bf89e316221553e",
+      "integrated_commit": "5040656c64a26a0bb32ee8bf2bf89e316221553e",
+      "tree": "9afce67a6298e11cedc884008c3ab7cd7ffdd44d"
+    },
+    {
+      "branch": "feat/production-operational-status",
+      "expected_head": "e7e7c6c76acfb7199bf7172b800fe4df5ffb4bfb",
+      "integrated_commit": "3c3a9652aa8e2b751f4d506425b9e8682e55cf46",
+      "tree": "8060ff3f42ed3ba376e53f3727a07f4af2b65ac9"
+    },
+    {
+      "branch": "feat/production-runtime-baseline",
+      "expected_head": "d85eba2732f05dc34d6ab0a02de67c982b86dab9",
+      "integrated_commit": "955870bfe83ce43907b10d7f46fbd4efe4681fbb",
+      "tree": "67fcfdbbacb991695720361cadc5fd0faeb39007"
+    },
+    {
+      "branch": "feat/production-terminal-acceptance",
+      "expected_head": "920011402b7f5a703fab2158292c0b78492ab4fe",
+      "integrated_commit": "a4c21066712679d725ee762b8914fc3c68af184d",
+      "tree": "27a6a1f03dcde4e3a477beb526756e4f56375f10"
+    },
+    {
+      "branch": "feat/relay-codex-config-renderer-v2",
+      "expected_head": "acd40d5852ec31642eec9e6549feea4b1171ff51",
+      "integrated_commit": "acd40d5852ec31642eec9e6549feea4b1171ff51",
+      "tree": "58d108a8ad23084c0407571cec98e2930588d7cd"
+    },
+    {
+      "branch": "feat/relay-live-handoff-manifest",
+      "expected_head": "ef2e9a050d418dba01688f5ba276855b858dde16",
+      "integrated_commit": "55d8692c3faf1600e2f1881d546812d0b10ae95a",
+      "tree": "a0de9a23aa54a3024b561eddb4ed77b4dc8dc286"
+    },
+    {
+      "branch": "feat/relay-prequalification-operator-pack",
+      "expected_head": "edb57daf953fd6400d5c4c0176245d47eb56686b",
+      "integrated_commit": "bb691fc2f826357787ad687999fafa1fe7d46112",
+      "tree": "dbefc8a9247d8745123a40fcca0eaa8022e2fe40"
+    },
+    {
+      "branch": "feat/relay-prequalification-v2-renderer",
+      "expected_head": "c449b83fb19bd1a9506395087cf1b9d988e2b737",
+      "integrated_commit": "54a059885d33e66d273919a1c215d5dce08b34d2",
+      "tree": "95e525e79e772d6c89ac9ba6282576d0fc26c208"
+    },
+    {
+      "branch": "feat/relay-private-http-policy",
+      "expected_head": "28788c431dc958bc5c6c8f1d40b059c5d820c6f3",
+      "integrated_commit": "acd40d5852ec31642eec9e6549feea4b1171ff51",
+      "tree": "58d108a8ad23084c0407571cec98e2930588d7cd"
+    },
+    {
+      "branch": "feat/relay-provider-prequalification",
+      "expected_head": "d0d06ef76430ac544897f86cfbcdc3381b841c75",
+      "integrated_commit": "d503bb34ce4324742d3d8ae4b6803f0413e5adf1",
+      "tree": "64158aa583824f49295e1aa600784bfc51206b30"
+    },
+    {
+      "branch": "feat/relay-qualification-kit",
+      "expected_head": "63e9ff3608c5036112c1bcd1cd7accf2088203bf",
+      "integrated_commit": "985ee3ba288d508457cdeca34ffc73d20e7f358b",
+      "tree": "677e6911ecc0e7058c475afe6a049347d1cfba6d"
+    },
+    {
+      "branch": "feat/relay-qualification-kit-verify",
+      "expected_head": "f1f87c7f4fd49b76564fc2c7219123c4c5ca3cee",
+      "integrated_commit": "7c13636d2abd2107f3e69d6bf9e3bebfe4d04c82",
+      "tree": "22c4535db46cdd5887d7d24c33b07f291537f346"
+    },
+    {
+      "branch": "feat/relay-runtime-handoff",
+      "expected_head": "30cb4f407a83b2ef8d6598dfd94181df28a81809",
+      "integrated_commit": "cd763860361c62af701927939bed9ef49ae73a8e",
+      "tree": "1ade69dd7df29a22ba38d29f9b3b64fa578ffb71"
+    },
+    {
+      "branch": "fix/audit-production-closure",
+      "expected_head": "cbd1a0a4506c2277b0b2771299a295569e1743e3",
+      "integrated_commit": "0633f9112933c1ed66e832d6cb007904823398ad",
+      "tree": "68a473a21eb1af62c8fc15e424bcc7af422a2477"
+    },
+    {
+      "branch": "fix/retained-closure-archive",
+      "expected_head": "5423a022b090480c0203ccbfc76cd727ea7ae62d",
+      "integrated_commit": "fb27ee10efaf45aadf6a4373df804cb4af9b1dcd",
+      "tree": "5e09acb5ad80fe057936a8c09158b0e0b184309e"
+    }
+  ]
+}

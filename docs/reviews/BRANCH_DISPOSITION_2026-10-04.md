@@ -52,3 +52,37 @@ Do **not** apply this disposition to the two retained M1 result branches:
 
 Those two branches are immutable evidence references for the already-closed M1
 Feature/Debug chains and remain intentionally preserved.
+
+## Mechanically proven retirement
+
+`.github/retired-branches.json` is an explicit maintenance manifest, not a
+runtime compatibility contract. Each candidate binds an exact branch tip,
+complete Git tree and an integrated commit on main with the identical tree.
+This handles squash/rebase integration without treating every non-ancestor as
+unmerged product work. The manifest does not cover all superseded prototypes.
+
+The `Retire integrated branches` workflow runs only after successful same-repo
+push-to-protected-main canonical CI. It checks the exact main checkout, actual
+remote heads, complete-tree identity, integrated-commit ancestry and the open-PR
+inventory. It then issues one atomic Git deletion with an exact old-SHA lease
+for every selected ref, followed by remote readback. A parallel update rejects
+the whole push. There is no force-delete fallback, no model/provider operation,
+and no inference of maturity from a successful cleanup. Failed/unknown pushes
+require observation/reconciliation, never blind replay.
+
+An absent manifest ref is an idempotent no-op. New or changed refs require an
+explicit manifest review. Main, release refs and both retained M1 result refs
+are excluded by code, not merely by the current data. The maintenance workflow
+never bypasses branch protection.
+
+Four older prototype branches are deliberately not in this mechanical pass:
+`feat/github-ci-core-evidence-import`, `feat/independent-publisher-service`,
+`feat/independent-review-authority`, and `feat/relay-codex-config-renderer`.
+No identical integrated tree was found for these tips in the reviewed history.
+Their superseded classification is not proof of byte-equivalent integration;
+manual semantic disposition or a separately retained source archive is required
+before deleting their only named development refs.
+
+The manifest is an approved candidate list, not a deletion receipt. Completed
+workflow receipts and an independent current-branch listing establish which
+refs were actually removed. Changing a manifest must not rewrite past receipts.
