@@ -35,8 +35,9 @@ jobs:
           git rev-parse HEAD > "$out/COMMIT"
           go version > "$out/TOOLCHAIN"
           tar -czf "$out/source.tar.gz" -C "$out/source" .
+          tar -czf "$out/go-toolchain.tar.gz" -C "$(go env GOROOT)" .
           rm -rf "$out/source"
-          (cd "$out" && sha256sum source.bundle source.tar.gz COMMIT TOOLCHAIN > SHA256SUMS)
+          (cd "$out" && sha256sum go-toolchain.tar.gz source.bundle source.tar.gz COMMIT TOOLCHAIN > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: audit-source-${{ github.event.pull_request.head.sha }}
