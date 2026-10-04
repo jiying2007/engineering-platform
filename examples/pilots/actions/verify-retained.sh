@@ -253,6 +253,8 @@ cleanup() {
     wait "$CONTROL_PID" 2>/dev/null || true
   fi
   rm -f "$STATE_ROOT/github-token"
+  # Review bootstraps fresh PKI; disposable keys/config must not enter transport.
+  rm -rf -- "$STACK_ROOT"
   git -C "$GITHUB_WORKSPACE" worktree remove --force "$RUNTIME_SRC" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT

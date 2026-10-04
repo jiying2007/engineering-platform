@@ -54,10 +54,26 @@ Admission mechanics are not live qualification of WIF. No relay identity or
 silent credential/provider fallback is admitted. Existing relay prequalification
 assets are frozen until a concrete live provider contract is supplied.
 
+## Retained terminal facts
+
+Terminal review uploads now contain only a bounded allowlisted fact archive,
+not the disposable stack, PKI, environment files, logs or database dumps.
+Verification destroys its bootstrap-only PKI after stopping Control; downstream
+Review already creates fresh identities. Intermediate database/result-artifact
+transport remains separate from the terminal fact archive.
+
+[Two fixed historical fact archives](../evidence/m1-terminal-facts/README.md)
+retain original member bytes from the actual Feature/Debug review artifacts and
+are independently checked in canonical CI. Source ZIP IDs/digests remain bound;
+historical schema bytes, review decisions and result refs are not rewritten.
+These small Git-retained records outlive Actions retention, but are explicitly
+not full runtime backups: original model output, binaries and Git bundle bytes
+still need their own retained artifact policy. No production claim follows.
+
 ## Remaining remediation
 
-Evidence archive scope/long-term readback, historical branch disposition and
-end-to-end interactive Worker control must receive their own tested closeout.
+Full engineering-artifact retention/restore, historical branch disposition and
+end-to-end interactive Worker control still require independent tested closeout.
 The two retained M1 result refs are evidence subjects, not cleanup candidates.
 Do not equate zero open PRs with repository hygiene or delivery maturity.
 
