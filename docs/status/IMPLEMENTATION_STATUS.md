@@ -164,3 +164,19 @@ qualification and compares the entire receipt. CI repeats the real native probe
 twice to test deterministic identity. This is not live model/tool/provider
 qualification, a resource sandbox, or production approval. Regenerate current
 qualification/Profile identity; do not rewrite historical M1 records.
+
+## W03 catchable post-turn failures
+
+The actual Worker now records bounded immutable local phase entries before
+post-turn persistence, Finalize and report work. Catchable failures after a
+completed/quiescent turn retain a private source checkpoint and attempt one
+immutable Core registration. A failed Finalize's one direct local child commit
+may be inspected only for source preservation; normal execution/reopen keeps its
+original-base fence. No successful path gets an unsolicited extra source copy.
+A completed turn's checkpoint remains ineligible for interruption-only source
+continuation. A lost response may follow an already committed Core receipt;
+local failure observations never override FINISHED or authorize model replay.
+
+These records are not new authority or automatic crash recovery. Abrupt host/
+Worker death, disk exhaustion that prevents all writes, comprehensive raw model/
+Git/binary/database retention and automatic repair remain separate unclosed work.

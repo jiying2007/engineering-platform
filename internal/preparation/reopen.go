@@ -113,5 +113,12 @@ func saveOfflineRecord(dir, name string, data []byte) error {
 	_, writeErr := file.Write(data)
 	syncErr := file.Sync()
 	closeErr := file.Close()
-	return errors.Join(writeErr, syncErr, closeErr)
+	if err := errors.Join(writeErr, syncErr, closeErr); err != nil {
+		return err
+	}
+	directory, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	return errors.Join(directory.Sync(), directory.Close())
 }
