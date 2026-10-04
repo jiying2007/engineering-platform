@@ -73,7 +73,7 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -104,13 +104,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash examples/pilots/actions/review-close-retained.sh
 
-      - name: Retain independent review state
-        if: ${{ always() }}
+      - name: Build bounded terminal review archive
+        shell: bash
+        env:
+          REVIEW_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          out="$RUNNER_TEMP/retained-pilot-review-facts"
+          mkdir "$out"
+          python3 -B scripts/retained_review_archive.py pack \
+            --source "$RUNNER_TEMP/retained-pilot-review" \
+            --review-run-id "$REVIEW_RUN_ID" --out "$out/review-facts.json"
+          (cd "$out" && sha256sum review-facts.json > SHA256SUMS)
+          digest="sha256:$(sha256sum "$out/review-facts.json" | cut -d' ' -f1)"
+          python3 -B scripts/retained_review_archive.py verify \
+            --archive "$out/review-facts.json" --expected-digest "$digest"
+
+      - name: Retain terminal review facts only
         uses: actions/upload-artifact@v4
         with:
-          name: retained-pilot-review-${{ inputs.pilot }}-${{ inputs.verification_run_id }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/retained-pilot-review
-          if-no-files-found: warn
+          name: retained-pilot-review-facts-${{ inputs.pilot }}-${{ inputs.verification_run_id }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-pilot-review-facts
+          if-no-files-found: error
           retention-days: 90
 
       - name: Summarize review decision
