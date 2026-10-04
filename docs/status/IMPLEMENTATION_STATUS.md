@@ -180,3 +180,21 @@ local failure observations never override FINISHED or authorize model replay.
 These records are not new authority or automatic crash recovery. Abrupt host/
 Worker death, disk exhaustion that prevents all writes, comprehensive raw model/
 Git/binary/database retention and automatic repair remain separate unclosed work.
+
+
+## W03 read-only execution readback
+
+`eng execution-readback` verifies the actual existing private permit/phase/turn/
+result/checkpoint records without modifying them or granting any effect. Explicit
+artifact paths opt into exact source or bundle byte checks; stored metadata paths
+are never followed. The offline default does not contact Core. Optional `--core`
+performs one existing authenticated GET and independently checks token, sealed
+transcript, expected result and checkpoint identity. A local failure does not
+replace an already-committed Core FINISHED receipt, and a Core descriptor does
+not prove private bytes were read. The report exposes no model/source/steering
+bodies and never authorizes execution, replay or production qualification.
+
+This is bounded consistency/observation tooling for the W03 failure path, not
+complete crash recovery, full raw-artifact retention, a second state authority,
+or an automatic repair decision. W01 service observation/capacity, abrupt-crash
+recovery and the remaining W04–W10 RC work packages are still not closed.

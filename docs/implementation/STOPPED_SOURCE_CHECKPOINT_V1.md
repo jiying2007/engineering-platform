@@ -146,3 +146,61 @@ leave only the last phase entry; this slice does not add a crash-recovery daemon
 automatic capture after restart, full Git/model/binary/database backups, or an
 automatically approved recovery decision. Local write exhaustion may prevent
 both capture and journaling; the error remains explicit rather than a success.
+
+
+## Read-only post-turn inspection
+
+`eng execution-readback` consumes the existing private records; it creates no
+new execution ledger, permission, or recovery daemon. This is a Linux readback
+command, not automatic repair. The offline default performs no network request,
+Git command, model call, restoration, or file write.
+
+```sh
+eng execution-readback \
+  --records /private/prepared/workspaces/EXACT_SLOT \
+  --run EXACT_RUN --execution EXACT_EXECUTION_ID \
+  --permit-digest sha256:EXTERNALLY_PINNED_RAW_PERMIT_DIGEST
+```
+
+The operator supplies the full raw-byte SHA256 of the existing
+`codex-<execution_id>.json` permit from a separately trusted capture. Hashing an
+untrusted permit and passing that hash is consistency checking, not authentication.
+Only fixed, execution-derived filenames are opened. The permit, contiguous phase
+entries, optional failure record, turn receipt, saved result and checkpoint must
+agree on the frozen Task/input, token, transcript, result and turn. Records are
+bounded to 1 MiB each and must be private regular files in a canonical private
+directory. Duplicate/unknown JSON fields, aliases, special files, truncated files,
+phase holes and identity drift fail. The selected record set is read twice,
+including absent entries. The directory must remain host-owned and quiescent;
+this does not defend against a malicious same-UID writer or root.
+
+`NO_POST_TURN_RECORDS`, `PHASE_ENTRIES_ONLY` and `FAILED_UNCONFIRMED` describe
+only what was observed locally. ENTERED proves neither completion nor a crash.
+In particular, all six phase entries do not themselves prove Core FINISHED.
+A saved registration flag remains a local claim, even when a later Core read
+confirms that a previously lost registration reply had followed a commit.
+
+`--archive /private/exact.source-checkpoint.tar` independently verifies source
+bytes with the existing checkpoint verifier and requires exact descriptor
+identity. `--bundle /private/exact.bundle` verifies exact size/hash under a
+private directory; this is not independent Git replay. Metadata archive/bundle
+paths are NEVER followed. Without these explicit arguments both byte fields
+remain NOT_READ. Unknown files and source/HOME are not scanned, so the report is
+not a full directory inventory or complete raw-artifact backup.
+
+`--core` adds exactly one authenticated mTLS GET of the existing Run/Codex API,
+using the existing read capability and client environment. It does not POST or
+retry. The token and sealed transcript must match, and a FINISHED receipt must
+validate against the original permit and locally expected result digest. Core
+checkpoint registration proves a descriptor, not that Core read the private
+archive. A missing/inconsistent receipt or failed HTTP observation fails closed.
+A locally FAILED_UNCONFIRMED execution may correctly show Core FINISHED after
+reply loss. Neither observation overwrites the other, and FINISHED here is an
+execution receipt, not overall Delivery/Review/Closure.
+
+The JSON output contains only identities, observations, selected-file digests
+and timestamps: no source bodies, model output, steering, credentials or absolute
+metadata paths. `execution_authorized`, `replay_authorized` and
+`production_qualified` remain false. Exit 0 means the requested readback passed,
+not that execution succeeded or may be retried. This does not capture bytes after
+abrupt death, decide recovery, transfer ownership, or fix missing/damaged files.
