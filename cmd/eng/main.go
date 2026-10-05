@@ -52,6 +52,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "distribution-install", "installation-verify":
+		if err := distributionInstall(os.Args[2:], os.Args[1] == "installation-verify"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "distribution-verify":
 		if err := distributionVerify(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -221,6 +226,8 @@ func usage() {
 	fmt.Println("  runtime-isolation-probe                     verify local kernel process containment, without accounts")
 	fmt.Println("  run-continue authorize|status <flags>  authorize one new Run from confirmed stopped source")
 	fmt.Println("  run-control inspect|status|steer|interrupt <flags>  explicit live control and receipt readback")
+	fmt.Println("  distribution-install --from DIR --into NEW_DIR --source-commit SHA  install matching runtime/templates; no service activation")
+	fmt.Println("  installation-verify --dir DIR --source-commit SHA  verify installed runtime/templates without execution")
 	fmt.Println("  distribution-verify --dir DIRECTORY       verify complete delivered executable roles and exact bytes")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
@@ -229,7 +236,8 @@ func usage() {
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
 	fmt.Println("  production-terminal-plan                        emit immutable terminal maintenance acceptance contract")
 	fmt.Println("  production-slo-report --observations FILE       summarize measured operational latency evidence without guessed targets")
-	fmt.Println("  production-status [--require-ready]             read authenticated operational status from Control API")
+	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
+	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")
 	fmt.Println("  relay-qualification-kit <flags>                materialize immutable offline relay qualification bundle")
