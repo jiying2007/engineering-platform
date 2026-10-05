@@ -114,10 +114,27 @@ automatically enabling executable permissions. This is a host reference case,
 NOT a new Runtime out-of-tree build profile, MCU qualification or board evidence.
 The shipping committed-source readback fence is unchanged.
 
+The existing mandatory PostgreSQL 17 authority-restore drill also consumes the
+private set. Native `pg_dump` runs as the test caller's UID/GID; it produces a
+consistent custom-format dump plus the expected authority snapshot. Packing is
+followed by deletion and absence checks of the original database and dump/plan
+directory. Restore reads only the retained archive, then the explicitly
+privileged test invokes native `pg_restore --single-transaction` into the fresh
+fixture database. Existing checks compare Work/Delivery/Evidence/Verification/
+Review/Closure, operation and recovery proof, audit sequence/digest, migrations
+and Outbox; recovered-epoch completion must still pass.
+
+This is an actual PostgreSQL/container integration with synthetic test records,
+not production-host or customer-data recovery. The archive's execution ID names
+a TEST-only backup operation, not a model run. Raw-set byte verification still
+does not execute SQL or assert producer semantics. The native recovery decision
+and existing Recovery completion authority remain separate. The test admin pool
+stays open until scoped database cleanup completes; no backup file is uploaded.
+
 This closes explicit raw-set storage/readback, not all W04/W05: producer-side
 frozen output contracts, complete per-Run dependency coverage (including original
 Git base/input/context), scheduled backup, approved second-site storage, key
-management/encryption policy, native database consistency/restore, full model
+management/encryption policy, production/cross-version database acceptance, full model
 output retention, crash capture and retention/GC lifecycle remain separate.
 Omitted files are NOT covered. Use native database backups, never live data files.
 Never upload private sets to public GitHub/Actions. Source, steering and artifacts
