@@ -1,0 +1,33 @@
+name: Install source snapshot
+on:
+  pull_request:
+    paths: ['.github/workflows/rc-install-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: a89727ecf4582477ed3bfd92eb18c69db66f7783
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export fixed public source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = a89727ecf4582477ed3bfd92eb18c69db66f7783
+          out="$RUNNER_TEMP/install-source"
+          mkdir "$out"
+          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
+          git bundle create "$out/source.bundle" HEAD
+          git rev-parse HEAD > "$out/COMMIT"
+          (cd "$out" && sha256sum source.tar.gz source.bundle COMMIT > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: install-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/install-source
+          if-no-files-found: error
+          retention-days: 7
