@@ -4,6 +4,10 @@ Wants=network-online.target
 After=network-online.target engineering-control-plane.service
 Requires=engineering-control-plane.service
 
+# Bound service crashes; this never authorizes replaying an engineering Run.
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
 [Service]
 Type=simple
 User=engineering-preparation
@@ -14,6 +18,9 @@ Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=20s
 TimeoutStopSec=20s
+KillMode=control-group
+KillSignal=SIGTERM
+SendSIGKILL=yes
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

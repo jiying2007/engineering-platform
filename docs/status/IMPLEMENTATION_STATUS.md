@@ -33,6 +33,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
 | Distribution | One six-role list; source-matched installer embeds original deployment examples and verifies fresh installed bytes after source removal; installed Control/Publisher/Worker mTLS and durable quiescent restart regression | Systemd, fresh-host provisioning, in-flight effect crash recovery, automatic upgrade/migration or checksum-only authenticity |
+| Service manager | Explicit 3-start/60-second limit and cgroup stop policy in four canonical units; installed Publisher mTLS/crash restart and descendant-timeout tests under real systemd | Full production unit graph, distinct Unix-role provisioning, in-flight publication or model replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
 | Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages/markers and bounded read-only progress windows | Inferred consumer/publisher health, capacity or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
@@ -207,3 +208,23 @@ bound-address announcement is not a provider-ready assertion. See the existing
 [operations contract](../implementation/PRODUCTION_OPERATIONS_V1.md).
 Systemd/dependency provisioning, in-flight crash recovery and upgrades are not
 covered by this quiescent process regression.
+
+
+The native CI additionally runs `scripts/ci-systemd-lifecycle.sh` against a real
+system manager. It creates only random transient test names in an ephemeral
+runner, retaining the installed Publisher service sandbox/restart/stop settings
+while substituting private paths and the non-root test UID/GID. No production
+unit is installed or enabled and no host-wide restriction is disabled. Actual
+Publisher health, one idle forced-crash restart, three invalid-start attempts
+ending at start-limit-hit, and a separate TERM-resistant setsid child fixture
+are checked. The last must be killed after the configured stop timeout, remain
+a timeout failure and not restart after explicit stop. A missing manager or
+noninteractive privilege is a failed required CI gate, not a successful skip.
+
+These are manager-policy tests, not complete W06: Control/Worker under the full
+production systemd dependency graph, distinct service accounts, fresh-host
+provisioning, upgrade/migration rollback and active external-effect recovery
+remain open. The previous direct-process PostgreSQL tests remain independent.
+Rate-limit values are an explicit conservative restart policy, not measured SLOs.
+Reaching the limit requires diagnosis and an explicit operator restart; a service
+restart never grants authority to replay a non-replayable engineering Run.
