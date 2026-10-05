@@ -2,6 +2,10 @@ package dbschema
 
 import _ "embed"
 
+// CurrentSchemaVersion is the latest migration understood by this binary.
+// Migration 0001 predates the ledger; recorded versions start at 0002.
+const CurrentSchemaVersion = 11
+
 //go:embed migrations/0001_core.sql
 var coreMigration string
 

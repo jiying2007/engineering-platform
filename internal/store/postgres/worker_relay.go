@@ -154,16 +154,3 @@ func (s *Store) insertWorkerIntent(ctx context.Context, tx pgx.Tx, key string, i
 	}
 	return nil
 }
-func (s *Store) CheckWorkerSchema(ctx context.Context) error {
-	if s == nil || s.pool == nil {
-		return fmt.Errorf("PostgreSQL store required")
-	}
-	var present bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM core_schema_migrations WHERE version=3)`).Scan(&present); err != nil {
-		return err
-	}
-	if !present {
-		return fmt.Errorf("worker inbox migration 0003 is required")
-	}
-	return nil
-}
