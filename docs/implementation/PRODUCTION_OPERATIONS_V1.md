@@ -113,24 +113,72 @@ PostgreSQL-backed operational snapshot containing:
 - UNKNOWN/RECONCILING/MANUAL external Action counts;
 - UNKNOWN Core-bound Codex execution count.
 
-`eng production-status` reads this endpoint using the existing direct-mTLS
-Control client. `--require-ready` returns nonzero when mutation readiness is
-not clean while still printing the machine-readable status first.
+`eng production-status` reads this endpoint through the existing direct-mTLS
+Control client. Snapshot v2 deliberately separates `authority_state=CLEAR` from
+`service_readiness=NOT_OBSERVED`. Neither an empty database, a valid lease nor
+historical progress demonstrates current worker/publisher capacity. `ready=false`
+and `production_qualified=false` remain explicit. `--require-ready` therefore
+fails closed without an implemented service-readiness observation. The separate
+`--require-authority-clear` checks only the narrower database authority condition.
 
-Readiness is fail-closed for structural authority hazards:
+Authority blockers include Recovery/Reconciliation, expired Worker leases,
+dead-letter Outbox records, UNKNOWN/RECONCILING/MANUAL external operations and
+UNKNOWN Codex execution. No snapshot or diagnostic may resolve these conditions,
+authorize a retry or replay a model/publication.
 
-- Recovery/Reconciliation mode -> `RECOVERY_REQUIRED`;
-- expired Worker leases;
-- dead-letter outbox messages;
-- UNKNOWN/RECONCILING/MANUAL external operations;
-- UNKNOWN Codex execution -> `DEGRADED`.
+### Bounded queue-progress observation
 
-Normal pending work/outbox backlog is retained as an observation but is not
-given an arbitrary SLO threshold yet. Latency/backlog thresholds are frozen only
-after measured operational data exists.
+A finite, read-only observation uses the same endpoint, client and `core:read`
+permission. It adds no server route, heartbeat table, scheduler, permission or
+second status authority:
 
-Publisher process reachability and selected-provider qualification remain
-separate preflight/live facts; this endpoint does not invent their health.
+```sh
+eng production-status --observe-for 30s --interval 5s \
+  --max-pending-age 2m --require-no-alert
+```
+
+The age is an explicitly selected diagnostic threshold, **not** a calibrated
+production SLO. It must be supplied; the command invents no default target.
+Windows are 2..300 seconds with 1..60-second intervals, 3..61 samples and exact
+whole-second divisibility. Age thresholds are 1 second..24 hours. Reads are
+sequential and bounded to one interval each. The total deadline is the requested
+window plus one interval. Cancellation/SIGTERM, a failed read, missed slot,
+stale/repeated/contradictory snapshot, changed Recovery epoch/mode or regressed
+progress marker aborts without retries, catch-up bursts or a complete report.
+Prior samples are validated before any next request. An aborted invocation
+returns nonzero; it is not evidence that the service is stopped or unhealthy.
+
+The report retains every bounded snapshot/request/receive time and the selected
+policy. Queue facts include pending start/end/sample peak, final oldest age,
+whether the oldest **timestamp** stayed equal at all samples, and whether the
+last recorded admission/dispatch timestamp advanced. Equal oldest timestamps do
+not prove that one identical task remained queued. Counts decreasing or an oldest
+timestamp changing do not prove successful work completion; no throughput is
+inferred. Sampling cannot detect every event between requests.
+
+If an unchanged oldest timestamp is present at every sample and exceeds the
+selected age at the final sample, the report alerts. It distinguishes
+`AGED_BACKLOG_NO_PROGRESS_MARKER` from `AGED_BACKLOG_WITH_PROGRESS_MARKER`; other
+work advancing must not hide persistent old backlog. A database authority hazard
+at **any** sample keeps the window alerted even when the final sample is clear.
+Empty or changed queues yield only sampled observations, never READY.
+
+`--require-no-alert` prints the completed report and exits nonzero on a diagnostic
+or sampled authority alert. Without it, exit zero means that the observation
+completed, not that no alert exists. This window flag cannot be mixed with the
+single-snapshot readiness/authority gates. All results keep service readiness
+unobserved, capacity unobserved, ready/execution/production flags false. A local
+report and adjacent checksum are not independently authenticated SLO evidence.
+
+Actual compiled-CLI tests use the existing authenticated Core middleware and
+real ephemeral mTLS identities: `core:read` succeeds, another valid identity
+without that permission fails before reaching the Store. The Store's changing
+snapshots in these tests are explicitly synthetic; they do not substitute for
+PostgreSQL service, real consumer heartbeat or deployment acceptance.
+
+Publisher reachability, component heartbeat/capacity and selected-provider
+qualification remain separate unfinished observations. Measured operating SLOs
+require their own frozen workload, provenance and acceptance.
 
 ## 6. Restart and UNKNOWN policy
 

@@ -34,7 +34,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
 | Distribution | One six-role list in `internal/distribution/binaries.txt`; build, verification and Evidence import use it | Checksums authenticate an untrusted download by themselves |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
-| Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages and last database progress | Inferred consumer/publisher health, capacity or production readiness |
+| Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages/markers and bounded read-only progress windows | Inferred consumer/publisher health, capacity or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v2 and exact nonempty no-skip test inventory | Live provider/service acceptance |
 | Operator CLI | Run controls, stopped-source restore/continuation, private execution readback and artifact-set storage | Completed WorkBuddy UX or Human Takeover |
@@ -172,8 +172,9 @@ cannot promote them into account/provider/device qualification.
 
 W01-W10 remain the approved scope, not a new authority/checklist framework.
 
-- W01: component heartbeat/health/capacity and measured progress windows remain
-  open after the truthful-status/provenance slice.
+- W01: bounded read-only queue-progress windows use existing authenticated
+  snapshots and explicit diagnostic thresholds; component heartbeat/health/
+  capacity and calibrated operating SLOs remain open.
 - W02: account-free isolated startup implemented; actual auth/model/tool and
   deployment-environment acceptance remain external gates.
 - W03: catchable failure preservation/readback implemented; abrupt-crash capture,
