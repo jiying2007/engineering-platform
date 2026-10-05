@@ -22,6 +22,11 @@ func main() {
 			os.Exit(2)
 		}
 		usage()
+	case "artifact-set":
+		if err := artifactSet(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "execution-readback":
 		if err := executionReadback(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -210,6 +215,7 @@ func printJSON(value any) {
 
 func usage() {
 	fmt.Println("eng <command>")
+	fmt.Println("  artifact-set pack|verify|restore <flags>   preserve explicit private raw artifacts; no execution grant")
 	fmt.Println("  execution-readback <flags>               verify private records/artifacts; --core adds one authenticated GET")
 	fmt.Println("  source-checkpoint verify|restore <flags>  read back stopped source; never resume a model")
 	fmt.Println("  runtime-isolation-probe                     verify local kernel process containment, without accounts")
