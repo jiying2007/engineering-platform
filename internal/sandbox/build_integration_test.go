@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -46,6 +47,10 @@ func TestRealOfflineBuildOutputContract(t *testing.T) {
 				if err == nil {
 					t.Fatal("invalid output/log became receipt", mode)
 				}
+			}
+			remaining, listErr := exec.Command("docker", "ps", "-aq", "--filter", "ancestor="+f.Image).CombinedOutput()
+			if listErr != nil || strings.TrimSpace(string(remaining)) != "" {
+				t.Fatalf("output success/failure left a container: %v %s", listErr, remaining)
 			}
 		})
 	}
