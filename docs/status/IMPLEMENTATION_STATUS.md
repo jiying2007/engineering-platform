@@ -27,7 +27,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation | Automatic abrupt-crash capture, repair or replay |
-| Raw artifact sets | Explicit private member plan, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context selection, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
@@ -92,15 +92,22 @@ a local commit: reconcile the failed execution instead of blindly retrying it.
 explicit sorted member list with raw plan/archive digest and Run anchoring.
 Files remain private and non-executable. Packing/readback/restore never calls
 Core, runs a model/Git/SQL, overwrites old destinations or uploads public data.
-Completeness is ONLY relative to declared members; producer semantics are not
-inferred. Caller-selected native backups need their own consistency/restore.
+Generic completeness is ONLY relative to declared members; producer semantics
+are not inferred. `capture-execution` derives current producer records and every
+frozen Context entry from the original anchored permit, requiring all referenced
+source/result bytes rather than relying on a hand-written list. It rejects
+missing/extra Context and unbound artifacts. It does not capture the original Git
+base, toolchain, full control history or upstream continuation dependencies.
+Caller-selected native backups still need their own consistency/restore.
 
 Actual Worker tests delete original records/source/bundle locations, restore the
 raw set and re-run existing semantic readback. A host C-compiler reference keeps
 ELF/map outside source and restores outputs after removing both original source
 and build directories. Neither test adds a Runtime build-output contract or
-qualifies MCU/hardware. Original Git base/input/context coverage, model output,
-second-site retention, encryption/key policy, scheduling and GC remain open.
+qualifies MCU/hardware. Producer-derived capture tests additionally remove the entire prepared root
+including Context, restore, and recheck every frozen input object and producer
+record. Original Git base/toolchain, full model/tool/control history, second-site
+retention, encryption/key policy, scheduling and GC remain open.
 
 The mandatory PostgreSQL 17 drill additionally retains a native dump and expected
 authority snapshot through the raw set, removes and checks absence of the original

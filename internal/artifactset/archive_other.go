@@ -16,3 +16,7 @@ func Verify(context.Context, string, string, string) (Report, error) {
 func Restore(context.Context, string, string, string, string) (Report, error) {
 	return Report{}, fmt.Errorf("private artifact sets require Linux")
 }
+
+func VerifyInputs(context.Context, Plan) error {
+	return fmt.Errorf("private artifact sets require Linux")
+}

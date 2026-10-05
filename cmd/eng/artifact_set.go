@@ -73,6 +73,9 @@ func executeArtifactSet(ctx context.Context, args []string) (artifactset.Report,
 	}
 }
 func artifactSet(args []string) error {
+	if len(args) > 0 && args[0] == "capture-execution" {
+		return captureExecution(args[1:])
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	r, err := executeArtifactSet(ctx, args)

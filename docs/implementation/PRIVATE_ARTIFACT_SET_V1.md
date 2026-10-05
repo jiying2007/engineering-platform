@@ -97,6 +97,62 @@ Reports distinguish packed, verified and restored bytes and always state
 not proof that a file is a valid firmware image or consistent database backup.
 Reports contain identities/digests/counts, not absolute paths or raw payloads.
 
+## Producer-derived execution capture
+
+`capture-execution` reuses this exact archive format and verifier. It derives the
+member plan from an externally anchored original execution permit, the existing
+strict execution readback, and ALL entries in the frozen preparation Context
+manifest. The Task and Run input are retained inside the original permit bytes;
+recorded agent output is retained inside original turn/result records. No new
+schema, permission or automatic runtime capture is introduced.
+
+```sh
+eng artifact-set capture-execution \
+  --records /private/original/records --run "$ORIGINAL_RUN" \
+  --execution "$EXECUTION_ID" --permit-digest "$PINNED_PERMIT_DIGEST" \
+  --context /private/original/context \
+  --archive /private/artifacts/source-checkpoint.tar \
+  --bundle /private/artifacts/result.bundle --out /private/retained/execution.tar
+```
+
+Supply `--archive` exactly when a source checkpoint is recorded, and `--bundle`
+exactly when a result is recorded. Omission of a referenced artifact rejects;
+metadata paths never supply defaults. At least one verifiable result/checkpoint
+is required. Missing or changed Context bytes/manifest, extra Context members,
+unsafe paths/files, output beneath records/Context, and existing output reject.
+A no-record/phase-only observation cannot be advertised as an archived result.
+
+Selection is `EXECUTION_RECORDS_AND_ALL_FROZEN_CONTEXT`. This closes selection
+completeness for those producer objects, not `full_run_backup`: the original Git
+base, runtime/toolchain binary, complete Core control/tool history, and upstream
+continuation dependencies still require separate retention. Artifact-set's own
+coverage stays `EXPLICIT_DECLARED_MEMBERS_ONLY`. No Core/network request, Git,
+SQL, model, source scan, permission grant or public upload occurs. The command
+requires already host-owned quiescent inputs; offline retention does not renew
+Context approval or authorize execution.
+
+The context manifest is stored as `files/context-manifest.json`, with original
+canonical manifest bytes and original entry names. This name avoids collision
+with the outer archive manifest. All producer record names and raw bytes remain
+unchanged. On explicit restore, existing `execution-readback` consumes the
+restored files; the context manifest and every referenced entry can be checked
+against the original preparation/Run input. Do not automatically resolve its
+historical paths or grant runtime access to restored material.
+
+The derived private plan exists only in an owned temporary staging directory.
+Packing uses the existing independent readback and atomic no-overwrite path.
+The selection is rechecked after packing, including record absences and Context
+inventory. An error after publication may leave an archive, but never reports
+successful capture. Only this call's temporary staging is cleaned; published
+or original material is never deleted to conceal failure.
+
+Actual Worker/Preparer/kernel-namespace tests cover completed execution, Finalize
+failure, result reply loss and checkpoint reply loss. They delete the entire
+original prepared root (source, HOME, records, Context and artifacts), restore
+only the retained set and verify producer records and every frozen Context byte.
+Protocol and Core transport in these tests are explicitly synthetic fixtures,
+not live provider or authenticated service proof.
+
 ## W04/W05 integration and remaining gates
 
 Actual Worker/Preparer tests preserve their emitted permit, phase, result,
