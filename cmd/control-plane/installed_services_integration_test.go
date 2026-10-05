@@ -281,7 +281,8 @@ func TestOfflineCommandInstalledServicesLifecycle(t *testing.T) {
 				t.Fatal("invalid plan was not rejected before external operations", response.StatusCode)
 			}
 		}
-		rejectInstalledProcess(t, ctx, filepath.Join(bin, "publisher-service"), []string{"--execute"}, publisherEnv)
+		// A fresh port prevents a port-conflict failure from masking ignored args.
+		rejectInstalledProcess(t, ctx, filepath.Join(bin, "publisher-service"), []string{"--execute"}, replaceServiceEnv(publisherEnv, "PORT", "0"))
 		rejectInstalledProcess(t, ctx, filepath.Join(bin, "publisher-service"), nil, publisherEnv) // occupied listener
 		checkPublisher()
 		publisher.stop(t, syscall.SIGTERM)
