@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/artifactset"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/offline"
@@ -29,12 +30,28 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/sandbox/testutil"
 	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
+	"github.com/jiying2007/engineering-platform/internal/workeragent"
 )
 
 // Actual local Git, mTLS, PostgreSQL, compiled Worker/eng and real container.
 // The computation is a fixture, not Codex/model evidence.
 func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
-	image := testutil.Build(t)
+	offlineCommandCapture(t, false)
+}
+
+// The compiler, actual Worker/eng, mTLS/Core, raw report and retained artifacts
+// are now one Run, rather than separate compiler and synthetic-record proofs.
+func TestOfflineCommandCCompilerCaptureRestore(t *testing.T) {
+	offlineCommandCapture(t, true)
+}
+
+func offlineCommandCapture(t *testing.T, compiler bool) {
+	var image testutil.Fixture
+	if compiler {
+		image = testutil.BuildCompiler(t)
+	} else {
+		image = testutil.Build(t)
+	}
 	url := os.Getenv("POSTGRES_TEST_URL")
 	if url == "" {
 		t.Fatal("real offline command suite requires POSTGRES_TEST_URL")
@@ -44,6 +61,11 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	guard, err := os.ReadFile(image.Guard)
 	commandOK(t, err)
 	profile := sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "build-output", "good"}, Seconds: 10, Outputs: []sandbox.OutputSpec{{Name: "app.bin", MaxBytes: 64}, {Name: "app.map", MaxBytes: 64}}}
+	if compiler {
+		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/main.c", "-Wl,-e,entry,-Map=/tmp/ep-output/app.map", "-o", "/tmp/ep-output/app.elf"}
+		profile.Seconds = 15
+		profile.Outputs = []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 128 << 10}, {Name: "app.map", MaxBytes: 64 << 10}}
+	}
 	pd, err := profile.Digest()
 	commandOK(t, err)
 	admin, err := pgxpool.New(ctx, url)
@@ -136,7 +158,10 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	gitRun("config", "user.name", "Offline Fixture")
 	gitRun("config", "user.email", "test@example.invalid")
 	commandOK(t, os.WriteFile(filepath.Join(repo, "hello.txt"), []byte("real approved source\n"), 0o600))
-	gitRun("add", "hello.txt")
+	if compiler {
+		commandOK(t, os.WriteFile(filepath.Join(repo, "main.c"), []byte("int entry(void) { return 42; }\n"), 0600))
+	}
+	gitRun("add", ".")
 	gitRun("commit", "-m", "base")
 	commit := gitRun("rev-parse", "HEAD")
 	contextBytes := []byte("real approved context\n")
@@ -239,16 +264,24 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	}
 	var receipt offline.Receipt
 	commandOK(t, json.Unmarshal(out, &receipt))
-	if receipt.Kind != offline.Kind || receipt.Result.ExitCode != 0 || !strings.Contains(string(receipt.Result.Stdout), "OFFLINE_BUILD_PASS") || receipt.Worker != worker {
+	if receipt.Kind != offline.Kind || receipt.Result.ExitCode != 0 || (!compiler && !strings.Contains(string(receipt.Result.Stdout), "OFFLINE_BUILD_PASS")) || receipt.Worker != worker {
 		t.Fatalf("invalid actual execution receipt: %#v", receipt)
 	}
 
-	if receipt.Result.BuildOutputs == nil || len(receipt.Result.BuildOutputs.Files) != 2 || string(receipt.Result.BuildOutputs.Files[0].Bytes) != "actual output\x00\xff" || receipt.Result.Validate(profile) != nil {
+	if receipt.Result.BuildOutputs == nil || len(receipt.Result.BuildOutputs.Files) != 2 || receipt.Result.Validate(profile) != nil {
 		t.Fatal("Worker lost frozen output bytes")
+	}
+	if compiler {
+		if !strings.HasPrefix(string(receipt.Result.BuildOutputs.Files[0].Bytes), "\x7fELF") || !strings.Contains(string(receipt.Result.BuildOutputs.Files[1].Bytes), "entry") {
+			t.Fatal("actual compiler output missing")
+		}
+	} else if string(receipt.Result.BuildOutputs.Files[0].Bytes) != "actual output\x00\xff" {
+		t.Fatal("probe output mismatch")
 	}
 	// The fsynced existing local report must retain exactly the same raw outputs
 	// before network reporting. No extra write-capable mount or new ledger exists.
 	recordCount := 0
+	records := ""
 	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -266,6 +299,7 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 					t.Fatal("local result differs from Core receipt")
 				}
 				recordCount++
+				records = filepath.Dir(path)
 			}
 		}
 		return nil
@@ -300,5 +334,90 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	if count != 0 {
 		t.Fatal("offline fixture manufactured Evidence")
 	}
-	t.Logf("actual offline receipt profile=%s stdout=%s", receipt.Result.ProfileDigest, receipt.Result.StdoutDigest)
+	// Capture the actual producer bytes without configuring network credentials.
+	// The external anchors here come from this authorized test's known files.
+	permitName := "offline-" + receipt.Token.ID + ".json"
+	reportName := "offline-" + sandbox.Hash([]byte(receipt.Token.ID + ":report"))[7:] + ".json"
+	permitRaw, err := os.ReadFile(filepath.Join(records, permitName))
+	commandOK(t, err)
+	reportRaw, err := os.ReadFile(filepath.Join(records, reportName))
+	commandOK(t, err)
+	retained := t.TempDir()
+	commandOK(t, os.Chmod(retained, 0700))
+	archive := filepath.Join(retained, "offline.tar")
+	capture := exec.CommandContext(ctx, filepath.Join(bin, "eng"), "artifact-set", "capture-offline", "--records", records, "--run", input.RunID, "--execution", receipt.Token.ID, "--permit-digest", sandbox.Hash(permitRaw), "--report-digest", sandbox.Hash(reportRaw), "--out", archive)
+	capture.Env = []string{"PATH=/usr/bin:/bin"}
+	out, err = capture.CombinedOutput()
+	if err != nil {
+		t.Fatalf("producer capture: %v %s", err, out)
+	}
+	var captured workeragent.OfflineCaptureReport
+	commandOK(t, json.Unmarshal(out, &captured))
+	if captured.OutputCount != 2 || captured.Archive.Members != 4 || captured.CoreObservation != "NOT_OBSERVED" || captured.ExecutionAuthorized || captured.ProductionQualified || captured.FullRunBackup {
+		t.Fatal("invalid capture scope", captured)
+	}
+	// Source/Git, Context and producer workspace are really gone. This proves
+	// output independence, not a claim that those excluded inputs are backed up.
+	for _, dir := range []string{root, repo, source} {
+		commandOK(t, filepath.WalkDir(dir, func(path string, d fs.DirEntry, e error) error {
+			if e == nil && d.IsDir() {
+				return os.Chmod(path, 0700)
+			}
+			return e
+		}))
+		commandOK(t, os.RemoveAll(dir))
+		if _, e := os.Stat(dir); !os.IsNotExist(e) {
+			t.Fatal("original remains", dir)
+		}
+	}
+	into := filepath.Join(retained, "restored")
+	restore := exec.CommandContext(ctx, filepath.Join(bin, "eng"), "artifact-set", "restore", "--archive", archive, "--archive-digest", captured.Archive.ArchiveDigest, "--run", input.RunID, "--into", into)
+	restore.Env = []string{"PATH=/usr/bin:/bin"}
+	out, err = restore.CombinedOutput()
+	if err != nil {
+		t.Fatalf("producer restore: %v %s", err, out)
+	}
+	var restored artifactset.Report
+	commandOK(t, json.Unmarshal(out, &restored))
+	if restored.ExecutionAuthorized || restored.ProductionQualified || restored.ProducerSemanticsVerified {
+		t.Fatal("restore grants authority")
+	}
+	files := filepath.Join(into, "files")
+	read := func(name string) []byte {
+		t.Helper()
+		raw, e := os.ReadFile(filepath.Join(files, name))
+		commandOK(t, e)
+		return raw
+	}
+	if string(read(permitName)) != string(permitRaw) || string(read(reportName)) != string(reportRaw) {
+		t.Fatal("producer records changed")
+	}
+	var restoredPermit offline.Permit
+	var restoredReport offline.Report
+	commandOK(t, json.Unmarshal(read(permitName), &restoredPermit))
+	commandOK(t, json.Unmarshal(read(reportName), &restoredReport))
+	commandOK(t, restoredPermit.Check(worker, offline.Start{RunID: input.RunID, WorkerProfile: workerProfile, Profile: profile}))
+	commandOK(t, receipt.Verify(worker, restoredPermit, restoredReport.Result))
+	for i, member := range []string{"output-000.bin", "output-001.bin"} {
+		data := read(member)
+		if string(data) != string(receipt.Result.BuildOutputs.Files[i].Bytes) {
+			t.Fatal("restored native output drift")
+		}
+		st, e := os.Stat(filepath.Join(files, member))
+		commandOK(t, e)
+		if st.Mode().Perm() != 0600 {
+			t.Fatal("output automatically executable")
+		}
+	}
+	observed, err := store.GetOffline(ctx, input.RunID)
+	commandOK(t, err)
+	got, _ = json.Marshal(observed.Receipt)
+	if observed.State != offline.Finished || string(got) != string(want) {
+		t.Fatal("capture changed Core result")
+	}
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM evidence").Scan(&count))
+	if count != 0 {
+		t.Fatal("capture manufactured Evidence")
+	}
+	t.Logf("same-Run compiler=%t Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s", compiler, receipt.Result.ProfileDigest)
 }

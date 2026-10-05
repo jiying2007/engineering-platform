@@ -196,3 +196,61 @@ Omitted files are NOT covered. Use native database backups, never live data file
 Never upload private sets to public GitHub/Actions. Source, steering and artifacts
 can contain secrets; these archives are not auto-redacted or encrypted. Public
 terminal fact allowlists and historical M1 archives are unchanged. #105 is open.
+
+## Frozen offline build producer capture
+
+`eng artifact-set capture-offline` reads only the two existing deterministic
+`offline-<execution>.json` and `offline-<hash(execution + ":report")>.json`
+producer records. Both raw digests must be independently anchored. The original
+permit binds Task, RunInput, preparation and exact sandbox Profile. The complete
+local report must match that permit, including the frozen output names/budgets,
+child-reap flag, actual command exit, stdout/stderr and every output byte/hash.
+A caller cannot omit an output or substitute a different Profile after the run.
+No expired permit is renewed and no local record is promoted to a Core receipt.
+
+```sh
+eng artifact-set capture-offline --records /private/original-workspace \
+  --run "$ORIGINAL_RUN" --execution "$OFFLINE_EXECUTION_ID" \
+  --permit-digest "$PINNED_RAW_PERMIT_DIGEST" \
+  --report-digest "$PINNED_RAW_REPORT_DIGEST" \
+  --out /private/retained/offline.tar
+```
+
+The unmodified permit/report bytes plus every collected raw file enter the
+existing archive format. Output archive IDs are `output-000.bin`, `output-001.bin`
+and so on in frozen contract order; the original case-sensitive names, bounds
+and digests remain in the report. These IDs are data, not executable paths.
+Failed-command reports are preserved with their nonzero exit, state
+`NOT_COLLECTED_EXIT_NONZERO` and **zero** output members. They never become
+successful builds because capture or restore returned zero.
+
+A private temporary directory materializes bounded inline output bytes for the
+existing Pack implementation; input ownership/link checks precede these writes.
+All source records are reread after packing. Only this call's staging is removed;
+original records and a published archive are never deleted on failure. Like
+Pack, post-publication failures require observation, not overwrite or blind
+retry. The generated raw-plan digest includes actual temporary source paths;
+separate captures need not have identical archive digests. Original record and
+output byte digests, not temporary-path identities, are the stable producer facts.
+
+Reports state `selection=FROZEN_OFFLINE_RECORDS_AND_COLLECTED_OUTPUTS`, command
+exit/output state/count, both external anchors, result and output-contract digests.
+`core_observation=NOT_OBSERVED`, `full_run_backup=false`, and execution/production
+flags remain false. Storage does not independently attest the original runtime.
+Offline execution may already have sent these output bytes to authorized Core
+readers; this command does not retract or reclassify that earlier exposure.
+No network, Core call, compile, SQL, Git, recursive scan or public upload occurs.
+
+This selection does NOT include source/Git-base bytes, Context objects, toolchain,
+upstream dependencies, complete logs or a database backup. The original embedded
+stdout/stderr are retained only within existing bounded reports. Successful capture
+is not Evidence/Verification/Review or a complete Run backup. Additional files in
+the private workspace are ignored, never inferred as approved archive members.
+
+Mandatory command integration runs both the existing probe and a real scratch-
+container host C compiler through the actual compiled Worker, mTLS and PostgreSQL.
+The same Run's local records are captured by compiled `eng`, original preparation,
+source and Git directories are removed, then the archive alone is restored. The
+restored permit/report and every raw output are compared with the previously
+observed Core receipt. No Evidence or new execution is created. This is synthetic
+test-task authority with real infrastructure, not a model, MCU or board qualification.

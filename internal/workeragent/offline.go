@@ -105,7 +105,7 @@ func ExecuteOffline(ctx context.Context, c Transport, p *preparation.Preparer, e
 	}
 	report := offline.Report{Token: permit.Token, Result: observed}
 	// A separate deterministic local record preserves actual output before network.
-	reportID := sandbox.Hash([]byte(permit.Token.ID + ":report"))[7:]
+	reportID := offlineReportID(permit.Token.ID)
 	if err = p.SaveOffline(ctx, permit.Assignment, result, reportID, report); err != nil {
 		return receipt, err
 	}
