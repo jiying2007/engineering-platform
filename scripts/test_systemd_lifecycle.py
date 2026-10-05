@@ -72,6 +72,22 @@ class LifecycleContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 lifecycle.cgroup_empty(group)
 
+    def test_rate_limit_requires_all_three_independent_facts(self):
+        name = "ep-sysd-1-1-012345abcdef.service"
+        state = {"LoadState": "loaded", "ActiveState": "failed", "SubState": "failed", "MainPID": "0", "Result": "exit-code", "StartLimitBurst": "3", "StartLimitIntervalUSec": "1min"}
+        row = {"_PID": "1", "UNIT": name, "MESSAGE": name + ": Start request repeated too quickly."}
+        lifecycle.assert_rate_limit(state, 3, [row], name)
+        lifecycle.assert_rate_limit(dict(state, Result="start-limit-hit"), 3, [row], name)
+        for key, value in (("LoadState", "not-found"), ("ActiveState", "activating"), ("SubState", "auto-restart"), ("MainPID", "100"), ("Result", "resources"), ("StartLimitBurst", "0"), ("StartLimitIntervalUSec", "0")):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                lifecycle.assert_rate_limit(dict(state, **{key:value}), 3, [row], name)
+        for attempts in (0, 1, 2, 4):
+            with self.assertRaises(ValueError):
+                lifecycle.assert_rate_limit(state, attempts, [row], name)
+        for rows in ([], [dict(row, _PID="123")], [dict(row, UNIT="other.service")], [dict(row, MESSAGE="forged")], [None], [row]*65):
+            with self.assertRaises(ValueError):
+                lifecycle.assert_rate_limit(state, 3, rows, name)
+
     def test_ci_scope_requires_manager_and_cleans_only_its_prefix(self):
         script = (ROOT/'scripts/ci-systemd-lifecycle.sh').read_text()
         for text in ('/run/systemd/private', 'sudo -n true', 'trap cleanup EXIT', 'EP_SYSTEMD_INTEGRATION=1', '--work-root "$root"', 'systemd_lifecycle.py', 'git rev-parse HEAD', 'reset-failed'):

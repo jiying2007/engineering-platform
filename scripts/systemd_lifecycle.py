@@ -158,6 +158,22 @@ class Unit:
                 self.p.stdout.close()
 
 
+
+def assert_rate_limit(state, attempts, manager_records, unit_name):
+    """Require manager-origin limit evidence, not a single Result label.
+
+    systemd v255 retains an earlier service exit-code when can_start rejects
+    the next restart (service_enter_dead only overwrites SERVICE_SUCCESS).
+    The PID1 journal event separately records that the actual limit was hit.
+    """
+    require(PREFIX.fullmatch(unit_name.removesuffix(".service")) and unit_name.endswith(".service"), "invalid limit subject")
+    require(state.get("LoadState") == "loaded" and state.get("ActiveState") == "failed" and state.get("SubState") == "failed" and state.get("MainPID") == "0", "limited service did not remain stopped")
+    require(state.get("Result") in ("exit-code", "start-limit-hit") and state.get("StartLimitBurst") == "3" and state.get("StartLimitIntervalUSec") == "1min", "unexpected limited service result/policy")
+    require(attempts == 3, "expected exactly three rejected startup attempts")
+    require(isinstance(manager_records, list) and len(manager_records) <= 64, "bounded manager records required")
+    require(any(isinstance(row, dict) and row.get("_PID") == "1" and row.get("UNIT") == unit_name and row.get("MESSAGE") == unit_name + ": Start request repeated too quickly." for row in manager_records), "manager did not independently confirm start limit")
+
+
 def cgroup_empty(group):
     require(re.fullmatch(r"/system.slice/ep-sysd-[0-9]+-[0-9]+-[a-f0-9]{12}\.service", group), "unexpected test cgroup")
     root = Path("/sys/fs/cgroup") / group.lstrip("/")
@@ -222,9 +238,17 @@ def run_suite(distribution, expected, root, prefix):
         rejected = unit([publisher, "--unsupported-ci-only"])
         rejected.finish(False)
         state = rejected.snapshot()
-        require(state["ActiveState"] == "failed" and state["Result"] == "start-limit-hit", "startup failure did not stop at manager rate limit: " + json.dumps(state, sort_keys=True) + "; rejected_attempts=" + str(sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines)))
-        require(sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines) == 3, "expected exactly three rejected startup attempts")
-        checks.append("three_rejected_starts_then_start_limit_hit")
+        # Preserve the actual service result; an earlier exit-code may remain.
+        # Only PID1's event for this exact random unit proves rate limiting.
+        log = command(["sudo", "-n", "journalctl", "--quiet", "--no-pager", "--output=json", "-n", "64", "_PID=1", "UNIT=" + rejected.name]).stdout
+        require(len(log) <= 1 << 20, "manager journal response exceeds bound")
+        records = [json.loads(line) for line in log.splitlines() if line]
+        attempts = sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines)
+        assert_rate_limit(state, attempts, records, rejected.name)
+        time.sleep(6)  # greater than RestartSec, still inside the 60s limit
+        require(rejected.snapshot() == state and sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines) == attempts, "rate-limited service restarted unexpectedly")
+        rate_result = {"service_result": state["Result"], "rejected_starts": attempts, "manager_limit_event": True, "observed_no_restart_seconds": 6}
+        checks.append("three_rejected_starts_then_manager_confirmed_rate_limit")
 
         # A clearly separate fault fixture verifies descendant cleanup. It is
         # not a model turn or evidence about Publisher's Git subprocesses.
@@ -249,7 +273,7 @@ def run_suite(distribution, expected, root, prefix):
         require(cgroup_empty(group) and child.snapshot()["MainPID"] == "0", "explicit stop incorrectly restarted work")
         checks.append("setsid_descendant_forced_stop_no_replay")
         command([str(eng), "installation-verify", "--dir", str(installed), "--source-commit", expected])
-        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
+        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
     finally:
         cleanup_errors = []
         for u in reversed(units):
