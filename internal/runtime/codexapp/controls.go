@@ -29,6 +29,10 @@ func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, tur
 	}
 	running, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Turn completion stops polling, but must not discard the bounded response
+	// to a control already dispatched. The original parent still cancels both.
+	inFlight, stopCall := context.WithCancel(ctx)
+	defer stopCall()
 	type observed struct {
 		value EngineeringObservation
 		err   error
@@ -36,14 +40,16 @@ func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, tur
 	observations := make(chan observed, 1)
 	deliveries := make(chan error, 1)
 	go func() { v, e := ObserveEngineeringTurn(running, a, threadID, turnID); observations <- observed{v, e} }()
-	go func() { deliveries <- pumpControls(running, a, threadID, turnID, c) }()
+	go func() { deliveries <- pumpControls(running, inFlight, a, threadID, turnID, c) }()
 	select {
 	case result := <-observations:
 		cancel()
-		dispatchErr := <-deliveries
-		if result.err == nil && dispatchErr != nil {
-			result.err = dispatchErr
+		if result.value.Status == "" {
+			// Protocol/approval/transport failure is not a valid terminal event.
+			stopCall()
 		}
+		dispatchErr := <-deliveries
+		result.err = errors.Join(result.err, dispatchErr)
 		return result.value, result.err
 	case err := <-deliveries:
 		cancel()
@@ -57,7 +63,7 @@ func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, tur
 		return result.value, result.err
 	}
 }
-func pumpControls(ctx context.Context, a *Adapter, threadID, turnID string, c EngineeringController) error {
+func pumpControls(ctx, inFlight context.Context, a *Adapter, threadID, turnID string, c EngineeringController) error {
 	for {
 		if ctx.Err() != nil {
 			return nil
@@ -90,7 +96,7 @@ func pumpControls(ctx context.Context, a *Adapter, threadID, turnID string, c En
 			outcome = "NOT_APPLIED"
 			callErr = ctx.Err()
 		} else {
-			call, done := context.WithTimeout(ctx, 5*time.Second)
+			call, done := context.WithTimeout(inFlight, 5*time.Second)
 			switch command.Kind {
 			case "STEER":
 				callErr = a.Steer(call, turnID, command.Text)
