@@ -5,6 +5,58 @@ This directory is the production-v1 deployment baseline for issue #105.
 It deliberately does **not** qualify a model provider and does not contain
 credentials. Provider qualification remains a later live gate.
 
+## Source-bound installation from delivered bytes
+
+The delivered `eng` embeds these existing templates directly from this directory;
+there is no second editable template catalog. After authenticating the original
+CI/release artifact and its exact source commit independently, extract it to a
+controlled directory and use that package's own executable:
+
+```sh
+/path/to/distribution/eng distribution-install \
+  --from /path/to/distribution --into /opt/engineering-platform \
+  --source-commit "$EXPECTED_SOURCE_COMMIT"
+/opt/engineering-platform/bin/eng installation-verify \
+  --dir /opt/engineering-platform --source-commit "$EXPECTED_SOURCE_COMMIT"
+```
+
+The destination must NOT exist, even as an empty directory. Its canonical parent
+must be caller-owned, not shared-writable or setgid. An ordinary user can install
+under a controlled home directory; an explicitly authorized administrator may
+install below `/opt`. Installing bytes does not authorize running services as root.
+The installer must itself identify the same clean source commit as every one of
+the six delivered roles. A checksum or embedded VCS string alone is not source
+or release authentication. The caller must already trust the package/expected SHA.
+
+The result contains `bin/` (six roles plus existing distribution manifests),
+`templates/` (these non-secret examples) and `installation-manifest.json`. Program
+files are 0555, templates/manifests 0444 and directories 0755. They contain public
+release bytes, NOT secret material. Before deployment, copy/configure the needed
+environment/TLS policy files into separately protected 0600 configuration paths;
+do not edit the installed templates in place or add credentials under this tree.
+
+Copying uses exclusive creation, file/directory fsync and independent full
+readback. An existing installation is never overwritten, including after a
+failed prior attempt. Errors/cancellation can leave partial files. A manifest
+being present is NOT completion; `installation-verify` checks exact inventory,
+all bytes, source/roles, modes and ownership and rejects extra files/directories,
+aliases, links and drift. Sources/host parents must be quiescent and controlled;
+this is not protection against malicious root/same-UID changes to the host.
+
+No dependency is downloaded or bundled, no account/configuration is provisioned,
+no systemd unit is activated, and no SQL/migration/model/Git operation is run.
+`services_started`, `configuration_applied`, `dependencies_included`,
+`execution_authorized` and `production_qualified` remain false. Upgrades install
+into another fresh directory; version switching, migration and rollback still
+require their separate deployment authority and acceptance. There is no automatic
+symlink switch or database downgrade.
+
+Canonical tests use the delivered installer and remove the original extracted
+package before verifying the installation. Existing native command integration
+runs installed Worker/eng/guard with mTLS/PostgreSQL and a real isolated C build.
+That test uses an in-process Core host; it is not systemd startup, complete
+fresh-host dependency provisioning or installed Publisher qualification.
+
 ## Identities
 
 Create distinct non-login service identities:

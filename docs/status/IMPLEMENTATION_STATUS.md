@@ -32,7 +32,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
-| Distribution | One six-role list in `internal/distribution/binaries.txt`; build, verification and Evidence import use it | Checksums authenticate an untrusted download by themselves |
+| Distribution | One six-role list; source-matched installer embeds original deployment examples and verifies fresh installed bytes after source removal | Service activation, dependency provisioning, automatic upgrade/migration or checksum-only authenticity |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
 | Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages/markers and bounded read-only progress windows | Inferred consumer/publisher health, capacity or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
@@ -180,9 +180,11 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
 - W03: catchable failure preservation/readback implemented; abrupt-crash capture,
   disk-exhaustion recovery and approved repair are still open.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
-  implemented; larger build profiles, automatic offline-output capture, full Run
+  implemented; larger build profiles, unattended retention scheduling, full Run
   dependencies and durable private retention/production-native acceptance remain open.
-- W06: complete fresh-host installation, upgrade/migration and recovery.
+- W06: source-bound six-role/template installation and exact readback implemented;
+  full fresh-host dependencies/service activation, upgrade/migration and recovery
+  acceptance remain open. Installation does not apply configuration or grant execution.
 - W07/W08: authorized normal user journey/WorkBuddy, controlled Human Takeover,
   and representative board-free embedded build/evidence scenarios.
 - W09/W10: fault/load/security regression, exact RC delivery, unmatched prototype

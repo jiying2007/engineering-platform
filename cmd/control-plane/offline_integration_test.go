@@ -24,6 +24,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/artifactset"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/distribution"
 	"github.com/jiying2007/engineering-platform/internal/offline"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
@@ -58,6 +59,8 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
+	bin := installedOfflineDistribution(t, ctx)
+	image.Guard = filepath.Join(bin, "sandbox-guard")
 	guard, err := os.ReadFile(image.Guard)
 	commandOK(t, err)
 	profile := sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "build-output", "good"}, Seconds: 10, Outputs: []sandbox.OutputSpec{{Name: "app.bin", MaxBytes: 64}, {Name: "app.map", MaxBytes: 64}}}
@@ -190,14 +193,6 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 	data, _ := json.Marshal(prep)
 	configFile := filepath.Join(base, "prepare.json")
 	commandOK(t, os.WriteFile(configFile, data, 0o600))
-	bin := t.TempDir()
-	for _, name := range []string{"worker", "eng"} {
-		cmd := exec.CommandContext(ctx, "go", "build", "-o", filepath.Join(bin, name), "../"+name)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("build: %v %s", err, out)
-		}
-	}
 	env := func(subject string) []string {
 		t.Helper()
 		dir := t.TempDir()
@@ -420,4 +415,35 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 		t.Fatal("capture manufactured Evidence")
 	}
 	t.Logf("same-Run compiler=%t Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s", compiler, receipt.Result.ProfileDigest)
+}
+
+// The native test runs installed Worker/eng/guard after the source distribution
+// is deleted. The Core server stays the real in-process authenticated test host;
+// this is not systemd, production configuration or installed publisher proof.
+func installedOfflineDistribution(t *testing.T, ctx context.Context) string {
+	t.Helper()
+	parent := t.TempDir()
+	dist := filepath.Join(parent, "distribution")
+	script, err := filepath.Abs("../../scripts/build-distribution.sh")
+	commandOK(t, err)
+	cmd := exec.CommandContext(ctx, "bash", script, dist)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build complete distribution: %v %s", err, out)
+	}
+	verified, err := distribution.Verify(dist)
+	commandOK(t, err)
+	installed := filepath.Join(parent, "installed")
+	cmd = exec.CommandContext(ctx, filepath.Join(dist, "eng"), "distribution-install", "--from", dist, "--into", installed, "--source-commit", verified.SourceCommit)
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("install actual distribution: %v %s", err, out)
+	}
+	commandOK(t, os.RemoveAll(dist))
+	if _, err := os.Stat(dist); !os.IsNotExist(err) {
+		t.Fatal("original distribution remains")
+	}
+	_, err = distribution.VerifyInstallation(ctx, installed, verified.SourceCommit)
+	commandOK(t, err)
+	t.Log("actual source-bound installation verified after removing original distribution")
+	return filepath.Join(installed, "bin")
 }

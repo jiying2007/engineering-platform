@@ -52,6 +52,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "distribution-install", "installation-verify":
+		if err := distributionInstall(os.Args[2:], os.Args[1] == "installation-verify"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "distribution-verify":
 		if err := distributionVerify(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -221,6 +226,8 @@ func usage() {
 	fmt.Println("  runtime-isolation-probe                     verify local kernel process containment, without accounts")
 	fmt.Println("  run-continue authorize|status <flags>  authorize one new Run from confirmed stopped source")
 	fmt.Println("  run-control inspect|status|steer|interrupt <flags>  explicit live control and receipt readback")
+	fmt.Println("  distribution-install --from DIR --into NEW_DIR --source-commit SHA  install matching runtime/templates; no service activation")
+	fmt.Println("  installation-verify --dir DIR --source-commit SHA  verify installed runtime/templates without execution")
 	fmt.Println("  distribution-verify --dir DIRECTORY       verify complete delivered executable roles and exact bytes")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
