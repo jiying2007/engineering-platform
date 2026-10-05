@@ -118,14 +118,18 @@ func runControlServer(ctx context.Context, server *http.Server, listener net.Lis
 		go func() { relayDone <- workerloop.Run(runCtx, 500*time.Millisecond, relay) }()
 	}
 	serverRead, relayRead := false, false
-	var cause error
+	var serverErr, relayErr error
 	select {
 	case <-ctx.Done():
-	case cause = <-serverDone:
+	case serverErr = <-serverDone:
 		serverRead = true
-	case cause = <-relayDone:
+	case relayErr = <-relayDone:
 		relayRead = true
 	}
+	// A relay which independently exits with cancellation is not a successful
+	// shutdown. Cancellation is expected only after a parent stop, or after we
+	// ask the still-running relay to stop because another component returned.
+	relayStopExpected := ctx.Err() != nil || !relayRead
 	cancelRun()
 	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -134,16 +138,52 @@ func runControlServer(ctx context.Context, server *http.Server, listener net.Lis
 		_ = server.Close()
 	}
 	if !serverRead {
-		<-serverDone
+		serverErr = <-serverDone
 	}
 	if relayDone != nil && !relayRead {
-		relayErr := <-relayDone
-		if relayErr != nil && !errors.Is(relayErr, context.Canceled) {
-			cause = errors.Join(cause, relayErr)
+		relayErr = <-relayDone
+	}
+	// errors.Is matches ANY branch of errors.Join. Clearing such a whole tree
+	// would silently discard an independent listener/database/relay failure.
+	if onlyControlStopError(serverErr, http.ErrServerClosed) {
+		serverErr = nil
+	}
+	if relayStopExpected && onlyControlStopError(relayErr, context.Canceled) {
+		relayErr = nil
+	}
+	return errors.Join(serverErr, relayErr, shutdownErr)
+}
+
+// Normalize only error trees whose EVERY leaf is the exact expected sentinel.
+// Opaque Is implementations, empty unwraps, cycles and oversized error trees
+// remain failures; do not discard useful error details to simplify exit status.
+func onlyControlStopError(err, expected error) bool {
+	budget := 128
+	var visit func(error) bool
+	visit = func(current error) bool {
+		budget--
+		if current == nil || budget < 0 {
+			return false
+		}
+		switch wrapped := current.(type) {
+		case interface{ Unwrap() []error }:
+			children := wrapped.Unwrap()
+			seen := false
+			for _, child := range children {
+				if child == nil {
+					continue
+				}
+				seen = true
+				if !visit(child) {
+					return false
+				}
+			}
+			return seen
+		case interface{ Unwrap() error }:
+			return visit(wrapped.Unwrap())
+		default:
+			return current == expected
 		}
 	}
-	if errors.Is(cause, http.ErrServerClosed) || errors.Is(cause, context.Canceled) {
-		cause = nil
-	}
-	return errors.Join(cause, shutdownErr)
+	return visit(err)
 }

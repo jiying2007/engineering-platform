@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -16,13 +17,17 @@ import (
 )
 
 func main() {
-	if err := serve(); err != nil {
+	if err := serve(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func serve() error {
+func serve(args []string) error {
+	// Never silently start a service for an unsupported operation/argument.
+	if len(args) != 0 {
+		return fmt.Errorf("publisher-service accepts no command-line arguments")
+	}
 	configFile := os.Getenv("PUBLISHER_CONFIG_FILE")
 	certFile := os.Getenv("PUBLISHER_TLS_CERT_FILE")
 	keyFile := os.Getenv("PUBLISHER_TLS_KEY_FILE")
@@ -62,6 +67,7 @@ func serve() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	log.Printf("publisher service listening on %s; scope=authenticated-endpoint-not-provider-readiness", listener.Addr())
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
 	select {
