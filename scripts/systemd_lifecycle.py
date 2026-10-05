@@ -222,7 +222,7 @@ def run_suite(distribution, expected, root, prefix):
         rejected = unit([publisher, "--unsupported-ci-only"])
         rejected.finish(False)
         state = rejected.snapshot()
-        require(state["ActiveState"] == "failed" and state["Result"] == "start-limit-hit", "startup failure did not stop at manager rate limit")
+        require(state["ActiveState"] == "failed" and state["Result"] == "start-limit-hit", "startup failure did not stop at manager rate limit: " + json.dumps(state, sort_keys=True) + "; rejected_attempts=" + str(sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines)))
         require(sum("publisher-service accepts no command-line arguments" in line for line in rejected.lines) == 3, "expected exactly three rejected startup attempts")
         checks.append("three_rejected_starts_then_start_limit_hit")
 

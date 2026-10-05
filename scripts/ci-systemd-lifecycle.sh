@@ -31,9 +31,8 @@ cleanup() {
     sudo -n systemctl reset-failed "$unit" >/dev/null 2>&1 || true
   done <<< "$inventory"
   if [ "$failed" -eq 0 ]; then
-    sudo -n rm -rf -- "$root"
-    rm -rf -- "$dist"
-    if [ $? -ne 0 ]; then failed=1; fi
+    sudo -n rm -rf -- "$root" || failed=1
+    rm -rf -- "$dist" || failed=1
   fi
   if [ "$failed" -ne 0 ]; then echo 'test service cleanup requires reconciliation' >&2; exit 1; fi
   exit "$status"
