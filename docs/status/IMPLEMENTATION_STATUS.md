@@ -32,7 +32,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
-| Distribution | One six-role list; source-matched installer embeds original deployment examples and verifies fresh installed bytes after source removal | Service activation, dependency provisioning, automatic upgrade/migration or checksum-only authenticity |
+| Distribution | One six-role list; source-matched installer embeds original deployment examples and verifies fresh installed bytes after source removal; installed Control/Publisher/Worker mTLS and durable quiescent restart regression | Systemd, fresh-host provisioning, in-flight effect crash recovery, automatic upgrade/migration or checksum-only authenticity |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
 | Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages/markers and bounded read-only progress windows | Inferred consumer/publisher health, capacity or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
@@ -195,3 +195,15 @@ green runs do not qualify new source. External accounts, production hosts,
 devices and human decisions remain separate gates; no local implementation can
 stand in for those decisions. Prioritize actual user journeys and reproducible
 delivery rather than parallel authorities, speculative tooling or more states.
+
+
+Installed-service CI also starts the real installed Control --production and
+Publisher entrypoints after original distribution removal. A test administrator
+migrates only an isolated synthetic schema; service startup rejects a blank
+schema/automatic migration. Actual Worker admission, graceful and idle forced
+stops preserve database receipts/audit/outbox/epoch without model replay.
+Publisher rejects unsupported arguments instead of silently listening, and its
+bound-address announcement is not a provider-ready assertion. See the existing
+[operations contract](../implementation/PRODUCTION_OPERATIONS_V1.md).
+Systemd/dependency provisioning, in-flight crash recovery and upgrades are not
+covered by this quiescent process regression.

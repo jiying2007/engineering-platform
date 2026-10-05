@@ -280,3 +280,42 @@ Final acceptance still requires:
 
 Trusted self-hosted M1 evidence remains separate and is not rerun merely to
 produce production screenshots.
+
+
+## Installed process lifecycle regression
+
+The mandatory native command CI now starts the installed `control-plane
+--production` and independent `publisher-service` entrypoints, not an in-process
+Control replacement. It installs the source-matched six-role distribution and
+removes its original copy first. Synthetic short-lived TLS identities and an
+inert test-only Publisher token remain in a separate private directory.
+
+An explicit test administrator creates/migrates only a new isolated PostgreSQL
+schema. Production Control must reject an unprepared schema without creating
+any tables and reject auto-migrate or the old in-process Publisher settings.
+The running installed Control's real relay and installed Worker complete input
+admission over mTLS. Clean SIGTERM and quiescent SIGKILL/restart preserve the
+exact admitted receipt, audit chain, Outbox states/attempts and Recovery epoch,
+without creating engineering Evidence or new model/external executions.
+Port-collision failures do not consume work or stop the original listener.
+
+Publisher tests check the exact authenticated control identity, reject malformed
+publish/observe plans before any upstream call, reject all command-line
+arguments, and check listener closure and rebind after graceful/forced stops.
+Its listener announcement is a bound-address diagnostic, not authenticated
+readiness: clients must verify TLS/health and the required operation separately.
+When Publisher is stopped, Control's database status continues to report service
+readiness NOT_OBSERVED rather than manufacturing a global-ready claim.
+
+These tests require PostgreSQL in the mandatory native CI; a local unavailable
+service is explicitly skipped, never replaced by memory. The optional
+EP_TEST_INSTALLED_ROOT / EP_TEST_INSTALLED_SOURCE test-harness variables run the
+same checks against an independently authenticated downloaded installation.
+They are not production service options. The test records retain no private
+keys, runtime credentials or customer data.
+
+This is installed process and quiescent-state restart evidence, NOT systemd or
+fresh-host dependency provisioning, in-flight publication/model crash recovery,
+zero-downtime upgrade, migration rollback, component capacity, real-provider or
+production qualification. No supervisor automatically replays model work. Those
+remaining gates and #105 remain open.
