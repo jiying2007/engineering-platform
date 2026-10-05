@@ -102,6 +102,13 @@ and build directories. Neither test adds a Runtime build-output contract or
 qualifies MCU/hardware. Original Git base/input/context coverage, model output,
 second-site retention, encryption/key policy, scheduling and GC remain open.
 
+The mandatory PostgreSQL 17 drill additionally retains a native dump and expected
+authority snapshot through the raw set, removes and checks absence of the original
+DB/dump/plan, restores bytes, then explicitly runs native transactional restore.
+All existing authority, audit, Outbox and Recovery-epoch checks still apply. This
+is a controlled database/container fixture, not a customer backup, production or
+cross-version qualification; the storage layer itself never executes SQL.
+
 [Two historical terminal fact archives](../evidence/m1-terminal-facts/README.md)
 retain selected original bytes/source ZIP identities in Git. Final Review uses
 allowlisted facts, not PKI/dumps/environment/log directories; verification deletes
@@ -154,7 +161,7 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   disk-exhaustion recovery and approved repair are still open.
 - W04/W05: explicit raw-set storage and reference build separation implemented;
   Runtime output contracts, full Run dependency coverage and durable private
-  retention/native restore remain open.
+  retention/production-native acceptance remain open.
 - W06: complete fresh-host installation, upgrade/migration and recovery.
 - W07/W08: authorized normal user journey/WorkBuddy, controlled Human Takeover,
   and representative board-free embedded build/evidence scenarios.

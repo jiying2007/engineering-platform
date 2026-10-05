@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/artifactset"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
@@ -64,20 +67,24 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
+	// Cleanup callbacks run after function defers. Keep the admin pool alive
+	// until the database cleanup registered below completes.
+	t.Cleanup(admin.Close)
 	sourceDB, restoredDB := restoreDatabaseName(t, "source"), restoreDatabaseName(t, "restored")
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 20*time.Second)
+		defer stop()
+		for _, name := range []string{sourceDB, restoredDB} {
+			if _, err := admin.Exec(cleanup, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); err != nil {
+				t.Errorf("scoped restore fixture cleanup failed: %v", err)
+			}
+		}
+	})
 	for _, name := range []string{sourceDB, restoredDB} {
 		if _, err := admin.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
 			t.Fatal(err)
 		}
 	}
-	t.Cleanup(func() {
-		cleanup, stop := context.WithTimeout(context.Background(), 20*time.Second)
-		defer stop()
-		for _, name := range []string{sourceDB, restoredDB} {
-			_, _ = admin.Exec(cleanup, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)")
-		}
-	})
 	sourceURL := databaseURLWithName(t, base, sourceDB)
 	restoredURL := databaseURLWithName(t, base, restoredDB)
 	source, err := Open(ctx, sourceURL)
@@ -99,15 +106,109 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 		source.Close()
 		t.Fatal(err)
 	}
+	value, _, err := source.GetExecution("restore-run")
+	if err != nil {
+		source.Close()
+		t.Fatal(err)
+	}
+	task, err := source.GetTaskByDigest(value.TaskContractDigest)
+	if err != nil {
+		source.Close()
+		t.Fatal(err)
+	}
 	source.Close()
 
 	dumpDir := t.TempDir()
+	if err := os.Chmod(dumpDir, 0700); err != nil {
+		t.Fatal(err)
+	}
 	dumpPath := filepath.Join(dumpDir, "authority.dump")
 	runPG17(t, base, []string{"pg_dump", "--format=custom", "--no-owner", "--no-privileges", "--file=/dump/authority.dump", sourceDB}, dumpDir)
 	if info, err := os.Stat(dumpPath); err != nil || info.Size() == 0 {
 		t.Fatalf("pg_dump did not produce bytes: %v", err)
 	}
-	runPG17(t, base, []string{"pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "--dbname=" + restoredDB, "/dump/authority.dump"}, dumpDir)
+	// Retain the native pg_dump bytes and the original expected authority facts.
+	// This ID names a TEST-only backup operation, not a Codex model execution.
+	backupID := canonical.BytesDigest([]byte("TEST-native-backup:" + sourceDB + ":" + wantDigest))[7:]
+	subject := artifactset.Subject{RunID: value.ID, ExecutionID: backupID,
+		TaskDigest: value.TaskContractDigest, InputDigest: value.RunInputManifestDigest,
+		BaseCommit: task.BaseCommit}
+	snapshotRaw, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshotPath := filepath.Join(dumpDir, "authority-snapshot.json")
+	if err := os.WriteFile(snapshotPath, snapshotRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	plan := artifactset.Plan{Version: 1, Subject: subject}
+	for _, item := range []struct{ id, kind, path string }{
+		{"authority-snapshot.json", "test-evidence", snapshotPath},
+		{"authority.dump", "database-backup", dumpPath},
+	} {
+		raw, err := os.ReadFile(item.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan.Members = append(plan.Members, artifactset.Input{
+			Entry: artifactset.Entry{ID: item.id, Kind: item.kind, Size: int64(len(raw)), Digest: canonical.BytesDigest(raw)},
+			Path:  item.path})
+	}
+	planRaw, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planPath := filepath.Join(dumpDir, "plan.json")
+	if err := os.WriteFile(planPath, planRaw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	retainedDir := t.TempDir()
+	if err := os.Chmod(retainedDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(retainedDir, "authority-set.tar")
+	packed, err := artifactset.Pack(ctx, planPath, canonical.BytesDigest(planRaw), archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The independent restore can no longer consult the source DB or original
+	// dump, metadata or plan. Only the private archive and external digest remain.
+	if _, err := admin.Exec(ctx, "DROP DATABASE "+pgx.Identifier{sourceDB}.Sanitize()+" WITH (FORCE)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(dumpDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dumpPath); !os.IsNotExist(err) {
+		t.Fatal("original dump survived source removal")
+	}
+	var exists bool
+	if err := admin.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)", sourceDB).Scan(&exists); err != nil || exists {
+		t.Fatalf("source DB still exists or absence not observed: %v", err)
+	}
+	if _, err := artifactset.Verify(ctx, archive, packed.ArchiveDigest, "another-run"); err == nil {
+		t.Fatal("wrong backup subject accepted")
+	}
+	restoredDir := filepath.Join(retainedDir, "restored")
+	bytesReport, err := artifactset.Restore(ctx, archive, packed.ArchiveDigest, value.ID, restoredDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytesReport.ProducerSemanticsVerified || bytesReport.ExecutionAuthorized || bytesReport.ProductionQualified || bytesReport.Coverage != artifactset.Coverage {
+		t.Fatal("byte storage granted native restore or production authority")
+	}
+	files := filepath.Join(restoredDir, "files")
+	readSnapshot, err := os.ReadFile(filepath.Join(files, "authority-snapshot.json"))
+	if err != nil || string(readSnapshot) != string(snapshotRaw) {
+		t.Fatalf("retained snapshot byte mismatch: %v", err)
+	}
+	if _, err := artifactset.Restore(ctx, archive, packed.ArchiveDigest, value.ID, restoredDir); err == nil {
+		t.Fatal("existing native restore inputs overwritten")
+	}
+	// The existing test authority explicitly invokes native PostgreSQL restore.
+	// artifact-set itself never executes SQL, launches a process or grants this.
+	runPG17(t, base, []string{"pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction", "--dbname=" + restoredDB, "/dump/authority.dump"}, files)
+	t.Log("native pg_dump -> private set -> original DB/dump removed -> bytes restored -> pg_restore completed")
 
 	restored, err := Open(ctx, restoredURL)
 	if err != nil {
@@ -320,6 +421,9 @@ func authoritySnapshot(ctx context.Context, s *Store) (restoreSnapshot, error) {
 		snapshot.Migrations = append(snapshot.Migrations, version)
 	}
 	rows.Close()
+	if err := rows.Err(); err != nil {
+		return snapshot, err
+	}
 	rows, err = s.pool.Query(ctx, "SELECT state,count(*) FROM outbox_events GROUP BY state ORDER BY state")
 	if err != nil {
 		return snapshot, err
@@ -371,7 +475,9 @@ func runPG17(t *testing.T, raw string, args []string, mount string) {
 	}
 	user := parsed.User.Username()
 	password, _ := parsed.User.Password()
-	command := []string{"run", "--rm", "--network", "host", "-e", "PGPASSWORD=" + password, "-v", mount + ":/dump", "postgres:17-alpine"}
+	// Native tools operate with the test caller's UID/GID, not container root.
+	// Dump files remain host-owned under private directories; no chown fallback.
+	command := []string{"run", "--rm", "--user", strconv.Itoa(os.Geteuid()) + ":" + strconv.Itoa(os.Getegid()), "--network", "host", "-e", "PGPASSWORD=" + password, "-v", mount + ":/dump", "postgres:17-alpine"}
 	command = append(command, args[0], "-h", host, "-p", port, "-U", user)
 	command = append(command, args[1:]...)
 	cmd := exec.Command("docker", command...)
