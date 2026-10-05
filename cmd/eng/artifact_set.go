@@ -73,6 +73,9 @@ func executeArtifactSet(ctx context.Context, args []string) (artifactset.Report,
 	}
 }
 func artifactSet(args []string) error {
+	if len(args) > 0 && args[0] == "capture-offline" {
+		return captureOffline(args[1:])
+	}
 	if len(args) > 0 && args[0] == "capture-execution" {
 		return captureExecution(args[1:])
 	}

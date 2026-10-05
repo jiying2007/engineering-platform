@@ -27,8 +27,8 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation | Automatic abrupt-crash capture, repair or replay |
-| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks | Writable host builds, large firmware, MCU/board qualification or automatic build-output backup |
-| Raw artifact sets | Explicit plans or producer-derived execution/Context selection, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
+| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks | Writable host builds, large firmware, MCU/board qualification or unattended retention scheduling |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
@@ -99,7 +99,11 @@ frozen Context entry from the original anchored permit, requiring all referenced
 source/result bytes rather than relying on a hand-written list. It rejects
 missing/extra Context and unbound artifacts. It does not capture the original Git
 base, toolchain, full control history or upstream continuation dependencies.
-Caller-selected native backups still need their own consistency/restore.
+`capture-offline` derives the original permit/report and every collected output
+from the frozen offline Profile. Both raw records require external digest anchors;
+failed commands retain failure records with zero outputs, never successful-build
+claims. It does not contact Core or execute restored data. Caller-selected native
+backups still need their own consistency/restore.
 
 Actual Worker tests delete original records/source/bundle locations, restore the
 raw set and re-run existing semantic readback. A host C-compiler reference keeps
@@ -109,7 +113,10 @@ also supports an explicitly frozen bounded build-output contract: the non-root
 PID1 guard collects exact files in private tmpfs after reaping children, and the
 existing Worker/Core/Evidence path binds their bytes. A real scratch-container C
 compiler and private artifact restore are covered, but no MCU/hardware or larger
-firmware capacity is qualified. Producer-derived capture tests remove the entire prepared root
+firmware capacity is qualified. A same-Run compiled Worker/mTLS/PostgreSQL/native
+C build additionally captures and restores its original records and raw outputs
+after deleting source/Git/preparation roots, without creating Evidence or new
+execution. Producer-derived capture tests remove the entire prepared root
 including Context, restore, and recheck every frozen input object and producer
 record. Original Git base/toolchain, full model/tool/control history, second-site
 retention, encryption/key policy, scheduling and GC remain open.

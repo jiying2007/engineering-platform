@@ -215,7 +215,7 @@ func printJSON(value any) {
 
 func usage() {
 	fmt.Println("eng <command>")
-	fmt.Println("  artifact-set pack|verify|restore|capture-execution <flags>   preserve explicit private raw artifacts; no execution grant")
+	fmt.Println("  artifact-set pack|verify|restore|capture-execution|capture-offline <flags>   preserve explicit private raw artifacts; no execution grant")
 	fmt.Println("  execution-readback <flags>               verify private records/artifacts; --core adds one authenticated GET")
 	fmt.Println("  source-checkpoint verify|restore <flags>  read back stopped source; never resume a model")
 	fmt.Println("  runtime-isolation-probe                     verify local kernel process containment, without accounts")
