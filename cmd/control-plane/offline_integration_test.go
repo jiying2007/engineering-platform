@@ -43,7 +43,7 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	defer cancel()
 	guard, err := os.ReadFile(image.Guard)
 	commandOK(t, err)
-	profile := sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe"}, Seconds: 10}
+	profile := sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "build-output", "good"}, Seconds: 10, Outputs: []sandbox.OutputSpec{{Name: "app.bin", MaxBytes: 64}, {Name: "app.map", MaxBytes: 64}}}
 	pd, err := profile.Digest()
 	commandOK(t, err)
 	admin, err := pgxpool.New(ctx, url)
@@ -221,6 +221,15 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	if _, err := command(); err == nil {
 		t.Fatal("ungranted command allowed")
 	}
+	changedOutputs := profile
+	changedOutputs.Outputs = append([]sandbox.OutputSpec(nil), profile.Outputs...)
+	changedOutputs.Outputs[0].MaxBytes++
+	config["profile"] = changedOutputs
+	data, _ = json.Marshal(config)
+	commandOK(t, os.WriteFile(offlineFile, data, 0600))
+	if _, err := command(); err == nil {
+		t.Fatal("ungranted output contract allowed")
+	}
 	config["profile"] = profile
 	data, _ = json.Marshal(config)
 	commandOK(t, os.WriteFile(offlineFile, data, 0o600))
@@ -230,8 +239,40 @@ func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
 	}
 	var receipt offline.Receipt
 	commandOK(t, json.Unmarshal(out, &receipt))
-	if receipt.Kind != offline.Kind || receipt.Result.ExitCode != 0 || !strings.Contains(string(receipt.Result.Stdout), "OFFLINE_PROBE_PASS") || receipt.Worker != worker {
+	if receipt.Kind != offline.Kind || receipt.Result.ExitCode != 0 || !strings.Contains(string(receipt.Result.Stdout), "OFFLINE_BUILD_PASS") || receipt.Worker != worker {
 		t.Fatalf("invalid actual execution receipt: %#v", receipt)
+	}
+
+	if receipt.Result.BuildOutputs == nil || len(receipt.Result.BuildOutputs.Files) != 2 || string(receipt.Result.BuildOutputs.Files[0].Bytes) != "actual output\x00\xff" || receipt.Result.Validate(profile) != nil {
+		t.Fatal("Worker lost frozen output bytes")
+	}
+	// The fsynced existing local report must retain exactly the same raw outputs
+	// before network reporting. No extra write-capable mount or new ledger exists.
+	recordCount := 0
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !d.IsDir() && strings.HasPrefix(d.Name(), "offline-") && strings.HasSuffix(d.Name(), ".json") {
+			raw, e := os.ReadFile(path)
+			if e != nil {
+				return e
+			}
+			var report offline.Report
+			if json.Unmarshal(raw, &report) == nil && report.Result.BuildOutputs != nil {
+				a, _ := json.Marshal(report.Result)
+				b, _ := json.Marshal(receipt.Result)
+				if string(a) != string(b) {
+					t.Fatal("local result differs from Core receipt")
+				}
+				recordCount++
+			}
+		}
+		return nil
+	})
+	commandOK(t, err)
+	if recordCount != 1 {
+		t.Fatal("actual output report not retained", recordCount)
 	}
 	query := exec.CommandContext(ctx, filepath.Join(bin, "eng"), "api", "GET", "/api/v1/runs/"+input.RunID+"/offline")
 	query.Env = env(engineer)

@@ -36,7 +36,7 @@ func validateContainer(data []byte, p Profile, user, owner, source, bundle, guar
 		return ErrPolicy
 	}
 	h := c.HostConfig
-	if c.Image != p.Image || c.Config.User != user || c.Config.WorkingDir != "/workspace" || c.Config.Labels["engineering-platform.offline"] != owner || c.Config.Tty || c.Config.OpenStdin || !reflect.DeepEqual(c.Config.Entrypoint, []string{"/ep-guard"}) || !reflect.DeepEqual(c.Config.Cmd, append([]string{strconv.Itoa(p.Seconds)}, p.Argv...)) {
+	if c.Image != p.Image || c.Config.User != user || c.Config.WorkingDir != "/workspace" || c.Config.Labels["engineering-platform.offline"] != owner || c.Config.Tty || c.Config.OpenStdin || !reflect.DeepEqual(c.Config.Entrypoint, []string{"/ep-guard"}) || !reflect.DeepEqual(c.Config.Cmd, append([]string{strconv.Itoa(p.Seconds)}, GuardArguments(p)...)) {
 		return ErrPolicy
 	}
 	if h.NetworkMode != "none" || h.IpcMode != "private" || h.PidMode != "" || !h.ReadonlyRootfs || h.Privileged || len(h.CapAdd) != 0 || len(h.CapDrop) != 1 || h.CapDrop[0] != "ALL" || len(h.SecurityOpt) != 1 || h.SecurityOpt[0] != "no-new-privileges:true" || h.Memory != 256<<20 || h.MemorySwap != 256<<20 || h.NanoCpus != 1_000_000_000 || h.PidsLimit != 64 || h.RestartPolicy.Name != "no" || h.LogConfig.Type != "local" || !reflect.DeepEqual(h.LogConfig.Config, map[string]string{"max-size": "1m", "max-file": "1", "compress": "false"}) || len(h.Devices) != 0 || len(h.Binds) != 0 || len(h.VolumesFrom) != 0 {

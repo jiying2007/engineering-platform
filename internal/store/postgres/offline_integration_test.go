@@ -24,8 +24,12 @@ import (
 // observations are separately exercised by the command-level integration suite.
 func offlineFixture(t *testing.T, s *Store) offline.Start {
 	t.Helper()
-	ctx := context.Background()
 	p := sandbox.Profile{Image: sandbox.Hash([]byte("fixture image")), GuardDigest: sandbox.Hash([]byte("guard")), Argv: []string{"/probe"}, Seconds: 10}
+	return offlineFixtureProfile(t, s, p)
+}
+func offlineFixtureProfile(t *testing.T, s *Store, p sandbox.Profile) offline.Start {
+	t.Helper()
+	ctx := context.Background()
 	pd, err := p.Digest()
 	workerOK(t, err)
 	work := core.WorkItem{ID: "offline-work", Title: "offline fixture", HumanOwner: "fixture", State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC()}
@@ -223,5 +227,48 @@ func TestOfflineStoreFrozenProfileRejectsDrift(t *testing.T) {
 	req.Profile.Argv = []string{"/different"}
 	if _, err := s.StartOffline(context.Background(), "offline-worker", req); !errors.Is(err, workerqueue.ErrIdentity) {
 		t.Fatalf("frozen profile drift: %v", err)
+	}
+}
+
+func TestOfflineStoreFrozenBuildOutputResult(t *testing.T) {
+	s := integrationStore(t)
+	p := sandbox.Profile{Image: sandbox.Hash([]byte("test-image")), GuardDigest: sandbox.Hash([]byte("test-guard")), Argv: []string{"/build"}, Seconds: 5, Outputs: []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 32}}}
+	req := offlineFixtureProfile(t, s, p)
+	ctx := context.Background()
+	permit, err := s.StartOffline(ctx, "offline-worker", req)
+	workerOK(t, err)
+	result := offlineResult(permit)
+	cd, _ := sandbox.OutputContractDigest(p.Outputs)
+	result.BuildOutputs = &sandbox.BuildOutputs{Contract: p.Outputs, ContractDigest: cd, State: "COLLECTED", ChildrenReaped: true, Files: []sandbox.OutputFile{{Name: "app.elf", Size: 4, Digest: sandbox.Hash([]byte{0x7f, 'E', 'L', 'F'}), Bytes: []byte{0x7f, 'E', 'L', 'F'}}}}
+	raw, _ := json.Marshal(result)
+	for _, mode := range []string{"missing", "contract", "bytes", "stop", "name"} {
+		var bad sandbox.Result
+		workerOK(t, json.Unmarshal(raw, &bad))
+		switch mode {
+		case "missing":
+			bad.BuildOutputs = nil
+		case "contract":
+			bad.BuildOutputs.Contract[0].MaxBytes++
+			bad.BuildOutputs.ContractDigest, _ = sandbox.OutputContractDigest(bad.BuildOutputs.Contract)
+		case "bytes":
+			bad.BuildOutputs.Files[0].Bytes[0] = 0
+		case "stop":
+			bad.BuildOutputs.ChildrenReaped = false
+		case "name":
+			bad.BuildOutputs.Files[0].Name = "other"
+		}
+		if _, err := s.FinishOffline(ctx, "offline-worker", offline.Report{Token: permit.Token, Result: bad}); err == nil {
+			t.Fatal("invalid output accepted", mode)
+		}
+	}
+	report := offline.Report{Token: permit.Token, Result: result}
+	receipt, err := s.FinishOffline(ctx, "offline-worker", report)
+	workerOK(t, err)
+	workerOK(t, receipt.Verify("offline-worker", permit, result))
+	// Rehashed changed payload is structurally valid, but cannot rewrite a result.
+	report.Result.BuildOutputs.Files[0].Bytes[0] = 1
+	report.Result.BuildOutputs.Files[0].Digest = sandbox.Hash(report.Result.BuildOutputs.Files[0].Bytes)
+	if _, err := s.FinishOffline(ctx, "offline-worker", report); err == nil {
+		t.Fatal("changed output rewrote immutable result")
 	}
 }

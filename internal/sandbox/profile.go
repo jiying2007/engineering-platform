@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -20,13 +21,17 @@ var ErrUnknown = errors.New("sandbox outcome or cleanup is unknown")
 var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
 type Profile struct {
-	Image       string   `json:"image_id"`
-	GuardDigest string   `json:"guard_digest"`
-	Argv        []string `json:"argv"`
-	Seconds     int      `json:"timeout_seconds"`
+	Image       string       `json:"image_id"`
+	GuardDigest string       `json:"guard_digest"`
+	Argv        []string     `json:"argv"`
+	Seconds     int          `json:"timeout_seconds"`
+	Outputs     []OutputSpec `json:"outputs,omitempty"`
 }
 
 func (p Profile) Validate() error {
+	if p.Outputs != nil && ValidateOutputContract(p.Outputs) != nil {
+		return ErrPolicy
+	}
 	if !digestPattern.MatchString(p.Image) || !digestPattern.MatchString(p.GuardDigest) || p.Seconds < 1 || p.Seconds > 45 || len(p.Argv) < 1 || len(p.Argv) > 32 {
 		return ErrPolicy
 	}
@@ -55,19 +60,26 @@ func (p Profile) Digest() (string, error) {
 }
 
 type Result struct {
-	Recipe        string `json:"recipe"`
-	ProfileDigest string `json:"profile_digest"`
-	ContainerID   string `json:"container_id"`
-	ExitCode      int    `json:"exit_code"`
-	Stdout        []byte `json:"stdout"`
-	Stderr        []byte `json:"stderr"`
-	StdoutDigest  string `json:"stdout_digest"`
-	StderrDigest  string `json:"stderr_digest"`
-	UserID        int    `json:"user_id"`
+	Recipe        string        `json:"recipe"`
+	ProfileDigest string        `json:"profile_digest"`
+	ContainerID   string        `json:"container_id"`
+	ExitCode      int           `json:"exit_code"`
+	Stdout        []byte        `json:"stdout"`
+	Stderr        []byte        `json:"stderr"`
+	StdoutDigest  string        `json:"stdout_digest"`
+	StderrDigest  string        `json:"stderr_digest"`
+	UserID        int           `json:"user_id"`
+	BuildOutputs  *BuildOutputs `json:"build_outputs,omitempty"`
 }
 
 func (r Result) Validate(p Profile) error {
 	digest, err := p.Digest()
+	if (len(p.Outputs) > 0) != (r.BuildOutputs != nil) || r.BuildOutputs.Validate(r.ExitCode) != nil {
+		return ErrPolicy
+	}
+	if r.BuildOutputs != nil && !reflect.DeepEqual(r.BuildOutputs.Contract, p.Outputs) {
+		return ErrPolicy
+	}
 	// 122 is reserved by our pinned guard for output overflow. Never retain a
 	// truncated Docker log as though it were a complete execution transcript.
 	if err != nil || r.Recipe != Recipe || r.ProfileDigest != digest || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(r.ContainerID) || r.ExitCode < 0 || r.ExitCode > 255 || r.ExitCode == 122 || r.UserID < 1 || len(r.Stdout) > OutputLimit || len(r.Stderr) > OutputLimit || Hash(r.Stdout) != r.StdoutDigest || Hash(r.Stderr) != r.StderrDigest {

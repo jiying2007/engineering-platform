@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +17,9 @@ import (
 
 type Fixture struct{ Image, Guard, Socket string }
 
-func Build(t *testing.T) Fixture {
+func Build(t *testing.T) Fixture         { return build(t, false) }
+func BuildCompiler(t *testing.T) Fixture { return build(t, true) }
+func build(t *testing.T, compiler bool) Fixture {
 	t.Helper()
 	if os.Getenv("EP_SANDBOX_INTEGRATION") != "1" {
 		t.Skip("set EP_SANDBOX_INTEGRATION=1 for mandatory real Docker integration")
@@ -51,7 +54,13 @@ func Build(t *testing.T) Fixture {
 	if _, err := rand.Read(nonce); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\nCOPY probe /probe\nLABEL engineering-platform.fixture="+hex.EncodeToString(nonce)+"\n"), 0o600); err != nil {
+	dockerfile := "FROM scratch\nCOPY probe /probe\n"
+	if compiler {
+		copyCompiler(t, dir, run)
+		dockerfile += "COPY rootfs /\n"
+	}
+	dockerfile += "LABEL engineering-platform.fixture=" + hex.EncodeToString(nonce) + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	iid := filepath.Join(dir, "image-id")
@@ -70,4 +79,75 @@ func Build(t *testing.T) Fixture {
 		}
 	})
 	return fixture
+}
+
+// Copy the trusted CI host compiler and only its native runtime dependencies
+// into a no-network scratch fixture. No package manager, mutable image tag or
+// host compiler mount enters the product Engine. The image ID binds these bytes.
+func copyCompiler(t *testing.T, dir string, run func(string, ...string) string) {
+	t.Helper()
+	gcc, err := exec.LookPath("gcc")
+	if err != nil {
+		t.Fatal("native build integration requires gcc", err)
+	}
+	files := map[string]string{"/usr/bin/gcc": gcc}
+	for _, name := range []string{"cc1", "collect2"} {
+		p := run(gcc, "-print-prog-name="+name)
+		if !filepath.IsAbs(p) {
+			t.Fatal("missing compiler component", name)
+		}
+		files[p] = p
+	}
+	plugin := run(gcc, "-print-file-name=liblto_plugin.so")
+	if !filepath.IsAbs(plugin) {
+		t.Fatal("missing compiler plugin")
+	}
+	files[plugin] = plugin
+	for _, name := range []string{"as", "ld"} {
+		p, err := exec.LookPath(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files["/usr/bin/"+name] = p
+	}
+	native := []string{}
+	for _, src := range files {
+		native = append(native, src)
+	}
+	for _, src := range native {
+		dependencies := run("ldd", src)
+		if strings.Contains(dependencies, "not found") {
+			t.Fatal("missing native runtime dependency", src)
+		}
+		for _, field := range strings.Fields(dependencies) {
+			if filepath.IsAbs(field) {
+				files[field] = field
+			}
+		}
+	}
+	for dst, src := range files {
+		resolved, err := filepath.EvalSymlinks(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		in, err := os.Open(resolved)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "rootfs", strings.TrimPrefix(dst, "/"))
+		if err = os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			in.Close()
+			t.Fatal(err)
+		}
+		out, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0555)
+		if err != nil {
+			in.Close()
+			t.Fatal(err)
+		}
+		_, copyErr := io.Copy(out, in)
+		closeIn, closeOut := in.Close(), out.Close()
+		if copyErr != nil || closeIn != nil || closeOut != nil {
+			t.Fatal("native tool copy failed", copyErr, closeIn, closeOut)
+		}
+	}
 }

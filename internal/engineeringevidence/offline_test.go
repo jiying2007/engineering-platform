@@ -117,3 +117,40 @@ func TestVerifyOfflineImportRejectsIdentityDrift(t *testing.T) {
 		})
 	}
 }
+
+func TestOfflineBuildEvidenceRejectsRehashedInvalidOutputs(t *testing.T) {
+	for _, mode := range []string{"valid", "missing-file", "bad-bytes", "not-stopped", "false-success"} {
+		t.Run(mode, func(t *testing.T) {
+			req := offlineFixture(t, 0)
+			contract := []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 32}}
+			cd, err := sandbox.OutputContractDigest(contract)
+			if err != nil {
+				t.Fatal(err)
+			}
+			output := &sandbox.BuildOutputs{Contract: contract, ContractDigest: cd, State: "COLLECTED", ChildrenReaped: true, Files: []sandbox.OutputFile{{Name: "app.elf", Size: 4, Digest: sandbox.Hash([]byte("data")), Bytes: []byte("data")}}}
+			req.Execution.Receipt.Result.BuildOutputs = output
+			switch mode {
+			case "missing-file":
+				output.Files = nil
+			case "bad-bytes":
+				output.Files[0].Bytes = []byte("evil")
+			case "not-stopped":
+				output.ChildrenReaped = false
+			case "false-success":
+				output.State = "NOT_COLLECTED_EXIT_NONZERO"
+				output.Files = nil
+			}
+			req.Execution.Receipt.ResultDigest, _ = canonical.Digest(req.Execution.Receipt.Result)
+			req.Delivery.Artifacts[0].Digest, _ = canonical.Digest(*req.Execution.Receipt)
+			req.Delivery.SubjectDigest, _ = req.Delivery.CalculateSubjectDigest()
+			e, err := VerifyOfflineImport(req)
+			if mode == "valid" {
+				if err != nil || e.Result != "PASS" {
+					t.Fatal(err, e)
+				}
+			} else if err == nil {
+				t.Fatal("invalid producer evidence accepted after outer rehash")
+			}
+		})
+	}
+}

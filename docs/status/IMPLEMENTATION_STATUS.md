@@ -27,6 +27,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation | Automatic abrupt-crash capture, repair or replay |
+| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks | Writable host builds, large firmware, MCU/board qualification or automatic build-output backup |
 | Raw artifact sets | Explicit plans or producer-derived execution/Context selection, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
@@ -103,8 +104,12 @@ Caller-selected native backups still need their own consistency/restore.
 Actual Worker tests delete original records/source/bundle locations, restore the
 raw set and re-run existing semantic readback. A host C-compiler reference keeps
 ELF/map outside source and restores outputs after removing both original source
-and build directories. Neither test adds a Runtime build-output contract or
-qualifies MCU/hardware. Producer-derived capture tests additionally remove the entire prepared root
+and build directories. The existing [offline Runtime](../implementation/OFFLINE_EXECUTION_V1.md)
+also supports an explicitly frozen bounded build-output contract: the non-root
+PID1 guard collects exact files in private tmpfs after reaping children, and the
+existing Worker/Core/Evidence path binds their bytes. A real scratch-container C
+compiler and private artifact restore are covered, but no MCU/hardware or larger
+firmware capacity is qualified. Producer-derived capture tests remove the entire prepared root
 including Context, restore, and recheck every frozen input object and producer
 record. Original Git base/toolchain, full model/tool/control history, second-site
 retention, encryption/key policy, scheduling and GC remain open.
@@ -166,9 +171,9 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   deployment-environment acceptance remain external gates.
 - W03: catchable failure preservation/readback implemented; abrupt-crash capture,
   disk-exhaustion recovery and approved repair are still open.
-- W04/W05: explicit raw-set storage and reference build separation implemented;
-  Runtime output contracts, full Run dependency coverage and durable private
-  retention/production-native acceptance remain open.
+- W04/W05: bounded offline build-output contracts and raw-set/context capture
+  implemented; larger build profiles, automatic offline-output capture, full Run
+  dependencies and durable private retention/production-native acceptance remain open.
 - W06: complete fresh-host installation, upgrade/migration and recovery.
 - W07/W08: authorized normal user journey/WorkBuddy, controlled Human Takeover,
   and representative board-free embedded build/evidence scenarios.
