@@ -1,0 +1,46 @@
+name: RC capture source transport
+on:
+  pull_request:
+    paths: ['.github/workflows/rc-capture-source.yml']
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'jiying2007/engineering-platform' && github.event.pull_request.head.repo.id == 1383377268 && github.event.pull_request.head.ref == 'feat/rc-offline-output-capture'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 18c81f287c32f8bca0936b6f2af192f0b686dc6d
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Export exact source and public verified dependency bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 18c81f287c32f8bca0936b6f2af192f0b686dc6d
+          test "$(git rev-parse HEAD^{tree})" = 9cf2fb0b905b344e71a2353d3802718218cd415f
+          export GOPATH="$RUNNER_TEMP/public-go"
+          export GOMODCACHE="$GOPATH/pkg/mod"
+          export GOTOOLCHAIN=local
+          go mod download
+          go mod verify
+          out="$RUNNER_TEMP/rc-capture-source"
+          mkdir -m 700 "$out"
+          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
+          git bundle create "$out/source.bundle" HEAD
+          tar -czf "$out/go-modules.tar.gz" -C "$GOPATH/pkg" mod
+          git rev-parse HEAD > "$out/COMMIT"
+          go version > "$out/TOOLCHAIN"
+          (cd "$out" && sha256sum source.tar.gz source.bundle go-modules.tar.gz COMMIT TOOLCHAIN > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rc-capture-source-${{ github.run_id }}
+          path: ${{ runner.temp }}/rc-capture-source
+          if-no-files-found: error
+          retention-days: 7
