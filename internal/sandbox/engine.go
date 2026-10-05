@@ -141,6 +141,7 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 		return result, ErrPolicy
 	}
 	p.Argv = append([]string(nil), p.Argv...)
+	p.Outputs = append([]OutputSpec(nil), p.Outputs...)
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(p.Seconds+25)*time.Second)
 	defer cancel()
 	nonce := make([]byte, 16)
@@ -152,7 +153,7 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 		return map[string]any{"Type": "bind", "Source": src, "Target": dst, "ReadOnly": true, "BindOptions": map[string]any{"Propagation": "rprivate", "NonRecursive": true}}
 	}
 	user := strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
-	config := map[string]any{"Image": p.Image, "Entrypoint": []string{"/ep-guard"}, "Cmd": append([]string{strconv.Itoa(p.Seconds)}, p.Argv...), "User": user, "WorkingDir": "/workspace", "Env": []string{"PATH=/usr/bin:/bin", "HOME=/tmp", "LANG=C", "TMPDIR=/tmp"}, "NetworkDisabled": true, "Tty": false, "OpenStdin": false, "Labels": map[string]string{"engineering-platform.offline": owner}, "Healthcheck": map[string]any{"Test": []string{"NONE"}}, "HostConfig": map[string]any{"NetworkMode": "none", "ReadonlyRootfs": true, "CapDrop": []string{"ALL"}, "SecurityOpt": []string{"no-new-privileges:true"}, "Memory": 256 << 20, "MemorySwap": 256 << 20, "NanoCpus": 1_000_000_000, "PidsLimit": 64, "IpcMode": "private", "ShmSize": 8 << 20, "RestartPolicy": map[string]any{"Name": "no"}, "LogConfig": map[string]any{"Type": "local", "Config": map[string]string{"max-size": "1m", "max-file": "1", "compress": "false"}}, "Tmpfs": map[string]string{"/tmp": "rw,nosuid,nodev,noexec,size=67108864,mode=1777"}, "Mounts": []any{mount(source, "/workspace"), mount(bundle, "/context"), mount(e.guard, "/ep-guard")}}}
+	config := map[string]any{"Image": p.Image, "Entrypoint": []string{"/ep-guard"}, "Cmd": append([]string{strconv.Itoa(p.Seconds)}, GuardArguments(p)...), "User": user, "WorkingDir": "/workspace", "Env": []string{"PATH=/usr/bin:/bin", "HOME=/tmp", "LANG=C", "TMPDIR=/tmp"}, "NetworkDisabled": true, "Tty": false, "OpenStdin": false, "Labels": map[string]string{"engineering-platform.offline": owner}, "Healthcheck": map[string]any{"Test": []string{"NONE"}}, "HostConfig": map[string]any{"NetworkMode": "none", "ReadonlyRootfs": true, "CapDrop": []string{"ALL"}, "SecurityOpt": []string{"no-new-privileges:true"}, "Memory": 256 << 20, "MemorySwap": 256 << 20, "NanoCpus": 1_000_000_000, "PidsLimit": 64, "IpcMode": "private", "ShmSize": 8 << 20, "RestartPolicy": map[string]any{"Name": "no"}, "LogConfig": map[string]any{"Type": "local", "Config": map[string]string{"max-size": "1m", "max-file": "1", "compress": "false"}}, "Tmpfs": map[string]string{"/tmp": "rw,nosuid,nodev,noexec,size=67108864,mode=1777"}, "Mounts": []any{mount(source, "/workspace"), mount(bundle, "/context"), mount(e.guard, "/ep-guard")}}}
 	name := "ep-offline-" + owner
 	created := false
 	defer func() {
@@ -232,13 +233,28 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 		result.ExitCode = current.State.ExitCode
 		break
 	}
-	data, _, err = e.call(ctx, http.MethodGet, "/containers/"+response.ID+"/logs?stdout=true&stderr=true", nil, 2*OutputLimit+32768)
+	logLimit := OutputLimit
+	if len(p.Outputs) > 0 {
+		logLimit = BuildWireLimit
+	}
+	data, _, err = e.call(ctx, http.MethodGet, "/containers/"+response.ID+"/logs?stdout=true&stderr=true", nil, 2*logLimit+32768)
 	if err != nil {
 		return result, err
 	}
-	result.Stdout, result.Stderr, err = demultiplex(data)
+	result.Stdout, result.Stderr, err = demultiplexBounded(data, logLimit)
 	if err != nil {
 		return result, err
+	}
+	if len(p.Outputs) > 0 {
+		if len(result.Stderr) != 0 {
+			return Result{}, ErrPolicy
+		}
+		envelope, decodeErr := DecodeBuildEnvelope(result.Stdout, p, result.ExitCode)
+		if decodeErr != nil {
+			return Result{}, decodeErr
+		}
+		result.Stdout, result.Stderr = envelope.Stdout, envelope.Stderr
+		result.BuildOutputs = &envelope.Outputs
 	}
 	result.Recipe = Recipe
 	result.ProfileDigest, _ = p.Digest()
@@ -247,7 +263,8 @@ func (e *Engine) Run(ctx context.Context, p Profile, source, bundle string) (res
 	result.StderrDigest = Hash(result.Stderr)
 	return result, result.Validate(p)
 }
-func demultiplex(data []byte) ([]byte, []byte, error) {
+func demultiplex(data []byte) ([]byte, []byte, error) { return demultiplexBounded(data, OutputLimit) }
+func demultiplexBounded(data []byte, limit int) ([]byte, []byte, error) {
 	out, stderr := []byte{}, []byte{}
 	for len(data) > 0 {
 		if len(data) < 8 || data[1] != 0 || data[2] != 0 || data[3] != 0 {
@@ -256,7 +273,7 @@ func demultiplex(data []byte) ([]byte, []byte, error) {
 		stream := data[0]
 		n := int(binary.BigEndian.Uint32(data[4:8]))
 		data = data[8:]
-		if n > len(data) {
+		if n < 0 || n > len(data) {
 			return nil, nil, ErrPolicy
 		}
 		switch stream {
@@ -267,7 +284,7 @@ func demultiplex(data []byte) ([]byte, []byte, error) {
 		default:
 			return nil, nil, ErrPolicy
 		}
-		if len(out) > OutputLimit || len(stderr) > OutputLimit {
+		if len(out) > limit || len(stderr) > limit {
 			return nil, nil, ErrPolicy
 		}
 		data = data[n:]

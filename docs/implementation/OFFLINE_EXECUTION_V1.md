@@ -15,7 +15,7 @@ Work/Task/Run -> existing relay/inbox -> worker --prepare-only
  -> new Core execution reservation under current Run/recovery authority
  -> current local approval snapshot + independent source/context byte recheck
  -> inspected restricted container + independently timed PID 1 guard
- -> captured stdout/stderr + exact hashes + exit code + confirmed cleanup
+ -> captured stdout/stderr + optional frozen build outputs + hashes + exit/cleanup
  -> recheck unchanged prepared bytes -> current lease -> transactional receipt
  -> eng api GET /api/v1/runs/<id>/offline
 ```
@@ -37,14 +37,16 @@ existing action:execute grant tuple:
 
 Task.AllowedActions must include worker.offline-execute and frozen
 RunInput.ToolProfile must equal `offline/<Profile digest>`. Changed image,
-guard, argv or timeout requires a new explicitly frozen input and grant; the
+guard, argv, timeout or declared build-output contract requires a new explicitly frozen input and grant; the
 worker cannot lower the risk, change a command or reuse another host's preparation.
 The existing generic Action Gateway's privileged external providers are still
 unconfigured. This is a narrowly bounded local offline execution reservation,
 not a route around external-effect reconciliation.
 
 Profile fields, in digest serialization order, are image_id, guard_digest, argv,
-timeout_seconds. The digest is `sandbox.Profile.Digest()`: compact Go JSON of the
+timeout_seconds, then optional outputs. Profiles with no output contract retain
+the original serialization; an explicitly declared contract never falls back to
+plain stdout capture or accepts missing outputs. The digest is `sandbox.Profile.Digest()`: compact Go JSON of the
 typed validated Profile, hashed as raw bytes with the sha256: prefix. Image is
 an exact locally installed Docker image ID (`sha256:<64 lowercase hex>`), NOT a
 mutable tag or a registry manifest digest. Engine never pulls an image. The
@@ -184,10 +186,74 @@ Three shuffled DB repetitions cover one-owner reservation, exact-profile drift,
 stale/foreign/paused/recovery/expired authority, replay, audit failure and expiry
 while waiting on audit. PR and fresh-main results are the actual acceptance proof.
 
-Remaining M1 gates: qualified real Codex/schema with a separately designed network
-boundary and interactive approval path, output/artifact publication and real
-Git/CI facts, independent Review, retained reconciliation/restore and Feature/Debug
-pilots. No real model execution or production readiness is claimed here.
+## Frozen out-of-tree build outputs
+
+An offline Profile may declare `outputs`, a sorted list of required lowercase-or-
+uppercase ASCII leaf names and per-file `max_bytes`. Every name/budget is part of
+`offline/<Profile digest>` and the exact action grant. It cannot be added to an
+already frozen Run. No declaration means no output collection; it is not an
+implicit discovery mode. There is no glob, optional member or late exclusion.
+
+For example (within the existing profile, not a new command/authority):
+
+```json
+"outputs": [
+  {"name": "app.elf", "max_bytes": 131072},
+  {"name": "app.map", "max_bytes": 65536}
+]
+```
+
+The pinned non-root PID1 guard creates `/tmp/ep-output` inside the existing bounded
+noexec tmpfs and supplies `EP_OUTPUT_DIR` only to the command. Source and Context
+remain read-only; there is NO writable host/daemon volume, socket or extra mount.
+Tool argv must explicitly select out-of-tree output. The guard buffers bounded
+command stdout/stderr, then kills and reaps remaining namespace children before
+reading outputs. A detached writer cannot remain active during collection. The
+host separately requires the expected container exit and confirmed removal.
+
+A zero-exit command must leave exactly the declared regular single-link files,
+within bounds; extra/missing files, links, directories, special files or unsafe
+permissions reject. Empty regular files are permitted. Contents remain untrusted
+build data; a filename is not firmware validation or compiler correctness proof.
+Nonzero command exit produces `NOT_COLLECTED_EXIT_NONZERO` with no successful
+artifact claim. Collection/guard/cleanup ambiguity cannot produce a success.
+The temporary outputs are not an abrupt-crash retention mechanism.
+
+The guard emits one bounded canonical envelope after command-pipe collection and
+child reap. The host checks its complete encoding, exit code, contract and each
+raw size/hash. Extra or forged outer log data rejects; there is no truncated-log
+fallback. The result stores `build_outputs`, including contract/digest, observed
+quiescence and original bytes, inside the existing fsynced local report and
+transactional Core receipt. Live finish verifies it against the frozen Profile;
+Evidence import independently checks its byte/structure claims. A rehashed
+changed report cannot replace a committed result. No new database migration,
+permission, Evidence family or Workflow is introduced.
+
+Bounds are intentionally tied to existing transports: at most 8 files, 128 KiB
+per file, 256 KiB total declared capacity. Command stdout/stderr remain 128 KiB
+each; the encoded envelope is at most 768 KiB, below the 1 MiB Core request/log
+budgets. No limits are raised silently. This supports bounded build/link checks,
+not a whole large BSP/firmware image. Larger outputs require a separately reviewed
+streaming transport/capacity change, not splitting or omitting unknown material.
+Returned raw bytes have the SAME authorized Core platform-read scope as stdout,
+not a new private-only API. Do not authorize commands that emit secrets. Nothing
+is automatically published to GitHub, restored as executable or granted replay.
+
+Required real-container tests cover safe outputs, detached writers, missing and
+extra files, aliases/hardlinks/FIFO/directories, bounds and forged outer logs.
+A compiler fixture constructs a no-network scratch image from the trusted host
+GCC/assembler/linker and their runtime dependencies, builds a freestanding C
+ELF/map against read-only source, and restores the output bytes through the
+existing private artifact set after deleting all original source/staging files.
+This is real native host-C/Engine execution, NOT MCU/board/model qualification.
+The actual compiled Worker/mTLS/PostgreSQL test freezes an output profile, denies
+a changed output budget, retains generated bytes before report, reads the exact
+Core receipt and still rejects duplicate command execution.
+
+Full producer dependency coverage, larger builds/representative MCU profiles,
+automatic offline artifact-set selection, crash salvage and production/host
+qualification remain separate. See IMPLEMENTATION_STATUS for current maturity;
+this contract does not reopen historical M1 subjects or declare production ready.
 
 Primary references used: Docker Engine run/security/resource-constraints docs,
 https://docs.docker.com/engine/containers/run/ ,

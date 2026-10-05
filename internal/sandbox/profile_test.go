@@ -72,3 +72,24 @@ func TestInspectRejectsMissingConstraints(t *testing.T) {
 		}
 	}
 }
+
+func TestInspectRequiresFrozenOutputContractArguments(t *testing.T) {
+	// Inspection checks exact argv independently of mutable image defaults.
+	p := fixtureProfile()
+	p.Outputs = []OutputSpec{{Name: "app.bin", MaxBytes: 32}}
+	expected := GuardArguments(p)
+	other := p
+	other.Outputs = []OutputSpec{{Name: "app.bin", MaxBytes: 33}}
+	if strings.Join(expected, "\x00") == strings.Join(GuardArguments(other), "\x00") {
+		t.Fatal("output bounds not passed to guard")
+	}
+	raw, _ := json.Marshal(p)
+	if !strings.Contains(string(raw), `"outputs":[`) {
+		t.Fatal("frozen output contract omitted")
+	}
+	plain := fixtureProfile()
+	raw, _ = json.Marshal(plain)
+	if strings.Contains(string(raw), "outputs") {
+		t.Fatal("plain profiles changed identity")
+	}
+}

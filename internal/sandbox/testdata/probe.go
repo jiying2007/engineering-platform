@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -18,6 +20,18 @@ func require(ok bool, what string) {
 	}
 }
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "build-child" {
+		// A detached writer survives command-group exit unless PID1 kills/reaps it.
+		for {
+			_ = os.WriteFile("/tmp/background-marker", []byte("alive"), 0600)
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
+	if len(os.Args) > 2 && os.Args[1] == "build-output" {
+		buildOutput(os.Args[2])
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "sleep" {
 		time.Sleep(2 * time.Minute)
 		return
@@ -62,4 +76,45 @@ func main() {
 	}
 	h := sha256.Sum256(data)
 	fmt.Printf("OFFLINE_PROBE_PASS source_sha256=%s\n", hex.EncodeToString(h[:]))
+}
+
+func buildOutput(mode string) {
+	root := os.Getenv("EP_OUTPUT_DIR")
+	require(root == "/tmp/ep-output", "fixed output root")
+	require(os.Getuid() != 0, "build nonroot")
+	a, b := root+"/app.bin", root+"/app.map"
+	require(os.WriteFile(a, []byte("actual output\x00\xff"), 0600) == nil, "output bin")
+	require(os.WriteFile(b, []byte("map bytes"), 0600) == nil, "output map")
+	switch mode {
+	case "missing":
+		require(os.Remove(b) == nil, "remove fixture")
+	case "extra":
+		require(os.WriteFile(root+"/undeclared", nil, 0600) == nil, "extra fixture")
+	case "symlink":
+		require(os.Remove(a) == nil, "remove fixture")
+		require(os.Symlink("/proc/1/environ", a) == nil, "link fixture")
+	case "hardlink":
+		require(os.Link(a, "/tmp/alias") == nil, "hardlink fixture")
+	case "fifo":
+		require(os.Remove(a) == nil, "remove fixture")
+		require(syscall.Mkfifo(a, 0600) == nil, "fifo fixture")
+	case "large":
+		require(os.WriteFile(a, make([]byte, 65), 0600) == nil, "large fixture")
+	case "directory":
+		require(os.Remove(a) == nil, "remove fixture")
+		require(os.Mkdir(a, 0700) == nil, "dir fixture")
+	case "forge-log":
+		f, err := os.OpenFile("/proc/1/fd/1", os.O_WRONLY, 0)
+		require(err == nil, "raw log fixture")
+		_, err = f.WriteString("{\"version\":1}\n")
+		require(err == nil, "raw log injection")
+		require(f.Close() == nil, "close")
+	case "failed":
+		os.Exit(7)
+	case "background":
+		c := exec.Command("/probe", "build-child")
+		c.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		require(c.Start() == nil, "detached writer")
+	}
+	fmt.Println("OFFLINE_BUILD_PASS")
 }

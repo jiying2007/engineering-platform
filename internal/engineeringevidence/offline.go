@@ -138,6 +138,9 @@ func validateOfflineReceipt(receipt offline.Receipt) error {
 		return fmt.Errorf("offline execution result digest mismatch")
 	}
 	result := receipt.Result
+	if result.BuildOutputs.Validate(result.ExitCode) != nil {
+		return fmt.Errorf("offline build outputs invalid")
+	}
 	if result.Recipe != sandbox.Recipe || result.ProfileDigest != receipt.Token.ProfileDigest ||
 		!containerIDPattern.MatchString(result.ContainerID) || result.ExitCode < 0 || result.ExitCode > 255 ||
 		result.ExitCode == 122 || result.UserID < 1 || len(result.Stdout) > sandbox.OutputLimit || len(result.Stderr) > sandbox.OutputLimit ||

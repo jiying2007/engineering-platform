@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/sandbox"
 )
 
 func main() { os.Exit(run(os.Args[1:])) }
@@ -24,6 +26,9 @@ func run(args []string) int {
 	seconds, err := strconv.Atoi(args[0])
 	if err != nil || seconds < 1 || seconds > 45 {
 		return 125
+	}
+	if len(args) >= 5 && args[1] == sandbox.BuildGuardMode && args[3] == "--" {
+		return runBuild(seconds, args[2], args[4:])
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(seconds)*time.Second)
 	defer cancel()
