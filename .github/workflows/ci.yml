@@ -36,6 +36,9 @@ jobs:
       - name: Verify exact retained evidence refs
         shell: bash
         run: python3 -B scripts/verify_retained_evidence_refs.py --manifest .github/retained-evidence-refs.json
+      - name: Verify exact retained superseded prototype refs
+        shell: bash
+        run: python3 -B scripts/verify_retained_prototype_refs.py --manifest .github/retained-prototype-refs.json
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod

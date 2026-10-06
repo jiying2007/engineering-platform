@@ -146,3 +146,36 @@ main, can be appended in-memory to the same atomic SHA-leased deletion. This
 does not broaden deletion to retained evidence refs, release refs, arbitrary
 branches or open PRs. If PR association, SHA, tree or remote inventory drifts,
 the mutation is rejected before deletion.
+
+
+## Frozen divergent prototype disposition — 2026-10-06
+
+The four non-byte-identical prototype branches are now deliberately retained as
+**RETAINED_SUPERSEDED_PROTOTYPE** history rather than deleted. Their exact remote
+heads are pinned in `.github/retained-prototype-refs.json` and required CI reads
+those four refs from origin and rejects any missing or changed head. This guard is
+read-only; it is not GitHub branch protection and does not mutate refs.
+
+These refs are historical source lineage only and must not be merged, rebased or
+cherry-picked back into current main:
+
+- `feat/github-ci-core-evidence-import@16a147396196fabda07dc225809844802c9491eb`
+  — the prototype CI Evidence line is superseded by the current
+  `internal/cievidence` + `cmd/eng/import_ci.go` authority and later Delivery /
+  verification hardening.
+- `feat/independent-publisher-service@eda85863ed185271fbc11beb54835e4e3701c1e1`
+  — its service split is superseded by the current independent
+  `cmd/publisher-service`, `internal/githubpublish` remote protocol, production
+  systemd/preflight wiring and authenticated Publisher health observation.
+- `feat/independent-review-authority@6ee61e27df4cbf545562895b552b059af77f5613`
+  — its Review model is superseded by the current `internal/review`, migration
+  0006, authenticated Review API and Closure binding.
+- `feat/relay-codex-config-renderer@e4e88385dcb01d3da54a7334eb64f14e472e0aec`
+  — its renderer is superseded by the current v2 relay qualification renderer,
+  config digest, qualification-kit and runtime-handoff contracts.
+
+Semantic supersession is intentionally NOT claimed to be byte equivalence. Keeping
+the exact refs preserves their unique source history while removing them from the
+set of pending RC work. Actual mutation prevention for these historical refs
+remains a repository-administrator policy if desired; CI drift detection is the
+implemented repository-side control.
