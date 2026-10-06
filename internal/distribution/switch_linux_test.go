@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -20,12 +21,20 @@ func installedReleaseFixture(t *testing.T, parent, name string) (string, Release
 	return dest, ReleaseIdentity{SourceCommit: sha, ManifestDigest: result.ManifestDigest}
 }
 
+func emptyProc(t *testing.T) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "proc")
+	installOK(t, os.Mkdir(root, 0755))
+	return root
+}
+
 func TestInstalledReleaseSwitchAndRollbackPreserveBothIdentities(t *testing.T) {
 	parent := t.TempDir()
+	proc := emptyProc(t)
 	active, oldID := installedReleaseFixture(t, parent, "active")
 	candidate, newID := installedReleaseFixture(t, parent, "candidate")
 	previous := filepath.Join(parent, "previous")
-	result, err := SwitchInstalledRelease(context.Background(), active, candidate, previous, oldID, newID)
+	result, err := switchInstalledRelease(context.Background(), active, candidate, previous, oldID, newID, proc, 999999)
 	installOK(t, err)
 	if result.Status != "INSTALLATION_SWITCH_BYTES_VERIFIED" || result.ActiveIdentity != newID || result.PreviousIdentity != oldID ||
 		result.ServicesStarted || result.DatabaseChanged || result.ExecutionAuthorized || result.ProductionQualified {
@@ -38,7 +47,7 @@ func TestInstalledReleaseSwitchAndRollbackPreserveBothIdentities(t *testing.T) {
 		t.Fatal("old release not retained", err)
 	}
 	failed := filepath.Join(parent, "failed-new")
-	rollback, err := SwitchInstalledRelease(context.Background(), active, previous, failed, newID, oldID)
+	rollback, err := switchInstalledRelease(context.Background(), active, previous, failed, newID, oldID, proc, 999999)
 	installOK(t, err)
 	if rollback.ActiveIdentity != oldID || rollback.PreviousIdentity != newID {
 		t.Fatal("rollback identities drifted", rollback)
@@ -76,7 +85,7 @@ func TestInstalledReleaseSwitchRejectsUnsafePreconditionsWithoutMutation(t *test
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
-			if _, err := SwitchInstalledRelease(ctx, active, candidate, previous, oldID, newID); err == nil {
+			if _, err := switchInstalledRelease(ctx, active, candidate, previous, oldID, newID, emptyProc(t), 999999); err == nil {
 				t.Fatal("unsafe switch accepted", mode)
 			}
 			if mode != "cross-parent" {
@@ -115,5 +124,17 @@ func TestReleaseProcessUseRejectsActiveAndOtherCandidateProcesses(t *testing.T) 
 	add(102, filepath.Join(candidate, "bin", "worker"))
 	if err := processUsesRelease(proc, 999, active, candidate); err == nil {
 		t.Fatal("other running candidate process accepted")
+	}
+}
+
+func TestInstalledReleaseSwitchPublicEntryRequiresHostAdministrator(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("test runner is root; host-admin requirement is exercised by native upgrade regression")
+	}
+	_, err := SwitchInstalledRelease(context.Background(), "/x/active", "/x/candidate", "/x/previous",
+		ReleaseIdentity{SourceCommit: strings.Repeat("a", 40), ManifestDigest: "sha256:" + strings.Repeat("a", 64)},
+		ReleaseIdentity{SourceCommit: strings.Repeat("b", 40), ManifestDigest: "sha256:" + strings.Repeat("b", 64)})
+	if err == nil {
+		t.Fatal("non-root release switch accepted")
 	}
 }
