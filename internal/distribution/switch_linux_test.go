@@ -121,6 +121,11 @@ func TestReleaseProcessUseRejectsActiveAndOtherCandidateProcesses(t *testing.T) 
 	if err := processUsesRelease(proc, 999, active, candidate); err != nil {
 		t.Fatal("switch process in candidate should be allowed", err)
 	}
+	installOK(t, os.RemoveAll(filepath.Join(proc, "999")))
+	add(999, filepath.Join(active, "bin", "eng"))
+	if err := processUsesRelease(proc, 999, active, candidate); err != nil {
+		t.Fatal("switch process in active should be allowed for upgrade/rollback", err)
+	}
 	add(102, filepath.Join(candidate, "bin", "worker"))
 	if err := processUsesRelease(proc, 999, active, candidate); err == nil {
 		t.Fatal("other running candidate process accepted")

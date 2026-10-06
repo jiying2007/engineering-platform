@@ -223,8 +223,9 @@ versions, start/stop services, migrate a database or authorize execution.
 is a host-administrator/root operation so process inspection fails closed rather
 than ignoring inaccessible `/proc/*/exe` entries. It requires active and candidate releases plus both externally retained identities,
 requires the three release paths to be direct siblings under one controlled
-parent, rejects any running executable from active or candidate (other than the
-switching candidate `eng` itself), and keeps the replaced release at an explicit
+parent, rejects any running executable from active or candidate other than the single
+current `installation-switch` process itself (which may run from active,
+candidate, or an external host-owned copy), and keeps the replaced release at an explicit
 new `previous` path. It serializes switches with a non-persistent lock on the
 parent and re-verifies both releases after the move. It never invokes systemd,
 migrations, PostgreSQL, model execution or publication. Rollback uses the same

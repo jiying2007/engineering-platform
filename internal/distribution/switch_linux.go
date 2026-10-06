@@ -71,7 +71,10 @@ func processUsesRelease(procRoot string, self int, active, candidate string) err
 		exe = strings.TrimSuffix(exe, " (deleted)")
 		in := func(root string) bool { return exe == root || strings.HasPrefix(exe, root+string(filepath.Separator)) }
 		if in(active) || in(candidate) {
-			if pid == self && in(candidate) && !in(active) {
+			// The switch process itself may be the active or candidate eng. Linux
+			// keeps its executable mapping valid across directory renames. Every
+			// other process from either release must already be stopped.
+			if pid == self {
 				continue
 			}
 			return fmt.Errorf("release has a running executable")
