@@ -27,7 +27,7 @@ func workIntakeFixture() workIntakeSpec {
 		Version:    1,
 		WorkItemID: "wb-work", TaskContractID: "wb-task", RunID: "wb-run", AttemptID: "attempt-1",
 		Title: "Add bounded embedded diagnostic", SourceRef: "workbuddy:req-42",
-		TargetID: "ssc305", TaskType: "FEATURE", Subsystem: "linux-bsp",
+		TaskType: "FEATURE", Subsystem: "linux-bsp",
 		ExpectedOutputs: []string{"source-change"},
 		Material: material.Manifest{
 			Repository: "repo", BaseCommit: strings.Repeat("a", 40), TargetID: "ssc305",
@@ -82,7 +82,7 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/work-items":
 			var got core.WorkItem
-			if json.NewDecoder(r.Body).Decode(&got) != nil || got.HumanOwner != owner {
+			if json.NewDecoder(r.Body).Decode(&got) != nil || got.HumanOwner != owner || got.TargetID != spec.Material.TargetID {
 				t.Error("work owner was not certificate identity", got)
 			}
 			got.State, got.Version, got.CreatedAt = core.WorkDraft, 1, time.Now().UTC()
@@ -185,5 +185,13 @@ func TestWorkIntakeNeverRetriesPartialCreation(t *testing.T) {
 		!partial.WorkCreated || partial.TaskCreated ||
 		workCalls != 1 || taskCalls != 1 || runCalls != 0 {
 		t.Fatal("partial intake retried or advanced", err, workCalls, taskCalls, runCalls)
+	}
+}
+
+func TestWorkIntakeRejectsDuplicateTaskAndTargetAuthorities(t *testing.T) {
+	spec := workIntakeFixture()
+	spec.Material.TaskType = spec.TaskType
+	if _, _, err := spec.validate(); err == nil {
+		t.Fatal("duplicate material task_type accepted")
 	}
 }
