@@ -37,7 +37,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
 | Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI also runs a bounded 32-Run/8-Worker concurrent admission/security characterization | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
-| Pre-live | Event SHA/tree, terminal plan v2 and exact nonempty no-skip test inventory | Live provider/service acceptance |
+| Pre-live | Event SHA/tree, terminal plan v2, exact nonempty no-skip test inventory and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Live provider/service acceptance, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
 
 ## Execution, failure and continuation
@@ -217,12 +217,17 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   only as characterization, not SLOs. The expanded exact-tree retirement batch
   removed 32 refs with five already absent, and future exact-tree same-repository
   merged heads are leased for automatic cleanup after successful main CI.
-  Retained-ref mutation protection, broader sustained/soak security coverage and
-  exact final RC delivery remain open. The four divergent prototype refs now have an
-  explicit frozen-history disposition and required drift guard.
+  Main-only internal RC delivery-envelope generation is implemented and each
+  main push must still actually emit/read back its source-bound artifact. Broader
+  sustained/soak security coverage and repository-administrator mutation
+  protection for retained historical refs remain open. The four divergent
+  prototype refs have an explicit frozen-history disposition and required
+  repository-side drift guard.
 
-Every slice needs exact-head CI, fresh-main and delivered-byte readback. Earlier
-green runs do not qualify new source. External accounts, production hosts,
+Every slice needs exact-head CI, fresh-main and delivered-byte readback. The
+internal RC envelope is provenance for that exact successful main CI only; it
+does not close external terminal gates. Earlier green runs do not qualify new
+source. External accounts, production hosts,
 devices and human decisions remain separate gates; no local implementation can
 stand in for those decisions. Prioritize actual user journeys and reproducible
 delivery rather than parallel authorities, speculative tooling or more states.
