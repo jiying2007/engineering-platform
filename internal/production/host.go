@@ -79,7 +79,8 @@ func Check(c Config) (Result, error) {
 		}
 		for key, value := range values {
 			if strings.HasSuffix(key, "_FILE") || strings.HasSuffix(key, "_CONFIG") {
-				if e := hostFile(value, strings.HasSuffix(key, "_KEY_FILE"), uids[i], false); e != nil {
+				private := strings.HasSuffix(key, "_KEY_FILE") || key == "WORKER_PREPARATION_CONFIG"
+				if e := hostFile(value, private, uids[i], false); e != nil {
 					return result, fmt.Errorf("%s: %w", key, e)
 				}
 				if e := servicePathAccess(value, uids[i], groups[i], 4); e != nil {
