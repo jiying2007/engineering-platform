@@ -499,7 +499,7 @@ def run_suite(distribution, expected, root, prefix):
 
         command([str(eng), "installation-verify", "--dir", str(installed), "--source-commit", expected])
         graph = transient_role_graph(root, prefix)
-        checks.append("transient_four_role_dependency_graph_distinct_numeric_identities")
+        checks.append("transient_four_role_dependency_graph_distinct_dynamic_users")
         return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "transient_role_graph": graph, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "transient_distinct_dynamic_users_tested": True, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
     finally:
         cleanup_errors = []
