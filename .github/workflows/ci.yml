@@ -455,3 +455,36 @@ jobs:
           path: ${{ runner.temp }}/ci-evidence-envelope.json
           if-no-files-found: error
           retention-days: 90
+      - name: Build exact internal RC delivery envelope on main only
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          test "$source_sha" = "${{ github.sha }}"
+          tree_sha="$(git rev-parse 'HEAD^{tree}')"
+          go run ./cmd/rc-delivery \
+            --ci-envelope "$RUNNER_TEMP/ci-evidence-envelope.json" \
+            --source-tree "$tree_sha" \
+            --implementation-status docs/status/IMPLEMENTATION_STATUS.md \
+            --retained-evidence .github/retained-evidence-refs.json \
+            --retained-prototypes .github/retained-prototype-refs.json \
+            > "$RUNNER_TEMP/internal-rc-delivery-envelope.json"
+          jq -e --arg sha "$source_sha" --arg tree "$tree_sha" '
+            .delivery.source_sha==$sha and
+            .delivery.source_tree==$tree and
+            .delivery.provider_live_executed==false and
+            .delivery.human_review_performed==false and
+            .delivery.production_qualified==false and
+            (.delivery.terminal_required_gates|length)>0 and
+            (.delivery_digest|startswith("sha256:"))
+          ' "$RUNNER_TEMP/internal-rc-delivery-envelope.json" >/dev/null
+          cat "$RUNNER_TEMP/internal-rc-delivery-envelope.json"
+      - name: Retain exact internal RC delivery envelope
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: internal-rc-delivery-${{ github.sha }}
+          path: ${{ runner.temp }}/internal-rc-delivery-envelope.json
+          if-no-files-found: error
+          retention-days: 90
