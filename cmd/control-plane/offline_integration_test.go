@@ -49,12 +49,17 @@ func TestOfflineCommandCCompilerCaptureRestore(t *testing.T) {
 	offlineCommandCapture(t, "compiler")
 }
 
+func TestOfflineCommandFreestandingFirmwareReference(t *testing.T) {
+	offlineCommandCapture(t, "firmware")
+}
+
 func TestOfflineCommandSIGKILLLeavesUnreconciledWithoutReplay(t *testing.T) {
 	offlineCommandCapture(t, "crash")
 }
 
 func offlineCommandCapture(t *testing.T, mode string) {
-	compiler := mode == "compiler"
+	firmware := mode == "firmware"
+	compiler := mode == "compiler" || firmware
 	crash := mode == "crash"
 	if mode != "probe" && !compiler && !crash {
 		t.Fatal("unknown offline command test mode", mode)
@@ -80,6 +85,10 @@ func offlineCommandCapture(t *testing.T, mode string) {
 		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/main.c", "-Wl,-e,entry,-Map=/tmp/ep-output/app.map", "-o", "/tmp/ep-output/app.elf"}
 		profile.Seconds = 15
 		profile.Outputs = []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 128 << 10}, {Name: "app.map", MaxBytes: 64 << 10}}
+	}
+	if firmware {
+		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/firmware.c", "-Wl,-e,reset_handler,-Map=/tmp/ep-output/firmware.map", "-o", "/tmp/ep-output/firmware.elf"}
+		profile.Outputs = []sandbox.OutputSpec{{Name: "firmware.elf", MaxBytes: 128 << 10}, {Name: "firmware.map", MaxBytes: 64 << 10}}
 	}
 	if crash {
 		profile = sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "sleep"}, Seconds: 10}
@@ -176,8 +185,14 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	gitRun("config", "user.name", "Offline Fixture")
 	gitRun("config", "user.email", "test@example.invalid")
 	commandOK(t, os.WriteFile(filepath.Join(repo, "hello.txt"), []byte("real approved source\n"), 0o600))
-	if compiler {
+	if compiler && !firmware {
 		commandOK(t, os.WriteFile(filepath.Join(repo, "main.c"), []byte("int entry(void) { return 42; }\n"), 0600))
+	}
+	if firmware {
+		const source = "volatile unsigned long boot_counter;\n" +
+			"void reset_handler(void) { boot_counter++; }\n" +
+			"__attribute__((used,section(\".vectors\"))) void (* const vectors[])(void) = { reset_handler };\n"
+		commandOK(t, os.WriteFile(filepath.Join(repo, "firmware.c"), []byte(source), 0600))
 	}
 	gitRun("add", ".")
 	gitRun("commit", "-m", "base")
@@ -285,7 +300,15 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	if receipt.Result.BuildOutputs == nil || len(receipt.Result.BuildOutputs.Files) != 2 || receipt.Result.Validate(profile) != nil {
 		t.Fatal("Worker lost frozen output bytes")
 	}
-	if compiler {
+	if firmware {
+		elf := receipt.Result.BuildOutputs.Files[0]
+		linkMap := string(receipt.Result.BuildOutputs.Files[1].Bytes)
+		if elf.Name != "firmware.elf" || !strings.HasPrefix(string(elf.Bytes), "\x7fELF") ||
+			receipt.Result.BuildOutputs.Files[1].Name != "firmware.map" ||
+			!strings.Contains(linkMap, "reset_handler") || !strings.Contains(linkMap, ".vectors") {
+			t.Fatal("freestanding firmware reference output missing")
+		}
+	} else if compiler {
 		if !strings.HasPrefix(string(receipt.Result.BuildOutputs.Files[0].Bytes), "\x7fELF") || !strings.Contains(string(receipt.Result.BuildOutputs.Files[1].Bytes), "entry") {
 			t.Fatal("actual compiler output missing")
 		}
@@ -433,7 +456,7 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	if count != 0 {
 		t.Fatal("capture manufactured Evidence")
 	}
-	t.Logf("same-Run compiler=%t Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s", compiler, receipt.Result.ProfileDigest)
+	t.Logf("same-Run mode=%s Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s; host-ISA reference only=%t", mode, receipt.Result.ProfileDigest, firmware)
 }
 
 func offlineCrashAfterPermit(t *testing.T, ctx context.Context, store *pgstore.Store, pool *pgxpool.Pool, workerBin string, env []string, subject, profileName, runID, preparedRoot string, profile sandbox.Profile, image testutil.Fixture) {
