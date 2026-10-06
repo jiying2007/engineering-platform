@@ -107,7 +107,11 @@ func TestInstalledReleaseReadbackRejectsTreeMutationAndAliases(t *testing.T) {
 				installOK(t, os.Chmod(template, 0644))
 				installOK(t, os.WriteFile(template, []byte("forged"), 0444))
 				installOK(t, os.Chmod(template, 0444))
-				cleanup = func() { _ = os.Chmod(template, 0644); _ = os.WriteFile(template, original, 0444); _ = os.Chmod(template, 0444) }
+				cleanup = func() {
+					_ = os.Chmod(template, 0644)
+					_ = os.WriteFile(template, original, 0444)
+					_ = os.Chmod(template, 0444)
+				}
 			case "hardlink":
 				alias := filepath.Join(t.TempDir(), "alias")
 				installOK(t, os.Link(template, alias))
