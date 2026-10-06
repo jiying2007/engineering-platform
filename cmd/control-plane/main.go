@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/servicenotify"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
 	"github.com/jiying2007/engineering-platform/internal/workerloop"
@@ -31,6 +32,11 @@ func serve() error {
 	flag.Parse()
 	if flag.NArg() != 0 {
 		return fmt.Errorf("unexpected control-plane arguments")
+	}
+
+	notifier, err := servicenotify.FromEnvironment()
+	if err != nil {
+		return err
 	}
 	env := os.Getenv
 	if *productionMode {
@@ -93,7 +99,7 @@ func serve() error {
 		relay = func(ctx context.Context) error { _, err := persistent.RelayRunStarts(ctx, owner, 16); return err }
 	}
 	log.Printf("control plane listening on %s; worker lane=input-admission-only", listener.Addr())
-	return runControlServer(ctx, server, listener, config.development, relay)
+	return runControlServer(ctx, server, notifier.Listener(ctx, listener), config.development, relay)
 }
 
 // The real entrypoint and command integration tests share this entire serving
