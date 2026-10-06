@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
@@ -51,9 +52,13 @@ func TestProbeRemoteHealthUsesAuthenticatedPublisherWithoutUpstreamCall(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	configDigest, err := canonical.Digest(config)
+	if err != nil {
+		t.Fatal(err)
+	}
 	remote := service.remote.(*serviceRemote)
 	if result.Version != 1 || result.Status != "PUBLISHER_ENDPOINT_OBSERVED" ||
-		result.Service != "engineering-github-publisher" || result.ObservedAt.IsZero() ||
+		result.Service != "engineering-github-publisher" || result.ConfigurationDigest != configDigest || result.ObservedAt.IsZero() ||
 		!result.EndpointObserved || result.UpstreamObserved || result.CapacityObserved ||
 		result.PublicationAuthorized || result.ExecutionAuthorized || result.ProductionQualified ||
 		remote.publishCalls != 0 || remote.observeCalls != 0 {
