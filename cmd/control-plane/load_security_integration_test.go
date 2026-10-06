@@ -173,9 +173,9 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 				}
 				var task map[string]json.RawMessage
 				if e := call("/api/v1/task-contracts", map[string]any{
-					"contract": map[string]any{"task_contract_id": label + "-task", "work_item_id": label + "-work", "task_type": "FEATURE"},
-					"material": map[string]any{"repository": "fixture", "base_commit": strings.Repeat("a", 40), "target_id": "target", "acceptance_criteria": []string{"admission integrity"}},
-					"subsystem": "driver",
+					"contract":          map[string]any{"task_contract_id": label + "-task", "work_item_id": label + "-work", "task_type": "FEATURE"},
+					"material":          map[string]any{"repository": "fixture", "base_commit": strings.Repeat("a", 40), "target_id": "target", "acceptance_criteria": []string{"admission integrity"}},
+					"subsystem":         "driver",
 					"verification_plan": map[string]any{"verification_plan_id": label + "-plan", "criteria": []any{map[string]any{"criterion_id": "ac", "statement": "admission integrity", "evidence_requirements": []any{map[string]any{"requirement_id": "req", "procedure": "ci.test"}}}}},
 				}, &task); e != nil {
 					intakeErrs <- fmt.Errorf("%s task: %w", label, e)
