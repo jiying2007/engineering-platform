@@ -120,6 +120,7 @@ class LifecycleContracts(unittest.TestCase):
             'worker-admission': 'engineering-admission',
             'worker-preparation': 'engineering-preparation',
         })
+        self.assertIn('engineering-publisher.service', parsed['control-plane']['Unit']['Wants'].split())
         self.assertIn('engineering-publisher.service', parsed['control-plane']['Unit']['After'].split())
         for role in ('worker-admission', 'worker-preparation'):
             self.assertIn('engineering-control-plane.service', parsed[role]['Unit']['Requires'].split())
