@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
@@ -32,19 +33,58 @@ type remoteClient struct {
 	client   *http.Client
 }
 
-func LoadRemoteClient(path string) (Remote, error) {
+type PublisherHealthObservation struct {
+	Version               int       `json:"version"`
+	Status                string    `json:"status"`
+	Service               string    `json:"service"`
+	ConfigurationDigest   string    `json:"configuration_digest"`
+	ObservedAt            time.Time `json:"observed_at"`
+	EndpointObserved      bool      `json:"endpoint_observed"`
+	UpstreamObserved      bool      `json:"upstream_observed"`
+	CapacityObserved      bool      `json:"capacity_observed"`
+	PublicationAuthorized bool      `json:"publication_authorized"`
+	ExecutionAuthorized   bool      `json:"execution_authorized"`
+	ProductionQualified   bool      `json:"production_qualified"`
+}
+
+type publisherHealthPayload struct {
+	Status  string `json:"status"`
+	Service string `json:"service"`
+}
+
+func readRemoteConfiguration(path string) (RemoteConfiguration, error) {
+	var config RemoteConfiguration
 	data, err := access.ReadConfiguration(path, false)
 	if err != nil {
-		return nil, err
+		return config, err
 	}
-	var config RemoteConfiguration
 	if err := strictjson.Decode(data, &config); err != nil {
+		return config, err
+	}
+	return config, nil
+}
+
+func LoadRemoteClient(path string) (Remote, error) {
+	config, err := readRemoteConfiguration(path)
+	if err != nil {
 		return nil, err
 	}
 	return NewRemoteClient(config)
 }
 
+func LoadRemoteHealth(ctx context.Context, path string) (PublisherHealthObservation, error) {
+	config, err := readRemoteConfiguration(path)
+	if err != nil {
+		return PublisherHealthObservation{}, err
+	}
+	return ProbeRemoteHealth(ctx, config)
+}
+
 func NewRemoteClient(config RemoteConfiguration) (Remote, error) {
+	return newRemoteClient(config)
+}
+
+func newRemoteClient(config RemoteConfiguration) (*remoteClient, error) {
 	if config.Version != 1 {
 		return nil, fmt.Errorf("publisher remote configuration version 1 required")
 	}
@@ -89,6 +129,60 @@ func NewRemoteClient(config RemoteConfiguration) (Remote, error) {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	return &remoteClient{endpoint: strings.TrimSuffix(config.Endpoint, "/"), client: client}, nil
+}
+
+func ProbeRemoteHealth(ctx context.Context, config RemoteConfiguration) (PublisherHealthObservation, error) {
+	digest, err := canonical.Digest(config)
+	if err != nil {
+		return PublisherHealthObservation{}, err
+	}
+	client, err := newRemoteClient(config)
+	if err != nil {
+		return PublisherHealthObservation{}, err
+	}
+	defer client.client.CloseIdleConnections()
+	return client.health(ctx, digest)
+}
+
+func (c *remoteClient) health(ctx context.Context, configurationDigest string) (PublisherHealthObservation, error) {
+	var zero PublisherHealthObservation
+	if c == nil || c.client == nil || c.endpoint == "" || !strings.HasPrefix(configurationDigest, "sha256:") || len(configurationDigest) != 71 {
+		return zero, fmt.Errorf("configured publisher remote required")
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint+"/healthz", nil)
+	if err != nil {
+		return zero, err
+	}
+	req.Header.Set("Accept", "application/json")
+	response, err := c.client.Do(req)
+	if err != nil {
+		return zero, fmt.Errorf("publisher health transport: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return zero, fmt.Errorf("publisher health returned HTTP %d", response.StatusCode)
+	}
+	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" || response.Header.Get("Content-Encoding") != "" {
+		return zero, fmt.Errorf("publisher health requires unencoded JSON")
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, (4<<10)+1))
+	if err != nil || len(body) == 0 || len(body) > 4<<10 {
+		return zero, fmt.Errorf("publisher health response outside size limit")
+	}
+	var payload publisherHealthPayload
+	if err := strictjson.Decode(body, &payload); err != nil ||
+		payload.Status != "ok" || payload.Service != "engineering-github-publisher" {
+		return zero, fmt.Errorf("publisher health identity mismatch")
+	}
+	return PublisherHealthObservation{
+		Version: 1, Status: "PUBLISHER_ENDPOINT_OBSERVED",
+		Service: payload.Service, ConfigurationDigest: configurationDigest,
+		ObservedAt: time.Now().UTC(), EndpointObserved: true,
+	}, nil
 }
 
 func (c *remoteClient) Publish(ctx context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {

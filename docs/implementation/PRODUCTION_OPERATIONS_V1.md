@@ -181,9 +181,20 @@ without that permission fails before reaching the Store. The Store's changing
 snapshots in these tests are explicitly synthetic; they do not substitute for
 PostgreSQL service, real consumer heartbeat or deployment acceptance.
 
-Publisher reachability, component heartbeat/capacity and selected-provider
-qualification remain separate unfinished observations. Measured operating SLOs
-require their own frozen workload, provenance and acceptance.
+`eng production-publisher-health --config FILE` performs exactly one bounded
+GET to the configured Publisher `/healthz` through the same direct TLS 1.3
+client certificate/server-CA configuration used by publication. The response
+must be HTTP 200, unencoded `application/json`, strictly contain the expected
+Publisher service identity/status, and stay within 4 KiB. Redirects, additional
+JSON claims, wrong service identity, wrong client identity and malformed
+responses fail closed. This probe makes no GitHub upstream request and grants no
+publication or execution authority. A successful endpoint observation still
+sets capacity/upstream/production claims false.
+
+Publisher endpoint reachability, Worker poll history and database queue progress
+are deliberately separate facts; component capacity and selected-provider
+qualification remain unfinished observations. Measured operating SLOs require
+their own frozen workload, provenance and acceptance.
 
 ## 6. Restart and UNKNOWN policy
 

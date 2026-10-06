@@ -107,6 +107,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-publisher-health":
+		if err := productionPublisherHealth(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-status":
 		if err := productionStatus(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -248,6 +253,7 @@ func usage() {
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
 	fmt.Println("  production-terminal-plan                        emit immutable terminal maintenance acceptance contract")
 	fmt.Println("  production-slo-report --observations FILE       summarize measured operational latency evidence without guessed targets")
+	fmt.Println("  production-publisher-health --config FILE        one authenticated Publisher health GET; not capacity/upstream readiness")
 	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
 	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
