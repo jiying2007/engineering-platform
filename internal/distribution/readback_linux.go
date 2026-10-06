@@ -19,16 +19,16 @@ import (
 var manifestDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
 type ReleaseReadbackResult struct {
-	Version              int    `json:"version"`
-	Status               string `json:"status"`
-	SourceCommit         string `json:"source_commit"`
-	ManifestDigest       string `json:"manifest_digest"`
-	FileCount            int    `json:"file_count"`
-	BinaryCount          int    `json:"binary_count"`
-	ServicesStarted      bool   `json:"services_started"`
-	DatabaseChanged      bool   `json:"database_changed"`
-	ExecutionAuthorized  bool   `json:"execution_authorized"`
-	ProductionQualified  bool   `json:"production_qualified"`
+	Version             int    `json:"version"`
+	Status              string `json:"status"`
+	SourceCommit        string `json:"source_commit"`
+	ManifestDigest      string `json:"manifest_digest"`
+	FileCount           int    `json:"file_count"`
+	BinaryCount         int    `json:"binary_count"`
+	ServicesStarted     bool   `json:"services_started"`
+	DatabaseChanged     bool   `json:"database_changed"`
+	ExecutionAuthorized bool   `json:"execution_authorized"`
+	ProductionQualified bool   `json:"production_qualified"`
 }
 
 // VerifyInstalledRelease reads an immutable installed release using an
