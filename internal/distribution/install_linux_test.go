@@ -22,15 +22,22 @@ func installOK(t *testing.T, e error) {
 
 // Real clean Git/buildinfo role fixture, not a deployed platform or service.
 // Actual shipped programs are also tested by test-distribution.py and native CI.
-func installFixture(t *testing.T) (string, string) {
+func installFixture(t *testing.T, salt ...string) (string, string) {
 	t.Helper()
 	repo := t.TempDir()
 	dist := t.TempDir()
 	installOK(t, os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module "+Module+"\n\ngo 1.25.0\n"), 0600))
+	fixtureSource := "package main\nfunc main() {}\n"
+	if len(salt) > 1 {
+		t.Fatal("at most one fixture salt")
+	}
+	if len(salt) == 1 {
+		fixtureSource = fmt.Sprintf("package main\nconst fixtureSalt = %q\nfunc main() {}\n", salt[0])
+	}
 	for _, n := range Names() {
 		dir := filepath.Join(repo, "cmd", n)
 		installOK(t, os.MkdirAll(dir, 0700))
-		installOK(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\nfunc main() {}\n"), 0600))
+		installOK(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte(fixtureSource), 0600))
 	}
 	run := func(tool string, args ...string) string {
 		t.Helper()

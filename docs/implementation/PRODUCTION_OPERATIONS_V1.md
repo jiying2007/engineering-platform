@@ -219,6 +219,24 @@ binary's embedded templates. Recomputing a manifest digest from an arbitrary
 tree during recovery is not qualification. This readback does not switch
 versions, start/stop services, migrate a database or authorize execution.
 
+`eng installation-switch` is the separate bounded byte cutover primitive. It
+is a host-administrator/root operation so process inspection fails closed rather
+than ignoring inaccessible `/proc/*/exe` entries. It requires active and candidate releases plus both externally retained identities,
+requires the three release paths to be direct siblings under one controlled
+parent, rejects any running executable from active or candidate (other than the
+switching candidate `eng` itself), and keeps the replaced release at an explicit
+new `previous` path. It serializes switches with a non-persistent lock on the
+parent and re-verifies both releases after the move. It never invokes systemd,
+migrations, PostgreSQL, model execution or publication. Rollback uses the same
+primitive with the retained previous release as candidate.
+
+A host crash between the two directory renames is an explicit reconciliation
+state: active may be absent while previous and candidate survive. Operators must
+identify surviving releases with `installation-readback` before restoring one.
+Binary rollback does not imply database rollback. If the database was migrated,
+the old Control schema gate may intentionally refuse startup until the approved
+database restore/Recovery procedure completes.
+
 Emergency stops must include:
 
 - disable selected provider credential/rule/gateway;
