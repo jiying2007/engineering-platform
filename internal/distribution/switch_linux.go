@@ -100,6 +100,13 @@ func syncDirectory(path string) error {
 // success; installation-readback can identify both surviving releases before
 // an operator restores one. No automatic database downgrade is attempted.
 func SwitchInstalledRelease(ctx context.Context, active, candidate, previous string, activeID, candidateID ReleaseIdentity) (ReleaseSwitchResult, error) {
+	if os.Geteuid() != 0 {
+		return ReleaseSwitchResult{}, fmt.Errorf("host administrator/root required for release switch")
+	}
+	return switchInstalledRelease(ctx, active, candidate, previous, activeID, candidateID, "/proc", os.Getpid())
+}
+
+func switchInstalledRelease(ctx context.Context, active, candidate, previous string, activeID, candidateID ReleaseIdentity, procRoot string, self int) (ReleaseSwitchResult, error) {
 	var zero ReleaseSwitchResult
 	if err := ctx.Err(); err != nil {
 		return zero, err
@@ -153,7 +160,7 @@ func SwitchInstalledRelease(ctx context.Context, active, candidate, previous str
 	if _, err := VerifyInstalledRelease(ctx, candidate, candidateID.SourceCommit, candidateID.ManifestDigest); err != nil {
 		return zero, fmt.Errorf("candidate release changed before switch")
 	}
-	if err := processUsesRelease("/proc", os.Getpid(), active, candidate); err != nil {
+	if err := processUsesRelease(procRoot, self, active, candidate); err != nil {
 		return zero, err
 	}
 	if err := ctx.Err(); err != nil {
