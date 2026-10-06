@@ -211,6 +211,14 @@ Rollback means restoring the previous deployable binaries/configuration and, if
 required, a database restore/reconciliation procedure. Rollback never rewrites
 or deletes retained Evidence, Review, Closure or external-operation receipts.
 
+Each immutable installation returns a source commit and installation-manifest
+digest that must be retained outside the release directory. `eng
+installation-readback` uses those externally retained identities to verify an
+older installation byte-for-byte without comparing its templates to the current
+binary's embedded templates. Recomputing a manifest digest from an arbitrary
+tree during recovery is not qualification. This readback does not switch
+versions, start/stop services, migrate a database or authorize execution.
+
 Emergency stops must include:
 
 - disable selected provider credential/rule/gateway;
