@@ -15,7 +15,7 @@ func progressSamples(t *testing.T, mutate func(int, *Snapshot)) (ProgressPolicy,
 	var observations []ProgressObservation
 	for i := 0; i < 3; i++ {
 		requested := start.Add(time.Duration(i) * 10 * time.Second)
-		s := Snapshot{Version: OperationalStatusVersion, CapturedAt: requested.Add(time.Millisecond), RecoveryMode: "NORMAL", PendingWorkerIntents: 1000, OldestPendingWorkerAt: &old}
+		s := Snapshot{Version: OperationalStatusVersion, CapturedAt: requested.Add(time.Millisecond), RecoveryMode: "NORMAL", WorkerPolls: []WorkerPollObservation{}, PendingWorkerIntents: 1000, OldestPendingWorkerAt: &old}
 		if mutate != nil {
 			mutate(i, &s)
 		}
@@ -120,7 +120,7 @@ func TestProgressWindowRejectsIncompleteOrIncomparableObservations(t *testing.T)
 		{"over-budget-read", func(_ *ProgressPolicy, o *[]ProgressObservation) {
 			(*o)[1].ReceivedAt = (*o)[1].RequestedAt.Add(11 * time.Second)
 		}},
-		{"stale-but-v2-fresh", func(_ *ProgressPolicy, o *[]ProgressObservation) {
+		{"stale-but-transport-fresh", func(_ *ProgressPolicy, o *[]ProgressObservation) {
 			(*o)[0].Status.Snapshot.CapturedAt = (*o)[0].RequestedAt.Add(-6 * time.Second)
 		}},
 		{"future-snapshot", func(_ *ProgressPolicy, o *[]ProgressObservation) {

@@ -3,11 +3,12 @@ package production
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 )
 
 const (
-	OperationalStatusVersion = 2
+	OperationalStatusVersion = 3
 
 	OperationalObservationRequired = "OBSERVATION_REQUIRED"
 	OperationalAuthorityClear      = "CLEAR"
@@ -16,6 +17,12 @@ const (
 	OperationalDegraded            = "DEGRADED"
 	OperationalRecoveryRequired    = "RECOVERY_REQUIRED"
 )
+
+type WorkerPollObservation struct {
+	WorkerProfile   string    `json:"worker_profile"`
+	KnownIdentities int64     `json:"known_identities"`
+	LatestPollAt    time.Time `json:"latest_poll_at"`
+}
 
 type Snapshot struct {
 	Version                int       `json:"version"`
@@ -33,6 +40,9 @@ type Snapshot struct {
 	ReconcilingOperations  int64     `json:"reconciling_operations"`
 	ManualOperations       int64     `json:"manual_operations"`
 	UnknownCodexExecutions int64     `json:"unknown_codex_executions"`
+	// Claim attempts update this existing database fact even when no work is
+	// available. It is poll history, not a freshness threshold or capacity claim.
+	WorkerPolls []WorkerPollObservation `json:"worker_polls"`
 	// Database observations, not component heartbeats or capacity claims.
 	OldestPendingWorkerAt *time.Time `json:"oldest_pending_worker_at"`
 	OldestPendingOutboxAt *time.Time `json:"oldest_pending_outbox_at"`
@@ -69,6 +79,20 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 		if count < 0 {
 			return OperationalStatus{}, fmt.Errorf("negative operational counter")
 		}
+	}
+	if snapshot.WorkerPolls == nil || len(snapshot.WorkerPolls) > 256 {
+		return OperationalStatus{}, fmt.Errorf("worker poll observations required and bounded")
+	}
+	previousProfile := ""
+	for _, observed := range snapshot.WorkerPolls {
+		if observed.WorkerProfile == "" || len(observed.WorkerProfile) > 128 ||
+			strings.TrimSpace(observed.WorkerProfile) != observed.WorkerProfile ||
+			strings.ContainsAny(observed.WorkerProfile, " \t\r\n\x00") ||
+			observed.WorkerProfile <= previousProfile || observed.KnownIdentities <= 0 ||
+			observed.LatestPollAt.IsZero() || observed.LatestPollAt.After(snapshot.CapturedAt) {
+			return OperationalStatus{}, fmt.Errorf("invalid worker poll observation")
+		}
+		previousProfile = observed.WorkerProfile
 	}
 
 	for _, at := range []*time.Time{snapshot.OldestPendingWorkerAt, snapshot.OldestPendingOutboxAt, snapshot.LastWorkerAdmissionAt, snapshot.LastOutboxDispatchAt} {

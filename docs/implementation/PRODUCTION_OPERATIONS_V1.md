@@ -114,8 +114,13 @@ PostgreSQL-backed operational snapshot containing:
 - UNKNOWN Core-bound Codex execution count.
 
 `eng production-status` reads this endpoint through the existing direct-mTLS
-Control client. Snapshot v2 deliberately separates `authority_state=CLEAR` from
-`service_readiness=NOT_OBSERVED`. Neither an empty database, a valid lease nor
+Control client. Snapshot v3 deliberately separates `authority_state=CLEAR` from
+`service_readiness=NOT_OBSERVED`. It also exposes bounded per-worker-profile
+poll history from the existing `workers.last_seen_at` rows: the latest poll
+timestamp and number of known identities for that profile. Claim attempts update
+this fact even when no work is available. No freshness threshold is built in,
+and the historical `ONLINE` label or identity count is never interpreted as
+current capacity. Neither an empty database, a valid lease, recent poll nor
 historical progress demonstrates current worker/publisher capacity. `ready=false`
 and `production_qualified=false` remain explicit. `--require-ready` therefore
 fails closed without an implemented service-readiness observation. The separate

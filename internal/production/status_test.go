@@ -10,6 +10,7 @@ func cleanSnapshot() Snapshot {
 		Version:      OperationalStatusVersion,
 		CapturedAt:   time.Unix(1700000000, 0).UTC(),
 		RecoveryMode: "NORMAL",
+		WorkerPolls:  []WorkerPollObservation{},
 	}
 }
 
@@ -108,5 +109,36 @@ func TestOperationalStatusRejectsMisleadingOrStaleSummary(t *testing.T) {
 	snapshot.LastOutboxDispatchAt = &future
 	if _, err = EvaluateSnapshot(snapshot); err == nil {
 		t.Fatal("future database progress admitted")
+	}
+}
+
+func TestEvaluateSnapshotValidatesWorkerPollFactsWithoutInferringReadiness(t *testing.T) {
+	s := cleanSnapshot()
+	t1 := s.CapturedAt.Add(-2 * time.Second)
+	t2 := s.CapturedAt.Add(-time.Second)
+	s.WorkerPolls = []WorkerPollObservation{
+		{WorkerProfile: "worker/admission-production", KnownIdentities: 2, LatestPollAt: t1},
+		{WorkerProfile: "worker/codex-production", KnownIdentities: 1, LatestPollAt: t2},
+	}
+	status, err := EvaluateSnapshot(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Ready || status.ProductionQualified || status.ServiceReadiness != ServiceReadinessUnobserved ||
+		len(status.Snapshot.WorkerPolls) != 2 {
+		t.Fatal("worker poll facts became readiness", status)
+	}
+	bad := []Snapshot{s, s, s, s}
+	bad[0].WorkerPolls = nil
+	bad[1].WorkerPolls = []WorkerPollObservation{{WorkerProfile: "worker/x", KnownIdentities: 0, LatestPollAt: t1}}
+	bad[2].WorkerPolls = []WorkerPollObservation{
+		{WorkerProfile: "worker/z", KnownIdentities: 1, LatestPollAt: t1},
+		{WorkerProfile: "worker/a", KnownIdentities: 1, LatestPollAt: t2},
+	}
+	bad[3].WorkerPolls = []WorkerPollObservation{{WorkerProfile: "worker/x", KnownIdentities: 1, LatestPollAt: s.CapturedAt.Add(time.Second)}}
+	for i, candidate := range bad {
+		if _, err := EvaluateSnapshot(candidate); err == nil {
+			t.Fatal("invalid worker poll facts accepted", i)
+		}
 	}
 }
