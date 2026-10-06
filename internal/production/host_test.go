@@ -140,3 +140,20 @@ func (f fakeUnixFileInfo) Mode() os.FileMode  { return f.mode }
 func (f fakeUnixFileInfo) ModTime() time.Time { return time.Time{} }
 func (f fakeUnixFileInfo) IsDir() bool        { return false }
 func (f fakeUnixFileInfo) Sys() any           { return &f.stat }
+
+func TestHostFilePrivateMaterialRequiresServiceOwner(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "preparation.json")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := hostFile(path, true, os.Getuid(), false); err != nil {
+		t.Fatal(err)
+	}
+	wrong := os.Getuid() + 10000
+	if wrong == 0 {
+		wrong++
+	}
+	if err := hostFile(path, true, wrong, false); err == nil {
+		t.Fatal("private preparation material accepted for a different service identity")
+	}
+}
