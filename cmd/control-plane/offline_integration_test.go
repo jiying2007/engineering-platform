@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
@@ -8,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io/fs"
 	"net"
 	"net/http"
@@ -15,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -37,16 +40,25 @@ import (
 // Actual local Git, mTLS, PostgreSQL, compiled Worker/eng and real container.
 // The computation is a fixture, not Codex/model evidence.
 func TestOfflineCommandPreparedBytesContainerAndDurableReceipt(t *testing.T) {
-	offlineCommandCapture(t, false)
+	offlineCommandCapture(t, "probe")
 }
 
 // The compiler, actual Worker/eng, mTLS/Core, raw report and retained artifacts
 // are now one Run, rather than separate compiler and synthetic-record proofs.
 func TestOfflineCommandCCompilerCaptureRestore(t *testing.T) {
-	offlineCommandCapture(t, true)
+	offlineCommandCapture(t, "compiler")
 }
 
-func offlineCommandCapture(t *testing.T, compiler bool) {
+func TestOfflineCommandSIGKILLLeavesUnreconciledWithoutReplay(t *testing.T) {
+	offlineCommandCapture(t, "crash")
+}
+
+func offlineCommandCapture(t *testing.T, mode string) {
+	compiler := mode == "compiler"
+	crash := mode == "crash"
+	if mode != "probe" && !compiler && !crash {
+		t.Fatal("unknown offline command test mode", mode)
+	}
 	var image testutil.Fixture
 	if compiler {
 		image = testutil.BuildCompiler(t)
@@ -68,6 +80,9 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/main.c", "-Wl,-e,entry,-Map=/tmp/ep-output/app.map", "-o", "/tmp/ep-output/app.elf"}
 		profile.Seconds = 15
 		profile.Outputs = []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 128 << 10}, {Name: "app.map", MaxBytes: 64 << 10}}
+	}
+	if crash {
+		profile = sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "sleep"}, Seconds: 10}
 	}
 	pd, err := profile.Digest()
 	commandOK(t, err)
@@ -232,6 +247,10 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 		cmd := exec.CommandContext(ctx, filepath.Join(bin, "worker"), "--execute-offline", "--profile", workerProfile, "--run", input.RunID, "--once")
 		cmd.Env = execEnv
 		return cmd.CombinedOutput()
+	}
+	if crash {
+		offlineCrashAfterPermit(t, ctx, store, pool, filepath.Join(bin, "worker"), execEnv, worker, workerProfile, input.RunID, root, profile, image)
+		return
 	}
 	denied := profile
 	denied.Argv = []string{"/probe", "sleep"}
@@ -415,6 +434,134 @@ func offlineCommandCapture(t *testing.T, compiler bool) {
 		t.Fatal("capture manufactured Evidence")
 	}
 	t.Logf("same-Run compiler=%t Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s", compiler, receipt.Result.ProfileDigest)
+}
+
+func offlineCrashAfterPermit(t *testing.T, ctx context.Context, store *pgstore.Store, pool *pgxpool.Pool, workerBin string, env []string, subject, profileName, runID, preparedRoot string, profile sandbox.Profile, image testutil.Fixture) {
+	t.Helper()
+	cmd := exec.Command(workerBin, "--execute-offline", "--profile", profileName, "--run", runID, "--once")
+	cmd.Env = env
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	commandOK(t, cmd.Start())
+	cleaned := false
+	cleanupContainer := func() {
+		if cleaned {
+			return
+		}
+		cleaned = true
+		list := exec.Command("docker", "ps", "-aq", "--filter", "ancestor="+image.Image, "--filter", "label=engineering-platform.offline")
+		raw, err := list.Output()
+		if err != nil {
+			t.Errorf("list crash fixture containers: %v", err)
+			return
+		}
+		ids := strings.Fields(string(raw))
+		if len(ids) != 0 {
+			args := append([]string{"rm", "-f"}, ids...)
+			if out, err := exec.Command("docker", args...).CombinedOutput(); err != nil {
+				t.Errorf("remove crash fixture containers: %v %s", err, out)
+			}
+		}
+	}
+	t.Cleanup(func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		cleaned = false
+		cleanupContainer()
+	})
+
+	var status offline.Status
+	var permitPath string
+	deadline := time.Now().Add(12 * time.Second)
+	for time.Now().Before(deadline) {
+		current, err := store.GetOffline(ctx, runID)
+		if err == nil && current.State == offline.Authorized && current.Token.ID != "" {
+			status = current
+			_ = filepath.WalkDir(preparedRoot, func(path string, d fs.DirEntry, walkErr error) error {
+				if walkErr == nil && !d.IsDir() && d.Name() == "offline-"+current.Token.ID+".json" {
+					permitPath = path
+				}
+				return nil
+			})
+			if permitPath != "" {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if permitPath == "" {
+		t.Fatalf("actual Worker never retained authorized permit; stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	permitRaw, err := os.ReadFile(permitPath)
+	commandOK(t, err)
+	var permit offline.Permit
+	commandOK(t, json.Unmarshal(permitRaw, &permit))
+	request := offline.Start{RunID: runID, WorkerProfile: profileName, Profile: profile}
+	commandOK(t, permit.Check(subject, request))
+	if permit.Token != status.Token {
+		t.Fatal("local permit differs from Core authorization")
+	}
+
+	deadline = time.Now().Add(8 * time.Second)
+	renewed := 0
+	for time.Now().Before(deadline) {
+		commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type='worker.offline.renewed'").Scan(&renewed))
+		if renewed > 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if renewed == 0 {
+		t.Fatal("actual Worker did not renew before crash injection")
+	}
+	commandOK(t, cmd.Process.Kill())
+	err = cmd.Wait()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		t.Fatalf("SIGKILL did not terminate Worker as expected: %v", err)
+	}
+	wait, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || wait.Signal() != syscall.SIGKILL {
+		t.Fatalf("Worker termination was not SIGKILL: %v", err)
+	}
+	cleanupContainer()
+
+	status, err = store.GetOffline(ctx, runID)
+	commandOK(t, err)
+	if status.State != offline.Authorized || status.Receipt != nil {
+		t.Fatal("crashed Worker invented a terminal receipt", status)
+	}
+	var finished, unknown, executions, evidence int
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type='worker.offline.finished'").Scan(&finished))
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type='worker.offline.unknown'").Scan(&unknown))
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM worker_offline_executions WHERE run_id=$1", runID).Scan(&executions))
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM evidence").Scan(&evidence))
+	if finished != 0 || unknown != 0 || executions != 1 || evidence != 0 {
+		t.Fatal("SIGKILL created terminal/replayed facts", finished, unknown, executions, evidence)
+	}
+
+	second := exec.CommandContext(ctx, workerBin, "--execute-offline", "--profile", profileName, "--run", runID, "--once")
+	second.Env = env
+	if out, err := second.CombinedOutput(); err == nil {
+		t.Fatalf("crashed execution automatically replayed: %s", out)
+	}
+	commandOK(t, pool.QueryRow(ctx, "SELECT count(*) FROM worker_offline_executions WHERE run_id=$1", runID).Scan(&executions))
+	if executions != 1 {
+		t.Fatal("replay created another offline execution", executions)
+	}
+
+	recoveryState, err := store.BeginRecovery(status.Token.RecoveryEpoch)
+	commandOK(t, err)
+	if _, err := store.CreateRecoveryProof(ctx, recoveryState.Epoch, "urn:engineering-platform:operator:crash-reconciler"); !errors.Is(err, pgstore.ErrRecoveryFactsUnresolved) {
+		t.Fatalf("unresolved crashed execution did not block recovery proof: %v", err)
+	}
+	observed, err := store.GetOffline(ctx, runID)
+	commandOK(t, err)
+	if observed.Receipt != nil || observed.Token != status.Token {
+		t.Fatal("recovery observation rewrote crashed execution", observed)
+	}
+	t.Logf("actual Worker SIGKILL after permit+renewal retained one unresolved execution and blocked Recovery proof; token=%s", status.Token.ID)
 }
 
 // The native test runs installed Worker/eng/guard after the source distribution
