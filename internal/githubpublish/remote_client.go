@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
@@ -36,6 +37,7 @@ type PublisherHealthObservation struct {
 	Version               int       `json:"version"`
 	Status                string    `json:"status"`
 	Service               string    `json:"service"`
+	ConfigurationDigest   string    `json:"configuration_digest"`
 	ObservedAt            time.Time `json:"observed_at"`
 	EndpointObserved      bool      `json:"endpoint_observed"`
 	UpstreamObserved      bool      `json:"upstream_observed"`
@@ -130,17 +132,21 @@ func newRemoteClient(config RemoteConfiguration) (*remoteClient, error) {
 }
 
 func ProbeRemoteHealth(ctx context.Context, config RemoteConfiguration) (PublisherHealthObservation, error) {
+	digest, err := canonical.Digest(config)
+	if err != nil {
+		return PublisherHealthObservation{}, err
+	}
 	client, err := newRemoteClient(config)
 	if err != nil {
 		return PublisherHealthObservation{}, err
 	}
 	defer client.client.CloseIdleConnections()
-	return client.health(ctx)
+	return client.health(ctx, digest)
 }
 
-func (c *remoteClient) health(ctx context.Context) (PublisherHealthObservation, error) {
+func (c *remoteClient) health(ctx context.Context, configurationDigest string) (PublisherHealthObservation, error) {
 	var zero PublisherHealthObservation
-	if c == nil || c.client == nil || c.endpoint == "" {
+	if c == nil || c.client == nil || c.endpoint == "" || !strings.HasPrefix(configurationDigest, "sha256:") || len(configurationDigest) != 71 {
 		return zero, fmt.Errorf("configured publisher remote required")
 	}
 	if err := ctx.Err(); err != nil {
@@ -174,7 +180,8 @@ func (c *remoteClient) health(ctx context.Context) (PublisherHealthObservation, 
 	}
 	return PublisherHealthObservation{
 		Version: 1, Status: "PUBLISHER_ENDPOINT_OBSERVED",
-		Service: payload.Service, ObservedAt: time.Now().UTC(), EndpointObserved: true,
+		Service: payload.Service, ConfigurationDigest: configurationDigest,
+		ObservedAt: time.Now().UTC(), EndpointObserved: true,
 	}, nil
 }
 
