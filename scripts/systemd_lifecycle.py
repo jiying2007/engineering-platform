@@ -52,8 +52,15 @@ def parse_unit(raw):
         require(all(value and "\n" not in value for value in section.values()), "empty/multiline property")
     for key, value in RATE_POLICY.items():
         require(result["Unit"].get(key) == value, "restart bound absent or changed: " + key)
-    for key, value in {**STOP_POLICY, "Restart": "on-failure", "RestartSec": "5s", "Type": "simple", "UMask": "0077", "NoNewPrivileges": "true", "ProtectSystem": "strict", "ProtectHome": "true"}.items():
+    for key, value in {**STOP_POLICY, "Restart": "on-failure", "RestartSec": "5s", "UMask": "0077", "NoNewPrivileges": "true", "ProtectSystem": "strict", "ProtectHome": "true"}.items():
         require(result["Service"].get(key) == value, "service boundary absent or changed: " + key)
+    executable = result["Service"].get("ExecStart")
+    notify = executable in ("/opt/engineering-platform/bin/control-plane --production", "/opt/engineering-platform/bin/publisher-service")
+    require(result["Service"].get("Type") == ("notify" if notify else "simple"), "role startup notification contract drift")
+    if notify:
+        require(result["Service"].get("NotifyAccess") == "main", "only main process may notify")
+    else:
+        require("NotifyAccess" not in result["Service"], "worker must not inherit endpoint readiness")
     return result
 
 
@@ -67,7 +74,7 @@ def publisher_properties(raw, root, uid, gid):
     # Unit graph intentionally not instantiated: no production-named unit is
     # loaded, started, stopped, enabled or reconfigured by this test.
     require(set(p["Unit"]) == {"Description", "Wants", "After", *RATE_POLICY}, "unreviewed unit graph/property")
-    allowed = {"Type", "User", "Group", "EnvironmentFile", "ExecStart", "Restart", "RestartSec", "TimeoutStartSec", "TimeoutStopSec", "UMask", "NoNewPrivileges", "PrivateTmp", "PrivateDevices", "ProtectSystem", "ProtectHome", "ProtectKernelTunables", "ProtectKernelModules", "ProtectKernelLogs", "ProtectControlGroups", "ProtectClock", "ProtectHostname", "RestrictSUIDSGID", "LockPersonality", "RestrictAddressFamilies", "ReadOnlyPaths", "SystemCallArchitectures", *STOP_POLICY}
+    allowed = {"Type", "NotifyAccess", "User", "Group", "EnvironmentFile", "ExecStart", "Restart", "RestartSec", "TimeoutStartSec", "TimeoutStopSec", "UMask", "NoNewPrivileges", "PrivateTmp", "PrivateDevices", "ProtectSystem", "ProtectHome", "ProtectKernelTunables", "ProtectKernelModules", "ProtectKernelLogs", "ProtectControlGroups", "ProtectClock", "ProtectHostname", "RestrictSUIDSGID", "LockPersonality", "RestrictAddressFamilies", "ReadOnlyPaths", "SystemCallArchitectures", *STOP_POLICY}
     require(set(p["Service"]) == allowed, "unreviewed service property")
     properties = {**RATE_POLICY, **p["Service"]}
     del properties["ExecStart"]
@@ -133,7 +140,7 @@ class Unit:
         return command(["sudo", "-n", "systemctl", *args, self.name], check=check)
 
     def snapshot(self):
-        r = self.ctl("show", "--property=LoadState,ActiveState,SubState,MainPID,NRestarts,Result,ControlGroup,User,Group,KillMode,SendSIGKILL,StartLimitBurst,StartLimitIntervalUSec,RestartUSec,TimeoutStopUSec", check=False)
+        r = self.ctl("show", "--property=LoadState,ActiveState,SubState,MainPID,NRestarts,Result,ControlGroup,User,Group,KillMode,SendSIGKILL,StartLimitBurst,StartLimitIntervalUSec,RestartUSec,TimeoutStopUSec,Type,NotifyAccess,ActiveEnterTimestampMonotonic,ExecMainStartTimestampMonotonic,Job", check=False)
         value = dict(line.split("=", 1) for line in r.stdout.splitlines() if "=" in line)
         require(r.returncode == 0 or value.get("LoadState") == "not-found", "cannot observe test unit")
         return value
@@ -211,8 +218,11 @@ def run_suite(distribution, expected, root, prefix):
     publisher = str(installed / "bin/publisher-service")
     units = []
     checks = []
-    def unit(argv):
-        u = Unit(prefix + "-" + os.urandom(6).hex(), props, argv)
+    def unit(argv, overrides=None, extra=None):
+        selected = dict(item.removeprefix("--property=").split("=", 1) for item in props)
+        selected.update(overrides or {})
+        selected.update(extra or {})
+        u = Unit(prefix + "-" + os.urandom(6).hex(), ["--property=" + key + "=" + value for key, value in sorted(selected.items())], argv)
         units.append(u)
         return u
     def health(endpoint):
@@ -220,15 +230,24 @@ def run_suite(distribution, expected, root, prefix):
         with opener.open(endpoint + "/healthz", timeout=3) as response:
             value = json.loads(response.read(4096))
             require(response.status == 200 and value == {"service": "engineering-github-publisher", "status": "ok"}, "authenticated identity health mismatch")
+    def activated(u):
+        deadline = time.monotonic() + 5
+        while True:
+            state = u.snapshot()
+            if state.get("ActiveState") == "active":
+                require(state.get("SubState") == "running" and state.get("Type") == "notify" and state.get("NotifyAccess") == "main", "manager readiness attribution mismatch")
+                return state
+            require(u.p.poll() is None and time.monotonic() < deadline, "manager did not accept main-process readiness")
+            time.sleep(0.02)
     try:
         live = unit([publisher])
         health(live.endpoint())
-        before = live.snapshot()
+        before = activated(live)
         require(before["User"] == str(os.getuid()) and before["Group"] == str(os.getgid()) and before["KillMode"] == "control-group" and before["SendSIGKILL"] == "yes" and before["StartLimitBurst"] == "3", "manager ignored identity/stop/restart policy")
         require(before["StartLimitIntervalUSec"] == "1min" and before["RestartUSec"] == "5s" and before["TimeoutStopUSec"] == "20s", "manager duration policy drift")
         live.ctl("kill", "--kill-whom=main", "--signal=SIGKILL")
         health(live.endpoint())
-        after = live.snapshot()
+        after = activated(live)
         require(after["MainPID"] != before["MainPID"] and int(after["NRestarts"]) == 1, "manager did not restart once with a fresh process")
         live.ctl("stop")
         live.finish(True)
@@ -252,7 +271,7 @@ def run_suite(distribution, expected, root, prefix):
 
         # A clearly separate fault fixture verifies descendant cleanup. It is
         # not a model turn or evidence about Publisher's Git subprocesses.
-        child = unit(["/bin/sh", "-c", "trap '' TERM; /usr/bin/setsid /bin/sleep 300 & wait"])
+        child = unit(["/bin/sh", "-c", "trap '' TERM; /usr/bin/setsid /bin/sleep 300 & wait"], {"Type": "simple", "NotifyAccess": "none"})
         end = time.monotonic() + 10
         while True:
             state = child.snapshot()
@@ -272,6 +291,64 @@ def run_suite(distribution, expected, root, prefix):
         time.sleep(6)  # beyond RestartSec: explicit stop must not replay fixture
         require(cgroup_empty(group) and child.snapshot()["MainPID"] == "0", "explicit stop incorrectly restarted work")
         checks.append("setsid_descendant_forced_stop_no_replay")
+        # A non-notifying process must never satisfy the endpoint startup gate.
+        silent = unit(["/bin/sleep", "300"], {"Restart": "no", "TimeoutStartSec": "2s", "TimeoutStopSec": "2s"})
+        deadline = time.monotonic() + 1
+        while True:
+            starting = silent.snapshot()
+            if starting.get("ActiveState") == "activating" and starting.get("ControlGroup"):
+                silent_group = starting["ControlGroup"]
+                break
+            require(silent.p.poll() is None and time.monotonic() < deadline, "silent notification fixture did not activate")
+            time.sleep(0.01)
+        silent.finish(False)
+        state = silent.snapshot()
+        require(state.get("Result") == "timeout" and state.get("MainPID") == "0" and state.get("ActiveEnterTimestampMonotonic") == "0", "missing READY became manager startup success")
+        require(cgroup_empty(silent_group), "timed-out startup left processes")
+        checks.append("missing_notification_never_becomes_active")
+
+        # A generated dependency transaction tests the same Requires/After
+        # semantics used by Worker units, without claiming the full unit graph.
+        release = root / "notify-release"
+        code = ("import os,socket,time; from pathlib import Path; "
+                "p=Path(" + repr(str(release)) + "); "
+                "exec(\"while not p.exists(): time.sleep(0.01)\"); "
+                "s=socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM); "
+                "s.connect(os.environ['NOTIFY_SOCKET'].replace('@','\\0',1) if os.environ['NOTIFY_SOCKET'].startswith('@') else os.environ['NOTIFY_SOCKET']); "
+                "s.send(b'READY=1'); s.close(); time.sleep(60)")
+        supplier = unit([sys.executable, "-c", code], {"Restart": "no"})
+        deadline = time.monotonic() + 5
+        while True:
+            waiting = supplier.snapshot()
+            if waiting.get("SubState") == "start" and waiting.get("MainPID", "0") != "0":
+                break
+            require(supplier.p.poll() is None and time.monotonic() < deadline, "notification fixture not starting")
+            time.sleep(0.02)
+        dependent = unit(["/bin/true"], {"Type": "oneshot", "NotifyAccess": "none", "Restart": "no", "RemainAfterExit": "yes"}, {"Requires": supplier.name, "After": supplier.name})
+        deadline = time.monotonic() + 5
+        while True:
+            pending = dependent.snapshot()
+            if pending.get("LoadState") == "loaded" and pending.get("Job"):
+                require(pending.get("MainPID") == "0" and pending.get("ActiveState") == "inactive", "dependent started before notification")
+                break
+            require(dependent.p.poll() is None and time.monotonic() < deadline, "dependent transaction missing")
+            time.sleep(0.02)
+        release.write_text("release explicit test fixture only\n")
+        active = activated(supplier)
+        deadline = time.monotonic() + 5
+        while True:
+            completed = dependent.snapshot()
+            if completed.get("ActiveState") == "active" and completed.get("SubState") == "exited":
+                require(int(completed["ExecMainStartTimestampMonotonic"]) >= int(active["ActiveEnterTimestampMonotonic"]) > 0, "manager released dependency before accepted readiness")
+                break
+            require(dependent.p.poll() is None and time.monotonic() < deadline, "dependent not released after notification")
+            time.sleep(0.02)
+        dependent.ctl("stop")
+        dependent.finish(True)
+        supplier.ctl("stop")
+        supplier.finish(True)
+        checks.append("requires_after_waits_for_main_ready_datagram")
+
         command([str(eng), "installation-verify", "--dir", str(installed), "--source-commit", expected])
         return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
     finally:

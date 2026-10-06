@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -98,7 +99,38 @@ func TestOfflineCommandInstalledCoreSchemaCompatibility(t *testing.T) {
 	remote := serviceJSON(t, config, "remote.json", githubpublish.RemoteConfiguration{Version: 1, Endpoint: "https://127.0.0.1:1", ClientCertFile: clientCert, ClientKeyFile: clientKey, ServerCAFile: ca})
 	env := []string{"DATABASE_URL=" + u.String(), "AUTO_MIGRATE=0", "CONTROL_TLS_CERT_FILE=" + cert, "CONTROL_TLS_KEY_FILE=" + key, "CONTROL_CLIENT_CA_FILE=" + ca, "CONTROL_AUTH_POLICY_FILE=" + policy, "GITHUB_PUBLISHER_PLAN_FILE=" + plan, "GITHUB_PUBLISHER_REMOTE_FILE=" + remote, "LISTEN_HOST=127.0.0.1", "PORT=0"}
 	binary, args := filepath.Join(bin, "control-plane"), []string{"--production"}
-	reject := func(t *testing.T) { t.Helper(); rejectInstalledProcess(t, ctx, binary, args, env) }
+	// A short, private Unix-datagram path avoids host TMPDIR path-length limits.
+	notifyRoot, err := os.MkdirTemp("/tmp", "ep-start-notify-")
+	commandOK(t, err)
+	defer os.RemoveAll(notifyRoot)
+	notifyPath := filepath.Join(notifyRoot, "socket")
+	notified, err := net.ListenUnixgram("unixgram", &net.UnixAddr{Name: notifyPath, Net: "unixgram"})
+	commandOK(t, err)
+	defer notified.Close()
+	env = append(env, "NOTIFY_SOCKET="+notifyPath)
+	notification := func(t *testing.T, expected bool) {
+		t.Helper()
+		delay := 20 * time.Millisecond
+		if expected {
+			delay = time.Second
+		}
+		commandOK(t, notified.SetReadDeadline(time.Now().Add(delay)))
+		raw := make([]byte, 128)
+		n, _, readErr := notified.ReadFromUnix(raw)
+		if expected {
+			commandOK(t, readErr)
+			if string(raw[:n]) != "READY=1" {
+				t.Fatal("incorrect endpoint notification")
+			}
+		} else if timeout, ok := readErr.(net.Error); !ok || !timeout.Timeout() {
+			t.Fatal("rejected/repeated startup emitted notification", n, readErr)
+		}
+	}
+	reject := func(t *testing.T) {
+		t.Helper()
+		rejectInstalledProcess(t, ctx, binary, args, env)
+		notification(t, false)
+	}
 	reject(t)
 	if count(t, "SELECT count(*) FROM pg_catalog.pg_tables WHERE schemaname='"+schema+"'") != 0 {
 		t.Fatal("blank database changed during rejected startup")
@@ -153,10 +185,12 @@ func TestOfflineCommandInstalledCoreSchemaCompatibility(t *testing.T) {
 	if health["status"] != "ok" {
 		t.Fatal("compatible installed Control did not serve authenticated health")
 	}
+	notification(t, true)
+	notification(t, false)
 	control.stop(t, syscall.SIGTERM)
 	assertServiceClosed(t, endpoint)
 	if count(t, "SELECT count(*) FROM audit_events") != 0 || count(t, "SELECT count(*) FROM outbox_events") != 0 || count(t, "SELECT count(*) FROM worker_codex_executions") != 0 {
 		t.Fatal("schema startup created execution or authority events")
 	}
-	t.Log("installed Control rejects blank/legacy/partial/future/structurally incomplete schemas before listening; explicit test migration permits authenticated startup; no automatic migration/replay")
+	t.Log("installed Control rejects blank/legacy/partial/future/structurally incomplete schemas before listening; explicit test migration permits authenticated startup; exact once-only main readiness after schema/TLS setup; no automatic migration/replay")
 }

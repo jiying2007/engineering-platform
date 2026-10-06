@@ -145,3 +145,28 @@ systemd may restart admission/preparation/control processes after a crash.
 It must not blindly replay a model turn or an external publication. Run,
 execution epoch, Action Gateway operation and Recovery authority remain the
 source of truth.
+
+
+## Endpoint startup ordering
+
+Control and Publisher use `Type=notify` with `NotifyAccess=main`. Their main
+process sends only `READY=1` when the actual HTTP/TLS serving loop first enters
+Accept, after configuration, Control schema checks, listener binding and TLS
+setup. Worker units keep their existing Requires/After dependency on Control;
+that ordering now waits for Control initialization rather than process creation.
+Publisher remains a Wants dependency: its outage does not remove Core read and
+reconciliation access. Startup failure is not converted into a ready endpoint.
+
+The optional manager address is consumed before serving and removed from the
+child environment. Only a bounded Unix datagram is sent, once, with no retry or
+plain-process fallback after failure. Without NOTIFY_SOCKET a directly invoked
+process retains its explicit unmanaged behavior. An invalid or unreachable
+configured notification socket fails startup. The manager authenticates the
+sender; no wrapper, Worker, model or subprocess is granted notification rights.
+
+This signal proves endpoint initialization, not authenticated client access,
+upstream provider health, queue capacity, production readiness or replay
+permission. Existing mTLS health checks and Core authority remain independent.
+There is no watchdog, heartbeat, READY polling API or new execution authority.
+Full service-graph, separate service-user, upgrade and rollback qualification
+still require their own acceptance.

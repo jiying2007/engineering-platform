@@ -14,6 +14,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
+	"github.com/jiying2007/engineering-platform/internal/servicenotify"
 )
 
 func main() {
@@ -27,6 +28,10 @@ func serve(args []string) error {
 	// Never silently start a service for an unsupported operation/argument.
 	if len(args) != 0 {
 		return fmt.Errorf("publisher-service accepts no command-line arguments")
+	}
+	notifier, err := servicenotify.FromEnvironment()
+	if err != nil {
+		return err
 	}
 	configFile := os.Getenv("PUBLISHER_CONFIG_FILE")
 	certFile := os.Getenv("PUBLISHER_TLS_CERT_FILE")
@@ -69,7 +74,7 @@ func serve(args []string) error {
 	defer stop()
 	log.Printf("publisher service listening on %s; scope=authenticated-endpoint-not-provider-readiness", listener.Addr())
 	done := make(chan error, 1)
-	go func() { done <- server.ServeTLS(listener, "", "") }()
+	go func() { done <- server.ServeTLS(notifier.Listener(ctx, listener), "", "") }()
 	select {
 	case <-ctx.Done():
 	case err := <-done:
