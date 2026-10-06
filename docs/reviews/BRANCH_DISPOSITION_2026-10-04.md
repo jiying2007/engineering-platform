@@ -179,3 +179,8 @@ the exact refs preserves their unique source history while removing them from th
 set of pending RC work. Actual mutation prevention for these historical refs
 remains a repository-administrator policy if desired; CI drift detection is the
 implemented repository-side control.
+
+Any intentional change to one of these four historical refs must first update
+this disposition and the exact-head manifest in the same reviewed change.
+Otherwise required CI fails closed; silently advancing a prototype branch is not
+an accepted maintenance path.
