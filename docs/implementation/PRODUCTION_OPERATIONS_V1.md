@@ -226,7 +226,13 @@ production baseline independently of provider authentication.
 Preflight configuration version 2 requires `expected_source_commit`. The default
 check validates the complete six-role distribution, actual distinct non-root
 UIDs, configuration ownership/references, TLS pairs, listener/endpoint/DSN
-syntax and publisher policy consistency. Its highest static result is
+syntax and publisher policy consistency. Referenced host files must be
+single-link regular files and must be reachable using the target service
+identity's Unix mode bits: every parent directory must be traversable and the
+target must expose the required read or directory access. Owner-private secrets
+remain owned by the consuming service (systemd EnvironmentFile itself may be
+root-owned because PID1 reads it). ACL-only grants are intentionally not inferred
+by this static check. Its highest static result is
 `HOST_VALIDATED`, with `operationally_ready=false`.
 
 `--config-only` is an explicit outer-contract inspection mode. It returns
