@@ -220,7 +220,7 @@ def _unused_numeric_identities(count=4):
 def _graph_show(unit):
     require(ROLE_GRAPH.fullmatch(unit.removesuffix(".service")), "invalid transient role unit")
     result = command(["sudo", "-n", "systemctl", "show",
-                      "--property=LoadState,ActiveState,SubState,MainPID,User,Group,Job,Type,NotifyAccess,Requires,After",
+                      "--property=LoadState,ActiveState,SubState,MainPID,User,Group,Job,Type,NotifyAccess,Wants,Requires,After",
                       unit], check=False)
     values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
     require(result.returncode == 0 or values.get("LoadState") == "not-found", "cannot observe role graph")
@@ -263,7 +263,7 @@ def transient_role_graph(root, prefix):
         "exec(\"if keep=='1': time.sleep(60)\")"
     )
     created = []
-    def start(role, notify, dependency=None):
+    def start(role, notify, dependency=None, required=True):
         uid, gid = identities[roles.index(role)]
         base = names[role].removesuffix(".service")
         runtime = "/run/" + base
@@ -280,7 +280,7 @@ def transient_role_graph(root, prefix):
         else:
             props.update(Type="oneshot", RemainAfterExit="yes")
         if dependency:
-            props["Requires"] = names[dependency]
+            props["Requires" if required else "Wants"] = names[dependency]
             props["After"] = names[dependency]
         release = str(shared / (role + ".release")) if notify else "-"
         argv = [python, "-c", code, runtime + "/identity", release, "1" if notify else "0", "1" if notify else "0"]
@@ -289,7 +289,7 @@ def transient_role_graph(root, prefix):
         created.append(role)
     try:
         start("publisher", True)
-        start("control", True, "publisher")
+        start("control", True, "publisher", False)
         start("admission", False, "control")
         start("preparation", False, "control")
         publisher = _graph_wait(names["publisher"], lambda x: x.get("ActiveState") == "activating" and x.get("MainPID", "0") != "0", "publisher did not wait for readiness")
@@ -315,7 +315,7 @@ def transient_role_graph(root, prefix):
             require(state.get("User") == str(uid) and state.get("Group") == str(gid), "manager identity differs from process identity")
             observed[role] = {"uid": uid, "gid": gid}
         require(len({v["uid"] for v in observed.values()}) == 4 and len({v["gid"] for v in observed.values()}) == 4, "role identities collapsed")
-        require(names["publisher"] in control.get("Requires", "").split() and names["publisher"] in control.get("After", "").split(), "control dependency graph drift")
+        require(names["publisher"] in control.get("Wants", "").split() and names["publisher"] in control.get("After", "").split(), "control dependency graph drift")
         for role in ("admission", "preparation"):
             state = worker_states[role]
             require(names["control"] in state.get("Requires", "").split() and names["control"] in state.get("After", "").split(), "worker dependency graph drift")
