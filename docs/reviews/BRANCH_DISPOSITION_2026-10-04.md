@@ -86,3 +86,34 @@ before deleting their only named development refs.
 The manifest is an approved candidate list, not a deletion receipt. Completed
 workflow receipts and an independent current-branch listing establish which
 refs were actually removed. Changing a manifest must not rewrite past receipts.
+
+
+## RC cleanup expansion — 2026-10-06
+
+The same exact-tree retirement mechanism now accepts the `test/*` namespace
+and carries reviewed RC working refs whose remote tips were independently
+compared against their squash-merge commits. Inclusion requires complete-tree
+identity; merge status alone is insufficient.
+
+The two retained M1 evidence refs under `engineering-platform/*` remain outside
+the retirement grammar and manifest. Unmatched historical prototypes also remain
+excluded because semantic supersession is not byte-equivalent integration proof.
+Current open-PR branches are never placed in this manifest.
+
+After this change reaches protected main and canonical CI succeeds, the existing
+workflow re-reads exact main, every candidate remote head, merge ancestry/tree
+identity and open-PR inventory before one atomic SHA-leased deletion and remote
+readback. Any drift rejects the entire mutation.
+
+
+## Retained evidence ref drift guard
+
+The two immutable M1 evidence refs stay outside the retirement grammar. Required
+CI now reads their exact remote inventory and requires the fixed branch names and
+object IDs in `.github/retained-evidence-refs.json`. Missing, changed or
+additional `engineering-platform/*` refs fail the existing required Go job.
+
+This is drift detection, not GitHub branch protection. The repository currently
+reports both retained refs as unprotected; actual mutation prevention remains a
+separate repository-administrator setting and must not be inferred from this CI
+guard.
