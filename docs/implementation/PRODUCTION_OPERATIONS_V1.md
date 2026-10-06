@@ -220,7 +220,8 @@ tree during recovery is not qualification. This readback does not switch
 versions, start/stop services, migrate a database or authorize execution.
 
 `eng installation-switch` is the separate bounded byte cutover primitive. It
-requires active and candidate releases plus both externally retained identities,
+is a host-administrator/root operation so process inspection fails closed rather
+than ignoring inaccessible `/proc/*/exe` entries. It requires active and candidate releases plus both externally retained identities,
 requires the three release paths to be direct siblings under one controlled
 parent, rejects any running executable from active or candidate (other than the
 switching candidate `eng` itself), and keeps the replaced release at an explicit
