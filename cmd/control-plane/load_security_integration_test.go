@@ -37,9 +37,6 @@ import (
 // and exactly-once admission invariants under concurrent legitimate and denied
 // requests. No model, preparation, publication, Delivery or Evidence is run.
 func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
-	if os.Getenv("EP_SANDBOX_INTEGRATION") != "1" {
-		t.Skip("explicit native integration not requested")
-	}
 	dsn := os.Getenv("POSTGRES_TEST_URL")
 	if dsn == "" {
 		t.Fatal("sustained matrix requires POSTGRES_TEST_URL")
