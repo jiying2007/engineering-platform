@@ -3,6 +3,12 @@
   "repository": "jiying2007/engineering-platform",
   "branches": [
     {
+      "branch": "chore/rc-integrated-ref-retirement",
+      "expected_head": "0ff485c785e2e86dd84e95409d208f0d067e5339",
+      "integrated_commit": "310874bd0a6297310a31c919b9d530dbf502bfa6",
+      "tree": "4bf3603e9305fba7c65021233db2627b31bd5871"
+    },
+    {
       "branch": "docs/lifecycle-status-and-ref-closeout",
       "expected_head": "4de88e3fc94537bd134f5ba5b41795eccba24793",
       "integrated_commit": "c4eaa7aee68776999c789794839bb1c294891073",

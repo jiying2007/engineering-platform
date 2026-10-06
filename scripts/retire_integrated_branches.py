@@ -107,12 +107,58 @@ def retire(root, value, expected_main, apply=False):
             "status": "APPLIED" if apply else "DRY_RUN", "mutation_attempted": bool(attempted), "branches": results}
 
 
+def merged_head_from_pull(pr, expected_main, main_tree):
+    require(isinstance(pr, dict) and isinstance(expected_main, str) and SHA.fullmatch(expected_main), "valid merged PR required")
+    require(isinstance(main_tree, str) and SHA.fullmatch(main_tree), "exact main tree required")
+    head = pr.get("head") or {}
+    base = pr.get("base") or {}
+    head_repo = head.get("repo") or {}
+    base_repo = base.get("repo") or {}
+    name, sha = head.get("ref"), head.get("sha")
+    require(pr.get("state") == "closed" and pr.get("merged_at") and pr.get("merge_commit_sha") == expected_main, "verified main must be an exact merged PR commit")
+    require(base.get("ref") == "main" and base_repo.get("id") == 1383377268, "merged PR must target this repository main")
+    require(head_repo.get("id") == 1383377268 and head_repo.get("full_name") == REPOSITORY, "merged head must belong to this repository")
+    require(isinstance(name, str) and BRANCH.fullmatch(name) and len(name) <= 200 and "//" not in name and not name.endswith("/"), "merged head branch is not retireable")
+    require(isinstance(sha, str) and SHA.fullmatch(sha), "exact merged head SHA required")
+    return {"branch": name, "expected_head": sha, "integrated_commit": expected_main, "tree": main_tree}
+
+
+def merged_head_entry(root, expected_main):
+    result = subprocess.run(
+        ["gh", "api", "repos/" + REPOSITORY + "/commits/" + expected_main + "/pulls"],
+        capture_output=True, text=True, timeout=60,
+    )
+    require(result.returncode == 0, "cannot resolve merged PR for verified main")
+    pulls = json.loads(result.stdout)
+    require(isinstance(pulls, list) and 0 < len(pulls) <= 16, "bounded merged PR association required")
+    matching = [
+        pr for pr in pulls
+        if isinstance(pr, dict)
+        and pr.get("merge_commit_sha") == expected_main
+        and pr.get("merged_at")
+        and (pr.get("base") or {}).get("ref") == "main"
+        and ((pr.get("head") or {}).get("repo") or {}).get("id") == 1383377268
+    ]
+    require(len(matching) == 1, "exact merged PR association required")
+    main_tree = git(root, "rev-parse", expected_main + "^{tree}")
+    entry = merged_head_from_pull(matching[0], expected_main, main_tree)
+    heads = inventory(root)
+    actual = heads.get("refs/heads/" + entry["branch"])
+    if actual is not None:
+        require(actual == entry["expected_head"], "merged PR head drift; nothing will be deleted")
+        require(git(root, "rev-parse", actual + "^{tree}") == main_tree, "merged PR head tree differs from verified main")
+    return entry
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--expected-main", required=True)
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--retire-merged-head", action="store_true")
     args = parser.parse_args()
+    if args.retire_merged_head and not args.apply:
+        parser.error("--retire-merged-head requires --apply")
     report = {"version": 1, "status": "REJECTED", "mutation_state": "NOT_ATTEMPTED_OR_REQUIRES_RECONCILIATION"}
     try:
         root = Path.cwd().resolve()
@@ -120,6 +166,7 @@ def main():
         require(path == path.resolve() and path.is_file() and 0 < path.stat().st_size <= 65536, "bounded non-aliased manifest required")
         raw = path.read_bytes()
         value = validate_manifest(json.loads(raw, object_pairs_hook=pairs))
+        merged_head = None
         if args.apply:
             require(os.environ.get("GITHUB_REPOSITORY") == REPOSITORY and os.environ.get("GITHUB_REPOSITORY_ID") == "1383377268", "fixed GitHub repository required")
             require(os.environ.get("GITHUB_EVENT_NAME") == "workflow_run" and os.environ.get("GITHUB_REF") == "refs/heads/main" and os.environ.get("GITHUB_REF_PROTECTED") == "true", "protected-main CI completion required")
@@ -127,11 +174,17 @@ def main():
             run = event["workflow_run"]
             require(run["event"] == "push" and run["name"] == "CI" and run["conclusion"] == "success" and run["head_branch"] == "main" and run["head_sha"] == args.expected_main and run["head_repository"]["id"] == 1383377268, "exact same-repository successful main CI required")
             require(git(root, "remote", "get-url", "origin") in (REMOTE, REMOTE + ".git"), "unexpected mutation destination")
+            if args.retire_merged_head:
+                merged_head = merged_head_entry(root, args.expected_main)
+                require(merged_head["branch"] not in {e["branch"] for e in value["branches"]}, "merged head already appears in manifest")
+                value = validate_manifest({**value, "branches": value["branches"] + [merged_head]})
             active = subprocess.run(["gh", "api", "--paginate", "repos/" + REPOSITORY + "/pulls?state=open&per_page=100", "--jq", ".[].head.ref"], capture_output=True, text=True, timeout=60)
             require(active.returncode == 0, "cannot verify open PR inventory")
             require(not ({e["branch"] for e in value["branches"]} & set(active.stdout.splitlines())), "candidate still has an open PR")
         report = retire(root, value, args.expected_main, args.apply)
         report["manifest_digest"] = "sha256:" + hashlib.sha256(raw).hexdigest()
+        if merged_head is not None:
+            report["merged_head_branch"] = merged_head["branch"]
         print(json.dumps(report, sort_keys=True, indent=2))
         return 0
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as error:

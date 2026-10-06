@@ -26,19 +26,19 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Stopped source | Private exact-byte archive after confirmed stop, immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
-| Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation | Automatic abrupt-crash capture, repair or replay |
-| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks | Writable host builds, large firmware, MCU/board qualification or unattended retention scheduling |
-| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore | Complete per-Run dependency coverage, native database consistency or second-site backup |
+| Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved, unreplayed and blocks Recovery proof | Automatic source capture after arbitrary Codex/host death, approved repair or replay |
+| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual C compiler and freestanding host-ISA firmware ELF/map reference | Writable host builds, large production firmware, MCU cross-compilation, boot/timing/board qualification or unattended retention scheduling |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete per-Run dependency coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
-| Publisher | Independent mTLS service; production startup rejects in-process publishing | Pilot-only local publisher is a second production lane |
-| Distribution | One six-role list; source-matched installer embeds original deployment examples and verifies fresh installed bytes after source removal; installed Control/Publisher/Worker mTLS and durable quiescent restart regression | Systemd, fresh-host provisioning, in-flight effect crash recovery, automatic upgrade/migration or checksum-only authenticity |
-| Service manager | Explicit 3-start/60-second limit and cgroup stop policy in four canonical units; installed Publisher mTLS/crash restart and descendant-timeout tests under real systemd | Full production unit graph, distinct Unix-role provisioning, in-flight publication or model replay safety |
-| Production preflight | v2 checks configuration and actual host facts with expected source SHA | CONFIG_VALIDATED or HOST_VALIDATED means operational READY |
-| Operational status | v2 separates database authority from unobserved service readiness, checks exact response/freshness, pending ages/markers and bounded read-only progress windows | Inferred consumer/publisher health, capacity or production readiness |
+| Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
+| Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
+| Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering | Provisioning the final named production Unix accounts on a fresh host, active publication/model crash recovery or replay safety |
+| Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
+| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation | Worker identity count/recent poll or Publisher endpoint reachability proves capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v2 and exact nonempty no-skip test inventory | Live provider/service acceptance |
-| Operator CLI | Run controls, stopped-source restore/continuation, private execution readback and artifact-set storage | Completed WorkBuddy UX or Human Takeover |
+| Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
 
 ## Execution, failure and continuation
 
@@ -63,8 +63,12 @@ and one immutable checkpoint registration. Preservation-only Git inspection
 allows the original base or one direct Finalize child; normal execution/reopen
 retains its original-base fence. Success makes no unsolicited source copy.
 Local FAILED_UNCONFIRMED cannot override an already committed Core FINISHED.
-Abrupt Worker/host death and exhausted storage may prevent capture/journaling;
-phase entry alone is not phase completion or proof of a crash.
+Abrupt Codex/host death and exhausted storage may still prevent source
+capture/journaling; phase entry alone is not phase completion or proof of a
+crash. Separately, required native CI now kills an actual installed offline
+Worker with SIGKILL after its permit is fsynced and its lease renewed: Core stays
+non-terminal without a receipt, a second Worker cannot replay the same
+execution, and Recovery proof remains blocked until reconciliation.
 
 `eng execution-readback` validates existing private permit/phase/turn/result/
 checkpoint identities. Explicit artifact paths opt into source/bundle byte
@@ -112,15 +116,19 @@ ELF/map outside source and restores outputs after removing both original source
 and build directories. The existing [offline Runtime](../implementation/OFFLINE_EXECUTION_V1.md)
 also supports an explicitly frozen bounded build-output contract: the non-root
 PID1 guard collects exact files in private tmpfs after reaping children, and the
-existing Worker/Core/Evidence path binds their bytes. A real scratch-container C
-compiler and private artifact restore are covered, but no MCU/hardware or larger
-firmware capacity is qualified. A same-Run compiled Worker/mTLS/PostgreSQL/native
+existing Worker/Core/Evidence path binds their bytes. A real scratch-container C compiler, a freestanding host-ISA firmware-like
+ELF/map reference and private artifact restore are covered, but no target MCU
+cross-toolchain, boot/timing/hardware behavior or larger production firmware
+capacity is qualified. A same-Run compiled Worker/mTLS/PostgreSQL/native
 C build additionally captures and restores its original records and raw outputs
 after deleting source/Git/preparation roots, without creating Evidence or new
 execution. Producer-derived capture tests remove the entire prepared root
 including Context, restore, and recheck every frozen input object and producer
 record. Original Git base/toolchain, full model/tool/control history, second-site
-retention, encryption/key policy, scheduling and GC remain open.
+retention, encryption/key policy, scheduling and GC remain open. A required
+1 MiB private-tmpfs fault test also proves real ENOSPC during artifact pack and
+restore cannot publish a successful archive/report; a private partial restore
+directory may remain explicitly unverified for operator disposition.
 
 The mandatory PostgreSQL 17 drill additionally retains a native dump and expected
 authority snapshot through the raw set, removes and checks absence of the original
@@ -137,9 +145,14 @@ transport is separate. Historical schemas and decisions remain historical proof.
 Neither terminal facts nor source checkpoints are full runtime backups.
 
 [Branch disposition](../reviews/BRANCH_DISPOSITION_2026-10-04.md) separates
-integrated refs, unmatched prototypes and retained M1 subjects. A manifest is not
-a deletion receipt; only atomic SHA-guarded execution and readback prove cleanup.
-Zero open PRs does not mean every ref is governed. Preserve unchanged:
+integrated refs, unmatched prototypes and retained M1 subjects. Protected-main
+retirement receipt `37476720045` applied the expanded manifest against
+`310874bd0a6297310a31c919b9d530dbf502bfa6`: 32 refs were
+`DELETED_READBACK_VERIFIED` and five were already `ABSENT`. Current governance
+also requires the exact same-repository merged PR head tree to equal verified
+main before automatically leasing deletion of that just-merged working ref.
+Four older divergent prototypes remain for explicit semantic disposition; they
+are not treated as byte-identical. Preserve unchanged:
 
 - Feature `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
   `engineering-platform/3ac04fc7097e8375e5f7c1f8`.
@@ -173,23 +186,34 @@ cannot promote them into account/provider/device qualification.
 
 W01-W10 remain the approved scope, not a new authority/checklist framework.
 
-- W01: bounded read-only queue-progress windows use existing authenticated
-  snapshots and explicit diagnostic thresholds; component heartbeat/health/
-  capacity and calibrated operating SLOs remain open.
+- W01: bounded queue-progress windows, canonical Worker poll observations and
+  authenticated Publisher endpoint health are implemented without promoting
+  readiness. Actual Worker/Publisher capacity, upstream publication health and
+  calibrated operating SLOs remain open.
 - W02: account-free isolated startup implemented; actual auth/model/tool and
   deployment-environment acceptance remain external gates.
-- W03: catchable failure preservation/readback implemented; abrupt-crash capture,
-  disk-exhaustion recovery and approved repair are still open.
+- W03: catchable preservation/readback, actual offline Worker SIGKILL
+  non-replay/Recovery blocking, and artifact ENOSPC fail-closed behavior are
+  covered. Arbitrary Codex/host crash source capture, disk-space repair and
+  approved reconciliation/repair remain open.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
   implemented; larger build profiles, unattended retention scheduling, full Run
   dependencies and durable private retention/production-native acceptance remain open.
-- W06: source-bound six-role/template installation and exact readback implemented;
-  full fresh-host dependencies/service activation, upgrade/migration and recovery
-  acceptance remain open. Installation does not apply configuration or grant execution.
-- W07/W08: authorized normal user journey/WorkBuddy, controlled Human Takeover,
-  and representative board-free embedded build/evidence scenarios.
-- W09/W10: fault/load/security regression, exact RC delivery, unmatched prototype
-  disposition, evidence-ref protection and working-ref governance.
+- W06: source-bound six-role install/readback, real transient four-role systemd
+  ordering/identity separation and immutable cross-version binary switch/rollback
+  are implemented. Fresh-host named-account provisioning/service activation,
+  database migration rollback policy and active external-effect recovery remain
+  open. Installation/switch never grants execution or downgrades the database.
+- W07/W08: authenticated Work -> Task -> Run intake and exact-epoch Human
+  Takeover are implemented using existing Core APIs; a board-free freestanding
+  firmware reference is in required native CI. WorkBuddy transport/UX and real
+  target cross-compilation/board acceptance remain open.
+- W09/W10: actual Worker SIGKILL, ENOSPC, service-manager fault/security and
+  cross-version rollback regressions are implemented. The expanded exact-tree
+  retirement batch removed 32 refs with five already absent, and future exact-tree
+  same-repository merged heads are leased for automatic cleanup after successful
+  main CI. Sustained load/security matrix, four divergent prototype dispositions,
+  retained-ref mutation protection and exact final RC delivery remain open.
 
 Every slice needs exact-head CI, fresh-main and delivered-byte readback. Earlier
 green runs do not qualify new source. External accounts, production hosts,
@@ -206,8 +230,11 @@ stops preserve database receipts/audit/outbox/epoch without model replay.
 Publisher rejects unsupported arguments instead of silently listening, and its
 bound-address announcement is not a provider-ready assertion. See the existing
 [operations contract](../implementation/PRODUCTION_OPERATIONS_V1.md).
-Systemd/dependency provisioning, in-flight crash recovery and upgrades are not
-covered by this quiescent process regression.
+Quiescent installed-service tests are now complemented by real systemd
+dependency/identity tests, immutable cross-version upgrade/rollback and an actual
+offline Worker SIGKILL case. They still do not provision the final named
+production accounts on a fresh host or prove active model/publication effect
+recovery.
 
 
 The native CI additionally runs `scripts/ci-systemd-lifecycle.sh` against a real
@@ -221,10 +248,11 @@ are checked. The last must be killed after the configured stop timeout, remain
 a timeout failure and not restart after explicit stop. A missing manager or
 noninteractive privilege is a failed required CI gate, not a successful skip.
 
-These are manager-policy tests, not complete W06: Control/Worker under the full
-production systemd dependency graph, distinct service accounts, fresh-host
-provisioning, upgrade/migration rollback and active external-effect recovery
-remain open. The previous direct-process PostgreSQL tests remain independent.
+These remain controlled manager tests, not complete production W06: the
+transient graph proves four distinct DynamicUser identities and canonical
+dependency ordering, but final named-account provisioning, fresh-host service
+activation, database migration rollback/restore acceptance and active
+external-effect recovery remain open. The previous direct-process PostgreSQL tests remain independent.
 Rate-limit values are an explicit conservative restart policy, not measured SLOs.
 Reaching the limit requires diagnosis and an explicit operator restart; a service
 restart never grants authority to replay a non-replayable engineering Run.

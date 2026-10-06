@@ -117,3 +117,32 @@ This is drift detection, not GitHub branch protection. The repository currently
 reports both retained refs as unprotected; actual mutation prevention remains a
 separate repository-administrator setting and must not be inferred from this CI
 guard.
+
+
+## Applied RC retirement receipt — 2026-10-06
+
+Protected-main CI `37475533558` qualified
+`310874bd0a6297310a31c919b9d530dbf502bfa6`. Its dependent maintenance run
+`37476720045` used manifest digest
+`sha256:478e163bc7e5aa2229cb143c2b690612b6626e80d8680105630eb446815dc521`.
+The retained receipt records 37 candidates: **32
+`DELETED_READBACK_VERIFIED` and 5 `ABSENT`**, with
+`mutation_attempted=true`. Direct remote inventory after the run confirms those
+32 refs are gone.
+
+The remaining non-main refs deliberately include the two historical M1 evidence
+refs and four divergent prototypes
+(`feat/github-ci-core-evidence-import`,
+`feat/independent-publisher-service`,
+`feat/independent-review-authority`,
+`feat/relay-codex-config-renderer`). The prototypes require semantic
+supersession review; they are not eligible for the byte-identical manifest.
+
+To avoid each governance/maintenance PR creating the next orphan, protected-main
+retirement also validates the PR associated with the newly verified main commit.
+Only a closed same-repository PR targeting main, with an allowed working-ref
+name, exact recorded head SHA and a complete head tree identical to verified
+main, can be appended in-memory to the same atomic SHA-leased deletion. This
+does not broaden deletion to retained evidence refs, release refs, arbitrary
+branches or open PRs. If PR association, SHA, tree or remote inventory drifts,
+the mutation is rejected before deletion.
