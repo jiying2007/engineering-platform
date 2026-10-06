@@ -47,6 +47,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "work-intake":
+		if err := workIntake(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "human-takeover":
 		if err := humanTakeover(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -245,6 +250,7 @@ func usage() {
 	fmt.Println("  source-checkpoint verify|restore <flags>  read back stopped source; never resume a model")
 	fmt.Println("  runtime-isolation-probe                     verify local kernel process containment, without accounts")
 	fmt.Println("  run-continue authorize|status <flags>  authorize one new Run from confirmed stopped source")
+	fmt.Println("  work-intake submit INTAKE.json            authenticated Work -> Task -> Run convenience; no execution")
 	fmt.Println("  human-takeover --run ID --epoch N         epoch-fenced transfer to HUMAN control; no runtime replay")
 	fmt.Println("  run-control inspect|status|steer|interrupt <flags>  explicit live control and receipt readback")
 	fmt.Println("  distribution-install --from DIR --into NEW_DIR --source-commit SHA  install matching runtime/templates; no service activation")
