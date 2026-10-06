@@ -195,7 +195,7 @@ jobs:
         run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 
       - name: Sustained admission and security matrix
-        run: go test -race -v -count=1 -timeout 3m ./cmd/control-plane -run '^TestSustainedAdmissionSecurityMatrix
+        run: go test -race -v -count=1 -timeout 3m ./cmd/control-plane -run '^TestSustainedAdmissionSecurityMatrix'
       - name: Build current immutable release candidate before nested checkout
         shell: bash
         env:
