@@ -84,6 +84,9 @@ class RetirementTests(unittest.TestCase):
         self.assertEqual(len(retire.inventory(self.root)), 3)
 
     def test_protected_names_invalid_manifests_and_duplicates_rejected(self):
+        retire.validate_manifest({"version": 1, "repository": retire.REPOSITORY, "branches": [
+            {"branch": "test/verified", "expected_head": self.topic, "integrated_commit": self.main, "tree": self.tree}
+        ]})
         for name in ("main", "engineering-platform/retained", "release/stable", "feat/../main", "feat//bad", "--force", "feat/trailing/"):
             bad = copy.deepcopy(self.manifest)
             bad["branches"][0]["branch"] = name

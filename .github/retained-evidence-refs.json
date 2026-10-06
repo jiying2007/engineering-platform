@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "repository": "jiying2007/engineering-platform",
+  "refs": [
+    {
+      "branch": "engineering-platform/3ac04fc7097e8375e5f7c1f8",
+      "expected_head": "6009ea95785237ad6ff9f5c9cba911b4891dfa58"
+    },
+    {
+      "branch": "engineering-platform/994964383ed085e51545105d",
+      "expected_head": "91d7d9fa068b7667bab5c211f13cd9e0151aeb92"
+    }
+  ]
+}

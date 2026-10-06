@@ -3,10 +3,16 @@
   "repository": "jiying2007/engineering-platform",
   "branches": [
     {
-      "branch": "fix/verified-branch-retirement",
-      "expected_head": "abc8022e5a9c925001e054f4e65eebea32010ff7",
-      "integrated_commit": "674f44941446585b238f97cd1a2a7e02f625bb01",
-      "tree": "e3e4c51ffe45e00c90423832a3a3cf5de1fa3a28"
+      "branch": "docs/lifecycle-status-and-ref-closeout",
+      "expected_head": "4de88e3fc94537bd134f5ba5b41795eccba24793",
+      "integrated_commit": "c4eaa7aee68776999c789794839bb1c294891073",
+      "tree": "a7c8c7ef95282c60be30354129d7f10f9c531a31"
+    },
+    {
+      "branch": "feat/authorized-source-continuation",
+      "expected_head": "af06d92e05cab06c83ea92b1e0050f271f0a84eb",
+      "integrated_commit": "ee621c9a73facab1dfea54261737a117dbaef07f",
+      "tree": "f2dbc0cbf42d9514a7d7b8c1121d55dbb03d64cd"
     },
     {
       "branch": "feat/interactive-worker-control",
@@ -15,10 +21,76 @@
       "tree": "4d08e5cf8c5c833836afcecc9693529af5be3460"
     },
     {
-      "branch": "fix/runtime-process-scope",
-      "expected_head": "a85ce8bc7f60c675b28ddb09689e84fafb93978e",
-      "integrated_commit": "842f6d8688eda2a4c273ee345647563637056722",
-      "tree": "942c159246e218af92a6a0609a5498d54c1cb3cb"
+      "branch": "feat/rc-execution-readback",
+      "expected_head": "7dbda9fa4d949f03c38925bca42b51a654c0d29f",
+      "integrated_commit": "b8ae71c4a03e378a71372e430fb4c917d23a9331",
+      "tree": "8fae4016721aee9f66c4718fc666ae2846cb85f9"
+    },
+    {
+      "branch": "feat/rc-frozen-execution-capture",
+      "expected_head": "9c7ae16e210ea841f08a82d7590c21ab12ff751e",
+      "integrated_commit": "76097e2c4ed84d3aef1e17ee04316a28032ec89f",
+      "tree": "6be52df838f797d8a0cf849f75c6dc4ebf7f4457"
+    },
+    {
+      "branch": "feat/rc-human-takeover-cli",
+      "expected_head": "8b8a920405c2a3e31541b5df3895a592eb2939f5",
+      "integrated_commit": "e0629d2f168b03723fcf0fa40048b347b3da65e5",
+      "tree": "1dbfc37752f8e3d744f5765901bbfa6710d2c0ea"
+    },
+    {
+      "branch": "feat/rc-installation-readback",
+      "expected_head": "736e252f5e662f95fc0e64b8325d22234359736c",
+      "integrated_commit": "7fae7cb642d832378c418deb53da1342cf871ec7",
+      "tree": "00ea4cf865a65a5f99cb87b482ccf17f70afca0a"
+    },
+    {
+      "branch": "feat/rc-installation-switch",
+      "expected_head": "0e00b7f32c59d05d1f1cac8c490647e60f4b2068",
+      "integrated_commit": "cbac0551c70ebdaa72ebc4e31fee7dd16e8ce4de",
+      "tree": "5653975557913b29483fd4fd612934ad4a21b8fc"
+    },
+    {
+      "branch": "feat/rc-offline-build-outputs",
+      "expected_head": "aeb5f3d8ada1a3cb7ed3f8717eeb7189b9f56116",
+      "integrated_commit": "18c81f287c32f8bca0936b6f2af192f0b686dc6d",
+      "tree": "9cf2fb0b905b344e71a2353d3802718218cd415f"
+    },
+    {
+      "branch": "feat/rc-offline-output-capture",
+      "expected_head": "a5b2ecc06a5c9e7af6d53648632a5c272d007049",
+      "integrated_commit": "a89727ecf4582477ed3bfd92eb18c69db66f7783",
+      "tree": "81cdd7f372027f7464745a71d75ecd2e6ddb53ff"
+    },
+    {
+      "branch": "feat/rc-private-artifact-sets",
+      "expected_head": "49b81f376fb916ead127d2b47b1457c665988151",
+      "integrated_commit": "71d803bb09a14358ee90ff8df82960918a76ce23",
+      "tree": "8273f7f7a4700def9250c1568a947f03e1905c20"
+    },
+    {
+      "branch": "feat/rc-publisher-health-observation",
+      "expected_head": "2a9b4221c8bfe5cda2a5d61b8adc0bf174ee0c45",
+      "integrated_commit": "0b412216e5bf72eb79a681bc4a8e1d63800ed82a",
+      "tree": "3daa94e27d0a905a9abc122a9c404e3d1c16b14c"
+    },
+    {
+      "branch": "feat/rc-self-contained-install",
+      "expected_head": "589cfe3da2f22cb2745fd2e2ce0086ba421d6d87",
+      "integrated_commit": "dc89768159dfd3e75d217ee25f1d63028495dfce",
+      "tree": "30aae1979d7b6f4b49623bb3a02d6a729fc9db90"
+    },
+    {
+      "branch": "feat/rc-work-intake",
+      "expected_head": "7c60489d18c91de9ed9c6412397d792a11126eb9",
+      "integrated_commit": "4bc5c03a065aa848ba28d5bb54f8b09f66c127eb",
+      "tree": "2236c0382507d3e97c350560c9be57ba75735561"
+    },
+    {
+      "branch": "feat/rc-worker-poll-observation",
+      "expected_head": "17dbf815d731978b411a2ea7f9e59b6763e705c9",
+      "integrated_commit": "ab481f0cbb77407046c61defe7ac3a07551e5497",
+      "tree": "f839d77537014e07db9c6f62e2bb9bf73cdc5c10"
     },
     {
       "branch": "feat/stopped-source-checkpoint",
@@ -27,10 +99,130 @@
       "tree": "19fc158e9c512d8d65a7254d1a09dc06cff5b34d"
     },
     {
-      "branch": "feat/authorized-source-continuation",
-      "expected_head": "af06d92e05cab06c83ea92b1e0050f271f0a84eb",
-      "integrated_commit": "ee621c9a73facab1dfea54261737a117dbaef07f",
-      "tree": "f2dbc0cbf42d9514a7d7b8c1121d55dbb03d64cd"
+      "branch": "fix/rc-control-terminal-ordering",
+      "expected_head": "97f734bc7172d7d73d2235966d8dad973db4fdb1",
+      "integrated_commit": "fb368684f30213ffb2ef73cd6674f2d45e0a582c",
+      "tree": "6619c288dace53ec3a1344c8b5b47351ba05893d"
+    },
+    {
+      "branch": "fix/rc-core-schema-startup-fence",
+      "expected_head": "eca93982a515366c9707b30b1ee2d022ff28e936",
+      "integrated_commit": "2100814970dc65ad836d2dc25332b5a6b8c1b981",
+      "tree": "1e1b7e6cde9c5e7b1beeaf0eb9d2eb3bef7eb518"
+    },
+    {
+      "branch": "fix/rc-endpoint-startup-notification",
+      "expected_head": "ac4290c28278625758b69ce5706ce3cde622721f",
+      "integrated_commit": "826ea78d8a4837d52a4195502ec1909fb8c11c3e",
+      "tree": "64efe166e12e6385ed69ecb3069354be2fcfbfbb"
+    },
+    {
+      "branch": "fix/rc-installed-service-lifecycle",
+      "expected_head": "3eafa2a50314e5962e9e063e71c8fb3dbb28b5ab",
+      "integrated_commit": "434d82faf4a7a02bdcbc707dd586c66319de18e0",
+      "tree": "f5c09c6ff2c8a36068967afa9dd2dfa1ea89871f"
+    },
+    {
+      "branch": "fix/rc-preparation-endpoint-fence",
+      "expected_head": "6dc6801e38beeb345700214565dbb9895eae496c",
+      "integrated_commit": "c42d5a9f1a2fd3d8e5a9060091530f91ffb366eb",
+      "tree": "2cd87445144266fa207d961ffe46579d1753d27b"
+    },
+    {
+      "branch": "fix/rc-queue-progress-window",
+      "expected_head": "22b011fc9ecbda96eff2029f4c18fdb0440d64b2",
+      "integrated_commit": "3a134a2bacdd44a7041b74f325e388e1393e4ac8",
+      "tree": "d7139958418c568b348bc8a065113c5e6341613d"
+    },
+    {
+      "branch": "fix/rc-service-file-access",
+      "expected_head": "32d7d6ea72f0543e609317f0aa7fd0edefa2c1ea",
+      "integrated_commit": "8545a369c70a21d167ce4b2de91117fc286fac09",
+      "tree": "2e4ed21b80594b739aa442f19c39c9d880a4dfb9"
+    },
+    {
+      "branch": "fix/rc-switch-self-process",
+      "expected_head": "3df4c4f4e02a89fb7824e885c4b57f9d2861ce5d",
+      "integrated_commit": "84fc62dd03e7fb6adaf87dbb2a683be1e56cbff4",
+      "tree": "ba3b70cb425176c919e5df6bf22bb60e3d0b24c6"
+    },
+    {
+      "branch": "fix/rc-systemd-bounded-lifecycle",
+      "expected_head": "c59d9327f636e39e9cae083560076f7006b36777",
+      "integrated_commit": "841ba8c1315bcbb93294fbbdfd9c5eaf8a17144c",
+      "tree": "baffa00a2bb0c12f6ff8a10d17526a9abbaeb0d2"
+    },
+    {
+      "branch": "fix/rc-w01-status-provenance",
+      "expected_head": "0a8fb399b73b1589ba6f7485f2ad4c10bae6a358",
+      "integrated_commit": "cdf7c1281437163fc1813c8c75228bf74e8c9d9c",
+      "tree": "3976120a7fb17174352661cdd0f17d2cdf1e32a7"
+    },
+    {
+      "branch": "fix/rc-w02-isolated-qualification",
+      "expected_head": "ab6331424fd20b2abfd41415b0ae0d5cbed91efa",
+      "integrated_commit": "a7dadb27c07ad7342b1250ff5138006482c57984",
+      "tree": "51afeb736b2e0af871156e53a4b6a1656ece5e3a"
+    },
+    {
+      "branch": "fix/rc-w03-postturn-retention",
+      "expected_head": "33abc08dd49a6cbf5849d35eb3ba29b1b9839c8d",
+      "integrated_commit": "9d0e2650dd5f305b0d2803cf7e64dec3bb581137",
+      "tree": "245710866ab67287aded9a47fd21d62f71302299"
+    },
+    {
+      "branch": "fix/rc-worker-claim-routing",
+      "expected_head": "5e125ac010e92ea039469384c9892655f103ad63",
+      "integrated_commit": "7c9890de90836df0bc64362b03bea80dd324cb5d",
+      "tree": "521f705309c3c55cb93b584687082f46fcb88fcd"
+    },
+    {
+      "branch": "fix/runtime-process-scope",
+      "expected_head": "a85ce8bc7f60c675b28ddb09689e84fafb93978e",
+      "integrated_commit": "842f6d8688eda2a4c273ee345647563637056722",
+      "tree": "942c159246e218af92a6a0609a5498d54c1cb3cb"
+    },
+    {
+      "branch": "fix/verified-branch-retirement",
+      "expected_head": "abc8022e5a9c925001e054f4e65eebea32010ff7",
+      "integrated_commit": "674f44941446585b238f97cd1a2a7e02f625bb01",
+      "tree": "e3e4c51ffe45e00c90423832a3a3cf5de1fa3a28"
+    },
+    {
+      "branch": "test/rc-artifact-enospc",
+      "expected_head": "14a2e0cf36bfcb431e35c256ffc681fd0334c7f2",
+      "integrated_commit": "cc502e26b2543fc3ccab1c409db5f363aa55fabf",
+      "tree": "e1b972508e1e7b8bf39c336f9376f3b4159e1fd1"
+    },
+    {
+      "branch": "test/rc-board-free-firmware-reference",
+      "expected_head": "664079fcff80853f878dc5627cf0183b7efda480",
+      "integrated_commit": "6339e21ea1374a38a7490b964d4fca3c8d110183",
+      "tree": "85b168a0824985b2d010243572d8353f87a6d095"
+    },
+    {
+      "branch": "test/rc-cross-version-release-switch",
+      "expected_head": "f33f979c1ced56a4b1d3f70e525093591c56768d",
+      "integrated_commit": "20ecd7f0002a7561596b59f4e8e79ea14ab6e9a7",
+      "tree": "0c01bdbfaac3808bd001ef399331eaefedb3023d"
+    },
+    {
+      "branch": "test/rc-four-role-systemd-graph",
+      "expected_head": "31a464543d06b92803c78284ee3383b6b03c32e7",
+      "integrated_commit": "98d146048fb04b7a4bfc165267040a8d7a6c0a9a",
+      "tree": "6114ce2e68843a5c92103467b71f2d86e8cf99f2"
+    },
+    {
+      "branch": "test/rc-offline-worker-sigkill",
+      "expected_head": "e59706cc45cf7cc6eb136727325397a53835aa69",
+      "integrated_commit": "c609b93510e27029d1bd0c7262476fd7deabc1c8",
+      "tree": "baad2cab663e47deee496a7771f1a27f764438ee"
+    },
+    {
+      "branch": "test/rc-private-native-restore",
+      "expected_head": "4721420788a964e9977314986c3ca9eb45488333",
+      "integrated_commit": "1677454ec598b49c5a4b52f72e6c1361ab69bed1",
+      "tree": "e30d7f473ca9b6c801ffe0d4744061fca04006de"
     }
   ]
 }
