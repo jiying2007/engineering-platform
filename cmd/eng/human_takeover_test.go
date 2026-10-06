@@ -22,7 +22,7 @@ func TestHumanTakeoverUsesCertificateActorAndEpochFence(t *testing.T) {
 			t.Errorf("unexpected takeover request %s %s", r.Method, r.URL.Path)
 		}
 		var body struct {
-			ExecutionEpoch uint64 \`json:"execution_epoch"\`
+			ExecutionEpoch uint64 `json:"execution_epoch"`
 		}
 		if json.NewDecoder(r.Body).Decode(&body) != nil || body.ExecutionEpoch != 7 {
 			t.Error("takeover epoch drift", body)
