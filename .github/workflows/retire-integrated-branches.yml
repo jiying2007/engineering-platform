@@ -37,7 +37,7 @@ jobs:
           test "$GITHUB_REF_PROTECTED" = true
           python3 -B scripts/retire_integrated_branches.py \
             --manifest .github/retired-branches.json \
-            --expected-main "$VERIFIED_MAIN" --apply \
+            --expected-main "$VERIFIED_MAIN" --apply --retire-merged-head \
             > "$RUNNER_TEMP/branch-retirement.json"
           cat "$RUNNER_TEMP/branch-retirement.json"
       - name: Retain exact maintenance receipt only
