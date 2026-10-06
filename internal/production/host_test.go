@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestAuditInvalidHostFailsClosed(t *testing.T) {
@@ -51,5 +54,106 @@ func TestMalformedDeploymentValuesRejectedBeforeHostAdmission(t *testing.T) {
 		if validateEndpoint(raw) == nil {
 			t.Fatalf("invalid endpoint %s accepted", raw)
 		}
+	}
+}
+
+func TestHostFileRejectsHardLinkAlias(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "config.json")
+	alias := filepath.Join(root, "alias.json")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(path, alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := hostFile(path, false, os.Getuid(), false); err == nil {
+		t.Fatal("hard-linked configuration accepted")
+	}
+}
+
+func TestServicePathAccessChecksTargetAndEveryDirectory(t *testing.T) {
+	root := t.TempDir()
+	private := filepath.Join(root, "private")
+	if err := os.Mkdir(private, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(private, 0o700) })
+	path := filepath.Join(private, "config")
+	if err := os.WriteFile(path, []byte("x"), 0o400); err != nil {
+		t.Fatal(err)
+	}
+	gids := map[uint32]bool{uint32(os.Getgid()): true}
+	for _, gid := range mustGroups(t) {
+		gids[uint32(gid)] = true
+	}
+	if err := servicePathAccess(path, os.Getuid(), gids, 4); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o200); err != nil {
+		t.Fatal(err)
+	}
+	if err := servicePathAccess(path, os.Getuid(), gids, 4); err == nil {
+		t.Fatal("unreadable file accepted")
+	}
+	if err := os.Chmod(path, 0o400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(private, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := servicePathAccess(path, os.Getuid(), gids, 4); err == nil {
+		t.Fatal("untraversable parent accepted")
+	}
+}
+
+func TestUnixModeAccessUsesOwnerGroupAndOtherBits(t *testing.T) {
+	info := fakeUnixFileInfo{mode: 0o640, stat: syscall.Stat_t{Uid: 1001, Gid: 2001}}
+	if !unixModeAllows(info, 1001, map[uint32]bool{}, 4) {
+		t.Fatal("owner read was rejected")
+	}
+	if !unixModeAllows(info, 1002, map[uint32]bool{2001: true}, 4) {
+		t.Fatal("group read was rejected")
+	}
+	if unixModeAllows(info, 1002, map[uint32]bool{2002: true}, 4) {
+		t.Fatal("other read was invented")
+	}
+}
+
+func mustGroups(t *testing.T) []int {
+	t.Helper()
+	groups, err := os.Getgroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return groups
+}
+
+type fakeUnixFileInfo struct {
+	mode os.FileMode
+	stat syscall.Stat_t
+}
+
+func (f fakeUnixFileInfo) Name() string       { return "fake" }
+func (f fakeUnixFileInfo) Size() int64        { return 1 }
+func (f fakeUnixFileInfo) Mode() os.FileMode  { return f.mode }
+func (f fakeUnixFileInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeUnixFileInfo) IsDir() bool        { return false }
+func (f fakeUnixFileInfo) Sys() any           { return &f.stat }
+
+func TestHostFilePrivateMaterialRequiresServiceOwner(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "preparation.json")
+	if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := hostFile(path, true, os.Getuid(), false); err != nil {
+		t.Fatal(err)
+	}
+	wrong := os.Getuid() + 10000
+	if wrong == 0 {
+		wrong++
+	}
+	if err := hostFile(path, true, wrong, false); err == nil {
+		t.Fatal("private preparation material accepted for a different service identity")
 	}
 }

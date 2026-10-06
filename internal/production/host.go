@@ -36,6 +36,10 @@ func Check(c Config) (Result, error) {
 	if err != nil {
 		return result, err
 	}
+	groups, err := resolveServiceGroups(users, user.Lookup)
+	if err != nil {
+		return result, err
+	}
 	dir := filepath.Dir(c.ControlBinary)
 	for role, path := range map[string]string{"control-plane": c.ControlBinary, "worker": c.WorkerBinary, "eng": c.EngBinary, "publisher-service": c.PublisherBinary} {
 		if path != filepath.Join(dir, role) {
@@ -75,7 +79,11 @@ func Check(c Config) (Result, error) {
 		}
 		for key, value := range values {
 			if strings.HasSuffix(key, "_FILE") || strings.HasSuffix(key, "_CONFIG") {
-				if e := hostFile(value, strings.HasSuffix(key, "_KEY_FILE"), uids[i], false); e != nil {
+				private := strings.HasSuffix(key, "_KEY_FILE") || key == "WORKER_PREPARATION_CONFIG"
+				if e := hostFile(value, private, uids[i], false); e != nil {
+					return result, fmt.Errorf("%s: %w", key, e)
+				}
+				if e := servicePathAccess(value, uids[i], groups[i], 4); e != nil {
 					return result, fmt.Errorf("%s: %w", key, e)
 				}
 			}
@@ -111,6 +119,9 @@ func Check(c Config) (Result, error) {
 		if err := hostFile(path, path == remote.ClientKeyFile, uids[0], false); err != nil {
 			return result, err
 		}
+		if err := servicePathAccess(path, uids[0], groups[0], 4); err != nil {
+			return result, err
+		}
 	}
 	if _, err := githubpublish.NewRemoteClient(remote); err != nil {
 		return result, err
@@ -138,10 +149,16 @@ func Check(c Config) (Result, error) {
 	if err := safeDirectory(pub.ArtifactRoot); err != nil {
 		return result, err
 	}
+	if err := servicePathAccess(pub.ArtifactRoot, uids[3], groups[3], 5); err != nil {
+		return result, fmt.Errorf("publisher artifact root: %w", err)
+	}
 	if err := safeExecutable(pub.GitExecutable); err != nil {
 		return result, err
 	}
 	if err := hostFile(pub.TokenFile, true, uids[3], false); err != nil {
+		return result, err
+	}
+	if err := servicePathAccess(pub.TokenFile, uids[3], groups[3], 4); err != nil {
 		return result, err
 	}
 	// This constructor validates policy/configuration and reads the token locally;
@@ -156,8 +173,15 @@ func Check(c Config) (Result, error) {
 	if pc.Version != 1 || !strings.HasPrefix(pc.Worker, "urn:engineering-platform:") || len(pc.Approvals) == 0 {
 		return result, fmt.Errorf("invalid preparation configuration")
 	}
-	for _, path := range []string{pc.Root, pc.ContextSource} {
+	for index, path := range []string{pc.Root, pc.ContextSource} {
 		if err := safeDirectory(path); err != nil {
+			return result, err
+		}
+		want := uint32(5)
+		if index == 0 {
+			want = 7
+		}
+		if err := servicePathAccess(path, uids[2], groups[2], want); err != nil {
 			return result, err
 		}
 	}
@@ -181,6 +205,31 @@ func Check(c Config) (Result, error) {
 	result.SourceCommit = dist.SourceCommit
 	result.Blockers = []string{"unattended_provider_live_qualification", "live_service_operational_qualification"}
 	return result, nil
+}
+
+func resolveServiceGroups(names []string, lookup func(string) (*user.User, error)) ([]map[uint32]bool, error) {
+	out := make([]map[uint32]bool, 0, len(names))
+	for _, name := range names {
+		account, err := lookup(name)
+		if err != nil || account == nil {
+			return nil, fmt.Errorf("service user %s does not exist", name)
+		}
+		ids, err := account.GroupIds()
+		if err != nil {
+			return nil, fmt.Errorf("service user %s groups unavailable", name)
+		}
+		ids = append(ids, account.Gid)
+		set := map[uint32]bool{}
+		for _, raw := range ids {
+			value, err := strconv.ParseUint(raw, 10, 32)
+			if err != nil || value == 0 {
+				return nil, fmt.Errorf("service user %s has invalid group identity", name)
+			}
+			set[uint32(value)] = true
+		}
+		out = append(out, set)
+	}
+	return out, nil
 }
 
 func resolveUsers(names []string, lookup func(string) (*user.User, error)) ([]int, error) {
@@ -249,11 +298,54 @@ func hostFile(path string, secret bool, uid int, systemdEnv bool) error {
 	if !ok {
 		return fmt.Errorf("Unix configuration ownership required")
 	}
+	if stat.Nlink != 1 {
+		return fmt.Errorf("configuration hard-link alias is not allowed")
+	}
 	if secret && int(stat.Uid) != uid && !(systemdEnv && stat.Uid == 0) {
 		return fmt.Errorf("private configuration is not readable by its service identity")
 	}
 	return nil
 }
+
+func unixModeAllows(info os.FileInfo, uid int, gids map[uint32]bool, want uint32) bool {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false
+	}
+	shift := uint(0)
+	if int(stat.Uid) == uid {
+		shift = 6
+	} else if gids[stat.Gid] {
+		shift = 3
+	}
+	actual := (uint32(info.Mode().Perm()) >> shift) & 7
+	return actual&want == want
+}
+
+func servicePathAccess(path string, uid int, gids map[uint32]bool, want uint32) error {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || uid <= 0 || len(gids) == 0 || want == 0 || want&^uint32(7) != 0 {
+		return fmt.Errorf("invalid service path-access contract")
+	}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil || resolved != path {
+		return fmt.Errorf("service path missing or aliased")
+	}
+	for parent := filepath.Dir(path); ; parent = filepath.Dir(parent) {
+		info, err := os.Lstat(parent)
+		if err != nil || !info.IsDir() || !unixModeAllows(info, uid, gids, 1) {
+			return fmt.Errorf("service identity cannot traverse referenced path")
+		}
+		if parent == string(filepath.Separator) {
+			break
+		}
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !unixModeAllows(info, uid, gids, want) {
+		return fmt.Errorf("service identity lacks required mode-bit access")
+	}
+	return nil
+}
+
 func readHostJSON(path string, out any) error {
 	data, err := access.ReadConfiguration(path, false)
 	if err != nil {
