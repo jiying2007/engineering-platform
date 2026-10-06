@@ -21,16 +21,16 @@ type humanTakeoverOptions struct {
 }
 
 type humanTakeoverReceipt struct {
-	Version             int    \`json:"version"\`
-	Status              string \`json:"status"\`
-	RunID               string \`json:"run_id"\`
-	Actor               string \`json:"actor"\`
-	PreviousEpoch       uint64 \`json:"previous_epoch"\`
-	ExecutionEpoch      uint64 \`json:"execution_epoch"\`
-	ControlOwner        string \`json:"control_owner"\`
-	RuntimeReplay       bool   \`json:"runtime_replay"\`
-	ModelTurnExecuted   bool   \`json:"model_turn_executed"\`
-	ProductionQualified bool   \`json:"production_qualified"\`
+	Version             int    `json:"version"`
+	Status              string `json:"status"`
+	RunID               string `json:"run_id"`
+	Actor               string `json:"actor"`
+	PreviousEpoch       uint64 `json:"previous_epoch"`
+	ExecutionEpoch      uint64 `json:"execution_epoch"`
+	ControlOwner        string `json:"control_owner"`
+	RuntimeReplay       bool   `json:"runtime_replay"`
+	ModelTurnExecuted   bool   `json:"model_turn_executed"`
+	ProductionQualified bool   `json:"production_qualified"`
 }
 
 func parseHumanTakeover(args []string) (humanTakeoverOptions, error) {
@@ -61,11 +61,11 @@ func executeHumanTakeover(ctx context.Context, c *controlclient.Client, options 
 		return zero, fmt.Errorf("authenticated takeover request required")
 	}
 	var response struct {
-		Run     run.Run         \`json:"run"\`
-		Session session.Session \`json:"session"\`
+		Run     run.Run         `json:"run"`
+		Session session.Session `json:"session"`
 	}
 	if err := c.Call(ctx, http.MethodPost, "/api/v1/runs/"+options.runID+"/takeover", struct {
-		ExecutionEpoch uint64 \`json:"execution_epoch"\`
+		ExecutionEpoch uint64 `json:"execution_epoch"`
 	}{ExecutionEpoch: options.epoch}, &response); err != nil {
 		return zero, err
 	}
