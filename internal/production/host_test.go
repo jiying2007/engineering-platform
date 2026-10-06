@@ -57,7 +57,6 @@ func TestMalformedDeploymentValuesRejectedBeforeHostAdmission(t *testing.T) {
 	}
 }
 
-
 func TestHostFileRejectsHardLinkAlias(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "config.json")
@@ -133,6 +132,7 @@ type fakeUnixFileInfo struct {
 	mode os.FileMode
 	stat syscall.Stat_t
 }
+
 func (f fakeUnixFileInfo) Name() string       { return "fake" }
 func (f fakeUnixFileInfo) Size() int64        { return 1 }
 func (f fakeUnixFileInfo) Mode() os.FileMode  { return f.mode }
