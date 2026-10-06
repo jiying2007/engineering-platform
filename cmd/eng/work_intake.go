@@ -29,7 +29,6 @@ type workIntakeSpec struct {
 	AttemptID        string            `json:"attempt_id"`
 	Title            string            `json:"title"`
 	SourceRef        string            `json:"source_ref,omitempty"`
-	TargetID         string            `json:"target_id,omitempty"`
 	AssuranceClass   string            `json:"assurance_class,omitempty"`
 	TaskType         string            `json:"task_type"`
 	Subsystem        string            `json:"subsystem"`
@@ -103,8 +102,8 @@ func (s workIntakeSpec) validate() (routing.Route, material.Result, error) {
 		!boundedIntakeValue(s.WorkerProfile, 256) || !boundedIntakeValue(s.PolicyProfile, 256) {
 		return routing.Route{}, material.Result{}, fmt.Errorf("invalid bounded work-intake field")
 	}
-	if s.Material.TaskType != "" && !strings.EqualFold(s.Material.TaskType, s.TaskType) {
-		return routing.Route{}, material.Result{}, fmt.Errorf("material task type conflicts with intake task")
+	if s.Material.TaskType != "" {
+		return routing.Route{}, material.Result{}, fmt.Errorf("material task_type must be omitted; intake task_type is authoritative")
 	}
 	if err := core.ValidateContextRefs(s.ContextRefs); err != nil {
 		return routing.Route{}, material.Result{}, err
@@ -178,7 +177,7 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 	}
 	work := core.WorkItem{
 		ID: spec.WorkItemID, Title: spec.Title, SourceRef: spec.SourceRef,
-		HumanOwner: client.Subject(), TargetID: spec.TargetID, AssuranceClass: spec.AssuranceClass,
+		HumanOwner: client.Subject(), TargetID: spec.Material.TargetID, AssuranceClass: spec.AssuranceClass,
 	}
 	var workResponse core.WorkItem
 	if err := client.Call(ctx, http.MethodPost, "/api/v1/work-items", work, &workResponse); err != nil {
