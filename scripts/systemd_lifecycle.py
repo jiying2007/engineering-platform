@@ -10,6 +10,7 @@ import configparser
 import hashlib
 import json
 import os
+import pwd
 from pathlib import Path
 import queue
 import re
@@ -189,6 +190,153 @@ def cgroup_empty(group):
     return all(not p.read_text().strip() for p in root.rglob("cgroup.procs"))
 
 
+
+ROLE_GRAPH = re.compile(r"ep-sysd-[0-9]+-[0-9]+-[a-f0-9]{8}-(publisher|control|admission|preparation)\Z")
+
+
+def _dynamic_role_names():
+    nonce = os.urandom(4).hex()
+    names = {
+        "publisher": "epg" + nonce + "pub",
+        "control": "epg" + nonce + "ctl",
+        "admission": "epg" + nonce + "adm",
+        "preparation": "epg" + nonce + "prep",
+    }
+    require(len(set(names.values())) == 4 and all(len(value) <= 31 for value in names.values()), "invalid dynamic role names")
+    for value in names.values():
+        try:
+            pwd.getpwnam(value)
+            raise ValueError("transient role name already exists")
+        except KeyError:
+            pass
+    return names
+
+def _graph_show(unit):
+    require(ROLE_GRAPH.fullmatch(unit.removesuffix(".service")), "invalid transient role unit")
+    result = command(["sudo", "-n", "systemctl", "show",
+                      "--property=LoadState,ActiveState,SubState,MainPID,User,Group,DynamicUser,Job,Type,NotifyAccess,Wants,Requires,After",
+                      unit], check=False)
+    values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    require(result.returncode == 0 or values.get("LoadState") == "not-found", "cannot observe role graph")
+    return values
+
+
+def _graph_wait(unit, predicate, message, timeout=8):
+    deadline = time.monotonic() + timeout
+    while True:
+        state = _graph_show(unit)
+        if predicate(state):
+            return state
+        require(time.monotonic() < deadline, message)
+        time.sleep(0.02)
+
+
+def transient_role_graph(root, prefix):
+    """Exercise manager ordering and four distinct ephemeral DynamicUser identities.
+
+    These are random transient test units and unregistered numeric UID/GIDs.
+    They do not create or modify the canonical production accounts or unit files.
+    """
+    dynamic_names = _dynamic_role_names()
+    nonce = os.urandom(4).hex()
+    stem = prefix + "-" + nonce
+    shared = Path("/run") / (stem + "-graph")
+    require(not shared.exists(), "transient graph root already exists")
+    command(["sudo", "-n", "install", "-d", "-m", "0755", str(shared)])
+    roles = ("publisher", "control", "admission", "preparation")
+    names = {role: stem + "-" + role + ".service" for role in roles}
+    for name in names.values():
+        require(ROLE_GRAPH.fullmatch(name.removesuffix(".service")), "invalid generated role unit")
+    python = str(Path(sys.executable).resolve())
+    code = (
+        "import os,pathlib,socket,sys,time;"
+        "marker,release,notify,keep=sys.argv[1:];"
+        "pathlib.Path(marker).write_text(f'{os.getuid()}:{os.getgid()}\\n');"
+        "exec(\"while release!='-' and not pathlib.Path(release).exists(): time.sleep(0.01)\");"
+        "exec(\"if notify=='1':\\n s=socket.socket(socket.AF_UNIX,socket.SOCK_DGRAM)\\n a=os.environ['NOTIFY_SOCKET']\\n a=('\\\\0'+a[1:]) if a.startswith('@') else a\\n s.connect(a)\\n s.send(b'READY=1')\\n s.close()\");"
+        "exec(\"if keep=='1': time.sleep(60)\")"
+    )
+    created = []
+    def start(role, notify, dependency=None, required=True):
+        base = names[role].removesuffix(".service")
+        runtime = "/run/" + base
+        props = {
+            "User": dynamic_names[role], "DynamicUser": "yes", "NoNewPrivileges": "yes",
+            "PrivateTmp": "yes", "PrivateDevices": "yes", "ProtectSystem": "strict",
+            "ProtectHome": "yes", "KillMode": "control-group", "SendSIGKILL": "yes",
+            "Restart": "no", "TimeoutStartSec": "5s", "TimeoutStopSec": "2s",
+            "RuntimeDirectory": base, "RuntimeDirectoryMode": "0700",
+            "RestrictAddressFamilies": "AF_UNIX", "SystemCallArchitectures": "native",
+        }
+        if notify:
+            props.update(Type="notify", NotifyAccess="main")
+        else:
+            props.update(Type="oneshot", RemainAfterExit="yes")
+        if dependency:
+            props["Requires" if required else "Wants"] = names[dependency]
+            props["After"] = names[dependency]
+        release = str(shared / (role + ".release")) if notify else "-"
+        argv = [python, "-c", code, runtime + "/identity", release, "1" if notify else "0", "1" if notify else "0"]
+        command(["sudo", "-n", "systemd-run", "--quiet", "--no-block", "--unit=" + names[role],
+                 *["--property=" + k + "=" + v for k, v in sorted(props.items())], "--", *argv])
+        created.append(role)
+    try:
+        start("publisher", True)
+        start("control", True, "publisher", False)
+        start("admission", False, "control")
+        start("preparation", False, "control")
+        publisher = _graph_wait(names["publisher"], lambda x: x.get("ActiveState") == "activating" and x.get("MainPID", "0") != "0", "publisher did not wait for readiness")
+        for role in ("control", "admission", "preparation"):
+            state = _graph_show(names[role])
+            require(state.get("MainPID", "0") == "0", role + " started before upstream readiness")
+        command(["sudo", "-n", "touch", str(shared / "publisher.release")])
+        publisher = _graph_wait(names["publisher"], lambda x: x.get("ActiveState") == "active", "publisher readiness not accepted")
+        control = _graph_wait(names["control"], lambda x: x.get("ActiveState") == "activating" and x.get("MainPID", "0") != "0", "control did not start after publisher")
+        for role in ("admission", "preparation"):
+            require(_graph_show(names[role]).get("MainPID", "0") == "0", role + " started before control readiness")
+        command(["sudo", "-n", "touch", str(shared / "control.release")])
+        control = _graph_wait(names["control"], lambda x: x.get("ActiveState") == "active", "control readiness not accepted")
+        worker_states = {}
+        for role in ("admission", "preparation"):
+            worker_states[role] = _graph_wait(names[role], lambda x: x.get("ActiveState") == "active" and x.get("SubState") == "exited", role + " did not run after control readiness")
+        observed = {}
+        for role in roles:
+            raw = command(["sudo", "-n", "cat", "/run/" + names[role].removesuffix(".service") + "/identity"]).stdout.strip()
+            parts = raw.split(":")
+            require(len(parts) == 2 and all(part.isdigit() for part in parts), "invalid process identity marker")
+            uid, gid = int(parts[0]), int(parts[1])
+            require(uid > 0 and gid > 0, "transient role ran as root")
+            state = _graph_show(names[role])
+            require(state.get("User") == dynamic_names[role] and state.get("DynamicUser") == "yes", "manager dynamic identity differs from requested role")
+            observed[role] = {"user": dynamic_names[role], "uid": uid, "gid": gid}
+        require(len({v["uid"] for v in observed.values()}) == 4 and len({v["gid"] for v in observed.values()}) == 4, "role identities collapsed")
+        require(names["publisher"] in control.get("Wants", "").split() and names["publisher"] in control.get("After", "").split(), "control dependency graph drift")
+        for role in ("admission", "preparation"):
+            state = worker_states[role]
+            require(names["control"] in state.get("Requires", "").split() and names["control"] in state.get("After", "").split(), "worker dependency graph drift")
+        return {"roles": observed, "ordered": True, "dynamic_user": True, "persistent_accounts_created": False, "production_named_units_used": False}
+    finally:
+        errors = []
+        for role in reversed(created):
+            name = names[role]
+            for action in (["stop", name], ["reset-failed", name]):
+                result = command(["sudo", "-n", "systemctl", *action], check=False)
+                if action[0] == "stop" and result.returncode not in (0, 5):
+                    errors.append(role + ":stop")
+        command(["sudo", "-n", "rm", "-rf", "--", str(shared)], check=False)
+        for role in roles:
+            runtime = Path("/run") / names[role].removesuffix(".service")
+            require(not runtime.exists(), "transient RuntimeDirectory not removed: " + role)
+        for value in dynamic_names.values():
+            try:
+                pwd.getpwnam(value)
+                raise ValueError("dynamic role identity remained registered after unit cleanup")
+            except KeyError:
+                pass
+        if errors:
+            raise ValueError("transient role graph cleanup requires reconciliation: " + ",".join(errors))
+
+
 def run_suite(distribution, expected, root, prefix):
     require(os.environ.get("EP_SYSTEMD_INTEGRATION") == "1" and os.environ.get("GITHUB_ACTIONS") == "true", "requires explicit ephemeral GitHub CI gate")
     require(os.getuid() != 0 and os.getgid() != 0, "tests and service must use non-root identity")
@@ -350,7 +498,9 @@ def run_suite(distribution, expected, root, prefix):
         checks.append("requires_after_waits_for_main_ready_datagram")
 
         command([str(eng), "installation-verify", "--dir", str(installed), "--source-commit", expected])
-        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
+        graph = transient_role_graph(root, prefix)
+        checks.append("transient_four_role_dependency_graph_distinct_dynamic_users")
+        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "transient_role_graph": graph, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "transient_distinct_dynamic_users_tested": True, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
     finally:
         cleanup_errors = []
         for u in reversed(units):

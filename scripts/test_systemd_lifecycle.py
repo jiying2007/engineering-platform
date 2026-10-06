@@ -103,5 +103,29 @@ class LifecycleContracts(unittest.TestCase):
         self.assertNotIn('continue-on-error: true', ci)
 
 
+    def test_transient_role_graph_is_ephemeral_and_never_provisions_accounts(self):
+        script = (ROOT/'scripts/systemd_lifecycle.py').read_text()
+        for text in ('transient_role_graph', '_dynamic_role_names', '--no-block', 'RuntimeDirectory', 'DynamicUser', 'persistent_accounts_created', 'transient_distinct_dynamic_users_tested'):
+            self.assertIn(text, script)
+        for forbidden in ('useradd', 'groupadd', 'adduser', 'addgroup', 'daemon-reload', 'systemctl enable', '/etc/passwd', '/etc/group'):
+            self.assertNotIn(forbidden, script)
+
+    def test_canonical_roles_declare_four_distinct_users_and_expected_dependencies(self):
+        parsed = {role: lifecycle.parse_unit((TEMPLATES / ('engineering-' + role + '.service')).read_text()) for role in lifecycle.ROLES}
+        users = {role: unit['Service']['User'] for role, unit in parsed.items()}
+        self.assertEqual(len(set(users.values())), 4)
+        self.assertEqual(users, {
+            'control-plane': 'engineering-control',
+            'publisher': 'engineering-publisher',
+            'worker-admission': 'engineering-admission',
+            'worker-preparation': 'engineering-preparation',
+        })
+        self.assertIn('engineering-publisher.service', parsed['control-plane']['Unit']['Wants'].split())
+        self.assertIn('engineering-publisher.service', parsed['control-plane']['Unit']['After'].split())
+        for role in ('worker-admission', 'worker-preparation'):
+            self.assertIn('engineering-control-plane.service', parsed[role]['Unit']['Requires'].split())
+            self.assertIn('engineering-control-plane.service', parsed[role]['Unit']['After'].split())
+
+
 if __name__ == '__main__':
     unittest.main()
