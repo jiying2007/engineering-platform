@@ -35,7 +35,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering | Provisioning the final named production Unix accounts on a fresh host, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
-| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation | Worker identity count/recent poll or Publisher endpoint reachability proves capacity, upstream health or production readiness |
+| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required native CI also runs a bounded 32-Run/8-Worker concurrent admission/security characterization | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v2 and exact nonempty no-skip test inventory | Live provider/service acceptance |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
@@ -210,12 +210,15 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   Takeover are implemented using existing Core APIs; a board-free freestanding
   firmware reference is in required native CI. WorkBuddy transport/UX and real
   target cross-compilation/board acceptance remain open.
-- W09/W10: actual Worker SIGKILL, ENOSPC, service-manager fault/security and
-  cross-version rollback regressions are implemented. The expanded exact-tree
-  retirement batch removed 32 refs with five already absent, and future exact-tree
-  same-repository merged heads are leased for automatic cleanup after successful
-  main CI. Sustained load/security matrix, retained-ref mutation protection and exact
-  final RC delivery remain open. The four divergent prototype refs now have an
+- W09/W10: actual Worker SIGKILL, ENOSPC, service-manager fault/security,
+  cross-version rollback and a bounded real PostgreSQL/mTLS 32-Run/8-Worker
+  admission/security matrix are implemented. The load matrix asserts exact
+  once-only admission and authorization invariants while reporting p50/p95/max
+  only as characterization, not SLOs. The expanded exact-tree retirement batch
+  removed 32 refs with five already absent, and future exact-tree same-repository
+  merged heads are leased for automatic cleanup after successful main CI.
+  Retained-ref mutation protection, broader sustained/soak security coverage and
+  exact final RC delivery remain open. The four divergent prototype refs now have an
   explicit frozen-history disposition and required drift guard.
 
 Every slice needs exact-head CI, fresh-main and delivered-byte readback. Earlier
