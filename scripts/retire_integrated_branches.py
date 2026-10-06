@@ -16,7 +16,7 @@ import sys
 REPOSITORY = "jiying2007/engineering-platform"
 REMOTE = "https://github.com/" + REPOSITORY
 SHA = re.compile(r"[0-9a-f]{40}\Z")
-BRANCH = re.compile(r"(?:ci|docs|feat|fix|test)/[a-z0-9][a-z0-9/-]*\Z")
+BRANCH = re.compile(r"(?:chore|ci|docs|feat|fix|test)/[a-z0-9][a-z0-9/-]*\Z")
 
 
 def require(value, message):
