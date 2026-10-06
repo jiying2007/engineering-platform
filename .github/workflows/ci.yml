@@ -196,6 +196,12 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           bash scripts/build-distribution.sh "$RUNNER_TEMP/current-release-dist"
+
+      - name: Fail closed on private artifact disk exhaustion
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci-artifact-enospc-drill.sh             "$RUNNER_TEMP/current-release-dist/eng"             "$RUNNER_TEMP/artifact-enospc-input"             "$RUNNER_TEMP/artifact-enospc-mount"
       - name: Checkout fixed retained rollback baseline
         uses: actions/checkout@v7
         with:
