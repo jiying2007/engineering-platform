@@ -105,7 +105,7 @@ class LifecycleContracts(unittest.TestCase):
 
     def test_transient_role_graph_is_ephemeral_and_never_provisions_accounts(self):
         script = (ROOT/'scripts/systemd_lifecycle.py').read_text()
-        for text in ('transient_role_graph', '_unused_numeric_identities', '--no-block', 'RuntimeDirectory', 'persistent_accounts_created', 'transient_distinct_unregistered_uids_tested'):
+        for text in ('transient_role_graph', '_dynamic_role_names', '--no-block', 'RuntimeDirectory', 'DynamicUser', 'persistent_accounts_created', 'transient_distinct_dynamic_users_tested'):
             self.assertIn(text, script)
         for forbidden in ('useradd', 'groupadd', 'adduser', 'addgroup', 'daemon-reload', 'systemctl enable', '/etc/passwd', '/etc/group'):
             self.assertNotIn(forbidden, script)
