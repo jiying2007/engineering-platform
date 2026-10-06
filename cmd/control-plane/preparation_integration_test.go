@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io/fs"
 	"net"
 	"net/http"
@@ -33,6 +34,18 @@ import (
 // Actual Git bytes, compiled worker/eng processes, live mTLS Control Plane/relay
 // and PostgreSQL receipt readback. This is a preparation test, not a model pilot.
 func TestPreparationCommandRealBytesLeaseAndDurableReadback(t *testing.T) {
+	// Validate the real fixture policy even when the optional local DB is absent.
+	const engineer = "urn:engineering-platform:engineer:prepare-command"
+	const worker = "urn:engineering-platform:worker:prepare-command"
+	const ordinary = "urn:engineering-platform:worker:input-only"
+	const profile = "worker/preparation"
+	const admissionProfile = "worker/input-only"
+	policy, err := access.New(access.Document{Version: 1, Principals: []access.PrincipalSpec{
+		{Subject: engineer, Scope: "platform", Capabilities: []string{access.Read, access.WorkCreate, access.TaskCreate, access.RunStart}},
+		{Subject: worker, Scope: "platform", Capabilities: []string{access.WorkerPoll, access.WorkerReport, access.WorkerPrepare}, WorkerProfiles: []string{profile}},
+		{Subject: ordinary, Scope: "platform", Capabilities: []string{access.WorkerPoll, access.WorkerReport}, WorkerProfiles: []string{admissionProfile}},
+	}})
+	commandOK(t, err)
 	url := os.Getenv("POSTGRES_TEST_URL")
 	if url == "" {
 		t.Skip("POSTGRES_TEST_URL is not configured")
@@ -66,16 +79,6 @@ func TestPreparationCommandRealBytesLeaseAndDurableReadback(t *testing.T) {
 	defer store.Close()
 	commandOK(t, store.ApplyCoreMigration(ctx))
 	commandOK(t, store.PreparationReady(ctx))
-	const engineer = "urn:engineering-platform:engineer:prepare-command"
-	const worker = "urn:engineering-platform:worker:prepare-command"
-	const ordinary = "urn:engineering-platform:worker:input-only"
-	const profile = "worker/preparation"
-	policy, err := access.New(access.Document{Version: 1, Principals: []access.PrincipalSpec{
-		{Subject: engineer, Scope: "platform", Capabilities: []string{access.Read, access.WorkCreate, access.TaskCreate, access.RunStart}},
-		{Subject: worker, Scope: "platform", Capabilities: []string{access.WorkerPoll, access.WorkerReport, access.WorkerPrepare}, WorkerProfiles: []string{profile}},
-		{Subject: ordinary, Scope: "platform", Capabilities: []string{access.WorkerPoll, access.WorkerReport}, WorkerProfiles: []string{profile}},
-	}})
-	commandOK(t, err)
 	pki := testsupport.NewPKI(t)
 	server, err := assembleServer(configuration{policy: policy, tls: pki.ServerTLS()}, store)
 	commandOK(t, err)
@@ -174,8 +177,13 @@ func TestPreparationCommandRealBytesLeaseAndDurableReadback(t *testing.T) {
 	ordinaryClient, err := controlclient.New(endpoint, &tls.Config{RootCAs: pki.Roots, Certificates: []tls.Certificate{pki.ClientCertificate(t, ordinary)}})
 	commandOK(t, err)
 	defer ordinaryClient.Close()
-	if err := ordinaryClient.Call(ctx, http.MethodPost, "/api/v1/worker/prepare-claim", map[string]string{"worker_profile": profile}, nil); err == nil {
-		t.Fatal("ordinary input worker obtained preparation authority")
+	// Own profile isolates missing preparation capability; the other profile also
+	// checks route separation. Both must be authorization denials, not any error.
+	for _, requested := range []string{admissionProfile, profile} {
+		var denied *controlclient.HTTPError
+		if err := ordinaryClient.Call(ctx, http.MethodPost, "/api/v1/worker/prepare-claim", map[string]string{"worker_profile": requested}, nil); !errors.As(err, &denied) || denied.Status != http.StatusForbidden {
+			t.Fatal("ordinary input worker was not denied preparation authority", err)
+		}
 	}
 	bin := t.TempDir()
 	for _, name := range []string{"worker", "eng"} {
