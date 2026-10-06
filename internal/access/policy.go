@@ -200,6 +200,9 @@ func New(doc Document) (*Policy, error) {
 		}
 		policy.principals[id.subject] = id
 	}
+	if err := validateWorkerClaimLanes(policy.principals); err != nil {
+		return nil, err
+	}
 	return policy, nil
 }
 

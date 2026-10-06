@@ -13,7 +13,7 @@ Type=simple
 User=engineering-admission
 Group=engineering-platform
 EnvironmentFile=/etc/engineering-platform/worker-admission.env
-ExecStart=/opt/engineering-platform/bin/worker --profile=worker/codex-production --admission-only
+ExecStart=/opt/engineering-platform/bin/worker --profile=worker/admission-production --admission-only
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=20s
