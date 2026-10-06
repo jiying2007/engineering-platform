@@ -17,7 +17,7 @@ func (s *Server) handlePrepareClaim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "worker preparation schema unavailable")
 		return
 	}
-	s.handleWorkerClaim(w, r)
+	s.claimWorkerInput(w, r, true)
 }
 func (s *Server) handleWorkerPrepared(w http.ResponseWriter, r *http.Request) {
 	_, id, ok := s.workerRepository(w, r, access.WorkerPrepare)
