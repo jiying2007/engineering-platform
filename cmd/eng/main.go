@@ -52,6 +52,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "installation-switch":
+		if err := installationSwitch(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "installation-readback":
 		if err := installationReadback(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -234,6 +239,7 @@ func usage() {
 	fmt.Println("  distribution-install --from DIR --into NEW_DIR --source-commit SHA  install matching runtime/templates; no service activation")
 	fmt.Println("  installation-verify --dir DIR --source-commit SHA  verify current-source runtime/templates without execution")
 	fmt.Println("  installation-readback --dir DIR --source-commit SHA --manifest-digest DIGEST  verify a retained immutable release across versions")
+	fmt.Println("  installation-switch <flags>  switch two stopped immutable releases; no service/DB action")
 	fmt.Println("  distribution-verify --dir DIRECTORY       verify complete delivered executable roles and exact bytes")
 	fmt.Println("  api GET|POST /api/v1/path [body.json]   call authenticated Control API")
 	fmt.Println("  import-ci-evidence <flags>               verify GitHub CI provenance and register Evidence")
