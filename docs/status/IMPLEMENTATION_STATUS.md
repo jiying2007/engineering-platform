@@ -151,8 +151,10 @@ retirement receipt `37476720045` applied the expanded manifest against
 `DELETED_READBACK_VERIFIED` and five were already `ABSENT`. Current governance
 also requires the exact same-repository merged PR head tree to equal verified
 main before automatically leasing deletion of that just-merged working ref.
-Four older divergent prototypes remain for explicit semantic disposition; they
-are not treated as byte-identical. Preserve unchanged:
+Four older divergent prototypes are explicitly disposed as frozen
+RETAINED_SUPERSEDED_PROTOTYPE refs. Required CI pins their exact remote heads;
+they remain source-history lineage and are not treated as byte-identical or
+pending product work. Preserve unchanged:
 
 - Feature `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
   `engineering-platform/3ac04fc7097e8375e5f7c1f8`.
@@ -212,8 +214,9 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   cross-version rollback regressions are implemented. The expanded exact-tree
   retirement batch removed 32 refs with five already absent, and future exact-tree
   same-repository merged heads are leased for automatic cleanup after successful
-  main CI. Sustained load/security matrix, four divergent prototype dispositions,
-  retained-ref mutation protection and exact final RC delivery remain open.
+  main CI. Sustained load/security matrix, retained-ref mutation protection and exact
+  final RC delivery remain open. The four divergent prototype refs now have an
+  explicit frozen-history disposition and required drift guard.
 
 Every slice needs exact-head CI, fresh-main and delivered-byte readback. Earlier
 green runs do not qualify new source. External accounts, production hosts,

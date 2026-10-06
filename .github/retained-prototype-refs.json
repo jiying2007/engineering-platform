@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "repository": "jiying2007/engineering-platform",
+  "refs": [
+    {
+      "branch": "feat/github-ci-core-evidence-import",
+      "expected_head": "16a147396196fabda07dc225809844802c9491eb",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
+      "branch": "feat/independent-publisher-service",
+      "expected_head": "eda85863ed185271fbc11beb54835e4e3701c1e1",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
+      "branch": "feat/independent-review-authority",
+      "expected_head": "6ee61e27df4cbf545562895b552b059af77f5613",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
+      "branch": "feat/relay-codex-config-renderer",
+      "expected_head": "e4e88385dcb01d3da54a7334eb64f14e472e0aec",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    }
+  ]
+}
