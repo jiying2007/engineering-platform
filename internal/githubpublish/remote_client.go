@@ -33,16 +33,16 @@ type remoteClient struct {
 }
 
 type PublisherHealthObservation struct {
-	Version                   int       `json:"version"`
-	Status                    string    `json:"status"`
-	Service                   string    `json:"service"`
-	ObservedAt                time.Time `json:"observed_at"`
-	EndpointObserved          bool      `json:"endpoint_observed"`
-	UpstreamObserved          bool      `json:"upstream_observed"`
-	CapacityObserved          bool      `json:"capacity_observed"`
-	PublicationAuthorized     bool      `json:"publication_authorized"`
-	ExecutionAuthorized       bool      `json:"execution_authorized"`
-	ProductionQualified       bool      `json:"production_qualified"`
+	Version               int       `json:"version"`
+	Status                string    `json:"status"`
+	Service               string    `json:"service"`
+	ObservedAt            time.Time `json:"observed_at"`
+	EndpointObserved      bool      `json:"endpoint_observed"`
+	UpstreamObserved      bool      `json:"upstream_observed"`
+	CapacityObserved      bool      `json:"capacity_observed"`
+	PublicationAuthorized bool      `json:"publication_authorized"`
+	ExecutionAuthorized   bool      `json:"execution_authorized"`
+	ProductionQualified   bool      `json:"production_qualified"`
 }
 
 type publisherHealthPayload struct {
