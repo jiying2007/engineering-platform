@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 import pwd
-import grp
 from pathlib import Path
 import queue
 import re
@@ -195,32 +194,27 @@ def cgroup_empty(group):
 ROLE_GRAPH = re.compile(r"ep-sysd-[0-9]+-[0-9]+-[a-f0-9]{8}-(publisher|control|admission|preparation)\Z")
 
 
-def _unused_numeric_identities(count=4):
-    require(count == 4, "four role identities required")
-    seed = 58000 + int.from_bytes(os.urandom(2), "big") % 4000
-    found = []
-    for offset in range(7000):
-        value = 58000 + ((seed - 58000 + offset) % 7000)
+def _dynamic_role_names():
+    nonce = os.urandom(4).hex()
+    names = {
+        "publisher": "epg" + nonce + "pub",
+        "control": "epg" + nonce + "ctl",
+        "admission": "epg" + nonce + "adm",
+        "preparation": "epg" + nonce + "prep",
+    }
+    require(len(set(names.values())) == 4 and all(len(value) <= 31 for value in names.values()), "invalid dynamic role names")
+    for value in names.values():
         try:
-            pwd.getpwuid(value)
-            continue
+            pwd.getpwnam(value)
+            raise ValueError("transient role name already exists")
         except KeyError:
             pass
-        try:
-            grp.getgrgid(value)
-            continue
-        except KeyError:
-            pass
-        found.append((value, value))
-        if len(found) == count:
-            return found
-    raise ValueError("no unused numeric identities available for transient graph")
-
+    return names
 
 def _graph_show(unit):
     require(ROLE_GRAPH.fullmatch(unit.removesuffix(".service")), "invalid transient role unit")
     result = command(["sudo", "-n", "systemctl", "show",
-                      "--property=LoadState,ActiveState,SubState,MainPID,User,Group,Job,Type,NotifyAccess,Wants,Requires,After",
+                      "--property=LoadState,ActiveState,SubState,MainPID,User,Group,DynamicUser,Job,Type,NotifyAccess,Wants,Requires,After",
                       unit], check=False)
     values = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
     require(result.returncode == 0 or values.get("LoadState") == "not-found", "cannot observe role graph")
@@ -238,12 +232,12 @@ def _graph_wait(unit, predicate, message, timeout=8):
 
 
 def transient_role_graph(root, prefix):
-    """Exercise manager ordering and four distinct ephemeral numeric identities.
+    """Exercise manager ordering and four distinct ephemeral DynamicUser identities.
 
     These are random transient test units and unregistered numeric UID/GIDs.
     They do not create or modify the canonical production accounts or unit files.
     """
-    identities = _unused_numeric_identities()
+    dynamic_names = _dynamic_role_names()
     nonce = os.urandom(4).hex()
     stem = prefix + "-" + nonce
     shared = Path("/run") / (stem + "-graph")
@@ -264,11 +258,10 @@ def transient_role_graph(root, prefix):
     )
     created = []
     def start(role, notify, dependency=None, required=True):
-        uid, gid = identities[roles.index(role)]
         base = names[role].removesuffix(".service")
         runtime = "/run/" + base
         props = {
-            "User": str(uid), "Group": str(gid), "NoNewPrivileges": "yes",
+            "User": dynamic_names[role], "DynamicUser": "yes", "NoNewPrivileges": "yes",
             "PrivateTmp": "yes", "PrivateDevices": "yes", "ProtectSystem": "strict",
             "ProtectHome": "yes", "KillMode": "control-group", "SendSIGKILL": "yes",
             "Restart": "no", "TimeoutStartSec": "5s", "TimeoutStopSec": "2s",
@@ -308,29 +301,20 @@ def transient_role_graph(root, prefix):
             worker_states[role] = _graph_wait(names[role], lambda x: x.get("ActiveState") == "active" and x.get("SubState") == "exited", role + " did not run after control readiness")
         observed = {}
         for role in roles:
-            uid, gid = identities[roles.index(role)]
             raw = command(["sudo", "-n", "cat", "/run/" + names[role].removesuffix(".service") + "/identity"]).stdout.strip()
-            require(raw == f"{uid}:{gid}", "role executed under wrong Unix identity")
+            parts = raw.split(":")
+            require(len(parts) == 2 and all(part.isdigit() for part in parts), "invalid process identity marker")
+            uid, gid = int(parts[0]), int(parts[1])
+            require(uid > 0 and gid > 0, "transient role ran as root")
             state = _graph_show(names[role])
-            require(state.get("User") == str(uid) and state.get("Group") == str(gid), "manager identity differs from process identity")
-            observed[role] = {"uid": uid, "gid": gid}
+            require(state.get("User") == dynamic_names[role] and state.get("DynamicUser") == "yes", "manager dynamic identity differs from requested role")
+            observed[role] = {"user": dynamic_names[role], "uid": uid, "gid": gid}
         require(len({v["uid"] for v in observed.values()}) == 4 and len({v["gid"] for v in observed.values()}) == 4, "role identities collapsed")
         require(names["publisher"] in control.get("Wants", "").split() and names["publisher"] in control.get("After", "").split(), "control dependency graph drift")
         for role in ("admission", "preparation"):
             state = worker_states[role]
             require(names["control"] in state.get("Requires", "").split() and names["control"] in state.get("After", "").split(), "worker dependency graph drift")
-        for uid, gid in identities:
-            try:
-                pwd.getpwuid(uid)
-                raise ValueError("transient UID unexpectedly became a named account")
-            except KeyError:
-                pass
-            try:
-                grp.getgrgid(gid)
-                raise ValueError("transient GID unexpectedly became a named group")
-            except KeyError:
-                pass
-        return {"roles": observed, "ordered": True, "persistent_accounts_created": False, "production_named_units_used": False}
+        return {"roles": observed, "ordered": True, "dynamic_user": True, "persistent_accounts_created": False, "production_named_units_used": False}
     finally:
         errors = []
         for role in reversed(created):
@@ -343,6 +327,12 @@ def transient_role_graph(root, prefix):
         for role in roles:
             runtime = Path("/run") / names[role].removesuffix(".service")
             require(not runtime.exists(), "transient RuntimeDirectory not removed: " + role)
+        for value in dynamic_names.values():
+            try:
+                pwd.getpwnam(value)
+                raise ValueError("dynamic role identity remained registered after unit cleanup")
+            except KeyError:
+                pass
         if errors:
             raise ValueError("transient role graph cleanup requires reconciliation: " + ",".join(errors))
 
@@ -510,7 +500,7 @@ def run_suite(distribution, expected, root, prefix):
         command([str(eng), "installation-verify", "--dir", str(installed), "--source-commit", expected])
         graph = transient_role_graph(root, prefix)
         checks.append("transient_four_role_dependency_graph_distinct_numeric_identities")
-        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "transient_role_graph": graph, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "transient_distinct_unregistered_uids_tested": True, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
+        return {"version": 1, "source_commit": expected, "status": "TEST_CASES_PASSED", "checks": checks, "rate_limit_observation": rate_result, "transient_role_graph": graph, "template_sha256": hashlib.sha256(raw.encode()).hexdigest(), "manager": command(["systemctl", "--version"]).stdout.splitlines()[0], "distinct_production_users_tested": False, "production_unit_graph_tested": False, "transient_distinct_dynamic_users_tested": True, "model_turn_executed": False, "upstream_publication_executed": False, "production_qualified": False}
     finally:
         cleanup_errors = []
         for u in reversed(units):
