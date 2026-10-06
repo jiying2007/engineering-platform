@@ -24,7 +24,7 @@ func (f observationReaderFunc) Raw(c context.Context, m, p string, b []byte) ([]
 
 func observerPayload(t *testing.T, now, old time.Time) []byte {
 	t.Helper()
-	s, e := production.EvaluateSnapshot(production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: now, RecoveryMode: "NORMAL", PendingWorkerIntents: 1000, OldestPendingWorkerAt: &old})
+	s, e := production.EvaluateSnapshot(production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: now, RecoveryMode: "NORMAL", WorkerPolls: []production.WorkerPollObservation{}, PendingWorkerIntents: 1000, OldestPendingWorkerAt: &old})
 	if e != nil {
 		t.Fatal(e)
 	}

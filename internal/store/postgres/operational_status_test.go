@@ -70,3 +70,27 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 		t.Fatalf("UNKNOWN action did not degrade readiness: %#v", status)
 	}
 }
+
+func TestReadOperationalStatusExposesIdleWorkerPollFactsWithoutReadiness(t *testing.T) {
+	s := newIsolatedIntegrationStore(t)
+	ctx := context.Background()
+	_, err := s.pool.Exec(ctx, `INSERT INTO workers(worker_id,protocol_version,runtime_providers,status,attributes_json,last_seen_at)
+ VALUES
+ ('admit-a','test','[]','ONLINE','{"worker_profile":"worker/admission-production"}',clock_timestamp()-interval '3 seconds'),
+ ('admit-b','test','[]','ONLINE','{"worker_profile":"worker/admission-production"}',clock_timestamp()-interval '1 second'),
+ ('prepare-a','test','[]','ONLINE','{"worker_profile":"worker/codex-production"}',clock_timestamp()-interval '2 seconds')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.ReadOperationalStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	polls := status.Snapshot.WorkerPolls
+	if status.Ready || status.ProductionQualified || len(polls) != 2 ||
+		polls[0].WorkerProfile != "worker/admission-production" || polls[0].KnownIdentities != 2 ||
+		polls[1].WorkerProfile != "worker/codex-production" || polls[1].KnownIdentities != 1 ||
+		polls[0].LatestPollAt.After(status.Snapshot.CapturedAt) || polls[1].LatestPollAt.After(status.Snapshot.CapturedAt) {
+		t.Fatal("worker poll observation drift", status)
+	}
+}

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ func TestOperationalStatusEndpointUsesStoreAuthority(t *testing.T) {
 		Version:      production.OperationalStatusVersion,
 		CapturedAt:   time.Unix(1700000000, 0).UTC(),
 		RecoveryMode: "NORMAL",
+		WorkerPolls:  []production.WorkerPollObservation{},
 	}
 	status, err := production.EvaluateSnapshot(snapshot)
 	if err != nil {
@@ -34,7 +36,7 @@ func TestOperationalStatusEndpointUsesStoreAuthority(t *testing.T) {
 	body := mustRequest(t, h, http.MethodGet, "/api/v1/operations/status", nil, http.StatusOK)
 	var got production.OperationalStatus
 	mustJSON(t, body, &got)
-	if got.Ready || !got.AuthorityClear || got.State != status.State || got.Snapshot != status.Snapshot || len(got.Reasons) != 1 {
+	if got.Ready || !got.AuthorityClear || got.State != status.State || !reflect.DeepEqual(got.Snapshot, status.Snapshot) || len(got.Reasons) != 1 {
 		t.Fatalf("unexpected operational status: %#v", got)
 	}
 }

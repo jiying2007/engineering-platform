@@ -32,7 +32,7 @@ type observationStore struct {
 
 func (s *observationStore) ReadOperationalStatus(context.Context) (production.OperationalStatus, error) {
 	i := s.calls.Add(1)
-	snapshot := production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: time.Now().UTC(), RecoveryMode: "NORMAL", RecoveryEpoch: 1}
+	snapshot := production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: time.Now().UTC(), RecoveryMode: "NORMAL", RecoveryEpoch: 1, WorkerPolls: []production.WorkerPollObservation{}}
 	if s.mode != "idle" {
 		snapshot.PendingWorkerIntents = 1000
 		snapshot.OldestPendingWorkerAt = &s.old

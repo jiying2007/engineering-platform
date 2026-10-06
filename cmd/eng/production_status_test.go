@@ -15,7 +15,7 @@ func TestProductionStatusRejectsUnexpectedArguments(t *testing.T) {
 
 func TestProductionStatusReadbackRejectsContradictoryEnvelope(t *testing.T) {
 	now := time.Now().UTC()
-	s, err := production.EvaluateSnapshot(production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: now, RecoveryMode: "NORMAL"})
+	s, err := production.EvaluateSnapshot(production.Snapshot{Version: production.OperationalStatusVersion, CapturedAt: now, RecoveryMode: "NORMAL", WorkerPolls: []production.WorkerPollObservation{}})
 	if err != nil {
 		t.Fatal(err)
 	}
