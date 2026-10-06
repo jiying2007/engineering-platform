@@ -78,8 +78,18 @@ func (s *Server) workerRepository(w http.ResponseWriter, r *http.Request, capabi
 	return repo, id, true
 }
 func (s *Server) handleWorkerClaim(w http.ResponseWriter, r *http.Request) {
+	s.claimWorkerInput(w, r, false)
+}
+
+// The route, not client-supplied mode, selects the terminal claim lane. A
+// preparation-capable identity must not downgrade to plain input admission.
+func (s *Server) claimWorkerInput(w http.ResponseWriter, r *http.Request, preparing bool) {
 	repo, id, ok := s.workerRepository(w, r, access.WorkerPoll)
 	if !ok {
+		return
+	}
+	if id.Allows(access.WorkerPrepare) != preparing {
+		writeError(w, http.StatusForbidden, "worker claim lane denied")
 		return
 	}
 	var req struct {
@@ -126,6 +136,10 @@ func (s *Server) handleWorkerRenew(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleWorkerReport(w http.ResponseWriter, r *http.Request) {
 	repo, id, ok := s.workerRepository(w, r, access.WorkerReport)
 	if !ok {
+		return
+	}
+	if id.Allows(access.WorkerPrepare) {
+		writeError(w, http.StatusForbidden, "preparation requires a prepared report")
 		return
 	}
 	var report workerqueue.Report
