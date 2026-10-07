@@ -61,6 +61,6 @@ func retainSource(c Transport, p *preparation.Preparer, permit codexexec.Permit,
 		reportErr = fmt.Errorf("Core checkpoint readback mismatch")
 	}
 	result.Registered = reportErr == nil
-	result.Cause = errors.Join(cause, recordErr, reportErr)
+	result.Cause = errors.Join(cause, cleanupErr, recordErr, reportErr)
 	return result
 }
