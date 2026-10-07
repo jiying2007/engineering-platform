@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
+	"github.com/jiying2007/engineering-platform/internal/workspace"
 )
 
 // CheckpointPaths revalidates ownership/frozen preparation, not changed source
