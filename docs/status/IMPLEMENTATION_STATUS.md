@@ -139,8 +139,8 @@ execution. Producer-derived capture tests remove the entire prepared root
 including Context, restore, and recheck every frozen input object and producer
 record. Original Git-base bytes are now retained on the successful-result and
 stopped-source producer paths; toolchain/container-image bytes, full
-model/tool/control history, upstream continuation dependencies, second-site
-retention, encryption/key policy, scheduling and GC remain open. A required
+model/tool/control history, second-site retention, encryption/key policy,
+scheduling and GC remain open. A required
 1 MiB private-tmpfs fault test also proves real ENOSPC during artifact pack and
 restore cannot publish a successful archive/report; a private partial restore
 directory may remain explicitly unverified for operator disposition.
