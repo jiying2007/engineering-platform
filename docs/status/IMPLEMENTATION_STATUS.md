@@ -8,6 +8,16 @@ parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b
 
 **Trusted self-hosted M1 phase 1 has historical proof. Current repository
 implementation and automated tests are not production/unattended qualification.**
+
+**Internal RC posture: `INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`.**
+For the current small-team baseline, the approved repository-side W01-W10
+implementation slices are closed behind required CI, retained byte/evidence
+readback and explicit fail-closed boundaries. The only open GitHub issues are
+#103 (managed-workspace WIF live qualification), #106 (optional relay/provider
+qualification) and #105 (production/unattended acceptance). Those require
+external provider, administrator or production-environment facts and cannot be
+manufactured by more repository code or local fixtures.
+
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
 schema/runtime compatibility obligation.
@@ -35,7 +45,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
-| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI also runs a bounded 32-Run/8-Worker concurrent admission/security characterization | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
+| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v3 with frozen single-canary, emergency-stop, no-provider-fallback and no-automatic-DB-downgrade gates, exact nonempty no-skip test inventory, and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Passing the frozen external canary/provider-revoke/Publisher-revoke/DB-restore gates, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
@@ -65,7 +75,10 @@ retains its original-base fence. Success makes no unsolicited source copy.
 Local FAILED_UNCONFIRMED cannot override an already committed Core FINISHED.
 Abrupt Codex/host death and exhausted storage may still prevent source
 capture/journaling; phase entry alone is not phase completion or proof of a
-crash. Separately, required native CI now kills an actual installed offline
+crash. This is an accepted fail-closed boundary, not a promise of impossible
+post-mortem source recovery: the platform must preserve/reconcile surviving
+facts and must not auto-replay, invent missing bytes or delete private data to
+manufacture space. Separately, required native CI now kills an actual installed offline
 Worker with SIGKILL after its permit is fsynced and its lease renewed: Core stays
 non-terminal without a receipt, a second Worker cannot replay the same
 execution, and Recovery proof remains blocked until reconciliation. Schema v12
@@ -150,9 +163,11 @@ executes that maintenance path under real systemd using the canonical
 `engineering-preparation:engineering-platform` identity on a disposable host,
 proving first-copy verification, idempotent existing-replica readback,
 fail-closed missing configuration and full account/group cleanup without
-installing/enabling the production-named retention unit/timer. Actual production-
-host/off-host/second-site placement, encryption/key custody and destructive GC
-remain open. A required
+installing/enabling the production-named retention unit/timer. Actual production-host/off-host/second-site placement plus encryption/key
+custody are deployment/operator acceptance gates. Bearer credentials and
+provider-internal session/streaming state remain intentionally excluded from
+artifact capture, and destructive GC remains an explicit operator action rather
+than an automatic background repair path. A required
 1 MiB private-tmpfs fault test also proves real ENOSPC during artifact pack and
 restore cannot publish a successful archive/report; a private partial restore
 directory may remain explicitly unverified for operator disposition.
@@ -217,70 +232,71 @@ calibrated SLO targets and independent human Review/Closure. Local protocol
 fixtures are not live model evidence; real kernel/PostgreSQL/container tests
 cannot promote them into account/provider/device qualification.
 
-## Remaining approved RC work
+## Internal RC boundary and external qualification gates
 
-W01-W10 remain the approved scope, not a new authority/checklist framework.
+W01-W10 remain the approved scope, but the repository-side implementation for
+the current small-team RC is closed. Remaining work is deliberately separated
+into **external qualification/deployment gates** and **explicit non-goals**; it
+is not an invitation to add parallel authorities, compatibility shims or
+speculative services.
 
-- W01: bounded queue-progress windows, canonical Worker poll observations and
-  authenticated Publisher endpoint health are implemented without promoting
-  readiness. Actual Worker/Publisher capacity, upstream publication health and
-  calibrated operating SLOs remain open.
-- W02: account-free isolated startup implemented; actual auth/model/tool and
-  deployment-environment acceptance remain external gates.
-- W03: catchable preservation/readback, actual offline Worker SIGKILL
-  non-replay/Recovery blocking, and artifact ENOSPC fail-closed behavior are
-  covered. Exact expired AUTHORIZED/UNKNOWN offline/Codex abandonment is now
-  explicitly reconciled under Recovery without replay/result authority. Arbitrary
-  Codex/host crash source capture and automatic disk-space repair remain open.
-- W04/W05: bounded offline build-output contracts and raw-set/context capture
-  implemented; successful result bundles retain their exact Git base objects,
-  stopped-source checkpoint v2 retains the validated base graph before/after
-  Finalize, successor capture retains the exact verified upstream continuation
-  checkpoint, and current execution capture requires the exact sealed private
-  ControlTranscript plus bounded raw Codex item/completion history. Externally
-  pinned verified replica scheduling is implemented without scan/overwrite/delete,
-  and required real-systemd CI now executes the maintenance oneshot under the
-  canonical preparation identity with cleanup/readback checks. Credential/session/
-  provider-internal state retention, actual production-host/off-host/second-site
-  placement, encryption/key custody and destructive GC remain open.
-- W06: source-bound six-role install/readback, real transient four-role systemd
-  ordering/identity separation and immutable cross-version binary switch/rollback
-  are implemented. Disposable fresh-host CI now proves the canonical named Unix
-  identity lifecycle without persisting accounts or installing production units.
-  Actual production-host account/unit provisioning and live production
-  acceptance of active model/publication-effect recovery remain open. The modeled
-  Action Gateway already reconciles UNKNOWN effects to confirmed/safe-to-retry/
-  manual outcomes; terminal plan v3 freezes the DB rollback policy as
-  authoritative-backup restore plus reconciliation, but the production
-  canary/restore acceptance gate is still external. Installation/switch never
-  grants execution or downgrades the database.
-- W07/W08: authenticated Work -> Task -> Run intake and exact-epoch Human
-  Takeover are implemented using existing Core APIs. Required native CI includes
-  both a freestanding host-ISA firmware reference and a no-network Cortex-M0
-  ARM EABI cross-toolchain build carried through Worker/Core/capture/restore.
-  WorkBuddy transport/UX and real board boot/timing/electrical acceptance remain
-  open.
-- W09/W10: actual Worker SIGKILL, ENOSPC, service-manager fault/security,
-  cross-version rollback and a bounded real PostgreSQL/mTLS 32-Run/8-Worker
-  admission/security matrix are implemented. The load matrix asserts exact
-  once-only admission and authorization invariants while reporting p50/p95/max
-  only as characterization, not SLOs. The expanded exact-tree retirement batch
-  removed 32 refs with five already absent, and future exact-tree same-repository
-  merged heads are leased for automatic cleanup after successful main CI.
-  Main-only internal RC delivery-envelope generation is implemented and each
-  main push must still actually emit/read back its source-bound artifact. Broader
-  sustained/soak security coverage and repository-administrator mutation
-  protection for retained historical refs remain open. The six divergent historical
-  refs have an explicit frozen-history disposition and required
-  repository-side drift guard.
+- **W01 — repository-side complete; production measurement external.** Bounded
+  queue-progress windows, canonical Worker poll observations, authenticated
+  Publisher endpoint health, and five consecutive 96-Run/8-Worker security
+  matrices are required CI. Each matrix also runs three interleaved security
+  rounds (48 denied probes), so one exact-head qualification covers 480 Runs and
+  240 denied probes. p50/p95/max remain characterization only. Actual deployed
+  capacity, upstream publication health and calibrated SLO targets require the
+  selected production environment/provider and stay under #105.
+- **W02 — external provider gate.** Account-free isolated startup and exact
+  compatibility identity are implemented. Real auth/model/tool qualification is
+  intentionally deferred to #103 or an explicitly qualified #106 provider; no
+  silent fallback is permitted.
+- **W03 — fail-closed terminal behavior complete.** Catchable preservation,
+  actual Worker SIGKILL non-replay/Recovery blocking, ENOSPC fail-closed behavior
+  and exact orphan abandonment under Recovery are covered. Automatic replay,
+  automatic deletion to repair disk pressure, or guaranteed source capture
+  after arbitrary host/storage loss are explicit non-goals; operators reconcile
+  the surviving facts instead.
+- **W04/W05 — bounded private retention complete for the declared RC scope.**
+  Source/result/base graphs, Context, continuation checkpoint, sealed
+  ControlTranscript, bounded Codex item history, build outputs, database backup
+  and verified scheduled replica retention are covered. Bearer credentials and
+  provider-internal session/stream state are intentionally excluded. Off-host/
+  second-site placement and encryption/key custody are deployment policy gates;
+  destructive GC is explicit operator action, not automatic repair.
+- **W06 — repository/service mechanics complete; production host acceptance
+  external.** Six-role immutable install/readback, distinct service identities,
+  real-systemd ordering/lifecycle, schema startup fencing and cross-version
+  binary switch/rollback are required CI. Production-host account/unit
+  provisioning, live external-effect acceptance and the frozen canary/
+  backup-restore/emergency-stop gates require the selected production
+  environment under #105. Binary rollback never downgrades the database.
+- **W07/W08 — generic platform journey complete; product/hardware integrations
+  external.** Authenticated Work -> Task -> Run intake, exact-epoch Human
+  Takeover, host-ISA firmware and no-network Cortex-M0 cross-toolchain
+  build/capture/restore are covered. WorkBuddy-specific transport/UX and real
+  board boot/timing/electrical acceptance require those external systems.
+- **W09/W10 — bounded fault/security/governance RC complete.** Required coverage
+  includes Worker SIGKILL, ENOSPC, systemd fault/security behavior,
+  cross-version rollback, five consecutive admission/security matrices,
+  main-only RC delivery envelopes, exact-tree working-ref retirement and
+  exact-head drift guards for retained evidence/prototypes. Long-horizon
+  production soak/calibrated alerting remains a #105 measurement task.
+  Repository-admin ruleset/branch mutation protection for retained historical
+  refs requires administrator permissions; the repository-side guard is
+  intentionally read-only and must not be mislabeled as admin protection.
 
-Every slice needs exact-head CI, fresh-main and delivered-byte readback. The
-internal RC envelope is provenance for that exact successful main CI only; it
-does not close external terminal gates. Earlier green runs do not qualify new
-source. External accounts, production hosts,
-devices and human decisions remain separate gates; no local implementation can
-stand in for those decisions. Prioritize actual user journeys and reproducible
-delivery rather than parallel authorities, speculative tooling or more states.
+Only three GitHub issues remain open by design: **#103, #106 and #105**. No
+additional repository implementation is required solely to change the internal
+RC state. Any future code slice must be justified by evidence from one of those
+external gates or a newly observed defect.
+
+Every future code slice still requires exact-head CI, fresh-main and
+delivered-byte readback. The internal RC envelope proves only that exact
+successful main CI/source/governance state; it does not close provider,
+production-host, WorkBuddy, device or independent human acceptance. Production/
+unattended readiness remains unclaimed until #105 closes.
 
 
 Installed-service CI also starts the real installed Control --production and
