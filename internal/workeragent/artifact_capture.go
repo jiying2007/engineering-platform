@@ -26,11 +26,11 @@ import (
 // the original frozen bundle, not a resolver or a path read from a local record.
 // There is no Core/network access, model execution, directory discovery or repair.
 type ExecutionCaptureRequest struct {
-	Readback              PostTurnReadbackRequest
-	ContextDirectory      string
-	RuntimeBinary         string
-	QualificationReceipt  string
-	Destination           string
+	Readback             PostTurnReadbackRequest
+	ContextDirectory     string
+	RuntimeBinary        string
+	QualificationReceipt string
+	Destination          string
 }
 
 type ExecutionCaptureReport struct {
@@ -219,7 +219,6 @@ func contextInventory(path string, expected []string) error {
 	return nil
 }
 
-
 func capturePrivateDependency(ctx context.Context, path string, limit int64, retain bool) (string, int64, []byte, error) {
 	if !filepath.IsAbs(path) || filepath.Clean(path) != path || limit <= 0 {
 		return "", 0, nil, fmt.Errorf("canonical bounded dependency path required")
@@ -256,9 +255,11 @@ func capturePrivateDependency(ctx context.Context, path string, limit int64, ret
 	}
 	n, err := io.Copy(writer, &readbackContextReader{ctx: ctx, r: io.LimitReader(file, limit+1)})
 	after, statErr := root.Lstat(name)
-	if err != nil || statErr != nil || n != before.Size() || !os.SameFile(before, after) ||
+	afterStat, afterOK := after.Sys().(*syscall.Stat_t)
+	if err != nil || statErr != nil || !afterOK || n != before.Size() || !os.SameFile(before, after) ||
 		before.Size() != after.Size() || before.Mode() != after.Mode() ||
-		!before.ModTime().Equal(after.ModTime()) {
+		!before.ModTime().Equal(after.ModTime()) || stat.Nlink != afterStat.Nlink ||
+		stat.Uid != afterStat.Uid || stat.Ctim != afterStat.Ctim {
 		return "", 0, nil, fmt.Errorf("dependency changed during read")
 	}
 	digest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
