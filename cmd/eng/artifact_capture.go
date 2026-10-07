@@ -25,6 +25,8 @@ func parseExecutionCapture(args []string) (workeragent.ExecutionCaptureRequest, 
 	fs.StringVar(&q.Readback.Archive, "archive", "", "explicit referenced source checkpoint")
 	fs.StringVar(&q.Readback.Bundle, "bundle", "", "explicit referenced result bundle")
 	fs.StringVar(&q.ContextDirectory, "context", "", "original frozen private context directory")
+	fs.StringVar(&q.RuntimeBinary, "runtime-binary", "", "private exact Codex runtime binary copy")
+	fs.StringVar(&q.QualificationReceipt, "qualification-receipt", "", "private exact Codex qualification receipt")
 	fs.StringVar(&q.Destination, "out", "", "new private archive path")
 	seen := map[string]bool{}
 	for _, arg := range args {
@@ -42,9 +44,9 @@ func parseExecutionCapture(args []string) (workeragent.ExecutionCaptureRequest, 
 	if err := q.Readback.Validate(); err != nil {
 		return q, err
 	}
-	for _, p := range []string{q.ContextDirectory, q.Destination} {
+	for _, p := range []string{q.ContextDirectory, q.RuntimeBinary, q.QualificationReceipt, q.Destination} {
 		if !filepath.IsAbs(p) || filepath.Clean(p) != p {
-			return q, fmt.Errorf("explicit canonical context and output paths required")
+			return q, fmt.Errorf("explicit canonical context/runtime/qualification/output paths required")
 		}
 	}
 	return q, nil

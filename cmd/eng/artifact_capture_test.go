@@ -6,7 +6,7 @@ import (
 )
 
 func TestCaptureExecutionCLIHasNoAuthorityOrImplicitPaths(t *testing.T) {
-	good := []string{"--records", "/private/records", "--run", "run", "--execution", strings.Repeat("a", 64), "--permit-digest", "sha256:" + strings.Repeat("b", 64), "--context", "/private/context", "--out", "/private/retained/set.tar"}
+	good := []string{"--records", "/private/records", "--run", "run", "--execution", strings.Repeat("a", 64), "--permit-digest", "sha256:" + strings.Repeat("b", 64), "--context", "/private/context", "--runtime-binary", "/private/runtime/codex", "--qualification-receipt", "/private/runtime/qualification.json", "--out", "/private/retained/set.tar"}
 	if _, err := parseExecutionCapture(good); err != nil {
 		t.Fatal(err)
 	}
@@ -23,11 +23,18 @@ func TestCaptureExecutionCLIHasNoAuthorityOrImplicitPaths(t *testing.T) {
 			t.Fatalf("missing required %s accepted", good[i])
 		}
 	}
-	for _, p := range []string{"relative", "/private/../context", "/private/context/"} {
+	for _, item := range []struct{ flag, value string }{
+		{"--context", "relative"}, {"--runtime-binary", "/private/../codex"},
+		{"--qualification-receipt", "/private/runtime/qualification.json/"}, {"--out", "relative"},
+	} {
 		args := append([]string{}, good...)
-		args[9] = p
+		for i := 0; i < len(args)-1; i += 2 {
+			if args[i] == item.flag {
+				args[i+1] = item.value
+			}
+		}
 		if _, err := parseExecutionCapture(args); err == nil {
-			t.Fatal("noncanonical path accepted", p)
+			t.Fatal("noncanonical path accepted", item.flag, item.value)
 		}
 	}
 }

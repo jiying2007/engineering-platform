@@ -16,6 +16,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
@@ -29,6 +30,8 @@ type completedTransport struct {
 	mu               sync.Mutex
 	permit           codexexec.Permit
 	work, root, mode string
+	runtimeBinary, runtimeDir string
+	qualificationRaw []byte
 	transcript       codexexec.ControlTranscript
 	checkpoint       codexexec.SourceCheckpoint
 	calls            map[string]int
@@ -140,7 +143,24 @@ func completedSetup(t *testing.T, mode string) (*preparation.Preparer, preparati
 	mustCheckpoint(t, os.WriteFile(binary, program, 0700))
 	login := filepath.Join(base, "auth.json")
 	mustCheckpoint(t, os.WriteFile(login, []byte(`{"fixture_only":"not-a-real-credential"}`), 0600))
-	profile := codexexec.Profile{Version: 3, Provider: provideridentity.OpenAIChatGPTTrustedSelfHosted(), CodexVersion: "0.157.1", BinaryDigest: canonical.BytesDigest(program), QualificationDigest: canonical.BytesDigest([]byte("TEST-only qualification")), EngineeringConfigDigest: codexapp.EngineeringConfigDigest(), Model: "fixture-only", Sandbox: "workspace-write", ApprovalPolicy: "never"}
+	qualification := codexapp.QualificationReceipt{
+		SchemaVersion: codexapp.QualificationSchemaVersion, CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
+		CLI: "codex-cli", Version: "0.157.1", BinaryDigest: canonical.BytesDigest(program),
+		StableSchemaDigest: "sha256:" + strings.Repeat("a", 64), ExperimentalSchemaDigest: "sha256:" + strings.Repeat("b", 64),
+		Transport: "stdio", FreshProcess: true, InitializePassed: true, ThreadStartPassed: true, ThreadStartModel: "fixture-only",
+		StableSchemaContractChecked: true, ExperimentalSurfaceChecked: true,
+		CredentialSafeConfigDigest: codexapp.CredentialSafeConfigDigest(), CredentialSafeProfileChecked: true,
+		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(), EngineeringProfileChecked: true,
+		IsolationMechanism: processscope.Mechanism, IsolationEnvironmentDigest: "sha256:" + strings.Repeat("c", 64),
+		IsolatedEngineeringStartup: true, NamespaceInitReaped: true,
+	}
+	qualificationDigest, err := qualification.Digest()
+	mustCheckpoint(t, err)
+	qualificationRaw, err := codexapp.MarshalQualification(qualification)
+	mustCheckpoint(t, err)
+	qualificationPath := filepath.Join(base, "qualification.json")
+	mustCheckpoint(t, os.WriteFile(qualificationPath, qualificationRaw, 0600))
+	profile := codexexec.Profile{Version: 3, Provider: provideridentity.OpenAIChatGPTTrustedSelfHosted(), CodexVersion: "0.157.1", BinaryDigest: canonical.BytesDigest(program), QualificationDigest: qualificationDigest, EngineeringConfigDigest: codexapp.EngineeringConfigDigest(), Model: "fixture-only", Sandbox: "workspace-write", ApprovalPolicy: "never"}
 	pd, err := profile.Digest()
 	mustCheckpoint(t, err)
 	a.Task.TaskType = "FEATURE"
@@ -168,7 +188,7 @@ func completedSetup(t *testing.T, mode string) (*preparation.Preparer, preparati
 	permit := codexexec.Permit{Token: codexexec.Token{ID: strings.Repeat("e", 64), RunID: a.Intent.RunID, WorkerProfile: a.Token.Profile, ProfileDigest: pd}, Assignment: a, Preparation: prepReceipt, Profile: profile, LeaseUntil: time.Now().Add(time.Minute)}
 	request := codexexec.Start{RunID: a.Intent.RunID, WorkerProfile: a.Token.Profile, Profile: profile}
 	mustCheckpoint(t, permit.Check(subject, request))
-	c := &completedTransport{permit: permit, work: prepared.Workspace.WorktreePath, root: config.Root, mode: mode, calls: map[string]int{}}
+	c := &completedTransport{permit: permit, work: prepared.Workspace.WorktreePath, root: config.Root, mode: mode, calls: map[string]int{}, runtimeBinary: binary, runtimeDir: base, qualificationRaw: qualificationRaw}
 	return p, prepared, c, request, workeragent.CodexRuntime{Executable: binary, SavedLoginFile: login}
 }
 func TestActualWorkerPostTurnFailuresRetainSourceWithoutReplay(t *testing.T) {
