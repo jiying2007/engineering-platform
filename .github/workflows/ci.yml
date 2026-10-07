@@ -192,6 +192,10 @@ jobs:
           test "$(id -u)" -ne 0
           test -S /var/run/docker.sock
           docker version
+
+      - name: Qualify canonical named service identities on disposable runner
+        shell: bash
+        run: bash scripts/ci-named-service-identities.sh
       - name: Real offline boundary and command integration
         run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 

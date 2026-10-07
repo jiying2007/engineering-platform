@@ -33,7 +33,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
-| Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering | Provisioning the final named production Unix accounts on a fresh host, active publication/model crash recovery or replay safety |
+| Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
 | Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI also runs a bounded 32-Run/8-Worker concurrent admission/security characterization | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
@@ -203,9 +203,10 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   dependencies and durable private retention/production-native acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
-  are implemented. Fresh-host named-account provisioning/service activation,
-  database migration rollback policy and active external-effect recovery remain
-  open. Installation/switch never grants execution or downgrades the database.
+  are implemented. Disposable fresh-host CI now proves the canonical named Unix
+  identity lifecycle without persisting accounts or installing production units.
+  Actual production-host account/unit provisioning, database migration rollback
+  policy and active external-effect recovery remain open. Installation/switch never grants execution or downgrades the database.
 - W07/W08: authenticated Work -> Task -> Run intake and exact-epoch Human
   Takeover are implemented using existing Core APIs; a board-free freestanding
   firmware reference is in required native CI. WorkBuddy transport/UX and real
@@ -261,9 +262,10 @@ noninteractive privilege is a failed required CI gate, not a successful skip.
 
 These remain controlled manager tests, not complete production W06: the
 transient graph proves four distinct DynamicUser identities and canonical
-dependency ordering, but final named-account provisioning, fresh-host service
-activation, database migration rollback/restore acceptance and active
-external-effect recovery remain open. The previous direct-process PostgreSQL tests remain independent.
+dependency ordering; a separate required runner gate creates/executes/fully
+removes the exact four canonical named service users and shared group. Production
+host account/unit provisioning, database migration rollback/restore acceptance
+and active external-effect recovery remain open. The previous direct-process PostgreSQL tests remain independent.
 Rate-limit values are an explicit conservative restart policy, not measured SLOs.
 Reaching the limit requires diagnosis and an explicit operator restart; a service
 restart never grants authority to replay a non-replayable engineering Run.
