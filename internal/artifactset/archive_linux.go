@@ -425,6 +425,9 @@ func Mirror(ctx context.Context, p, digest, run, out string) (Report, error) {
 	if err != nil || final != before {
 		return zero, fmt.Errorf("published mirror readback failed")
 	}
+	if err := rootUnchanged(dir, parent); err != nil {
+		return zero, err
+	}
 	final.Status = "ARTIFACT_SET_INDEPENDENT_FILESYSTEM_MIRROR_BYTES_VERIFIED"
 	return final, nil
 }
