@@ -303,8 +303,19 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 				err        error
 			}
 			done := make(chan turnResult, 1)
+			var historyDigest string
+			var historyCount int
+			retainHistory := func(history codexapp.EngineeringHistory) error {
+				digest, e := history.Digest()
+				if e != nil {
+					return e
+				}
+				historyDigest = digest
+				historyCount = len(history.Items)
+				return nil
+			}
 			go func() {
-				receipt, transcript, e := workeragent.RunCodexTurn(ctx, worker, permit, workeragent.CodexRuntime{Executable: executable, SavedLoginFile: login}, work, home, "fixture input")
+				receipt, transcript, e := workeragent.RunCodexTurn(ctx, worker, permit, workeragent.CodexRuntime{Executable: executable, SavedLoginFile: login}, work, home, "fixture input", retainHistory)
 				done <- turnResult{receipt, transcript, e}
 			}()
 			waitFor(t, func() bool {
@@ -359,6 +370,9 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 			checkCtx := context.Background()
 			if mode == "steer" {
 				workerOK(t, result.err)
+				if result.receipt.ItemHistoryDigest != historyDigest || result.receipt.ItemHistoryCount != historyCount || historyCount <= 0 {
+					t.Fatal("private item history sink/receipt binding drift")
+				}
 				if !result.transcript.AllowsDelivery() {
 					t.Fatal("accepted steering absent from transcript")
 				}
