@@ -18,7 +18,7 @@ type artifactSetOptions struct{ command, plan, planDigest, archive, archiveDiges
 func parseArtifactSet(args []string) (artifactSetOptions, error) {
 	var o artifactSetOptions
 	if len(args) == 0 {
-		return o, fmt.Errorf("artifact-set requires pack, verify or restore")
+		return o, fmt.Errorf("artifact-set requires pack, verify, restore or mirror")
 	}
 	o.command = args[0]
 	fs := flag.NewFlagSet("artifact-set "+o.command, flag.ContinueOnError)
@@ -28,12 +28,15 @@ func parseArtifactSet(args []string) (artifactSetOptions, error) {
 		fs.StringVar(&o.plan, "plan", "", "explicit private input declaration")
 		fs.StringVar(&o.planDigest, "plan-digest", "", "externally anchored raw plan SHA256")
 		fs.StringVar(&o.out, "out", "", "new private archive path")
-	case "verify", "restore":
+	case "verify", "restore", "mirror":
 		fs.StringVar(&o.archive, "archive", "", "explicit private archive path")
 		fs.StringVar(&o.archiveDigest, "archive-digest", "", "externally anchored archive SHA256")
 		fs.StringVar(&o.run, "run", "", "expected original Run")
 		if o.command == "restore" {
 			fs.StringVar(&o.into, "into", "", "new private restore directory")
+		}
+		if o.command == "mirror" {
+			fs.StringVar(&o.out, "out", "", "new archive path on a distinct private filesystem")
 		}
 	default:
 		return o, fmt.Errorf("unsupported artifact-set command")
@@ -51,7 +54,7 @@ func parseArtifactSet(args []string) (artifactSetOptions, error) {
 	if fs.Parse(args[1:]) != nil || fs.NArg() != 0 {
 		return o, fmt.Errorf("invalid artifact-set arguments")
 	}
-	if o.command == "pack" && (o.plan == "" || o.planDigest == "" || o.out == "") || o.command != "pack" && (o.archive == "" || o.archiveDigest == "" || o.run == "") || o.command == "restore" && o.into == "" {
+	if o.command == "pack" && (o.plan == "" || o.planDigest == "" || o.out == "") || o.command != "pack" && (o.archive == "" || o.archiveDigest == "" || o.run == "") || o.command == "restore" && o.into == "" || o.command == "mirror" && o.out == "" {
 		return o, fmt.Errorf("explicit paths, identities and digest anchors required")
 	}
 	return o, nil
@@ -68,6 +71,8 @@ func executeArtifactSet(ctx context.Context, args []string) (artifactset.Report,
 		return artifactset.Verify(ctx, o.archive, o.archiveDigest, o.run)
 	case "restore":
 		return artifactset.Restore(ctx, o.archive, o.archiveDigest, o.run, o.into)
+	case "mirror":
+		return artifactset.Mirror(ctx, o.archive, o.archiveDigest, o.run, o.out)
 	default:
 		return artifactset.Report{}, fmt.Errorf("invalid artifact-set command")
 	}
