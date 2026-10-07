@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"time"
 
@@ -63,6 +64,7 @@ type PostTurnReadback struct {
 	EnteredPhases          []string        `json:"entered_phases"`
 	FailedPhase            string          `json:"failed_phase,omitempty"`
 	TranscriptDigest       string          `json:"control_transcript_digest,omitempty"`
+	ControlTranscriptRetained bool         `json:"control_transcript_retained"`
 	ExpectedResultDigest   string          `json:"expected_result_digest,omitempty"`
 	CheckpointDigest       string          `json:"checkpoint_digest,omitempty"`
 	LocalRegistrationClaim bool            `json:"local_registration_claim"`
@@ -79,6 +81,7 @@ type PostTurnReadback struct {
 	permit                 codexexec.Permit
 	checkpoint             *codexexec.SourceCheckpoint
 	result                 *codexexec.Result
+	controlTranscript      *codexexec.ControlTranscript
 }
 
 func recordName(id, suffix string) string {
@@ -207,6 +210,22 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		return empty, fmt.Errorf("permit anchor or identity mismatch")
 	}
 	r := PostTurnReadback{Version: 1, Token: p.Token, PermitDigest: q.PermitDigest, LocalObservation: "NO_POST_TURN_RECORDS", EnteredPhases: []string{}, SourceBytes: "NOT_READ", BundleBytes: "NOT_READ", CoreObservation: "NOT_OBSERVED", CoreCheckpoint: "NOT_OBSERVED", Files: []ReadbackFile{}, permit: p}
+	controlName := recordName(q.ExecutionID, ":control-transcript")
+	var localControl codexexec.ControlTranscript
+	controlSaved, err := get(controlName, &localControl)
+	if err != nil {
+		return empty, err
+	}
+	if controlSaved {
+		digest, digestErr := localControl.Digest()
+		if digestErr != nil || localControl.Close.Binding.Token != p.Token ||
+			localControl.Close.Binding.ExecutionEpoch != p.Assignment.Intent.ExecutionEpoch {
+			return empty, fmt.Errorf("retained control transcript identity mismatch")
+		}
+		r.TranscriptDigest = digest
+		r.ControlTranscriptRetained = true
+		r.controlTranscript = &localControl
+	}
 	bind := func(entry postTurnRecord) error {
 		if r.TranscriptDigest != "" && r.TranscriptDigest != entry.TranscriptDigest {
 			return fmt.Errorf("mixed transcript records")
@@ -307,6 +326,10 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		if r.checkpoint != nil && (r.checkpoint.Binding.ThreadID != turn.ThreadID || r.checkpoint.Binding.TurnID != turn.TurnID) {
 			return empty, fmt.Errorf("checkpoint/turn identity mismatch")
 		}
+		if r.controlTranscript != nil && (r.controlTranscript.Close.Binding.ThreadID != turn.ThreadID ||
+			r.controlTranscript.Close.Binding.TurnID != turn.TurnID) {
+			return empty, fmt.Errorf("retained control transcript/turn identity mismatch")
+		}
 	} else if len(r.EnteredPhases) >= 2 {
 		return empty, fmt.Errorf("Finalize phase without saved turn")
 	}
@@ -369,7 +392,7 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		return empty, fmt.Errorf("record directory changed during readback")
 	}
 	// Deterministic output; retain only names/hashes, never source/model/steer text.
-	names := []string{permitName}
+	names := []string{permitName, controlName}
 	for _, phase := range postTurnPhases {
 		names = append(names, recordName(q.ExecutionID, ":post-turn:"+phase))
 	}
@@ -460,6 +483,9 @@ func ObservePostTurnCore(ctx context.Context, c *controlclient.Client, r PostTur
 		digest, err := t.Transcript.Digest()
 		if err != nil || digest != r.TranscriptDigest || t.Digest != digest || t.Binding != t.Transcript.Close.Binding || t.Binding.Token != r.Token || t.Binding.ExecutionEpoch != r.permit.Assignment.Intent.ExecutionEpoch || !t.Transcript.Close.ProcessScope.Quiescent() {
 			return PostTurnReadback{}, fmt.Errorf("Core transcript readback mismatch")
+		}
+		if r.ControlTranscriptRetained && (r.controlTranscript == nil || !reflect.DeepEqual(*r.controlTranscript, *t.Transcript)) {
+			return PostTurnReadback{}, fmt.Errorf("Core transcript differs from retained private transcript")
 		}
 	}
 	r.CoreCheckpoint = "NOT_PRESENT"

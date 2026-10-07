@@ -106,6 +106,18 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		return receipt, err
 	}
 	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt)
+	controlDigest, controlErr := transcript.Digest()
+	if controlErr == nil && transcript.Close.Binding.Token == permit.Token &&
+		transcript.Close.Binding.ExecutionEpoch == permit.Assignment.Intent.ExecutionEpoch {
+		saveErr := p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID+":control-transcript"))[7:], transcript)
+		err = errors.Join(err, saveErr)
+	} else if err == nil {
+		if controlErr != nil {
+			err = fmt.Errorf("sealed control transcript required: %w", controlErr)
+		} else {
+			err = fmt.Errorf("sealed control transcript binding mismatch")
+		}
+	}
 	if err != nil {
 		return receipt, retainStoppedSource(c, p, permit, prepared, transcript, err)
 	}
@@ -145,8 +157,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	controlDigest, err := transcript.Digest()
-	if err != nil || !transcript.AllowsDelivery() {
+	if !canonical.ValidDigest(controlDigest) || !transcript.AllowsDelivery() {
 		return receipt, fmt.Errorf("control transcript not eligible for delivery")
 	}
 	result := codexexec.Result{ControlTranscriptDigest: controlDigest, PromptIdentityDigest: promptIdentityDigest, Codex: codexReceipt, Change: finalized.Facts}
