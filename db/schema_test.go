@@ -73,7 +73,6 @@ func TestCodexExecutionMigrationIsAdditiveAndOrdered(t *testing.T) {
 	}
 }
 
-
 func TestExecutionReconciliationMigrationPreservesStoppedCodexState(t *testing.T) {
 	for _, required := range []string{
 		"ADD COLUMN reconciliation_json jsonb",
