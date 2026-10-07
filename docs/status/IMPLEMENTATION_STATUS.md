@@ -28,7 +28,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before publication; recipe v2 emits a self-contained result bundle and proves exact base+result import from an empty object database | Clean Git status alone proves all source was delivered; successful result retention equals full repository history |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved/unreplayed; schema v12 can explicitly abandon an exact expired AUTHORIZED/UNKNOWN offline/Codex execution under Recovery without creating a result or replay authority | Automatic source capture after arbitrary Codex/host death, automatic repair or replay |
 | Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware, target-board boot/timing/electrical qualification or unattended retention scheduling |
-| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete full control/tool history coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; execution capture requires the exact sealed ControlTranscript plus bounded raw Codex item/completion history; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Provider credential/session bootstrap and internal streaming state, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
@@ -116,8 +116,12 @@ drift, qualification semantic drift and unbound artifacts. For an explicit
 source-continuation successor it additionally requires the exact upstream
 source-checkpoint archive and validates the frozen ContinuationRef/Task/base/
 Codex-tool/Worker-profile binding before retaining those bytes. It now also requires and retains the exact private sealed ControlTranscript raw
-bytes, and Core readback compares that transcript structurally when present. It
-still does not capture credential/session material or full model/tool item history.
+bytes, and Core readback compares that transcript structurally when present.
+Schema-v5 Codex receipts bind a private bounded EngineeringHistory: exact raw
+accepted `item/completed` Params plus terminal `turn/completed`, fsynced before
+a successful turn proceeds and automatically included by `capture-execution`.
+Those private bodies do not enter Core. Credential/session bootstrap, bearer
+material and provider-internal streaming state remain excluded.
 `capture-offline` derives the original permit/report and every collected output
 from the frozen offline Profile. Both raw records require external digest anchors;
 failed commands retain failure records with zero outputs, never successful-build
@@ -224,8 +228,10 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   stopped-source checkpoint v2 retains the validated base graph before/after
   Finalize, successor capture retains the exact verified upstream continuation
   checkpoint, and current execution capture requires the exact sealed private
-  ControlTranscript. Unattended retention scheduling, full model/tool item
-  history and durable private retention/production-native acceptance remain open.
+  ControlTranscript plus bounded raw Codex item/completion history. Unattended
+  retention scheduling, credential/session/provider-internal state retention,
+  encryption/key policy and durable private retention/production-native
+  acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
   are implemented. Disposable fresh-host CI now proves the canonical named Unix
