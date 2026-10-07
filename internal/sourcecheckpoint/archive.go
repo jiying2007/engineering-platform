@@ -42,18 +42,18 @@ type Entry struct {
 	Target     string `json:"target,omitempty"`
 }
 type Manifest struct {
-	Version        int                         `json:"version"`
-	TaskDigest     string                      `json:"task_contract_digest"`
-	InputDigest    string                      `json:"run_input_manifest_digest"`
-	BaseCommit     string                      `json:"base_commit"`
+	Version         int                         `json:"version"`
+	TaskDigest      string                      `json:"task_contract_digest"`
+	InputDigest     string                      `json:"run_input_manifest_digest"`
+	BaseCommit      string                      `json:"base_commit"`
 	BaselineDigest  string                      `json:"baseline_source_digest"`
 	GitHead         string                      `json:"git_head"`
 	GitBundleDigest string                      `json:"git_bundle_digest"`
 	GitBundleSize   int64                       `json:"git_bundle_size"`
-	Transcript     codexexec.ControlTranscript `json:"control_transcript"`
-	SnapshotDigest string                      `json:"snapshot_digest"`
-	CapturedAt     time.Time                   `json:"captured_at"`
-	Entries        []Entry                     `json:"entries"`
+	Transcript      codexexec.ControlTranscript `json:"control_transcript"`
+	SnapshotDigest  string                      `json:"snapshot_digest"`
+	CapturedAt      time.Time                   `json:"captured_at"`
+	Entries         []Entry                     `json:"entries"`
 }
 type Artifact struct {
 	Facts codexexec.SourceCheckpoint `json:"facts"`
