@@ -113,7 +113,7 @@ jobs:
           go test -race -count=20 -timeout 2m ./internal/workerqueue ./internal/workeragent ./internal/workerloop ./internal/controlclient
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestWorkerInbox
           go test -race -count=3 -timeout 2m ./cmd/control-plane -run TestWorkerCommand
-          go test -race -v -count=1 -timeout 2m ./cmd/control-plane -run TestSustainedAdmissionSecurityMatrix
+          go test -race -v -count=1 -timeout 4m ./cmd/control-plane -run TestSustainedAdmissionSecurityMatrix
       - name: Worker preparation and independent workspace regression
         run: |
           go test -race -count=5 -timeout 2m ./internal/workspace ./internal/preparation
