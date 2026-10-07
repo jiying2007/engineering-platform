@@ -50,10 +50,10 @@ func retainSource(c Transport, p *preparation.Preparer, permit codexexec.Permit,
 	}
 	artifact, captureErr := sourcecheckpoint.Capture(ctx, source, root, permit, t, sourcecheckpoint.GitBundle{Path: gitBundle.Path, Digest: gitBundle.Digest, Size: gitBundle.Size, Head: gitBundle.Head})
 	cleanupErr := os.Remove(gitBundle.Path)
-	if captureErr != nil || cleanupErr != nil {
+	if captureErr != nil {
 		return errors.Join(cause, fmt.Errorf("stopped source capture failed: %w", errors.Join(captureErr, cleanupErr)))
 	}
-	result := &CheckpointRetainedError{Cause: cause, Artifact: artifact}
+	result := &CheckpointRetainedError{Cause: errors.Join(cause, cleanupErr), Artifact: artifact}
 	recordErr := p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":source-checkpoint"))[7:], artifact)
 	var readback codexexec.SourceCheckpoint
 	reportErr := c.Call(ctx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, &readback)
