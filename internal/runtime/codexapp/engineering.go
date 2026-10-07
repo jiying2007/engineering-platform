@@ -494,7 +494,7 @@ func (r EngineeringReceipt) Validate() error {
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.QualificationDigest) ||
 		r.EngineeringConfigDigest != EngineeringConfigDigest() || r.Provider.Validate() != nil ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||
-		!canonical.ValidDigest(r.ItemHistoryDigest) || r.ItemHistoryCount < 0 || r.ItemHistoryCount > MaxEngineeringHistoryItems ||
+		!canonical.ValidDigest(r.ItemHistoryDigest) || r.ItemHistoryCount <= 0 || r.ItemHistoryCount > MaxEngineeringHistoryItems ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
 		strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 ||
 		r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.CommandCount < 0 ||
