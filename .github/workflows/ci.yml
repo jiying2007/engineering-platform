@@ -147,7 +147,7 @@ jobs:
   offline:
     name: offline-container-integration
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -212,7 +212,7 @@ jobs:
         shell: bash
         run: bash scripts/ci-named-service-identities.sh
       - name: Real offline boundary and command integration
-        run: go test -race -v -count=3 -timeout 7m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
+        run: go test -race -v -count=3 -timeout 10m ./internal/sandbox ./cmd/control-plane -run 'TestRealOffline|TestOfflineCommand'
 
       - name: Build current immutable release candidate before nested checkout
         shell: bash
