@@ -190,10 +190,10 @@ func (m *Manager) verifySelfContainedResultBundle(ctx context.Context, source Wo
 	if _, err := m.gitOutput(ctx, repo, home, "init", "--template="+template, "--object-format=sha1"); err != nil {
 		return fmt.Errorf("initialize independent bundle readback: %w", err)
 	}
-	if _, err := m.gitOutput(ctx, repo, home, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--", bundlePath, "HEAD"); err != nil {
+	if _, err := m.gitOutput(ctx, repo, home, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--", bundlePath, "HEAD:refs/heads/retained-result"); err != nil {
 		return fmt.Errorf("self-contained result bundle import failed: %w", err)
 	}
-	fetched, err := m.gitOutput(ctx, repo, home, "rev-parse", "--verify", "FETCH_HEAD^{commit}")
+	fetched, err := m.gitOutput(ctx, repo, home, "rev-parse", "--verify", "refs/heads/retained-result^{commit}")
 	if err != nil || strings.TrimSpace(fetched) != resultCommit {
 		return fmt.Errorf("result bundle head identity mismatch")
 	}
