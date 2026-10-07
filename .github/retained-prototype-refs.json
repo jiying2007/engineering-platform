@@ -13,6 +13,11 @@
       "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
     },
     {
+      "branch": "feat/rc-independent-artifact-mirror",
+      "expected_head": "54fc83d0f90bbf841ef2dc500b766446e63399a0",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
       "branch": "feat/independent-publisher-service",
       "expected_head": "eda85863ed185271fbc11beb54835e4e3701c1e1",
       "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
@@ -20,11 +25,6 @@
     {
       "branch": "feat/independent-review-authority",
       "expected_head": "6ee61e27df4cbf545562895b552b059af77f5613",
-      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
-    },
-    {
-      "branch": "feat/rc-independent-artifact-mirror",
-      "expected_head": "54fc83d0f90bbf841ef2dc500b766446e63399a0",
       "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
     },
     {
