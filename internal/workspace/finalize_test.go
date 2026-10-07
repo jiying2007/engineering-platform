@@ -51,7 +51,6 @@ func TestFinalizeCreatesIndependentResultCommitAndBundle(t *testing.T) {
 	}
 }
 
-
 func TestFinalizeBundleRemainsSelfContainedAfterSourceRemoval(t *testing.T) {
 	ctx := context.Background()
 	repo, base := initRepository(t)
