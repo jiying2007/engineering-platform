@@ -17,6 +17,7 @@ type EngineeringController interface {
 	Bind(context.Context, string, string) error
 	Claim(context.Context) (*LiveControl, error)
 	Report(context.Context, string, string) error
+	RetainHistory(context.Context, EngineeringHistory) error
 	Close(context.Context, string, processscope.Proof) error
 }
 

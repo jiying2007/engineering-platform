@@ -27,6 +27,8 @@ type fixtureController struct {
 	exited        bool
 	reportFailure bool
 	closeFailure  bool
+	historyDigest string
+	historyCount  int
 }
 
 func (c *fixtureController) Bind(_ context.Context, thread, turn string) error {
@@ -55,6 +57,18 @@ func (c *fixtureController) Report(_ context.Context, id, outcome string) error 
 	}
 	return nil
 }
+func (c *fixtureController) RetainHistory(_ context.Context, history EngineeringHistory) error {
+	digest, err := history.Digest()
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.historyDigest = digest
+	c.historyCount = len(history.Items)
+	return nil
+}
+
 func (c *fixtureController) Close(_ context.Context, status string, proof processscope.Proof) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
