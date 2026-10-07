@@ -20,15 +20,15 @@ those subjects or rewrite their receipts to manufacture current production proof
 
 | Area | Implemented | Not implied |
 | --- | --- | --- |
-| Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, execution and Recovery epochs | Production service operating acceptance |
+| Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, execution and Recovery epochs; schema v12 adds explicit non-success abandonment reconciliation for exact expired offline/Codex executions | Production service operating acceptance or replay authority |
 | Live controls | mTLS RunControl, durable one-shot steering/interrupt, exact actor/sequence/epoch/turn binding and sealed transcript | ACK means stopped; accepted input means objective fulfilled |
 | Process lifetime | Dedicated Linux user/PID namespace; receipt v4 and transcript v2 bind kernel-observed init reap | Complete filesystem/resource isolation or control of unrelated host processes |
 | Stopped source | Private exact-byte archive after confirmed stop; archive v2 also embeds a self-contained, empty-repo-verified Git graph for the frozen base/direct Finalize child; immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before publication; recipe v2 emits a self-contained result bundle and proves exact base+result import from an empty object database | Clean Git status alone proves all source was delivered; successful result retention equals full repository history |
-| Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved, unreplayed and blocks Recovery proof | Automatic source capture after arbitrary Codex/host death, approved repair or replay |
+| Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved/unreplayed; schema v12 can explicitly abandon an exact expired AUTHORIZED/UNKNOWN offline/Codex execution under Recovery without creating a result or replay authority | Automatic source capture after arbitrary Codex/host death, automatic repair or replay |
 | Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware, target-board boot/timing/electrical qualification or unattended retention scheduling |
-| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete per-Run dependency coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete full control/tool history coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
@@ -37,7 +37,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
 | Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI also runs a bounded 32-Run/8-Worker concurrent admission/security characterization | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
-| Pre-live | Event SHA/tree, terminal plan v2, exact nonempty no-skip test inventory and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Live provider/service acceptance, independent human Review or production qualification |
+| Pre-live | Event SHA/tree, terminal plan v3 with frozen single-canary, emergency-stop, no-provider-fallback and no-automatic-DB-downgrade gates, exact nonempty no-skip test inventory, and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Passing the frozen external canary/provider-revoke/Publisher-revoke/DB-restore gates, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
 
 ## Execution, failure and continuation
@@ -68,7 +68,16 @@ capture/journaling; phase entry alone is not phase completion or proof of a
 crash. Separately, required native CI now kills an actual installed offline
 Worker with SIGKILL after its permit is fsynced and its lease renewed: Core stays
 non-terminal without a receipt, a second Worker cannot replay the same
-execution, and Recovery proof remains blocked until reconciliation.
+execution, and Recovery proof remains blocked until reconciliation. Schema v12
+adds the bounded terminal reconciliation for this exact orphan class: an existing
+`recovery:reconcile` mTLS identity must bind the exact Run/execution/current
+Recovery epoch, a retained external observation digest and fixed
+`ABANDON_NO_REPLAY` disposition after lease expiry. The durable row becomes
+`ABANDONED_RECONCILED`, never `FINISHED`; its unique Run reservation remains,
+execution/replay/production authority remain false, exact retry is idempotent,
+and changed observation or reconciler identity conflicts. The normal immutable
+Recovery proof plus a distinct completion identity are still required before
+returning to NORMAL.
 
 `eng execution-readback` validates existing private permit/phase/turn/result/
 checkpoint identities. Explicit artifact paths opt into source/bundle byte
@@ -103,9 +112,11 @@ are not inferred. `capture-execution` derives current producer records and every
 frozen Context entry from the original anchored permit, requiring all referenced
 source/result bytes plus private copies of the exact Permit-bound Codex runtime
 binary and qualification receipt. It rejects missing/extra Context, runtime byte
-drift, qualification semantic drift and unbound artifacts. It still does not
-capture original Git base bytes, credential/session material, full control/tool
-history or upstream continuation dependencies.
+drift, qualification semantic drift and unbound artifacts. For an explicit
+source-continuation successor it additionally requires the exact upstream
+source-checkpoint archive and validates the frozen ContinuationRef/Task/base/
+Codex-tool/Worker-profile binding before retaining those bytes. It still does
+not capture credential/session material or full control/tool history.
 `capture-offline` derives the original permit/report and every collected output
 from the frozen offline Profile. Both raw records require external digest anchors;
 failed commands retain failure records with zero outputs, never successful-build
@@ -180,10 +191,14 @@ The stable kernel/architecture/UID/GID digest excludes PID/inode/time. CI probes
 twice; each actual Worker CLI requalifies and compares the entire receipt. Old
 current-admission receipts fail, but historical M1 records are not rewritten.
 
-**Production #105 stays open.** Terminal plan v2 requires host validation and
-accepted source-verified SLO evidence, not old READY/COMPLETE labels. Provider-free
-dry runs are distinct from real qualification. Completion still needs one
-qualified unattended lane, real lifecycle/recovery measurements, exact delivery,
+**Production #105 stays open.** Terminal plan v3 additionally freezes the
+single-maintenance-canary profile, selected-provider emergency disablement,
+Publisher credential revocation, Worker execution stop, authoritative
+backup+reconcile DB rollback policy, no silent provider fallback and no
+automatic database downgrade. These are required gates, not evidence that they
+have passed. Provider-free dry runs are distinct from real qualification.
+Completion still needs one qualified unattended lane, live canary/emergency/
+restore acceptance, real lifecycle/recovery measurements, exact delivery,
 calibrated SLO targets and independent human Review/Closure. Local protocol
 fixtures are not live model evidence; real kernel/PostgreSQL/container tests
 cannot promote them into account/provider/device qualification.
@@ -200,19 +215,26 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   deployment-environment acceptance remain external gates.
 - W03: catchable preservation/readback, actual offline Worker SIGKILL
   non-replay/Recovery blocking, and artifact ENOSPC fail-closed behavior are
-  covered. Arbitrary Codex/host crash source capture, disk-space repair and
-  approved reconciliation/repair remain open.
+  covered. Exact expired AUTHORIZED/UNKNOWN offline/Codex abandonment is now
+  explicitly reconciled under Recovery without replay/result authority. Arbitrary
+  Codex/host crash source capture and automatic disk-space repair remain open.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
-  implemented; successful result bundles retain their exact Git base objects and
+  implemented; successful result bundles retain their exact Git base objects,
   stopped-source checkpoint v2 retains the validated base graph before/after
-  Finalize. Unattended retention scheduling, full control/tool/continuation
-  dependencies and durable private retention/production-native acceptance remain open.
+  Finalize, and successor capture retains the exact verified upstream
+  continuation checkpoint. Unattended retention scheduling, full control/tool
+  history and durable private retention/production-native acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
   are implemented. Disposable fresh-host CI now proves the canonical named Unix
   identity lifecycle without persisting accounts or installing production units.
-  Actual production-host account/unit provisioning, database migration rollback
-  policy and active external-effect recovery remain open. Installation/switch never grants execution or downgrades the database.
+  Actual production-host account/unit provisioning and live production
+  acceptance of active model/publication-effect recovery remain open. The modeled
+  Action Gateway already reconciles UNKNOWN effects to confirmed/safe-to-retry/
+  manual outcomes; terminal plan v3 freezes the DB rollback policy as
+  authoritative-backup restore plus reconciliation, but the production
+  canary/restore acceptance gate is still external. Installation/switch never
+  grants execution or downgrades the database.
 - W07/W08: authenticated Work -> Task -> Run intake and exact-epoch Human
   Takeover are implemented using existing Core APIs. Required native CI includes
   both a freestanding host-ISA firmware reference and a no-network Cortex-M0
@@ -252,9 +274,10 @@ bound-address announcement is not a provider-ready assertion. See the existing
 [operations contract](../implementation/PRODUCTION_OPERATIONS_V1.md).
 Quiescent installed-service tests are now complemented by real systemd
 dependency/identity tests, immutable cross-version upgrade/rollback and an actual
-offline Worker SIGKILL case. They still do not provision the final named
-production accounts on a fresh host or prove active model/publication effect
-recovery.
+offline Worker SIGKILL case. The exact expired orphaned execution class now has
+explicit non-replay Recovery abandonment, but these tests still do not provision
+the final named production accounts on a production host or prove live provider/
+publication-effect acceptance.
 
 
 The native CI additionally runs `scripts/ci-systemd-lifecycle.sh` against a real
@@ -272,8 +295,8 @@ These remain controlled manager tests, not complete production W06: the
 transient graph proves four distinct DynamicUser identities and canonical
 dependency ordering; a separate required runner gate creates/executes/fully
 removes the exact four canonical named service users and shared group. Production
-host account/unit provisioning, database migration rollback/restore acceptance
-and active external-effect recovery remain open. The previous direct-process PostgreSQL tests remain independent.
+host account/unit provisioning, database rollback/restore acceptance and live
+active external-effect acceptance remain open. The previous direct-process PostgreSQL tests remain independent.
 Rate-limit values are an explicit conservative restart policy, not measured SLOs.
 Reaching the limit requires diagnosis and an explicit operator restart; a service
 restart never grants authority to replay a non-replayable engineering Run.
