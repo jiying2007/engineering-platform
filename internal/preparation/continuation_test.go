@@ -53,8 +53,11 @@ func sourceContinuationFixture(t *testing.T) (workerqueue.Assignment, preparatio
 	mustCheckpoint(t, os.WriteFile(filepath.Join(prepared.Workspace.WorktreePath, "hello.txt"), []byte("inherited unfinished\n"), 0600))
 	mustCheckpoint(t, os.WriteFile(filepath.Join(prepared.Workspace.WorktreePath, "new.txt"), []byte("未完成\n"), 0600))
 	tr := codexexec.ControlTranscript{Version: 2, Close: codexexec.ControlClose{Binding: codexexec.ControlBinding{Token: permit.Token, ExecutionEpoch: 1, ThreadID: "thread", TurnID: "turn"}, TurnStatus: "interrupted", ProcessScope: testsupport.ProcessScopeFixture()}}
-	artifact, err := sourcecheckpoint.Capture(context.Background(), prepared.Workspace.WorktreePath, filepath.Join(c.Root, "artifacts"), permit, tr)
+	retained, err := p.CheckpointGitBundle(context.Background(), subject, a, prepared, fd, permit.Token.ID, false)
 	mustCheckpoint(t, err)
+	artifact, err := sourcecheckpoint.Capture(context.Background(), prepared.Workspace.WorktreePath, filepath.Join(c.Root, "artifacts"), permit, tr, sourcecheckpoint.GitBundle{Path: retained.Path, Digest: retained.Digest, Size: retained.Size, Head: retained.Head})
+	mustCheckpoint(t, err)
+	mustCheckpoint(t, os.Remove(retained.Path))
 	ref, err := artifact.Facts.ContinuationRef()
 	mustCheckpoint(t, err)
 	a.Token.InboxID = 2

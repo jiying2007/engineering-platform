@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
@@ -43,11 +44,16 @@ func retainSource(c Transport, p *preparation.Preparer, permit codexexec.Permit,
 	if err != nil {
 		return errors.Join(cause, fmt.Errorf("stopped source capture denied: %w", err))
 	}
-	artifact, err := sourcecheckpoint.Capture(ctx, source, root, permit, t)
+	gitBundle, err := p.CheckpointGitBundle(ctx, c.Subject(), permit.Assignment, prepared, permit.Preparation.FactsDigest, permit.Token.ID, finalizeEntered)
 	if err != nil {
-		return errors.Join(cause, fmt.Errorf("stopped source capture failed: %w", err))
+		return errors.Join(cause, fmt.Errorf("stopped Git-base capture denied: %w", err))
 	}
-	result := &CheckpointRetainedError{Cause: cause, Artifact: artifact}
+	artifact, captureErr := sourcecheckpoint.Capture(ctx, source, root, permit, t, sourcecheckpoint.GitBundle{Path: gitBundle.Path, Digest: gitBundle.Digest, Size: gitBundle.Size, Head: gitBundle.Head})
+	cleanupErr := os.Remove(gitBundle.Path)
+	if captureErr != nil {
+		return errors.Join(cause, fmt.Errorf("stopped source capture failed: %w", errors.Join(captureErr, cleanupErr)))
+	}
+	result := &CheckpointRetainedError{Cause: errors.Join(cause, cleanupErr), Artifact: artifact}
 	recordErr := p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":source-checkpoint"))[7:], artifact)
 	var readback codexexec.SourceCheckpoint
 	reportErr := c.Call(ctx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, &readback)
@@ -55,6 +61,6 @@ func retainSource(c Transport, p *preparation.Preparer, permit codexexec.Permit,
 		reportErr = fmt.Errorf("Core checkpoint readback mismatch")
 	}
 	result.Registered = reportErr == nil
-	result.Cause = errors.Join(cause, recordErr, reportErr)
+	result.Cause = errors.Join(cause, cleanupErr, recordErr, reportErr)
 	return result
 }

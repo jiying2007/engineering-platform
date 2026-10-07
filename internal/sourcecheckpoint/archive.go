@@ -29,7 +29,7 @@ import (
 
 const MaxSource int64 = 256 << 20
 const MaxFile int64 = 64 << 20
-const MaxArchive int64 = 320 << 20
+const MaxArchive int64 = MaxSource + MaxGitBundle + (32 << 20)
 const MaxEntries = 10000
 const maxManifest int64 = 16 << 20
 
@@ -42,15 +42,18 @@ type Entry struct {
 	Target     string `json:"target,omitempty"`
 }
 type Manifest struct {
-	Version        int                         `json:"version"`
-	TaskDigest     string                      `json:"task_contract_digest"`
-	InputDigest    string                      `json:"run_input_manifest_digest"`
-	BaseCommit     string                      `json:"base_commit"`
-	BaselineDigest string                      `json:"baseline_source_digest"`
-	Transcript     codexexec.ControlTranscript `json:"control_transcript"`
-	SnapshotDigest string                      `json:"snapshot_digest"`
-	CapturedAt     time.Time                   `json:"captured_at"`
-	Entries        []Entry                     `json:"entries"`
+	Version         int                         `json:"version"`
+	TaskDigest      string                      `json:"task_contract_digest"`
+	InputDigest     string                      `json:"run_input_manifest_digest"`
+	BaseCommit      string                      `json:"base_commit"`
+	BaselineDigest  string                      `json:"baseline_source_digest"`
+	GitHead         string                      `json:"git_head"`
+	GitBundleDigest string                      `json:"git_bundle_digest"`
+	GitBundleSize   int64                       `json:"git_bundle_size"`
+	Transcript      codexexec.ControlTranscript `json:"control_transcript"`
+	SnapshotDigest  string                      `json:"snapshot_digest"`
+	CapturedAt      time.Time                   `json:"captured_at"`
+	Entries         []Entry                     `json:"entries"`
 }
 type Artifact struct {
 	Facts codexexec.SourceCheckpoint `json:"facts"`
@@ -77,7 +80,7 @@ func validTarget(name, target string) bool {
 }
 func (m Manifest) descriptor(hash string, size int64) (codexexec.SourceCheckpoint, error) {
 	td, err := m.Transcript.Digest()
-	if err != nil || m.Version != 1 || !m.Transcript.Close.ProcessScope.Quiescent() || m.CapturedAt.Before(m.Transcript.Close.ProcessScope.ReapedAt) || m.CapturedAt.IsZero() {
+	if err != nil || m.Version != 2 || validateGitBundleFacts(m.BaseCommit, m.GitHead, m.GitBundleDigest, m.GitBundleSize) != nil || !m.Transcript.Close.ProcessScope.Quiescent() || m.CapturedAt.Before(m.Transcript.Close.ProcessScope.ReapedAt) || m.CapturedAt.IsZero() {
 		return codexexec.SourceCheckpoint{}, fmt.Errorf("quiescent sealed transcript required")
 	}
 	facts := codexexec.SourceCheckpoint{Version: 1, Binding: m.Transcript.Close.Binding, TaskDigest: m.TaskDigest, InputDigest: m.InputDigest, BaseCommit: m.BaseCommit, BaselineDigest: m.BaselineDigest, TranscriptDigest: td, SnapshotDigest: m.SnapshotDigest, ArchiveDigest: hash, ArchiveSize: size}
@@ -313,13 +316,16 @@ func collect(ctx context.Context, root *os.Root) ([]Entry, error) {
 // Capture accepts only a validated immutable permit and sealed same-run controls.
 // The preparation owner validates the source slot before invoking it. Output is
 // installed without replacement and read back by its exact externally held hash.
-func Capture(ctx context.Context, source, output string, p codexexec.Permit, t codexexec.ControlTranscript) (Artifact, error) {
+func Capture(ctx context.Context, source, output string, p codexexec.Permit, t codexexec.ControlTranscript, gitBundle GitBundle) (Artifact, error) {
 	var empty Artifact
 	if err := p.Check(p.Preparation.Admission.Worker, codexexec.Start{RunID: p.Token.RunID, WorkerProfile: p.Token.WorkerProfile, Profile: p.Profile}); err != nil {
 		return empty, err
 	}
 	if t.Close.Binding.Token != p.Token || t.Close.Binding.ExecutionEpoch != p.Assignment.Intent.ExecutionEpoch {
 		return empty, fmt.Errorf("checkpoint permit/control identity mismatch")
+	}
+	if err := gitBundle.Validate(p.Preparation.Facts.BaseCommit); err != nil {
+		return empty, err
 	}
 	if _, err := t.Digest(); err != nil || !t.Close.ProcessScope.Quiescent() {
 		return empty, fmt.Errorf("unconfirmed runtime termination")
@@ -350,7 +356,7 @@ func Capture(ctx context.Context, source, output string, p codexexec.Permit, t c
 	if err != nil {
 		return empty, err
 	}
-	m := Manifest{Version: 1, TaskDigest: p.Assignment.Intent.TaskDigest, InputDigest: p.Assignment.Intent.InputDigest, BaseCommit: p.Preparation.Facts.BaseCommit, BaselineDigest: p.Preparation.Facts.SourceDigest, Transcript: t, SnapshotDigest: sd, CapturedAt: time.Now().UTC(), Entries: entries}
+	m := Manifest{Version: 2, TaskDigest: p.Assignment.Intent.TaskDigest, InputDigest: p.Assignment.Intent.InputDigest, BaseCommit: p.Preparation.Facts.BaseCommit, BaselineDigest: p.Preparation.Facts.SourceDigest, GitHead: gitBundle.Head, GitBundleDigest: gitBundle.Digest, GitBundleSize: gitBundle.Size, Transcript: t, SnapshotDigest: sd, CapturedAt: time.Now().UTC(), Entries: entries}
 	if _, err := m.descriptor(canonical.BytesDigest([]byte("validation-only")), 1); err != nil {
 		return empty, err
 	}
@@ -377,6 +383,12 @@ func Capture(ctx context.Context, source, output string, p codexexec.Permit, t c
 		return empty, err
 	}
 	if _, err := tw.Write(metadata); err != nil {
+		return empty, err
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: "git-base.bundle", Mode: 0600, Size: gitBundle.Size, Typeflag: tar.TypeReg}); err != nil {
+		return empty, err
+	}
+	if err := copyGitBundle(ctx, gitBundle, tw); err != nil {
 		return empty, err
 	}
 	for _, e := range entries {
@@ -516,6 +528,28 @@ func readArchive(ctx context.Context, f *os.File, expected, run string, dest *os
 	if run == "" || facts.Binding.Token.RunID != run {
 		return empty, fmt.Errorf("checkpoint run mismatch")
 	}
+	gitHeader, err := tr.Next()
+	if err != nil || gitHeader.Name != "git-base.bundle" || gitHeader.Typeflag != tar.TypeReg ||
+		gitHeader.Mode != 0600 || gitHeader.Uid != 0 || gitHeader.Gid != 0 || gitHeader.Size != m.GitBundleSize {
+		return empty, fmt.Errorf("checkpoint Git bundle member mismatch")
+	}
+	var gitTarget io.Writer = io.Discard
+	var gitOut *os.File
+	if dest != nil {
+		gitOut, err = dest.OpenFile("git-base.bundle", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return empty, err
+		}
+		gitTarget = gitOut
+	}
+	gitHash := sha256.New()
+	gitN, gitErr := io.Copy(io.MultiWriter(gitHash, gitTarget), tr)
+	if gitOut != nil {
+		gitErr = errors.Join(gitErr, gitOut.Sync(), gitOut.Close())
+	}
+	if gitErr != nil || gitN != m.GitBundleSize || "sha256:"+hex.EncodeToString(gitHash.Sum(nil)) != m.GitBundleDigest {
+		return empty, fmt.Errorf("checkpoint Git bundle digest mismatch")
+	}
 	for _, e := range m.Entries {
 		header, err := tr.Next()
 		if err != nil || header.Name != "source/"+e.Path || header.Size != e.Size || header.Linkname != e.Target {
@@ -542,7 +576,7 @@ func readArchive(ctx context.Context, f *os.File, expected, run string, dest *os
 			var output io.Writer = io.Discard
 			var target *os.File
 			if dest != nil {
-				target, err = dest.OpenFile(e.Path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, os.FileMode(mode))
+				target, err = dest.OpenFile("source/"+e.Path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, os.FileMode(mode))
 				if err != nil {
 					return empty, err
 				}
@@ -562,7 +596,7 @@ func readArchive(ctx context.Context, f *os.File, expected, run string, dest *os
 				return empty, fmt.Errorf("checkpoint member digest mismatch")
 			}
 		} else if dest != nil && e.Kind == "directory" {
-			if err := dest.Mkdir(e.Path, 0700); err != nil {
+			if err := dest.Mkdir("source/"+e.Path, 0700); err != nil {
 				return empty, err
 			}
 		}
@@ -594,14 +628,14 @@ func readArchive(ctx context.Context, f *os.File, expected, run string, dest *os
 		// Links are created last: even internal link chains can never redirect writes.
 		for _, e := range m.Entries {
 			if e.Kind == "symlink" {
-				if err := dest.Symlink(e.Target, e.Path); err != nil {
+				if err := dest.Symlink(e.Target, "source/"+e.Path); err != nil {
 					return empty, err
 				}
 			}
 		}
 		for i := len(m.Entries) - 1; i >= 0; i-- {
 			if m.Entries[i].Kind == "directory" {
-				if err := syncDir(dest, m.Entries[i].Path); err != nil {
+				if err := syncDir(dest, "source/"+m.Entries[i].Path); err != nil {
 					return empty, err
 				}
 			}
@@ -609,7 +643,15 @@ func readArchive(ctx context.Context, f *os.File, expected, run string, dest *os
 		if err := syncDir(dest, "."); err != nil {
 			return empty, err
 		}
-		entries, err := collect(ctx, dest)
+		if err := syncDir(dest, "source"); err != nil {
+			return empty, err
+		}
+		sourceRoot, err := dest.OpenRoot("source")
+		if err != nil {
+			return empty, err
+		}
+		entries, err := collect(ctx, sourceRoot)
+		_ = sourceRoot.Close()
 		if err != nil {
 			return empty, err
 		}
@@ -672,12 +714,7 @@ func Restore(ctx context.Context, filename, expected, run, destination string) (
 	if err := out.Mkdir("source", 0700); err != nil {
 		return empty, err
 	}
-	src, err := out.OpenRoot("source")
-	if err != nil {
-		return empty, err
-	}
-	defer src.Close()
-	facts, err := readArchive(ctx, f, expected, run, src)
+	facts, err := readArchive(ctx, f, expected, run, out)
 	if err != nil {
 		return empty, err
 	}

@@ -158,7 +158,7 @@ func must(t *testing.T, err error) {
 		t.Fatal(err)
 	}
 }
-func fixture(t *testing.T) (string, string, codexexec.Permit, codexexec.ControlTranscript) {
+func fixture(t *testing.T) (string, string, codexexec.Permit, codexexec.ControlTranscript, GitBundle) {
 	t.Helper()
 	root := t.TempDir()
 	must(t, os.Chmod(root, 0700))
@@ -176,12 +176,15 @@ func fixture(t *testing.T) (string, string, codexexec.Permit, codexexec.ControlT
 	}
 	must(t, os.WriteFile(filepath.Join(source, "run.sh"), []byte("#!/bin/sh\n"), 0700))
 	must(t, os.Symlink("../changed.c", filepath.Join(source, "nested/link")))
-	return source, out, p, tr
+	bundlePath := filepath.Join(root, "git-base.bundle")
+	bundleBytes := []byte("TEST-ONLY-SELF-CONTAINED-GIT-BUNDLE")
+	must(t, os.WriteFile(bundlePath, bundleBytes, 0600))
+	return source, out, p, tr, GitBundle{Path: bundlePath, Digest: canonical.BytesDigest(bundleBytes), Size: int64(len(bundleBytes)), Head: p.Preparation.Facts.BaseCommit}
 }
 func TestSourceCheckpointRawRoundTripAndNoOverwrite(t *testing.T) {
-	src, out, p, tr := fixture(t)
+	src, out, p, tr, git := fixture(t)
 	ctx := context.Background()
-	a, err := Capture(ctx, src, out, p, tr)
+	a, err := Capture(ctx, src, out, p, tr, git)
 	must(t, err)
 	raw, err := os.ReadFile(a.Path)
 	must(t, err)
@@ -201,6 +204,11 @@ func TestSourceCheckpointRawRoundTripAndNoOverwrite(t *testing.T) {
 	}
 	if _, err := os.Lstat(filepath.Join(dst, "source/.git")); !os.IsNotExist(err) {
 		t.Fatal("Git metadata restored")
+	}
+	gitRaw, err := os.ReadFile(filepath.Join(dst, "git-base.bundle"))
+	must(t, err)
+	if canonical.BytesDigest(gitRaw) != git.Digest {
+		t.Fatal("retained Git base bundle changed")
 	}
 	if _, err := os.Lstat(filepath.Join(dst, "INCOMPLETE")); !os.IsNotExist(err) {
 		t.Fatal("incomplete restore")
@@ -223,7 +231,7 @@ func TestSourceCheckpointRawRoundTripAndNoOverwrite(t *testing.T) {
 	if _, err = Restore(ctx, a.Path, a.Facts.ArchiveDigest, p.Token.RunID, dst); err == nil {
 		t.Fatal("existing destination overwritten")
 	}
-	if _, err = Capture(ctx, src, out, p, tr); err == nil {
+	if _, err = Capture(ctx, src, out, p, tr, git); err == nil {
 		t.Fatal("existing checkpoint overwritten")
 	}
 	after, _ := os.ReadFile(a.Path)
@@ -234,7 +242,7 @@ func TestSourceCheckpointRawRoundTripAndNoOverwrite(t *testing.T) {
 func TestSourceCheckpointRequiresProofAndExactPermit(t *testing.T) {
 	for _, mode := range []string{"unreaped", "foreign", "bad-transcript", "bad-task"} {
 		t.Run(mode, func(t *testing.T) {
-			src, out, p, tr := fixture(t)
+			src, out, p, tr, git := fixture(t)
 			switch mode {
 			case "unreaped":
 				tr.Close.ProcessScope.InitReaped = false
@@ -246,7 +254,7 @@ func TestSourceCheckpointRequiresProofAndExactPermit(t *testing.T) {
 			case "bad-task":
 				p.Assignment.Intent.TaskDigest = canonical.BytesDigest([]byte("other"))
 			}
-			if _, err := Capture(context.Background(), src, out, p, tr); err == nil {
+			if _, err := Capture(context.Background(), src, out, p, tr, git); err == nil {
 				t.Fatal("invalid capture accepted")
 			}
 			files, _ := os.ReadDir(out)
@@ -259,7 +267,7 @@ func TestSourceCheckpointRequiresProofAndExactPermit(t *testing.T) {
 func TestSourceCheckpointRejectsUnsafeFilesystem(t *testing.T) {
 	for _, mode := range []string{"absolute-link", "escape-link", "chain-escape", "cycle", "too-large", "nested-git", "overlap", "aliased-root"} {
 		t.Run(mode, func(t *testing.T) {
-			src, out, p, tr := fixture(t)
+			src, out, p, tr, git := fixture(t)
 			switch mode {
 			case "absolute-link":
 				must(t, os.Symlink("/etc/passwd", filepath.Join(src, "bad")))
@@ -285,7 +293,7 @@ func TestSourceCheckpointRejectsUnsafeFilesystem(t *testing.T) {
 				must(t, os.Symlink(src, link))
 				src = link
 			}
-			if _, err := Capture(context.Background(), src, out, p, tr); err == nil {
+			if _, err := Capture(context.Background(), src, out, p, tr, git); err == nil {
 				t.Fatal("unsafe source accepted")
 			}
 		})
@@ -326,13 +334,13 @@ func mutateArchive(t *testing.T, raw []byte, mutate func(*Manifest), extra bool)
 	return b.Bytes()
 }
 func TestSourceCheckpointRejectsTamperEvenWithRecomputedOuterHash(t *testing.T) {
-	src, out, p, tr := fixture(t)
+	src, out, p, tr, git := fixture(t)
 	ctx := context.Background()
-	a, err := Capture(ctx, src, out, p, tr)
+	a, err := Capture(ctx, src, out, p, tr, git)
 	must(t, err)
 	raw, err := os.ReadFile(a.Path)
 	must(t, err)
-	for _, mode := range []string{"missing-entry", "path-traversal", "digest", "extra", "trailer", "scope"} {
+	for _, mode := range []string{"missing-entry", "path-traversal", "digest", "git-digest", "extra", "trailer", "scope"} {
 		t.Run(mode, func(t *testing.T) {
 			changed := mutateArchive(t, raw, func(m *Manifest) {
 				switch mode {
@@ -344,6 +352,8 @@ func TestSourceCheckpointRejectsTamperEvenWithRecomputedOuterHash(t *testing.T) 
 					m.Entries[0].Digest = canonical.BytesDigest([]byte("other"))
 				case "scope":
 					m.Transcript.Close.ProcessScope.NamespaceID = m.Transcript.Close.ProcessScope.ParentNamespaceID
+				case "git-digest":
+					m.GitBundleDigest = canonical.BytesDigest([]byte("other bundle"))
 				}
 				m.SnapshotDigest, _ = canonical.Digest(m.Entries)
 			}, mode == "extra")
@@ -369,11 +379,11 @@ func TestSourceCheckpointRejectsTamperEvenWithRecomputedOuterHash(t *testing.T) 
 	}
 }
 func TestSourceCheckpointEmptyAndCancelled(t *testing.T) {
-	src, out, p, tr := fixture(t)
+	src, out, p, tr, git := fixture(t)
 	for _, name := range []string{".gitignore", "changed.c", "ignored", "nested", "empty", "run.sh"} {
 		must(t, os.RemoveAll(filepath.Join(src, name)))
 	}
-	a, err := Capture(context.Background(), src, out, p, tr)
+	a, err := Capture(context.Background(), src, out, p, tr, git)
 	must(t, err)
 	_, err = Verify(context.Background(), a.Path, a.Facts.ArchiveDigest, p.Token.RunID)
 	must(t, err)
