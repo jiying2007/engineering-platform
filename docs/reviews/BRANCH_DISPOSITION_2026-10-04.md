@@ -204,3 +204,24 @@ Only the already-reviewed post-successful-main workflow may delete it, after
 re-reading protected main, exact remote head, ancestry/tree identity and open PR
 inventory under the existing atomic SHA lease. Any drift fails the whole
 maintenance mutation before deletion.
+
+## Review-transport residue candidates — 2026-10-07
+
+Two temporary review transport refs were created while the linked GitHub actor
+could create Git commits/branches but the draft Ready transition and replacement
+PR mutations returned connector/GraphQL errors:
+
+- `chore/rc-retire-private-retention-residue-ready@1b8fd9f1e61ee9da7a1d124eceff8e0e9734c332`
+- `chore/rc-retire-private-retention-residue-review@11b71b7cecb6c14bc02cc800b3ee44da98c1d903`
+
+They contain **no unique file content**. Both resolve to complete tree
+`b6a1d55122783f8795cea764f25e99e05c3b0bda`, exactly the tree of protected
+main `6ff2589221ed9530311aeb4635271eef8f4780ba` after #198. The second ref differs only by an empty review
+transport commit; neither is a product/history authority or retained evidence ref.
+
+Both exact branch/head/tree tuples are therefore added to the existing retirement
+manifest. This change performs no direct deletion. Only the existing
+post-successful-main workflow may remove them after re-reading protected main,
+exact remote heads, integrated-commit ancestry/tree identity and open-PR
+inventory, using the existing atomic SHA leases and remote readback. Any drift
+rejects the maintenance mutation before deletion.
