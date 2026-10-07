@@ -98,13 +98,13 @@ func TestMirrorCopiesVerifiedArchiveToIndependentFilesystemOnly(t *testing.T) {
 		t.Fatal("failed overwrite attempt changed mirror")
 	}
 
-	for name, digest, run := range map[string][2]string{
+	for name, identity := range map[string][2]string{
 		"wrong-digest": {"sha256:" + strings.Repeat("0", 64), p.Subject.RunID},
 		"wrong-run":    {packed.ArchiveDigest, "other-run"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(targetRoot, name+".tar")
-			if _, err := Mirror(context.Background(), archive, digest, run, out); err == nil {
+			if _, err := Mirror(context.Background(), archive, identity[0], identity[1], out); err == nil {
 				t.Fatal("invalid mirror anchor accepted")
 			}
 			if _, err := os.Lstat(out); !os.IsNotExist(err) {
