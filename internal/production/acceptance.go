@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	TerminalPlanVersion = 2
+	TerminalPlanVersion = 3
 	SLOReportVersion    = 2
 
 	SLOStatusUnverified     = "UNVERIFIED_SUMMARY"
@@ -27,8 +27,13 @@ type TerminalPlan struct {
 	MaxEngineeringModelTurns int      `json:"max_engineering_model_turns"`
 	RequiredEvidence         []string `json:"required_evidence"`
 	RequiredGates            []string `json:"required_gates"`
+	DeploymentProfile        string   `json:"deployment_profile"`
+	DatabaseRollbackPolicy   string   `json:"database_rollback_policy"`
+	EmergencyStops           []string `json:"emergency_stops"`
 	HumanReviewRequired      bool     `json:"human_review_required"`
 	ProviderLiveRequired     bool     `json:"provider_live_required"`
+	NoSilentProviderFallback bool     `json:"no_silent_provider_fallback"`
+	NoAutomaticDBDowngrade   bool     `json:"no_automatic_database_downgrade"`
 }
 
 type TerminalPlanEnvelope struct {
@@ -47,6 +52,13 @@ func BuildTerminalPlan() (TerminalPlanEnvelope, error) {
 		MarkerBefore:             "PRE_LIVE_READY\n",
 		MarkerAfter:              "TERMINAL_QUALIFIED\n",
 		MaxEngineeringModelTurns: 1,
+		DeploymentProfile:        "canary-single-maintenance-fixture",
+		DatabaseRollbackPolicy:   "restore-authoritative-backup-and-reconcile",
+		EmergencyStops: []string{
+			"provider-credential-or-rule-disable",
+			"publisher-credential-revoke",
+			"worker-execution-stop",
+		},
 		RequiredEvidence: []string{
 			"codex.core.execution.v1",
 			"git.changed-tree.v1",
@@ -63,9 +75,15 @@ func BuildTerminalPlan() (TerminalPlanEnvelope, error) {
 			"closure_created",
 			"shutdown_restart_recovery_proven",
 			"source_verified_slo_evidence_accepted",
+			"canary_deployment_accepted",
+			"provider_emergency_disable_proven",
+			"publisher_revocation_proven",
+			"database_rollback_restore_policy_accepted",
 		},
-		HumanReviewRequired:  true,
-		ProviderLiveRequired: true,
+		HumanReviewRequired:      true,
+		ProviderLiveRequired:     true,
+		NoSilentProviderFallback: true,
+		NoAutomaticDBDowngrade:   true,
 	}
 	if err := plan.Validate(); err != nil {
 		return TerminalPlanEnvelope{}, err
@@ -88,9 +106,23 @@ func (p TerminalPlan) Validate() error {
 		p.MarkerAfter != "TERMINAL_QUALIFIED\n" ||
 		p.MarkerBefore == p.MarkerAfter ||
 		p.MaxEngineeringModelTurns != 1 ||
+		p.DeploymentProfile != "canary-single-maintenance-fixture" ||
+		p.DatabaseRollbackPolicy != "restore-authoritative-backup-and-reconcile" ||
 		!p.HumanReviewRequired || !p.ProviderLiveRequired ||
-		len(p.RequiredEvidence) != 3 || len(p.RequiredGates) != 10 {
+		!p.NoSilentProviderFallback || !p.NoAutomaticDBDowngrade ||
+		len(p.EmergencyStops) != 3 ||
+		len(p.RequiredEvidence) != 3 || len(p.RequiredGates) != 14 {
 		return fmt.Errorf("invalid production terminal acceptance plan")
+	}
+	expectedStops := []string{
+		"provider-credential-or-rule-disable",
+		"publisher-credential-revoke",
+		"worker-execution-stop",
+	}
+	for i := range expectedStops {
+		if p.EmergencyStops[i] != expectedStops[i] {
+			return fmt.Errorf("production terminal emergency-stop contract drift")
+		}
 	}
 	expectedEvidence := []string{
 		"codex.core.execution.v1",
@@ -113,6 +145,10 @@ func (p TerminalPlan) Validate() error {
 		"closure_created",
 		"shutdown_restart_recovery_proven",
 		"source_verified_slo_evidence_accepted",
+		"canary_deployment_accepted",
+		"provider_emergency_disable_proven",
+		"publisher_revocation_proven",
+		"database_rollback_restore_policy_accepted",
 	}
 	for i := range expectedGates {
 		if p.RequiredGates[i] != expectedGates[i] {
