@@ -27,14 +27,14 @@ import (
 )
 
 type completedTransport struct {
-	mu               sync.Mutex
-	permit           codexexec.Permit
-	work, root, mode string
+	mu                        sync.Mutex
+	permit                    codexexec.Permit
+	work, root, mode          string
 	runtimeBinary, runtimeDir string
-	qualificationRaw []byte
-	transcript       codexexec.ControlTranscript
-	checkpoint       codexexec.SourceCheckpoint
-	calls            map[string]int
+	qualificationRaw          []byte
+	transcript                codexexec.ControlTranscript
+	checkpoint                codexexec.SourceCheckpoint
+	calls                     map[string]int
 }
 
 func (*completedTransport) Subject() string { return subject }
