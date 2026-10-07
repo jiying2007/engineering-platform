@@ -27,7 +27,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved, unreplayed and blocks Recovery proof | Automatic source capture after arbitrary Codex/host death, approved repair or replay |
-| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual C compiler and freestanding host-ISA firmware ELF/map reference | Writable host builds, large production firmware, MCU cross-compilation, boot/timing/board qualification or unattended retention scheduling |
+| Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware, target-board boot/timing/electrical qualification or unattended retention scheduling |
 | Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete per-Run dependency coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
@@ -208,9 +208,11 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   Actual production-host account/unit provisioning, database migration rollback
   policy and active external-effect recovery remain open. Installation/switch never grants execution or downgrades the database.
 - W07/W08: authenticated Work -> Task -> Run intake and exact-epoch Human
-  Takeover are implemented using existing Core APIs; a board-free freestanding
-  firmware reference is in required native CI. WorkBuddy transport/UX and real
-  target cross-compilation/board acceptance remain open.
+  Takeover are implemented using existing Core APIs. Required native CI includes
+  both a freestanding host-ISA firmware reference and a no-network Cortex-M0
+  ARM EABI cross-toolchain build carried through Worker/Core/capture/restore.
+  WorkBuddy transport/UX and real board boot/timing/electrical acceptance remain
+  open.
 - W09/W10: actual Worker SIGKILL, ENOSPC, service-manager fault/security,
   cross-version rollback and a bounded real PostgreSQL/mTLS 32-Run/8-Worker
   admission/security matrix are implemented. The load matrix asserts exact
