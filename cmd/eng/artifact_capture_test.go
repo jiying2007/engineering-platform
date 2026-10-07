@@ -10,6 +10,14 @@ func TestCaptureExecutionCLIHasNoAuthorityOrImplicitPaths(t *testing.T) {
 	if _, err := parseExecutionCapture(good); err != nil {
 		t.Fatal(err)
 	}
+	withContinuation := append(append([]string{}, good...), "--continuation-archive", "/private/upstream.source-checkpoint.tar")
+	if q, err := parseExecutionCapture(withContinuation); err != nil || q.ContinuationArchive == "" {
+		t.Fatal(q, err)
+	}
+	duplicateContinuation := append(append([]string{}, withContinuation...), "--continuation-archive", "/private/other.tar")
+	if _, err := parseExecutionCapture(duplicateContinuation); err == nil {
+		t.Fatal("duplicate continuation archive accepted")
+	}
 	for _, extra := range [][]string{{"--core"}, {"--execute"}, {"--restore"}, {"--identity", "owner"}, {"--context", "/other"}, {"--run=other"}, {"--out=/other"}, {"extra"}} {
 		args := append(append([]string{}, good...), extra...)
 		if _, err := parseExecutionCapture(args); err == nil {
@@ -26,8 +34,16 @@ func TestCaptureExecutionCLIHasNoAuthorityOrImplicitPaths(t *testing.T) {
 	for _, item := range []struct{ flag, value string }{
 		{"--context", "relative"}, {"--runtime-binary", "/private/../codex"},
 		{"--qualification-receipt", "/private/runtime/qualification.json/"}, {"--out", "relative"},
+		{"--continuation-archive", "relative"},
 	} {
 		args := append([]string{}, good...)
+		if item.flag == "--continuation-archive" {
+			args = append(args, item.flag, item.value)
+			if _, err := parseExecutionCapture(args); err == nil {
+				t.Fatal("noncanonical path accepted", item.flag, item.value)
+			}
+			continue
+		}
 		for i := 0; i < len(args)-1; i += 2 {
 			if args[i] == item.flag {
 				args[i+1] = item.value

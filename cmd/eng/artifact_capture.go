@@ -27,6 +27,7 @@ func parseExecutionCapture(args []string) (workeragent.ExecutionCaptureRequest, 
 	fs.StringVar(&q.ContextDirectory, "context", "", "original frozen private context directory")
 	fs.StringVar(&q.RuntimeBinary, "runtime-binary", "", "private exact Codex runtime binary copy")
 	fs.StringVar(&q.QualificationReceipt, "qualification-receipt", "", "private exact Codex qualification receipt")
+	fs.StringVar(&q.ContinuationArchive, "continuation-archive", "", "explicit upstream source checkpoint for successor Run")
 	fs.StringVar(&q.Destination, "out", "", "new private archive path")
 	seen := map[string]bool{}
 	for _, arg := range args {
@@ -48,6 +49,9 @@ func parseExecutionCapture(args []string) (workeragent.ExecutionCaptureRequest, 
 		if !filepath.IsAbs(p) || filepath.Clean(p) != p {
 			return q, fmt.Errorf("explicit canonical context/runtime/qualification/output paths required")
 		}
+	}
+	if q.ContinuationArchive != "" && (!filepath.IsAbs(q.ContinuationArchive) || filepath.Clean(q.ContinuationArchive) != q.ContinuationArchive) {
+		return q, fmt.Errorf("explicit canonical continuation archive required")
 	}
 	return q, nil
 }

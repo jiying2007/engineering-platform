@@ -139,7 +139,7 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 }
 
 func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
-	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-runtime", "changed-runtime", "missing-qualification", "changed-qualification", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "cancelled"} {
+	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-runtime", "changed-runtime", "missing-qualification", "changed-qualification", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "unexpected-continuation", "cancelled"} {
 		t.Run(bad, func(t *testing.T) {
 			q, c := captureFixture(t, "report-lost")
 			ctx := context.Background()
@@ -189,6 +189,8 @@ func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
 				mustCheckpoint(t, os.Chmod(file, 0666))
 			case "hard-linked-context":
 				mustCheckpoint(t, os.Link(file, filepath.Join(filepath.Dir(q.Destination), "extra-link")))
+			case "unexpected-continuation":
+				q.ContinuationArchive = q.Readback.Archive
 			case "cancelled":
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)

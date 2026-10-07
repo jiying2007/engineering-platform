@@ -30,6 +30,7 @@ type ExecutionCaptureRequest struct {
 	ContextDirectory     string
 	RuntimeBinary        string
 	QualificationReceipt string
+	ContinuationArchive  string
 	Destination          string
 }
 
@@ -44,6 +45,7 @@ type ExecutionCaptureReport struct {
 	ResultBundleRetained     bool               `json:"result_bundle_retained"`
 	RuntimeBinaryRetained    bool               `json:"runtime_binary_retained"`
 	QualificationRetained    bool               `json:"qualification_retained"`
+	ContinuationRetained     bool               `json:"continuation_retained"`
 	RuntimeBinaryDigest      string             `json:"runtime_binary_digest"`
 	QualificationDigest      string             `json:"qualification_digest"`
 	FullRunBackup            bool               `json:"full_run_backup"`
@@ -56,15 +58,21 @@ type ExecutionCaptureReport struct {
 // checkpoint, result bundle or context member while claiming this selection.
 // It retains current record formats unchanged and additionally requires private
 // copies of the exact Codex binary and qualification receipt already frozen by
-// the Permit. This is still NOT all Run dependencies: the original Git base,
-// credentials, full Core control/tool history and upstream continuation bytes are
-// outside this narrowly declared selection.
+// the Permit. If this Run is an explicit source continuation, the exact upstream
+// source-checkpoint archive is also mandatory and is validated with the SAME
+// ref/Task/base/profile checks used by restoration before it enters the plan.
+// Current result/checkpoint producers retain their own base Git graph. This is
+// still NOT all Run dependencies: credentials/session material and full Core
+// control/tool history remain outside this narrowly declared selection.
 func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (report ExecutionCaptureReport, err error) {
 	var zero ExecutionCaptureReport
 	for _, p := range []string{q.ContextDirectory, q.RuntimeBinary, q.QualificationReceipt, q.Destination} {
 		if !filepath.IsAbs(p) || filepath.Clean(p) != p {
 			return zero, fmt.Errorf("canonical explicit context/runtime/qualification/destination required")
 		}
+	}
+	if q.ContinuationArchive != "" && (!filepath.IsAbs(q.ContinuationArchive) || filepath.Clean(q.ContinuationArchive) != q.ContinuationArchive) {
+		return zero, fmt.Errorf("canonical explicit continuation archive required")
 	}
 	// Do not add staging/output into producer records or the frozen context.
 	for _, root := range []string{q.Readback.Records, q.ContextDirectory} {
@@ -84,6 +92,18 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 		return zero, fmt.Errorf("every referenced source archive and result bundle must be supplied explicitly")
 	}
 	p := before.permit
+	continuationRetained := false
+	if p.Assignment.Input.Continuation != nil {
+		if q.ContinuationArchive == "" {
+			return zero, fmt.Errorf("successor Run requires its exact upstream continuation archive")
+		}
+		if _, err := VerifyContinuationArchive(ctx, p.Assignment, q.ContinuationArchive); err != nil {
+			return zero, fmt.Errorf("upstream continuation archive: %w", err)
+		}
+		continuationRetained = true
+	} else if q.ContinuationArchive != "" {
+		return zero, fmt.Errorf("ordinary Run cannot claim an upstream continuation archive")
+	}
 	runtimeDigest, runtimeSize, _, err := capturePrivateDependency(ctx, q.RuntimeBinary, artifactset.MaxFile, false)
 	if err != nil || runtimeDigest != p.Profile.BinaryDigest {
 		return zero, fmt.Errorf("runtime binary does not match frozen profile")
@@ -123,6 +143,10 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 		// Permit.Check has already verified each exact derived leaf name and digest.
 		names = append(names, entry.File)
 		add(entry.File, "context", filepath.Join(q.ContextDirectory, entry.File), entry.Ref.Digest, entry.Size)
+	}
+	if p.Assignment.Input.Continuation != nil {
+		ref := p.Assignment.Input.Continuation
+		add("continuation-source-checkpoint.tar", "source", q.ContinuationArchive, ref.ArchiveDigest, ref.ArchiveSize)
 	}
 	if before.checkpoint != nil {
 		add("source-checkpoint.tar", "source", q.Readback.Archive, before.checkpoint.ArchiveDigest, before.checkpoint.ArchiveSize)
@@ -186,7 +210,11 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	if err := contextInventory(q.ContextDirectory, names); err != nil {
 		return zero, err
 	}
-	return ExecutionCaptureReport{Archive: packed, Selection: "EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME", PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil, RuntimeBinaryRetained: true, QualificationRetained: true, RuntimeBinaryDigest: p.Profile.BinaryDigest, QualificationDigest: p.Profile.QualificationDigest}, nil
+	selection := "EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME"
+	if continuationRetained {
+		selection = "EXECUTION_RECORDS_CONTEXT_RUNTIME_AND_UPSTREAM_CONTINUATION"
+	}
+	return ExecutionCaptureReport{Archive: packed, Selection: selection, PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil, RuntimeBinaryRetained: true, QualificationRetained: true, ContinuationRetained: continuationRetained, RuntimeBinaryDigest: p.Profile.BinaryDigest, QualificationDigest: p.Profile.QualificationDigest}, nil
 }
 
 func contextInventory(path string, expected []string) error {
