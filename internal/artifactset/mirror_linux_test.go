@@ -76,6 +76,7 @@ func TestMirrorCopiesVerifiedArchiveToIndependentFilesystemOnly(t *testing.T) {
 	if mirrored.Status != "ARTIFACT_SET_INDEPENDENT_FILESYSTEM_MIRROR_BYTES_VERIFIED" ||
 		mirrored.ArchiveDigest != packed.ArchiveDigest || mirrored.ArchiveSize != packed.ArchiveSize ||
 		mirrored.ManifestDigest != packed.ManifestDigest || mirrored.Subject != packed.Subject ||
+		!mirrored.IndependentFilesystem || mirrored.SecondSiteQualified ||
 		mirrored.ExecutionAuthorized || mirrored.ProducerSemanticsVerified || mirrored.ProductionQualified {
 		t.Fatal("mirror identity/authority drift", mirrored)
 	}
