@@ -93,7 +93,7 @@ func TestFinalizeBundleRemainsSelfContainedAfterSourceRemoval(t *testing.T) {
 	if _, err := manager.gitOutput(ctx, independent, home, "init", "--template="+template, "--object-format=sha1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.gitOutput(ctx, independent, home, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--", finalized.BundlePath, "HEAD"); err != nil {
+	if _, err := manager.gitOutput(ctx, independent, home, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--", finalized.BundlePath, "HEAD:refs/heads/retained-result"); err != nil {
 		t.Fatal(err)
 	}
 	for _, commit := range []string{finalized.Facts.BaseCommit, finalized.Facts.ResultCommit} {
