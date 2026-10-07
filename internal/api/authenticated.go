@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
@@ -32,42 +33,43 @@ func AuthenticatedIdentity(ctx context.Context) (access.Identity, bool) {
 // Every admitted route has an explicit capability. New routes default to denial;
 // method/path prefixes, proxy headers and an unknown capability never grant access.
 var routeCapabilities = map[string]string{
-	"GET /api/v1/capabilities":            access.Read,
-	"GET /api/v1/recovery":                access.Read,
-	"GET /api/v1/operations/status":       access.Read,
-	"POST /api/v1/recovery/begin":         access.RecoveryBegin,
-	"POST /api/v1/recovery/complete":      access.RecoveryComplete,
-	"POST /api/v1/recovery/proofs":        access.RecoveryReconcile,
-	"GET /api/v1/recovery/proofs/{epoch}": access.Read,
-	"POST /api/v1/work-items":             access.WorkCreate,
-	"GET /api/v1/work-items/{id}":         access.Read,
-	"POST /api/v1/task-contracts":         access.TaskCreate,
-	"GET /api/v1/task-contracts/{id}":     access.Read,
-	"POST /api/v1/runs":                   access.RunStart,
-	"GET /api/v1/runs/{id}":               access.Read,
-	"POST /api/v1/runs/{id}/steer":        access.RunControl,
-	"POST /api/v1/runs/{id}/interrupt":    access.RunControl,
-	"GET /api/v1/steering/{id}/delivery":  access.Read,
-	"GET /api/v1/steering/{id}":           access.Read,
-	"POST /api/v1/runs/{id}/pause":        access.RunControl,
-	"POST /api/v1/runs/{id}/resume":       access.RunControl,
-	"POST /api/v1/runs/{id}/takeover":     access.RunControl,
-	"POST /api/v1/runs/{id}/complete":     access.RunComplete,
-	"POST /api/v1/runs/{id}/checkpoints":  access.CheckpointCreate,
-	"GET /api/v1/checkpoints/{id}":        access.Read,
-	"POST /api/v1/runs/{id}/actions":      access.ActionExecute,
-	"GET /api/v1/actions/{id}":            access.Read,
-	"POST /api/v1/actions/{id}/reconcile": access.ActionReconcile,
-	"POST /api/v1/deliveries":             access.DeliveryCreate,
-	"GET /api/v1/deliveries/{id}":         access.Read,
-	"POST /api/v1/evidence":               access.EvidenceRegister,
-	"GET /api/v1/evidence/{id}":           access.Read,
-	"POST /api/v1/verifications":          access.VerificationCreate,
-	"GET /api/v1/verifications/{id}":      access.Read,
-	"POST /api/v1/reviews":                access.ReviewCreate,
-	"GET /api/v1/reviews/{id}":            access.Read,
-	"POST /api/v1/closures":               access.ClosureCreate,
-	"GET /api/v1/closures/{id}":           access.Read,
+	"GET /api/v1/capabilities":                 access.Read,
+	"GET /api/v1/recovery":                     access.Read,
+	"GET /api/v1/operations/status":            access.Read,
+	"POST /api/v1/recovery/begin":              access.RecoveryBegin,
+	"POST /api/v1/recovery/complete":           access.RecoveryComplete,
+	"POST /api/v1/recovery/proofs":             access.RecoveryReconcile,
+	"GET /api/v1/recovery/proofs/{epoch}":      access.Read,
+	"POST /api/v1/recovery/executions/abandon": access.RecoveryReconcile,
+	"POST /api/v1/work-items":                  access.WorkCreate,
+	"GET /api/v1/work-items/{id}":              access.Read,
+	"POST /api/v1/task-contracts":              access.TaskCreate,
+	"GET /api/v1/task-contracts/{id}":          access.Read,
+	"POST /api/v1/runs":                        access.RunStart,
+	"GET /api/v1/runs/{id}":                    access.Read,
+	"POST /api/v1/runs/{id}/steer":             access.RunControl,
+	"POST /api/v1/runs/{id}/interrupt":         access.RunControl,
+	"GET /api/v1/steering/{id}/delivery":       access.Read,
+	"GET /api/v1/steering/{id}":                access.Read,
+	"POST /api/v1/runs/{id}/pause":             access.RunControl,
+	"POST /api/v1/runs/{id}/resume":            access.RunControl,
+	"POST /api/v1/runs/{id}/takeover":          access.RunControl,
+	"POST /api/v1/runs/{id}/complete":          access.RunComplete,
+	"POST /api/v1/runs/{id}/checkpoints":       access.CheckpointCreate,
+	"GET /api/v1/checkpoints/{id}":             access.Read,
+	"POST /api/v1/runs/{id}/actions":           access.ActionExecute,
+	"GET /api/v1/actions/{id}":                 access.Read,
+	"POST /api/v1/actions/{id}/reconcile":      access.ActionReconcile,
+	"POST /api/v1/deliveries":                  access.DeliveryCreate,
+	"GET /api/v1/deliveries/{id}":              access.Read,
+	"POST /api/v1/evidence":                    access.EvidenceRegister,
+	"GET /api/v1/evidence/{id}":                access.Read,
+	"POST /api/v1/verifications":               access.VerificationCreate,
+	"GET /api/v1/verifications/{id}":           access.Read,
+	"POST /api/v1/reviews":                     access.ReviewCreate,
+	"GET /api/v1/reviews/{id}":                 access.Read,
+	"POST /api/v1/closures":                    access.ClosureCreate,
+	"GET /api/v1/closures/{id}":                access.Read,
 }
 
 // NewAuthenticatedHandler is the supported network assembly. NewServer remains
@@ -186,6 +188,11 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 		}
 		if body.Reviewer != id.Subject() {
 			return http.StatusForbidden
+		}
+	case "POST /api/v1/recovery/executions/abandon":
+		var body recovery.ExecutionAbandonRequest
+		if strictjson.Decode(data, &body) != nil || body.Validate() != nil {
+			return http.StatusBadRequest
 		}
 	case "POST /api/v1/recovery/proofs":
 		var body createRecoveryProofRequest

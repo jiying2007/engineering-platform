@@ -24,9 +24,11 @@ var startupSchemaTables = []string{
 }
 
 var startupSchemaColumns = map[string][]string{
-	"outbox_events":     {"lease_recovery_epoch", "risk_class"},
-	"closure_receipts":  {"review_report_id"},
-	"steering_commands": {"execution_id", "control_payload", "dispatched_at", "resolved_at"},
+	"outbox_events":             {"lease_recovery_epoch", "risk_class"},
+	"closure_receipts":          {"review_report_id"},
+	"steering_commands":         {"execution_id", "control_payload", "dispatched_at", "resolved_at"},
+	"worker_offline_executions": {"reconciliation_json"},
+	"worker_codex_executions":   {"reconciliation_json"},
 }
 
 // CheckWorkerSchema is the existing pre-listen startup gate. It now requires the

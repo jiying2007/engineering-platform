@@ -25,8 +25,17 @@ A proof is created only when all machine-observable ambiguity is clear:
 - no live Worker inbox lease;
 - no offline execution in AUTHORIZED or UNKNOWN.
 
-Expired offline AUTHORIZED is intentionally unresolved: the workload may have
-started before its Worker disappeared.
+Expired offline/Codex AUTHORIZED and explicit UNKNOWN executions are
+intentionally unresolved: the workload or model turn may have started before its
+Worker disappeared. Migration v12 adds an explicit operator reconciliation path:
+a dedicated recovery reconciler may, only while the exact Recovery epoch is
+active and after the execution lease has expired, retain a
+`RECOVERY_EXECUTION_ABANDONMENT_V1` receipt bound to exact Run/execution identity
+and an externally retained observation digest. The execution becomes
+`ABANDONED_RECONCILED`, never FINISHED; no result, Delivery, replay or execution
+authority is created. Exact retry is idempotent, while changed observation bytes
+or a different reconciler are rejected. The durable execution row remains, so
+the one-Run reservation still prevents replay.
 
 The immutable proof binds the recovery epoch, reconciler identity, canonical facts
 digest, audit-journal head and creation time. One proof exists per epoch.
@@ -41,11 +50,16 @@ completion audit event, and only then changes mode to NORMAL.
 
 A stale proof therefore cannot authorize completion after new ambiguity appears.
 
-## Migration v7
+## Migrations v7 and v12
 
 `0007_recovery_reconciliation.sql` adds only the immutable proof table and
 schema-version marker. It does not fabricate historical proof rows or reclassify
 operations.
+
+`0012_execution_reconciliation.sql` extends only the existing offline/Codex
+execution ledgers with the non-success `ABANDONED_RECONCILED` state and an
+immutable reconciliation receipt. It does not delete the original reservation,
+invent a result, authorize retry, or reclassify historical rows.
 
 ## Restore drill
 
