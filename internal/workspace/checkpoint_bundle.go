@@ -53,7 +53,10 @@ func (m *Manager) RetainPreservationBundle(ctx context.Context, w Workspace, art
 	complete := false
 	defer func() {
 		if !complete {
-			err = errors.Join(err, os.Remove(bundlePath))
+			cleanup := os.Remove(bundlePath)
+			if cleanup != nil && !errors.Is(cleanup, os.ErrNotExist) {
+				err = errors.Join(err, cleanup)
+			}
 		}
 	}()
 	if _, err := m.gitOutput(ctx, w.WorktreePath, w.HomePath, "bundle", "create", bundlePath, "HEAD"); err != nil {
