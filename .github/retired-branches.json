@@ -75,6 +75,12 @@
       "tree": "8273f7f7a4700def9250c1568a947f03e1905c20"
     },
     {
+      "branch": "feat/rc-private-retention",
+      "expected_head": "f0374a67a528280332b77739526d305e171c13e3",
+      "integrated_commit": "f0374a67a528280332b77739526d305e171c13e3",
+      "tree": "2fae6f76194a7548c29422f3dab73b93b9ec7098"
+    },
+    {
       "branch": "feat/rc-publisher-health-observation",
       "expected_head": "2a9b4221c8bfe5cda2a5d61b8adc0bf174ee0c45",
       "integrated_commit": "0b412216e5bf72eb79a681bc4a8e1d63800ed82a",
