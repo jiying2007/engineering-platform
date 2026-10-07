@@ -10,7 +10,7 @@ import (
 
 const (
 	MaxEngineeringHistoryItems    = 2048
-	MaxEngineeringHistoryRawBytes = 2 << 20
+	MaxEngineeringHistoryRawBytes = 512 << 10
 )
 
 // EngineeringHistory is private reconciliation material. Params are exact
