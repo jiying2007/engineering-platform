@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"io"
 	"os"
@@ -156,6 +157,44 @@ func TestObserveEngineeringTurnAcceptsLocalItems(t *testing.T) {
 	}
 	if digest, err := got.History.Digest(); err != nil || !strings.HasPrefix(digest, "sha256:") {
 		t.Fatalf("item history digest invalid: %q %v", digest, err)
+	}
+}
+
+func TestEngineeringHistoryFitsStrictPrivateRecordAtBound(t *testing.T) {
+	h := EngineeringHistory{Version: 1, ThreadID: "thread-live", TurnID: "turn-live", Items: [][]byte{}}
+	padding := strings.Repeat("x", MaxEngineeringHistoryRawBytes-1024)
+	raw, err := json.Marshal(map[string]any{
+		"threadId": "thread-live", "turnId": "turn-live",
+		"item": map[string]any{"type": "agentMessage", "id": "message-large", "text": padding},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.appendItem(raw); err != nil {
+		t.Fatal(err)
+	}
+	completion := []byte(`{"threadId":"thread-live","turn":{"id":"turn-live","status":"completed"}}`)
+	if err := h.complete(completion); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) >= strictjson.MaxBytes {
+		t.Fatalf("bounded raw history encoded beyond strict private record: %d", len(encoded))
+	}
+	var restored EngineeringHistory
+	if err := strictjson.Decode(encoded, &restored); err != nil {
+		t.Fatal(err)
+	}
+	before, err := h.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := restored.Digest()
+	if err != nil || before != after {
+		t.Fatalf("strict private history round-trip drift: %q %q %v", before, after, err)
 	}
 }
 
