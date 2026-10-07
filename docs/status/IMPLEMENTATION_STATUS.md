@@ -25,7 +25,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Process lifetime | Dedicated Linux user/PID namespace; receipt v4 and transcript v2 bind kernel-observed init reap | Complete filesystem/resource isolation or control of unrelated host processes |
 | Stopped source | Private exact-byte archive after confirmed stop, immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
-| Finalization | Independent trusted-Git checkout reproduces complete source/tree before bundle publication | Clean Git status alone proves all source was delivered |
+| Finalization | Independent trusted-Git checkout reproduces complete source/tree before publication; recipe v2 emits a self-contained result bundle and proves exact base+result import from an empty object database | Clean Git status alone proves all source was delivered; successful result retention equals full repository history |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved, unreplayed and blocks Recovery proof | Automatic source capture after arbitrary Codex/host death, approved repair or replay |
 | Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware, target-board boot/timing/electrical qualification or unattended retention scheduling |
 | Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test | Complete per-Run dependency coverage, second-site backup, retention scheduling/encryption policy or automatic disk-exhaustion repair |
@@ -201,8 +201,9 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   covered. Arbitrary Codex/host crash source capture, disk-space repair and
   approved reconciliation/repair remain open.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
-  implemented; larger build profiles, unattended retention scheduling, full Run
-  dependencies and durable private retention/production-native acceptance remain open.
+  implemented; successful result bundles now retain their exact Git base objects.
+  Pre-finalization failure Git-base bytes, unattended retention scheduling, full
+  control/tool/continuation dependencies and durable private retention/production-native acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
   are implemented. Disposable fresh-host CI now proves the canonical named Unix

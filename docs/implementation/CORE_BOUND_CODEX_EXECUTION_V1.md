@@ -90,8 +90,9 @@ uses the platform-owned Git manager to finalize the changed workspace:
 - hooks/GPG signing are bypassed;
 - a fixed local author is used;
 - the result workspace must be clean after commit;
-- a Git bundle containing only the result relative to the base is created and
-  verified;
+- a self-contained Git bundle containing the result **and its exact base commit,
+  tree and source objects** is created, imported into a fresh empty object
+  database, and both base/result source digests are independently verified;
 - result commit/tree/source digest plus bundle SHA-256/size are retained.
 
 No git push or GitHub token exists in this lane.

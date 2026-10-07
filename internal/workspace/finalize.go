@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-const FinalizeRecipe = "independent-git-finalize-v1"
+const FinalizeRecipe = "independent-git-finalize-v2-self-contained"
 
 var bundleIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
@@ -131,10 +131,14 @@ func (m *Manager) Finalize(ctx context.Context, w Workspace, artifactRoot, artif
 	if _, err := os.Lstat(bundlePath); err == nil || !os.IsNotExist(err) {
 		return result, ErrWorkspaceExists
 	}
-	if _, err := m.gitOutput(ctx, w.WorktreePath, w.HomePath, "bundle", "create", bundlePath, "HEAD", "^"+w.BaseCommit); err != nil {
+	if _, err := m.gitOutput(ctx, w.WorktreePath, w.HomePath, "bundle", "create", bundlePath, "HEAD"); err != nil {
 		return result, err
 	}
 	if _, err := m.gitOutput(ctx, w.WorktreePath, w.HomePath, "bundle", "verify", bundlePath); err != nil {
+		_ = os.Remove(bundlePath)
+		return result, err
+	}
+	if err := m.verifySelfContainedResultBundle(ctx, w, artifactRoot, bundlePath, resultCommit, resultTree, resultDigest); err != nil {
 		_ = os.Remove(bundlePath)
 		return result, err
 	}
@@ -165,6 +169,67 @@ func (m *Manager) Finalize(ctx context.Context, w Workspace, artifactRoot, artif
 		BundlePath: bundlePath,
 	}
 	return result, nil
+}
+
+// verifySelfContainedResultBundle imports only the retained bundle into a fresh
+// empty object database. Successful fetch plus explicit base/result byte checks
+// prove the bundle has no external Git-object prerequisite. It does not import
+// source HOME/config/hooks/credentials and removes only its own private scratch.
+func (m *Manager) verifySelfContainedResultBundle(ctx context.Context, source Workspace, artifactRoot, bundlePath, resultCommit, resultTree, resultDigest string) (err error) {
+	dir, err := os.MkdirTemp(artifactRoot, ".bundle-readback-")
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
+	repo, home, template := filepath.Join(dir, "repo"), filepath.Join(dir, "home"), filepath.Join(dir, "template")
+	for _, path := range []string{repo, home, template} {
+		if err := os.Mkdir(path, 0o700); err != nil {
+			return err
+		}
+	}
+	if _, err := m.gitOutput(ctx, repo, home, "init", "--template="+template, "--object-format=sha1"); err != nil {
+		return fmt.Errorf("initialize independent bundle readback: %w", err)
+	}
+	if _, err := m.gitOutput(ctx, repo, home, "fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--", bundlePath, "HEAD:refs/heads/retained-result"); err != nil {
+		return fmt.Errorf("self-contained result bundle import failed: %w", err)
+	}
+	fetched, err := m.gitOutput(ctx, repo, home, "rev-parse", "--verify", "refs/heads/retained-result^{commit}")
+	if err != nil || strings.TrimSpace(fetched) != resultCommit {
+		return fmt.Errorf("result bundle head identity mismatch")
+	}
+	parents, err := m.gitOutput(ctx, repo, home, "rev-list", "--parents", "-n", "1", resultCommit)
+	if err != nil {
+		return fmt.Errorf("result bundle parent identity unavailable")
+	}
+	fields := strings.Fields(parents)
+	if len(fields) != 2 || fields[0] != resultCommit || fields[1] != source.BaseCommit {
+		return fmt.Errorf("result bundle is not the exact direct child of retained base")
+	}
+	shallow, err := m.gitOutput(ctx, repo, home, "rev-parse", "--is-shallow-repository")
+	if err != nil || strings.TrimSpace(shallow) != "false" {
+		return fmt.Errorf("result bundle import retained an external shallow prerequisite")
+	}
+	for commit, tree := range map[string]string{source.BaseCommit: source.TreeCommit, resultCommit: resultTree} {
+		actual, err := m.gitOutput(ctx, repo, home, "rev-parse", "--verify", commit+"^{tree}")
+		if err != nil || strings.TrimSpace(actual) != tree {
+			return fmt.Errorf("result bundle missing exact commit/tree identity")
+		}
+	}
+	if _, err := m.gitOutput(ctx, repo, home, "checkout", "--detach", source.BaseCommit); err != nil {
+		return fmt.Errorf("result bundle base checkout failed: %w", err)
+	}
+	baseDigest, err := snapshotDigest(ctx, repo)
+	if err != nil || baseDigest != source.SourceDigest {
+		return fmt.Errorf("result bundle base source bytes mismatch")
+	}
+	if _, err := m.gitOutput(ctx, repo, home, "checkout", "--detach", resultCommit); err != nil {
+		return fmt.Errorf("result bundle result checkout failed: %w", err)
+	}
+	observedResult, err := snapshotDigest(ctx, repo)
+	if err != nil || observedResult != resultDigest {
+		return fmt.Errorf("result bundle result source bytes mismatch")
+	}
+	return nil
 }
 
 // verifyResultReadback uses the same trusted Git and snapshot recipe in a fresh
