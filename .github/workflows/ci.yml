@@ -193,6 +193,21 @@ jobs:
           test -S /var/run/docker.sock
           docker version
 
+      - name: Require host Cortex-M linker fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v clang
+          if ! command -v ld.lld >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            export NEEDRESTART_MODE=l
+            sudo -E apt-get update -qq
+            sudo -E apt-get install -y --no-install-recommends lld
+          fi
+          command -v ld.lld
+          clang --version
+          ld.lld --version
+
       - name: Qualify canonical named service identities on disposable runner
         shell: bash
         run: bash scripts/ci-named-service-identities.sh
