@@ -57,7 +57,17 @@ with tempfile.TemporaryDirectory(prefix="ep-installed-byte-test-") as tmp:
     report = invoke(original / "eng", "distribution-install", "--from", str(original),
                     "--into", str(installed), "--source-commit", revision)
     assert report["status"] == "INSTALLED_BYTES_VERIFIED"
-    assert report["binary_count"] == 6 and report["template_count"] == 21
+    manifest = json.loads((installed / "installation-manifest.json").read_text())
+    template_paths = {item["path"] for item in manifest["files"] if item["path"].startswith("templates/")}
+    required_retention_templates = {
+        "templates/artifact-retention.env.example",
+        "templates/artifact-retention.json.tmpl",
+        "templates/systemd/maintenance/engineering-artifact-retention.service",
+        "templates/systemd/maintenance/engineering-artifact-retention.timer",
+    }
+    assert report["binary_count"] == 6
+    assert report["template_count"] == len(template_paths)
+    assert required_retention_templates <= template_paths
     for claim in ("services_started", "configuration_applied", "dependencies_included",
                   "execution_authorized", "production_qualified"):
         assert report[claim] is False

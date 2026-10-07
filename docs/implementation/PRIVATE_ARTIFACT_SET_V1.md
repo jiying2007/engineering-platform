@@ -131,16 +131,24 @@ decoded and its semantic digest, binary/version/model/config identities must
 match the frozen Profile before its original bytes enter the archive. Restored
 runtime bytes remain non-executable like every other artifact-set payload.
 
-Selection is `EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME`. This closes
-selection completeness for the current producer records, frozen Context and
-Permit-bound Codex runtime/qualification objects, not `full_run_backup`: the
-original Git base bytes, credential/session material, complete Core control/tool
-history, and upstream continuation source dependencies still require separate
-retention. Artifact-set's own
-coverage stays `EXPLICIT_DECLARED_MEMBERS_ONLY`. No Core/network request, Git,
-SQL, model, source scan, permission grant or public upload occurs. The command
-requires already host-owned quiescent inputs; offline retention does not renew
-Context approval or authorize execution.
+The ordinary selection is
+`EXECUTION_RECORDS_CONTROL_HISTORY_CONTEXT_AND_FROZEN_RUNTIME`; an explicit
+source-continuation successor uses
+`EXECUTION_RECORDS_CONTROL_HISTORY_CONTEXT_RUNTIME_AND_UPSTREAM_CONTINUATION`.
+Both selections require the exact private sealed ControlTranscript and bounded
+schema-v5 EngineeringHistory (accepted `item/completed` Params plus terminal
+`turn/completed`) in addition to current producer records, frozen Context and
+Permit-bound Codex runtime/qualification. A continuation successor additionally
+requires the exact upstream source-checkpoint archive. Result bundles are
+self-contained for the frozen base+result Git graph, while stopped-source
+checkpoint v2 retains its validated base graph. This remains
+`full_run_backup=false`: credential/session bootstrap, bearer material,
+provider-internal streaming state, broader repository history and external
+service state remain outside this selection. Artifact-set's own coverage stays
+`EXPLICIT_DECLARED_MEMBERS_ONLY`. No Core/network request, Git, SQL, model,
+source scan, permission grant or public upload occurs. The command requires
+already host-owned quiescent inputs; offline retention does not renew Context
+approval or authorize execution.
 
 The context manifest is stored as `files/context-manifest.json`, with original
 canonical manifest bytes and original entry names. This name avoids collision
@@ -199,14 +207,55 @@ and existing Recovery completion authority remain separate. The test admin pool
 stays open until scoped database cleanup completes; no backup file is uploaded.
 
 This closes explicit raw-set storage/readback, not all W04/W05: producer-side
-frozen output contracts, complete per-Run dependency coverage (including original
-Git base/input/context), scheduled backup, approved second-site storage, key
-management/encryption policy, production/cross-version database acceptance, full model
-output retention, crash capture and retention/GC lifecycle remain separate.
+frozen output contracts, complete credential/session/provider-internal state
+coverage, approved off-host/second-site placement, destructive retention/GC policy,
+key management/encryption policy, production/cross-version database acceptance,
+provider credential/session/internal-streaming retention and crash capture remain
+separate. Periodic verified replica scheduling is implemented but does not delete
+or qualify a second site.
 Omitted files are NOT covered. Use native database backups, never live data files.
 Never upload private sets to public GitHub/Actions. Source, steering and artifacts
 can contain secrets; these archives are not auto-redacted or encrypted. Public
 terminal fact allowlists and historical M1 archives are unchanged. #105 is open.
+
+## Scheduled verified replica retention
+
+`eng artifact-retention replicate` adds a deliberately narrow unattended
+retention primitive around already-created artifact-set archives. It takes an
+owner-controlled strict configuration whose **raw config digest must be pinned
+externally**. The config names two existing owner-private roots, an explicit
+sorted list of archive leaf names, exact original Run IDs and exact archive
+digests, plus a bounded total byte budget.
+
+The command performs two phases. First it verifies every primary archive and
+every already-present replica with the existing artifact-set verifier and checks
+the whole sweep against the explicit byte budget. Only after all existing state
+is valid does it create missing replicas. Copying uses a private temporary file,
+streaming digest/size verification, fsync, independent archive readback,
+no-replace publication, directory fsync, final replica readback and a second
+primary readback. A nonblocking lock on the replica root serializes concurrent
+sweeps. Existing mismatched files, aliases, links, unsafe roots, changed inputs,
+cancellation and budget overflow fail closed.
+
+The report contains only config digest, counts and verified bytes. It always
+states `deletion_performed=false`, `execution_authorized=false`,
+`production_qualified=false` and `second_site_qualified=false`. Replication
+does **not** scan for archives, choose retention policy, delete/overwrite either
+root, execute restored data, call Core, Git, SQL, a model or a network service.
+A replica root on the same filesystem is not evidence of a second site.
+
+The production examples include a disabled-by-default maintenance systemd
+service/timer running as the existing `engineering-preparation` identity.
+Installation only copies these templates; an operator must provision the
+owner-private config/roots, pin the raw config digest, review the example cadence
+and explicitly enable the timer. The example six-hour cadence is an operating
+example, not a measured SLO. The service can write only the replica root under
+`ProtectSystem=strict`; the primary remains read-only.
+
+This closes the code path for unattended **verified replication scheduling**.
+Retention expiry/GC, destructive deletion, encryption/key custody and actual
+off-host/second-site placement remain separate explicit gates. No automatic GC
+is intentionally coupled to successful replication.
 
 ## Frozen offline build producer capture
 
