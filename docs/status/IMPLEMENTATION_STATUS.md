@@ -115,8 +115,9 @@ binary and qualification receipt. It rejects missing/extra Context, runtime byte
 drift, qualification semantic drift and unbound artifacts. For an explicit
 source-continuation successor it additionally requires the exact upstream
 source-checkpoint archive and validates the frozen ContinuationRef/Task/base/
-Codex-tool/Worker-profile binding before retaining those bytes. It still does
-not capture credential/session material or full control/tool history.
+Codex-tool/Worker-profile binding before retaining those bytes. It now also requires and retains the exact private sealed ControlTranscript raw
+bytes, and Core readback compares that transcript structurally when present. It
+still does not capture credential/session material or full model/tool item history.
 `capture-offline` derives the original permit/report and every collected output
 from the frozen offline Profile. Both raw records require external digest anchors;
 failed commands retain failure records with zero outputs, never successful-build
@@ -221,8 +222,9 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
   implemented; successful result bundles retain their exact Git base objects,
   stopped-source checkpoint v2 retains the validated base graph before/after
-  Finalize, and successor capture retains the exact verified upstream
-  continuation checkpoint. Unattended retention scheduling, full control/tool
+  Finalize, successor capture retains the exact verified upstream continuation
+  checkpoint, and current execution capture requires the exact sealed private
+  ControlTranscript. Unattended retention scheduling, full model/tool item
   history and durable private retention/production-native acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback

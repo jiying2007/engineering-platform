@@ -64,7 +64,7 @@ func TestActualPostTurnReadbackPreservesObservationsAndBytes(t *testing.T) {
 			calls, _ := canonical.Digest(c.calls)
 			r, err := workeragent.InspectPostTurn(context.Background(), q)
 			mustCheckpoint(t, err)
-			if r.CoreObservation != "NOT_OBSERVED" || r.SourceBytes != "NOT_READ" || r.BundleBytes != "NOT_READ" || r.ExecutionAuthorized || r.ReplayAuthorized || r.ProductionQualified {
+			if r.CoreObservation != "NOT_OBSERVED" || r.SourceBytes != "NOT_READ" || r.BundleBytes != "NOT_READ" || !r.ControlTranscriptRetained || r.ExecutionAuthorized || r.ReplayAuthorized || r.ProductionQualified {
 				t.Fatal("invented authority", r)
 			}
 			if mode == "success" {
@@ -252,6 +252,17 @@ func TestActualPostTurnReadbackRejectsTamperingAndNeverFollowsPaths(t *testing.T
 		"public-record": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
 			mustCheckpoint(t, os.Chmod(filepath.Join(q.Records, name(":post-turn:FINALIZE")), 0644))
 		},
+		"control-transcript-drift": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
+			path := filepath.Join(q.Records, name(":control-transcript"))
+			raw, e := os.ReadFile(path)
+			mustCheckpoint(t, e)
+			var v map[string]any
+			mustCheckpoint(t, json.Unmarshal(raw, &v))
+			v["close"].(map[string]any)["binding"].(map[string]any)["token"].(map[string]any)["execution_id"] = strings.Repeat("a", 64)
+			changed, e := json.Marshal(v)
+			mustCheckpoint(t, e)
+			mustCheckpoint(t, os.WriteFile(path, changed, 0600))
+		},
 		"wrong-bundle": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
 			q.Bundle = filepath.Join(q.Records, "bad.bundle")
 			mustCheckpoint(t, os.WriteFile(q.Bundle, []byte("bad"), 0600))
@@ -311,6 +322,15 @@ func TestActualPostTurnReadbackRejectsTamperingAndNeverFollowsPaths(t *testing.T
 		q.Archive = filepath.Join(c.root, "artifacts", q.ExecutionID+".source-checkpoint.tar")
 		_, e = workeragent.InspectPostTurn(context.Background(), q)
 		mustCheckpoint(t, e)
+	})
+	t.Run("historical-missing-control-transcript-remains-readable", func(t *testing.T) {
+		q := copyRecords(t)
+		mustCheckpoint(t, os.Remove(filepath.Join(q.Records, name(":control-transcript"))))
+		r, e := workeragent.InspectPostTurn(context.Background(), q)
+		mustCheckpoint(t, e)
+		if r.ControlTranscriptRetained || r.TranscriptDigest == "" {
+			t.Fatal("historical readback invented retained control bytes", r)
+		}
 	})
 	t.Run("only-entered-is-not-crash-or-success", func(t *testing.T) {
 		q := copyRecords(t)
