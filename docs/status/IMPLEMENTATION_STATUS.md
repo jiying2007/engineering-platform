@@ -23,7 +23,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Core | PostgreSQL business/audit/outbox, frozen Task/RunInput, execution and Recovery epochs | Production service operating acceptance |
 | Live controls | mTLS RunControl, durable one-shot steering/interrupt, exact actor/sequence/epoch/turn binding and sealed transcript | ACK means stopped; accepted input means objective fulfilled |
 | Process lifetime | Dedicated Linux user/PID namespace; receipt v4 and transcript v2 bind kernel-observed init reap | Complete filesystem/resource isolation or control of unrelated host processes |
-| Stopped source | Private exact-byte archive after confirmed stop, immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
+| Stopped source | Private exact-byte archive after confirmed stop; archive v2 also embeds a self-contained, empty-repo-verified Git graph for the frozen base/direct Finalize child; immutable Core descriptor and new-directory restore | Full model session, automatic replay, successful Delivery or takeover authority |
 | Source continuation | Work owner with RunStart + RunControl explicitly creates one fresh successor; old Run fenced as STOPPED_NO_DELIVERY | In-memory pause/resume, inherited execution permit or model-memory reconstruction |
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before publication; recipe v2 emits a self-contained result bundle and proves exact base+result import from an empty object database | Clean Git status alone proves all source was delivered; successful result retention equals full repository history |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved, unreplayed and blocks Recovery proof | Automatic source capture after arbitrary Codex/host death, approved repair or replay |
@@ -126,7 +126,9 @@ C build additionally captures and restores its original records and raw outputs
 after deleting source/Git/preparation roots, without creating Evidence or new
 execution. Producer-derived capture tests remove the entire prepared root
 including Context, restore, and recheck every frozen input object and producer
-record. Original Git base/toolchain, full model/tool/control history, second-site
+record. Original Git-base bytes are now retained on the successful-result and
+stopped-source producer paths; toolchain/container-image bytes, full
+model/tool/control history, upstream continuation dependencies, second-site
 retention, encryption/key policy, scheduling and GC remain open. A required
 1 MiB private-tmpfs fault test also proves real ENOSPC during artifact pack and
 restore cannot publish a successful archive/report; a private partial restore
@@ -201,9 +203,10 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   covered. Arbitrary Codex/host crash source capture, disk-space repair and
   approved reconciliation/repair remain open.
 - W04/W05: bounded offline build-output contracts and raw-set/context capture
-  implemented; successful result bundles now retain their exact Git base objects.
-  Pre-finalization failure Git-base bytes, unattended retention scheduling, full
-  control/tool/continuation dependencies and durable private retention/production-native acceptance remain open.
+  implemented; successful result bundles retain their exact Git base objects and
+  stopped-source checkpoint v2 retains the validated base graph before/after
+  Finalize. Unattended retention scheduling, full control/tool/continuation
+  dependencies and durable private retention/production-native acceptance remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
   are implemented. Disposable fresh-host CI now proves the canonical named Unix
