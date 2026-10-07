@@ -66,7 +66,7 @@ type ExecutionCaptureReport struct {
 // Current result/checkpoint producers retain their own base Git graph. The exact
 // sealed private ControlTranscript and exact bounded completed-item history are
 // mandatory for current capture. This is still NOT all Run dependencies:
- // credential/session material and provider-internal streaming state remain outside
+// credential/session material and provider-internal streaming state remain outside
 // this narrowly declared selection.
 func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (report ExecutionCaptureReport, err error) {
 	var zero ExecutionCaptureReport
