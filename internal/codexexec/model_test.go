@@ -185,7 +185,7 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 	p, permit := contractFixture(t)
 	promptDigest, _ := PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	codex := codexapp.EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(),
+		SchemaVersion: 5, ProcessScope: testsupport.ProcessScopeFixture(),
 		CLI:                        "codex-cli",
 		Version:                    p.CodexVersion,
 		BinaryDigest:               p.BinaryDigest,
@@ -195,6 +195,8 @@ func TestResultValidationBindsPromptModelAndChange(t *testing.T) {
 		FederationRuleID:           "rule",
 		Model:                      p.Model,
 		PromptDigest:               "sha256:" + strings.Repeat("7", 64),
+		ItemHistoryDigest:          canonical.BytesDigest([]byte("test-only item history")),
+		ItemHistoryCount:           1,
 		ThreadID:                   "thread",
 		TurnID:                     "turn",
 		TurnStatus:                 "completed",
