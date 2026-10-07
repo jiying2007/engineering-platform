@@ -28,7 +28,7 @@ those subjects or rewrite their receipts to manufacture current production proof
 | Finalization | Independent trusted-Git checkout reproduces complete source/tree before publication; recipe v2 emits a self-contained result bundle and proves exact base+result import from an empty object database | Clean Git status alone proves all source was delivered; successful result retention equals full repository history |
 | Post-turn failures | Immutable fsynced phase records; catchable failures preserve stopped source; read-only local/Core reconciliation; actual offline Worker SIGKILL after permit/renewal remains unresolved/unreplayed; schema v12 can explicitly abandon an exact expired AUTHORIZED/UNKNOWN offline/Codex execution under Recovery without creating a result or replay authority | Automatic source capture after arbitrary Codex/host death, automatic repair or replay |
 | Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware or target-board boot/timing/electrical qualification |
-| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; execution capture requires the exact sealed ControlTranscript plus bounded raw Codex item/completion history; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test; externally pinned scheduled verification/copy into a second owner-private root | Provider credential/session bootstrap and internal streaming state, actual off-host/second-site qualification, encryption/key custody, destructive GC or automatic disk-exhaustion repair |
+| Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; execution capture requires the exact sealed ControlTranscript plus bounded raw Codex item/completion history; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test; externally pinned scheduled verification/copy into a second owner-private root; required real-systemd CI runs the maintenance oneshot as canonical `engineering-preparation:engineering-platform` and proves first-copy/idempotent readback/fail-closed missing config without installing production-named units | Provider credential/session bootstrap and internal streaming state, actual off-host/second-site or production-host retention qualification, encryption/key custody, destructive GC or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
 | Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
@@ -145,8 +145,14 @@ including Context, restore, and recheck every frozen input object and producer
 record. Original Git-base bytes are now retained on the successful-result and
 stopped-source producer paths; toolchain/container-image bytes and broader
 credential/session/provider-internal state remain outside the set. Scheduled
-verified private replica retention is implemented; actual off-host/second-site
-placement, encryption/key custody and destructive GC remain open. A required
+verified private replica retention is implemented. Required native CI also
+executes that maintenance path under real systemd using the canonical
+`engineering-preparation:engineering-platform` identity on a disposable host,
+proving first-copy verification, idempotent existing-replica readback,
+fail-closed missing configuration and full account/group cleanup without
+installing/enabling the production-named retention unit/timer. Actual production-
+host/off-host/second-site placement, encryption/key custody and destructive GC
+remain open. A required
 1 MiB private-tmpfs fault test also proves real ENOSPC during artifact pack and
 restore cannot publish a successful archive/report; a private partial restore
 directory may remain explicitly unverified for operator disposition.
@@ -230,10 +236,11 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   Finalize, successor capture retains the exact verified upstream continuation
   checkpoint, and current execution capture requires the exact sealed private
   ControlTranscript plus bounded raw Codex item/completion history. Externally
-  pinned verified replica scheduling is implemented without scan/overwrite/delete;
-  credential/session/provider-internal state retention, actual off-host/second-site
-  placement, encryption/key custody, destructive GC and production-native
-  retention acceptance remain open.
+  pinned verified replica scheduling is implemented without scan/overwrite/delete,
+  and required real-systemd CI now executes the maintenance oneshot under the
+  canonical preparation identity with cleanup/readback checks. Credential/session/
+  provider-internal state retention, actual production-host/off-host/second-site
+  placement, encryption/key custody and destructive GC remain open.
 - W06: source-bound six-role install/readback, real transient four-role systemd
   ordering/identity separation and immutable cross-version binary switch/rollback
   are implemented. Disposable fresh-host CI now proves the canonical named Unix
