@@ -109,7 +109,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	controlDigest, controlErr := transcript.Digest()
 	if controlErr == nil && transcript.Close.Binding.Token == permit.Token &&
 		transcript.Close.Binding.ExecutionEpoch == permit.Assignment.Intent.ExecutionEpoch {
-		saveErr := p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID+":control-transcript"))[7:], transcript)
+		saveErr := p.SaveCodex(permit.Assignment, prepared, sandbox.Hash([]byte(permit.Token.ID + ":control-transcript"))[7:], transcript)
 		err = errors.Join(err, saveErr)
 	} else if err == nil {
 		if controlErr != nil {
