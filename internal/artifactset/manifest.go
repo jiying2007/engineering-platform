@@ -61,6 +61,8 @@ type Report struct {
 	Members                   int     `json:"member_count"`
 	Bytes                     int64   `json:"payload_bytes"`
 	ProducerSemanticsVerified bool    `json:"producer_semantics_verified"`
+	IndependentFilesystem     bool    `json:"independent_filesystem"`
+	SecondSiteQualified       bool    `json:"second_site_qualified"`
 	ExecutionAuthorized       bool    `json:"execution_authorized"`
 	ProductionQualified       bool    `json:"production_qualified"`
 }
