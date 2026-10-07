@@ -200,7 +200,7 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		}
 		limit := int64(strictjson.MaxBytes)
 		if name == historyName {
-			limit = 4 << 20
+			limit = int64(strictjson.MaxBytes)
 		}
 		raw, err := readbackFileBound(root, name, limit)
 		if err != nil {
