@@ -11,7 +11,9 @@ REPOSITORY = "jiying2007/engineering-platform"
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 DISPOSITION = "RETAINED_SUPERSEDED_PROTOTYPE"
 NAMES = (
+    "docs/rc-status-after-terminal-v3",
     "feat/github-ci-core-evidence-import",
+    "feat/independent-artifact-mirror",
     "feat/independent-publisher-service",
     "feat/independent-review-authority",
     "feat/relay-codex-config-renderer",
