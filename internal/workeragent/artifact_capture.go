@@ -35,23 +35,23 @@ type ExecutionCaptureRequest struct {
 }
 
 type ExecutionCaptureReport struct {
-	Archive                  artifactset.Report `json:"archive"`
-	Selection                string             `json:"selection"`
-	PermitDigest             string             `json:"permit_digest"`
-	ContextManifestDigest    string             `json:"context_manifest_digest"`
-	RecordCount              int                `json:"record_count"`
-	ContextCount             int                `json:"context_count"`
-	SourceCheckpointRetained bool               `json:"source_checkpoint_retained"`
-	ResultBundleRetained     bool               `json:"result_bundle_retained"`
-	RuntimeBinaryRetained    bool               `json:"runtime_binary_retained"`
-	QualificationRetained    bool               `json:"qualification_retained"`
-	ControlTranscriptRetained bool              `json:"control_transcript_retained"`
-	ContinuationRetained     bool               `json:"continuation_retained"`
-	RuntimeBinaryDigest      string             `json:"runtime_binary_digest"`
-	QualificationDigest      string             `json:"qualification_digest"`
-	FullRunBackup            bool               `json:"full_run_backup"`
-	ExecutionAuthorized      bool               `json:"execution_authorized"`
-	ProductionQualified      bool               `json:"production_qualified"`
+	Archive                   artifactset.Report `json:"archive"`
+	Selection                 string             `json:"selection"`
+	PermitDigest              string             `json:"permit_digest"`
+	ContextManifestDigest     string             `json:"context_manifest_digest"`
+	RecordCount               int                `json:"record_count"`
+	ContextCount              int                `json:"context_count"`
+	SourceCheckpointRetained  bool               `json:"source_checkpoint_retained"`
+	ResultBundleRetained      bool               `json:"result_bundle_retained"`
+	RuntimeBinaryRetained     bool               `json:"runtime_binary_retained"`
+	QualificationRetained     bool               `json:"qualification_retained"`
+	ControlTranscriptRetained bool               `json:"control_transcript_retained"`
+	ContinuationRetained      bool               `json:"continuation_retained"`
+	RuntimeBinaryDigest       string             `json:"runtime_binary_digest"`
+	QualificationDigest       string             `json:"qualification_digest"`
+	FullRunBackup             bool               `json:"full_run_backup"`
+	ExecutionAuthorized       bool               `json:"execution_authorized"`
+	ProductionQualified       bool               `json:"production_qualified"`
 }
 
 // CaptureExecutionArtifacts derives the existing raw-set plan from verified
