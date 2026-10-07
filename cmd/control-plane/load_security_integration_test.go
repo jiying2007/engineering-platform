@@ -41,7 +41,7 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 	if dsn == "" {
 		t.Fatal("sustained matrix requires POSTGRES_TEST_URL")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 	bin := installedOfflineDistribution(t, ctx)
 
@@ -62,11 +62,12 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 		return ""
 	}()
 	const (
-		runCount    = 32
-		workerCount = 8
-		perWorker   = runCount / workerCount
-		engineer    = "urn:engineering-platform:engineer:load-matrix"
-		denied      = "urn:engineering-platform:observer:load-matrix"
+		runCount       = 96
+		workerCount    = 8
+		perWorker      = runCount / workerCount
+		securityRounds = 3
+		engineer       = "urn:engineering-platform:engineer:load-matrix"
+		denied         = "urn:engineering-platform:observer:load-matrix"
 	)
 	if runCount%workerCount != 0 {
 		t.Fatal("invalid fixed matrix dimensions")
@@ -224,7 +225,7 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 		output   string
 	}
 	validResults := make(chan processResult, runCount)
-	deniedResults := make(chan processResult, workerCount*2)
+	deniedResults := make(chan processResult, workerCount*2*securityRounds)
 	workerStart := time.Now()
 	var workers sync.WaitGroup
 	for i, subject := range workerSubjects {
@@ -248,24 +249,31 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 	}
 	// Security probes run while legitimate workers are active. Neither identity
 	// nor profile mismatch is allowed to reach a successful claim.
-	for i := 0; i < workerCount; i++ {
-		workers.Add(2)
-		go func() {
-			defer workers.Done()
-			start := time.Now()
-			cmd := exec.CommandContext(ctx, filepath.Join(bin, "worker"), "--admission-only", "--profile="+profile, "--once")
-			cmd.Env = envFor(denied)
-			raw, e := cmd.CombinedOutput()
-			deniedResults <- processResult{duration: time.Since(start), err: e, output: string(raw)}
-		}()
-		go func(subject string) {
-			defer workers.Done()
-			start := time.Now()
-			cmd := exec.CommandContext(ctx, filepath.Join(bin, "worker"), "--admission-only", "--profile=worker/codex-production", "--once")
-			cmd.Env = envFor(subject)
-			raw, e := cmd.CombinedOutput()
-			deniedResults <- processResult{duration: time.Since(start), err: e, output: string(raw)}
-		}(workerSubjects[i])
+	for round := 0; round < securityRounds; round++ {
+		for i := 0; i < workerCount; i++ {
+			workers.Add(2)
+			go func() {
+				defer workers.Done()
+				start := time.Now()
+				cmd := exec.CommandContext(ctx, filepath.Join(bin, "worker"), "--admission-only", "--profile="+profile, "--once")
+				cmd.Env = envFor(denied)
+				raw, e := cmd.CombinedOutput()
+				deniedResults <- processResult{duration: time.Since(start), err: e, output: string(raw)}
+			}()
+			go func(subject string) {
+				defer workers.Done()
+				start := time.Now()
+				cmd := exec.CommandContext(ctx, filepath.Join(bin, "worker"), "--admission-only", "--profile=worker/codex-production", "--once")
+				cmd.Env = envFor(subject)
+				raw, e := cmd.CombinedOutput()
+				deniedResults <- processResult{duration: time.Since(start), err: e, output: string(raw)}
+			}(workerSubjects[i])
+		}
+		// Spread denied probes across the same long-lived Core/PostgreSQL instance
+		// while legitimate Worker processes are still consuming the larger queue.
+		if round+1 < securityRounds {
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 	workers.Wait()
 	close(validResults)
@@ -296,7 +304,7 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 			t.Fatalf("security probe did not fail with authorization denial: %v %q", result.err, result.output)
 		}
 	}
-	if deniedCount != workerCount*2 {
+	if deniedCount != workerCount*2*securityRounds {
 		t.Fatalf("security probe count drift: %d", deniedCount)
 	}
 
@@ -346,6 +354,6 @@ func TestSustainedAdmissionSecurityMatrix(t *testing.T) {
 		}
 		return durations[index-1]
 	}
-	t.Logf("LOAD_CHARACTERIZATION_NOT_SLO runs=%d worker_identities=%d denied=%d intake_wall=%s worker_wall=%s process_p50=%s process_p95=%s process_max=%s",
-		runCount, workerCount, deniedCount, intakeDuration, workerWall, percentile(50), percentile(95), durations[len(durations)-1])
+	t.Logf("LOAD_CHARACTERIZATION_NOT_SLO runs=%d worker_identities=%d security_rounds=%d denied=%d intake_wall=%s worker_wall=%s process_p50=%s process_p95=%s process_max=%s",
+		runCount, workerCount, securityRounds, deniedCount, intakeDuration, workerWall, percentile(50), percentile(95), durations[len(durations)-1])
 }
