@@ -89,7 +89,23 @@ eng artifact-set verify --archive /private/retained/set.tar \
 eng artifact-set restore --archive /private/retained/set.tar \
   --archive-digest "$PINNED_ARCHIVE_DIGEST" --run "$ORIGINAL_RUN" \
   --into /private/restores/new-set
+eng artifact-set mirror --archive /private/retained/set.tar \
+  --archive-digest "$PINNED_ARCHIVE_DIGEST" --run "$ORIGINAL_RUN" \
+  --out /independent-private-filesystem/set.tar
 ```
+
+`mirror` first performs the normal full archive verification, then requires the
+destination private directory to be on a different Unix filesystem device
+(`st_dev`) from the source archive. It copies to a private temporary file,
+fsyncs, independently verifies the copied archive, publishes without overwrite,
+fsyncs the destination directory and verifies the final path again. Source bytes
+remain unchanged. Same-filesystem destinations reject before publication.
+
+This is only an **independent-filesystem byte mirror**. Different `st_dev` does
+not prove another host, availability zone, security boundary, approved retention
+period, encryption/key policy or geographic second site. No automatic schedule,
+overwrite, deletion, repair or garbage collection is introduced; those remain
+separate policy/operator decisions.
 
 Reports distinguish packed, verified and restored bytes and always state
 `coverage=EXPLICIT_DECLARED_MEMBERS_ONLY`, `producer_semantics_verified=false`,
