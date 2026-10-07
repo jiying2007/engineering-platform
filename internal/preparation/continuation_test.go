@@ -74,6 +74,24 @@ func sourceContinuationFixture(t *testing.T) (workerqueue.Assignment, preparatio
 	return a, c, artifact
 }
 
+func TestContinuationArchiveVerifierMatchesApprovedRestoreIdentity(t *testing.T) {
+	a, _, artifact := sourceContinuationFixture(t)
+	facts, err := workeragent.VerifyContinuationArchive(context.Background(), a, artifact.Path)
+	mustCheckpoint(t, err)
+	if facts != artifact.Facts {
+		t.Fatal("verified continuation descriptor drift")
+	}
+	bad := a
+	ref := *bad.Input.Continuation
+	ref.ArchiveDigest = canonical.BytesDigest([]byte("other"))
+	bad.Input.Continuation = &ref
+	bad.Intent.InputDigest, _ = bad.Input.Digest()
+	bad.IntentDigest, _ = bad.Intent.Digest()
+	if _, err := workeragent.VerifyContinuationArchive(context.Background(), bad, artifact.Path); err == nil {
+		t.Fatal("changed continuation identity accepted")
+	}
+}
+
 func TestContinuationPreparesSeedWithoutCommittingOrDroppingOriginalDiff(t *testing.T) {
 	a, c, artifact := sourceContinuationFixture(t)
 	ctx := context.Background()
