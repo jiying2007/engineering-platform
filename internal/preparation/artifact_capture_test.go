@@ -163,7 +163,7 @@ func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
 				mustCheckpoint(t, os.Chmod(m, 0600))
 				mustCheckpoint(t, os.WriteFile(m, []byte("{}"), 0600))
 			case "missing-control-transcript":
-				name := "codex-" + sandbox.Hash([]byte(q.Readback.ExecutionID+":control-transcript"))[7:] + ".json"
+				name := "codex-" + sandbox.Hash([]byte(q.Readback.ExecutionID + ":control-transcript"))[7:] + ".json"
 				mustCheckpoint(t, os.Remove(filepath.Join(q.Readback.Records, name)))
 			case "missing-runtime":
 				q.RuntimeBinary = ""
