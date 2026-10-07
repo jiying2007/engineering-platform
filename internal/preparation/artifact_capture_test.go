@@ -13,6 +13,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/artifactset"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
 )
 
@@ -27,7 +28,7 @@ func captureFixture(t *testing.T, mode string) (workeragent.ExecutionCaptureRequ
 	}
 	store := t.TempDir()
 	mustCheckpoint(t, os.Chmod(store, 0700))
-	return workeragent.ExecutionCaptureRequest{Readback: q, ContextDirectory: filepath.Join(c.root, "bundles", strings.TrimPrefix(c.permit.Assignment.Intent.InputDigest, "sha256:")), Destination: filepath.Join(store, "execution.tar")}, c
+	return workeragent.ExecutionCaptureRequest{Readback: q, ContextDirectory: filepath.Join(c.root, "bundles", strings.TrimPrefix(c.permit.Assignment.Intent.InputDigest, "sha256:")), RuntimeBinary: c.runtimeBinary, QualificationReceipt: filepath.Join(c.runtimeDir, "qualification.json"), Destination: filepath.Join(store, "execution.tar")}, c
 }
 
 func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
@@ -43,7 +44,7 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 			if r.FullRunBackup || r.ExecutionAuthorized || r.ProductionQualified || r.Archive.ProducerSemanticsVerified || r.Archive.ExecutionAuthorized || r.Archive.ProductionQualified {
 				t.Fatal("invented authority or coverage", r)
 			}
-			if r.Selection != "EXECUTION_RECORDS_AND_ALL_FROZEN_CONTEXT" || r.RecordCount != len(before.Files) || r.ContextCount != len(c.permit.Assignment.Input.ContextRefs) || r.ContextManifestDigest != c.permit.Preparation.Facts.BundleDigest || r.PermitDigest != q.Readback.PermitDigest {
+			if r.Selection != "EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME" || r.RecordCount != len(before.Files) || r.ContextCount != len(c.permit.Assignment.Input.ContextRefs) || r.ContextManifestDigest != c.permit.Preparation.Facts.BundleDigest || r.PermitDigest != q.Readback.PermitDigest || !r.RuntimeBinaryRetained || !r.QualificationRetained || r.RuntimeBinaryDigest != c.permit.Profile.BinaryDigest || r.QualificationDigest != c.permit.Profile.QualificationDigest {
 				t.Fatal("wrong derived coverage", r)
 			}
 			// Same source identities/bytes produce the same archive regardless of new
@@ -62,8 +63,9 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 					t.Fatal("raw private content in report")
 				}
 			}
-			// Remove ALL original prepared state: context, source, HOME, records, raw
-			// result bundle and source archive. Only the retained archive can save this.
+			// Remove ALL original prepared state plus the private runtime dependency copies:
+			// context, source, HOME, records, raw result/source artifacts, Codex bytes and
+			// qualification receipt. Only the retained archive can save this selection.
 			mustCheckpoint(t, filepath.WalkDir(c.root, func(path string, d os.DirEntry, e error) error {
 				if e == nil && d.IsDir() {
 					return os.Chmod(path, 0700)
@@ -71,8 +73,11 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 				return e
 			}))
 			mustCheckpoint(t, os.RemoveAll(c.root))
-			if _, err := os.Stat(c.root); !os.IsNotExist(err) {
-				t.Fatal("original survived")
+			mustCheckpoint(t, os.RemoveAll(c.runtimeDir))
+			for _, original := range []string{c.root, c.runtimeDir} {
+				if _, err := os.Stat(original); !os.IsNotExist(err) {
+					t.Fatal("original survived", original)
+				}
 			}
 			into := filepath.Join(filepath.Dir(q.Destination), "restored")
 			_, err = artifactset.Restore(ctx, q.Destination, r.Archive.ArchiveDigest, q.Readback.RunID, into)
@@ -103,6 +108,23 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 					t.Fatal("frozen context byte mismatch")
 				}
 			}
+			runtimeRaw, err := os.ReadFile(filepath.Join(files, "runtime-codex.bin"))
+			mustCheckpoint(t, err)
+			if canonical.BytesDigest(runtimeRaw) != c.permit.Profile.BinaryDigest {
+				t.Fatal("restored runtime binary mismatch")
+			}
+			qualificationRaw, err := os.ReadFile(filepath.Join(files, "runtime-qualification.json"))
+			mustCheckpoint(t, err)
+			if string(qualificationRaw) != string(c.qualificationRaw) {
+				t.Fatal("restored qualification raw bytes mismatch")
+			}
+			var qualification codexapp.QualificationReceipt
+			mustCheckpoint(t, json.Unmarshal(qualificationRaw, &qualification))
+			qualificationDigest, err := qualification.Digest()
+			mustCheckpoint(t, err)
+			if qualificationDigest != c.permit.Profile.QualificationDigest {
+				t.Fatal("restored qualification semantic identity mismatch")
+			}
 			afterCalls, _ := canonical.Digest(c.calls)
 			if calls != afterCalls {
 				t.Fatal("capture or restore invoked transport")
@@ -117,7 +139,7 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 }
 
 func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
-	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "cancelled"} {
+	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-runtime", "changed-runtime", "missing-qualification", "changed-qualification", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "cancelled"} {
 		t.Run(bad, func(t *testing.T) {
 			q, c := captureFixture(t, "report-lost")
 			ctx := context.Background()
@@ -139,6 +161,14 @@ func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
 				m := filepath.Join(q.ContextDirectory, "manifest.json")
 				mustCheckpoint(t, os.Chmod(m, 0600))
 				mustCheckpoint(t, os.WriteFile(m, []byte("{}"), 0600))
+			case "missing-runtime":
+				q.RuntimeBinary = ""
+			case "changed-runtime":
+				mustCheckpoint(t, os.WriteFile(q.RuntimeBinary, []byte("changed runtime"), 0700))
+			case "missing-qualification":
+				q.QualificationReceipt = ""
+			case "changed-qualification":
+				mustCheckpoint(t, os.WriteFile(q.QualificationReceipt, []byte("{}"), 0600))
 			case "missing-source":
 				q.Readback.Archive = ""
 			case "missing-bundle":

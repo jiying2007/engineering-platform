@@ -1,7 +1,10 @@
 package workeragent
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,18 +14,23 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/jiying2007/engineering-platform/internal/artifactset"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 // ExecutionCaptureRequest explicitly selects private inputs. ContextDirectory is
 // the original frozen bundle, not a resolver or a path read from a local record.
 // There is no Core/network access, model execution, directory discovery or repair.
 type ExecutionCaptureRequest struct {
-	Readback         PostTurnReadbackRequest
-	ContextDirectory string
-	Destination      string
+	Readback             PostTurnReadbackRequest
+	ContextDirectory     string
+	RuntimeBinary        string
+	QualificationReceipt string
+	Destination          string
 }
 
 type ExecutionCaptureReport struct {
@@ -34,6 +42,10 @@ type ExecutionCaptureReport struct {
 	ContextCount             int                `json:"context_count"`
 	SourceCheckpointRetained bool               `json:"source_checkpoint_retained"`
 	ResultBundleRetained     bool               `json:"result_bundle_retained"`
+	RuntimeBinaryRetained    bool               `json:"runtime_binary_retained"`
+	QualificationRetained    bool               `json:"qualification_retained"`
+	RuntimeBinaryDigest      string             `json:"runtime_binary_digest"`
+	QualificationDigest      string             `json:"qualification_digest"`
 	FullRunBackup            bool               `json:"full_run_backup"`
 	ExecutionAuthorized      bool               `json:"execution_authorized"`
 	ProductionQualified      bool               `json:"production_qualified"`
@@ -42,14 +54,16 @@ type ExecutionCaptureReport struct {
 // CaptureExecutionArtifacts derives the existing raw-set plan from verified
 // producer records and the frozen Run input, so callers cannot omit a referenced
 // checkpoint, result bundle or context member while claiming this selection.
-// It retains current record formats unchanged. This is NOT all Run dependencies:
-// the original Git base, toolchain, credentials, full Core control history and
-// upstream continuation history are outside this narrowly declared selection.
+// It retains current record formats unchanged and additionally requires private
+// copies of the exact Codex binary and qualification receipt already frozen by
+// the Permit. This is still NOT all Run dependencies: the original Git base,
+// credentials, full Core control/tool history and upstream continuation bytes are
+// outside this narrowly declared selection.
 func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (report ExecutionCaptureReport, err error) {
 	var zero ExecutionCaptureReport
-	for _, p := range []string{q.ContextDirectory, q.Destination} {
+	for _, p := range []string{q.ContextDirectory, q.RuntimeBinary, q.QualificationReceipt, q.Destination} {
 		if !filepath.IsAbs(p) || filepath.Clean(p) != p {
-			return zero, fmt.Errorf("canonical explicit context and destination required")
+			return zero, fmt.Errorf("canonical explicit context/runtime/qualification/destination required")
 		}
 	}
 	// Do not add staging/output into producer records or the frozen context.
@@ -70,6 +84,26 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 		return zero, fmt.Errorf("every referenced source archive and result bundle must be supplied explicitly")
 	}
 	p := before.permit
+	runtimeDigest, runtimeSize, _, err := capturePrivateDependency(ctx, q.RuntimeBinary, artifactset.MaxFile, false)
+	if err != nil || runtimeDigest != p.Profile.BinaryDigest {
+		return zero, fmt.Errorf("runtime binary does not match frozen profile")
+	}
+	qualificationRawDigest, qualificationSize, qualificationRaw, err := capturePrivateDependency(ctx, q.QualificationReceipt, artifactset.MaxMetadata, true)
+	if err != nil {
+		return zero, fmt.Errorf("qualification receipt unavailable: %w", err)
+	}
+	var qualification codexapp.QualificationReceipt
+	if strictjson.Decode(qualificationRaw, &qualification) != nil {
+		return zero, fmt.Errorf("invalid qualification receipt")
+	}
+	qualificationDigest, err := qualification.Digest()
+	if err != nil || qualificationDigest != p.Profile.QualificationDigest ||
+		qualification.BinaryDigest != p.Profile.BinaryDigest ||
+		qualification.Version != p.Profile.CodexVersion ||
+		qualification.ThreadStartModel != p.Profile.Model ||
+		qualification.EngineeringConfigDigest != p.Profile.EngineeringConfigDigest {
+		return zero, fmt.Errorf("qualification receipt does not match frozen profile")
+	}
 	plan := artifactset.Plan{Version: 1, Subject: artifactset.Subject{RunID: q.Readback.RunID, ExecutionID: q.Readback.ExecutionID, TaskDigest: p.Assignment.Intent.TaskDigest, InputDigest: p.Assignment.Intent.InputDigest, BaseCommit: p.Preparation.Facts.BaseCommit}}
 	add := func(id, kind, path, digest string, size int64) {
 		plan.Members = append(plan.Members, artifactset.Input{Entry: artifactset.Entry{ID: id, Kind: kind, Size: size, Digest: digest}, Path: path})
@@ -77,6 +111,8 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	for _, f := range before.Files {
 		add(f.Name, "runtime-record", filepath.Join(q.Readback.Records, f.Name), f.Digest, int64(f.Size))
 	}
+	add("runtime-codex.bin", "runtime-binary", q.RuntimeBinary, runtimeDigest, runtimeSize)
+	add("runtime-qualification.json", "qualification", q.QualificationReceipt, qualificationRawDigest, qualificationSize)
 	contextRaw, err := json.Marshal(p.Preparation.Facts.Context)
 	if err != nil {
 		return zero, err
@@ -150,7 +186,7 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	if err := contextInventory(q.ContextDirectory, names); err != nil {
 		return zero, err
 	}
-	return ExecutionCaptureReport{Archive: packed, Selection: "EXECUTION_RECORDS_AND_ALL_FROZEN_CONTEXT", PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil}, nil
+	return ExecutionCaptureReport{Archive: packed, Selection: "EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME", PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil, RuntimeBinaryRetained: true, QualificationRetained: true, RuntimeBinaryDigest: p.Profile.BinaryDigest, QualificationDigest: p.Profile.QualificationDigest}, nil
 }
 
 func contextInventory(path string, expected []string) error {
@@ -181,4 +217,58 @@ func contextInventory(path string, expected []string) error {
 		}
 	}
 	return nil
+}
+
+func capturePrivateDependency(ctx context.Context, path string, limit int64, retain bool) (string, int64, []byte, error) {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || limit <= 0 {
+		return "", 0, nil, fmt.Errorf("canonical bounded dependency path required")
+	}
+	root, _, err := readbackDirectory(filepath.Dir(path))
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer root.Close()
+	name := filepath.Base(path)
+	before, err := root.Lstat(name)
+	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0022 != 0 ||
+		before.Size() <= 0 || before.Size() > limit {
+		return "", 0, nil, fmt.Errorf("private bounded dependency required")
+	}
+	stat, ok := before.Sys().(*syscall.Stat_t)
+	if !ok || stat.Nlink != 1 || stat.Uid != uint32(os.Geteuid()) {
+		return "", 0, nil, fmt.Errorf("dependency ownership/link identity invalid")
+	}
+	file, err := openReadbackFile(root, name)
+	if err != nil {
+		return "", 0, nil, err
+	}
+	defer file.Close()
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(before, opened) {
+		return "", 0, nil, fmt.Errorf("dependency changed before read")
+	}
+	hash := sha256.New()
+	var raw bytes.Buffer
+	var writer io.Writer = hash
+	if retain {
+		writer = io.MultiWriter(hash, &raw)
+	}
+	n, err := io.Copy(writer, &readbackContextReader{ctx: ctx, r: io.LimitReader(file, limit+1)})
+	after, statErr := root.Lstat(name)
+	var afterStat *syscall.Stat_t
+	afterOK := false
+	if after != nil {
+		afterStat, afterOK = after.Sys().(*syscall.Stat_t)
+	}
+	if err != nil || statErr != nil || !afterOK || n != before.Size() || !os.SameFile(before, after) ||
+		before.Size() != after.Size() || before.Mode() != after.Mode() ||
+		!before.ModTime().Equal(after.ModTime()) || stat.Nlink != afterStat.Nlink ||
+		stat.Uid != afterStat.Uid || stat.Ctim != afterStat.Ctim {
+		return "", 0, nil, fmt.Errorf("dependency changed during read")
+	}
+	digest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
+	if retain {
+		return digest, n, raw.Bytes(), nil
+	}
+	return digest, n, nil, nil
 }

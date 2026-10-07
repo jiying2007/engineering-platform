@@ -101,9 +101,11 @@ Core, runs a model/Git/SQL, overwrites old destinations or uploads public data.
 Generic completeness is ONLY relative to declared members; producer semantics
 are not inferred. `capture-execution` derives current producer records and every
 frozen Context entry from the original anchored permit, requiring all referenced
-source/result bytes rather than relying on a hand-written list. It rejects
-missing/extra Context and unbound artifacts. It does not capture the original Git
-base, toolchain, full control history or upstream continuation dependencies.
+source/result bytes plus private copies of the exact Permit-bound Codex runtime
+binary and qualification receipt. It rejects missing/extra Context, runtime byte
+drift, qualification semantic drift and unbound artifacts. It still does not
+capture original Git base bytes, credential/session material, full control/tool
+history or upstream continuation dependencies.
 `capture-offline` derives the original permit/report and every collected output
 from the frozen offline Profile. Both raw records require external digest anchors;
 failed commands retain failure records with zero outputs, never successful-build

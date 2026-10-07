@@ -111,6 +111,8 @@ eng artifact-set capture-execution \
   --records /private/original/records --run "$ORIGINAL_RUN" \
   --execution "$EXECUTION_ID" --permit-digest "$PINNED_PERMIT_DIGEST" \
   --context /private/original/context \
+  --runtime-binary /private/runtime/codex \
+  --qualification-receipt /private/runtime/qualification.json \
   --archive /private/artifacts/source-checkpoint.tar \
   --bundle /private/artifacts/result.bundle --out /private/retained/execution.tar
 ```
@@ -122,10 +124,19 @@ is required. Missing or changed Context bytes/manifest, extra Context members,
 unsafe paths/files, output beneath records/Context, and existing output reject.
 A no-record/phase-only observation cannot be advertised as an archived result.
 
-Selection is `EXECUTION_RECORDS_AND_ALL_FROZEN_CONTEXT`. This closes selection
-completeness for those producer objects, not `full_run_backup`: the original Git
-base, runtime/toolchain binary, complete Core control/tool history, and upstream
-continuation dependencies still require separate retention. Artifact-set's own
+The command also requires private, quiescent copies of the exact Codex runtime
+binary and compatibility qualification receipt frozen by the Permit. Runtime
+bytes must hash to `profile.binary_digest`; the qualification JSON is strictly
+decoded and its semantic digest, binary/version/model/config identities must
+match the frozen Profile before its original bytes enter the archive. Restored
+runtime bytes remain non-executable like every other artifact-set payload.
+
+Selection is `EXECUTION_RECORDS_CONTEXT_AND_FROZEN_RUNTIME`. This closes
+selection completeness for the current producer records, frozen Context and
+Permit-bound Codex runtime/qualification objects, not `full_run_backup`: the
+original Git base bytes, credential/session material, complete Core control/tool
+history, and upstream continuation source dependencies still require separate
+retention. Artifact-set's own
 coverage stays `EXPLICIT_DECLARED_MEMBERS_ONLY`. No Core/network request, Git,
 SQL, model, source scan, permission grant or public upload occurs. The command
 requires already host-owned quiescent inputs; offline retention does not renew

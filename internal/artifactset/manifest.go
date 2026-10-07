@@ -85,7 +85,7 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("invalid, unordered or duplicate artifact")
 		}
 		switch e.Kind {
-		case "source", "git-bundle", "runtime-record", "build-output", "database-backup", "distribution", "qualification", "test-evidence", "context":
+		case "source", "git-bundle", "runtime-record", "runtime-binary", "build-output", "database-backup", "distribution", "qualification", "test-evidence", "context":
 		default:
 			return fmt.Errorf("unknown artifact kind")
 		}
