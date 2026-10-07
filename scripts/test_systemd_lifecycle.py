@@ -103,6 +103,39 @@ class LifecycleContracts(unittest.TestCase):
         self.assertNotIn('continue-on-error: true', ci)
 
 
+    def test_retention_maintenance_units_are_bounded_and_non_destructive(self):
+        def parse(path):
+            parser = configparser.ConfigParser(interpolation=None, strict=True)
+            parser.optionxform = str
+            parser.read_string(path.read_text())
+            return parser
+
+        service = parse(TEMPLATES/'maintenance'/'engineering-artifact-retention.service')
+        timer = parse(TEMPLATES/'maintenance'/'engineering-artifact-retention.timer')
+        self.assertEqual(service['Service']['Type'], 'oneshot')
+        self.assertEqual(service['Service']['User'], 'engineering-preparation')
+        self.assertEqual(service['Service']['Group'], 'engineering-platform')
+        self.assertEqual(service['Service']['ProtectSystem'], 'strict')
+        self.assertEqual(service['Service']['RestrictAddressFamilies'], 'AF_UNIX')
+        self.assertEqual(service['Service']['ReadOnlyPaths'], '/var/lib/engineering-platform/preparation/retained')
+        self.assertEqual(service['Service']['ReadWritePaths'], '/var/lib/engineering-platform/preparation/retained-replica')
+        self.assertEqual(service['Service']['EnvironmentFile'], '/etc/engineering-platform/artifact-retention.env')
+        self.assertIn('artifact-retention replicate', service['Service']['ExecStart'])
+        self.assertNotIn('Restart', service['Service'])
+        self.assertNotIn('ExecStartPre', service['Service'])
+        self.assertNotIn('ConditionPathExists', service['Unit'])
+        self.assertNotIn('Install', service.sections())
+        for forbidden in (' rm ', ' find ', '--delete', 'curl ', 'wget ', '/bin/sh', 'sudo '):
+            self.assertNotIn(forbidden, service['Service']['ExecStart'])
+
+        self.assertEqual(timer['Timer']['Unit'], 'engineering-artifact-retention.service')
+        self.assertEqual(timer['Timer']['OnCalendar'], '*-*-* 00,06,12,18:00:00')
+        self.assertEqual(timer['Timer']['Persistent'], 'true')
+        self.assertEqual(timer['Install']['WantedBy'], 'timers.target')
+        self.assertNotIn('OnUnitActiveSec', timer['Timer'])
+        self.assertNotIn('OnBootSec', timer['Timer'])
+
+
     def test_transient_role_graph_is_ephemeral_and_never_provisions_accounts(self):
         script = (ROOT/'scripts/systemd_lifecycle.py').read_text()
         for text in ('transient_role_graph', '_dynamic_role_names', '--no-block', 'RuntimeDirectory', 'DynamicUser', 'persistent_accounts_created', 'transient_distinct_dynamic_users_tested'):

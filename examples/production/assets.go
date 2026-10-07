@@ -8,7 +8,7 @@ import (
 	"io/fs"
 )
 
-//go:embed README.md *.example *.tmpl systemd/*.service apparmor/engineering-worker terminal-maintenance/*.md terminal-maintenance/*.json terminal-maintenance/*.tmpl terminal-maintenance/*.txt
+//go:embed README.md *.example *.tmpl systemd/*.service systemd/maintenance/*.service systemd/maintenance/*.timer apparmor/engineering-worker terminal-maintenance/*.md terminal-maintenance/*.json terminal-maintenance/*.tmpl terminal-maintenance/*.txt
 var files embed.FS
 
 func Files() (map[string][]byte, error) {

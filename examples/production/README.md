@@ -47,9 +47,13 @@ No dependency is downloaded or bundled, no account/configuration is provisioned,
 no systemd unit is activated, and no SQL/migration/model/Git operation is run.
 `services_started`, `configuration_applied`, `dependencies_included`,
 `execution_authorized` and `production_qualified` remain false. Upgrades install
-into another fresh directory; version switching, migration and rollback still
-require their separate deployment authority and acceptance. There is no automatic
-symlink switch or database downgrade.
+into another fresh directory. `installation-readback` verifies retained releases
+by externally anchored source+manifest identity, and `installation-switch`
+performs only a stopped immutable sibling-directory cutover while retaining the
+replaced release. Required CI exercises a real cross-version upgrade and rollback.
+The switch never starts services, migrates/restores PostgreSQL or downgrades the
+database; the two-rename host-crash boundary remains explicit reconciliation, not
+an atomic-success claim.
 
 Canonical tests use the delivered installer and remove the original extracted
 package before verifying the installation. Existing native command integration
@@ -75,6 +79,8 @@ for multiple authority roles.
 - service configuration: `/etc/engineering-platform`
 - mutable preparation data: `/var/lib/engineering-platform/preparation`
 - backups: `/var/lib/engineering-platform/backups`
+- private artifact primary: `/var/lib/engineering-platform/preparation/retained`
+- private artifact replica example: `/var/lib/engineering-platform/preparation/retained-replica`
 
 The Control Plane unit invokes `--production`; do not remove this startup fence.
 Environment files must be owner-private mode 0600. Secret values are provisioned
@@ -127,17 +133,25 @@ eng production-status --require-authority-clear
 The command reads `GET /api/v1/operations/status`. Detailed readiness is never
 inferred from anonymous `/healthz` alone.
 
-Operational status v2 exposes database authority separately from service
-readiness. Empty queues or recent database progress do not prove a consumer or
-publisher is alive. This slice returns `service_readiness=NOT_OBSERVED` and
-`ready=false`; `--require-ready` therefore fails until actual service observation
-is implemented. Never replace a production readiness gate with
+Operational status v3 exposes database authority separately from service
+readiness. It includes bounded per-profile Worker poll observations from the
+existing `workers.last_seen_at` facts; recent polls and identity counts are still
+not capacity. Empty queues or recent database progress do not prove a consumer or
+publisher is ready. `service_readiness=NOT_OBSERVED` and `ready=false` remain
+deliberate. Never replace a production readiness gate with
 `--require-authority-clear` merely to make it pass. A nonzero authority check
 requires reconciliation of Recovery/UNKNOWN/dead-letter/lease facts, not a restart
 or model replay. Queue ages and last admission/dispatch timestamps are database
-observations, not heartbeats or calibrated SLOs. Clients rederive the full response
-and reject snapshots older than 30 seconds or more than 5 seconds in the future;
-these transport freshness bounds are not production performance targets.
+observations, not calibrated SLOs. Clients rederive the full response and reject
+snapshots older than 30 seconds or more than 5 seconds in the future; these
+transport freshness bounds are not production performance targets.
+
+Publisher endpoint reachability is observed separately with
+`eng production-publisher-health --config FILE`. That performs one bounded
+authenticated mTLS `GET /healthz`, binds the observation to the exact remote
+configuration digest and never calls publish/observe upstream. A successful
+endpoint probe still does not establish upstream GitHub health, capacity,
+publication authority or production readiness.
 
 ## Restart semantics
 
@@ -168,5 +182,30 @@ This signal proves endpoint initialization, not authenticated client access,
 upstream provider health, queue capacity, production readiness or replay
 permission. Existing mTLS health checks and Core authority remain independent.
 There is no watchdog, heartbeat, READY polling API or new execution authority.
-Full service-graph, separate service-user, upgrade and rollback qualification
-still require their own acceptance.
+Required CI now also proves the canonical Publisher -> Control ->
+admission/preparation dependency ordering with distinct transient identities,
+the exact four named service identities on a disposable host, and immutable
+cross-version binary upgrade/rollback. Actual production-host account/unit
+provisioning and live provider/publication-effect acceptance remain separate
+external gates.
+
+
+## Private artifact retention replication
+
+After creating and independently anchoring artifact-set archives, render
+`artifact-retention.json.tmpl` into an owner-private preparation file and pin
+the **raw config SHA-256** in `artifact-retention.env`. The maintenance service
+uses the existing preparation identity and never deletes data:
+
+```sh
+/opt/engineering-platform/bin/eng artifact-retention replicate \
+  --config /var/lib/engineering-platform/preparation/retention.json \
+  --config-digest "$PINNED_RAW_CONFIG_DIGEST"
+```
+
+The installed `systemd/maintenance/engineering-artifact-retention.service` and
+`.timer` are examples only and are not enabled by installation. Provision both
+roots as owner-private directories first, review the timer cadence, and enable it
+only through normal host-change authority. A successful run proves declared
+replica bytes only; it is not second-site qualification, encryption, GC, a
+production backup SLO or permission to delete the primary.

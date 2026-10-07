@@ -11,7 +11,7 @@ func TestEmbeddedTemplatesAreOriginalSourceFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 21 {
+	if len(all) != 25 {
 		t.Fatal("explicit deployment template inventory changed", len(all))
 	}
 	for path, raw := range all {

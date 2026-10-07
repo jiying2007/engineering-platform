@@ -1,0 +1,28 @@
+[Unit]
+Description=Engineering Platform Private Artifact Retention Replication
+After=local-fs.target
+[Service]
+Type=oneshot
+User=engineering-preparation
+Group=engineering-platform
+EnvironmentFile=/etc/engineering-platform/artifact-retention.env
+ExecStart=/opt/engineering-platform/bin/eng artifact-retention replicate --config ${ARTIFACT_RETENTION_CONFIG} --config-digest ${ARTIFACT_RETENTION_CONFIG_DIGEST}
+TimeoutStartSec=1h
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+ReadOnlyPaths=/var/lib/engineering-platform/preparation/retained
+ReadWritePaths=/var/lib/engineering-platform/preparation/retained-replica
+SystemCallArchitectures=native
