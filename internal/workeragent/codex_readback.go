@@ -65,9 +65,9 @@ type PostTurnReadback struct {
 	FailedPhase               string          `json:"failed_phase,omitempty"`
 	TranscriptDigest          string          `json:"control_transcript_digest,omitempty"`
 	ControlTranscriptRetained bool            `json:"control_transcript_retained"`
-	ItemHistoryDigest         string           `json:"item_history_digest,omitempty"`
-	ItemHistoryCount          int              `json:"item_history_count"`
-	ItemHistoryRetained       bool             `json:"item_history_retained"`
+	ItemHistoryDigest         string          `json:"item_history_digest,omitempty"`
+	ItemHistoryCount          int             `json:"item_history_count"`
+	ItemHistoryRetained       bool            `json:"item_history_retained"`
 	ExpectedResultDigest      string          `json:"expected_result_digest,omitempty"`
 	CheckpointDigest          string          `json:"checkpoint_digest,omitempty"`
 	LocalRegistrationClaim    bool            `json:"local_registration_claim"`
