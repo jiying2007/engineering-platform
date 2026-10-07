@@ -193,7 +193,7 @@ run_unit() {
 first="$(run_unit "$unit_ok" "$config" "$config_digest")"
 identity="$(printf '%s\n' "$first" | grep '^IDENTITY:' | tail -n1)"
 test "$identity" = "IDENTITY:$uid:$gid:$user:$group"
-report="$(printf '%s\n' "$first" | grep '^{' | tail -n1)"
+report="$(printf '%s\n' "$first" | sed '/^IDENTITY:/d')"
 jq -e --arg digest "$config_digest" --argjson bytes "$archive_size" '
   .status=="RETENTION_REPLICA_BYTES_VERIFIED" and .config_digest==$digest and
   .item_count==1 and .copied_count==1 and .existing_count==0 and
@@ -204,7 +204,7 @@ jq -e --arg digest "$config_digest" --argjson bytes "$archive_size" '
 sudo -n -u "$user" env -i PATH=/usr/bin:/bin HOME=/nonexistent   "$eng" artifact-set verify --archive "$replica/run-a.tar" --archive-digest "$archive_digest" --run retention-maintenance-ci   | jq -e '.status=="ARTIFACT_SET_BYTES_VERIFIED" and .execution_authorized==false and .production_qualified==false' >/dev/null
 
 second="$(run_unit "$unit_again" "$config" "$config_digest")"
-report2="$(printf '%s\n' "$second" | grep '^{' | tail -n1)"
+report2="$(printf '%s\n' "$second" | sed '/^IDENTITY:/d')"
 jq -e --arg digest "$config_digest" --argjson bytes "$archive_size" '
   .status=="RETENTION_REPLICA_BYTES_VERIFIED" and .config_digest==$digest and
   .item_count==1 and .copied_count==0 and .existing_count==1 and .verified_bytes==$bytes' <<<"$report2" >/dev/null
