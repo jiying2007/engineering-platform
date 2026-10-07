@@ -19,6 +19,10 @@ The plan fixes:
 - repository: `jiying2007/engineering-platform`;
 - exact marker path and before/after bytes;
 - at most one Core-bound engineering model turn;
+- deployment profile: `canary-single-maintenance-fixture`;
+- database rollback policy: `restore-authoritative-backup-and-reconcile`;
+- emergency stops for provider credential/rule, Publisher credential and Worker execution;
+- no silent provider fallback and no automatic database downgrade;
 - Codex/Git/trusted-CI Evidence procedures;
 - production preflight/readiness gates;
 - live-qualified unattended Provider v3 gate;
@@ -28,7 +32,11 @@ The plan fixes:
 - independent human Review PASS;
 - ClosureReceipt;
 - shutdown/restart/recovery proof;
-- source-verified SLO evidence and independent acceptance.
+- source-verified SLO evidence and independent acceptance;
+- canary deployment acceptance;
+- provider emergency-disable proof;
+- Publisher credential-revocation proof;
+- database rollback/restore policy acceptance.
 
 Human Review and provider live qualification are mandatory and cannot be
 replaced by synthetic fixtures.
@@ -109,18 +117,25 @@ measurements; they are not guessed in source code.
 
 After one unattended provider identity is independently qualified:
 
-1. production preflight must be HOST_VALIDATED for the admitted source commit;
-2. operational status must be READY;
-3. exact terminal plan/fixture bytes are frozen;
-4. one Core-authorized unattended engineering execution changes only the marker;
-5. independent Publisher creates/updates the exact PR;
-6. exact PR-head trusted CI passes;
-7. Codex/Git/CI Evidence is imported;
-8. Verification passes;
-9. an independent human reviewer records PASS;
-10. ClosureReceipt is created;
-11. clean shutdown/restart/recovery evidence is retained;
-12. source-verified provider-inclusive SLO evidence is accepted against frozen,
+1. the selected unattended provider is live-qualified with no silent fallback,
+   and its emergency credential/rule disable path is proven;
+2. production preflight must be HOST_VALIDATED for the admitted source commit;
+3. the exact immutable release is admitted through the frozen canary deployment
+   profile before broader rollout;
+4. operational status must be READY;
+5. the database rollback/restore policy is accepted and retains authoritative
+   backup + Recovery/Reconciliation rather than automatic schema downgrade;
+6. the independent Publisher credential-revocation path is proven;
+7. exact terminal plan/fixture bytes are frozen;
+8. one Core-authorized unattended engineering execution changes only the marker;
+9. independent Publisher creates/updates the exact PR;
+10. exact PR-head trusted CI passes;
+11. Codex/Git/CI Evidence is imported;
+12. Verification passes;
+13. an independent human reviewer records PASS;
+14. ClosureReceipt is created;
+15. clean shutdown/restart/recovery evidence is retained;
+16. source-verified provider-inclusive SLO evidence is accepted against frozen,
     measured targets by Verification and independent Review.
 
 Only then may issue #105 and production readiness be closed.
@@ -137,9 +152,16 @@ qualification until reconciled.
 
 ## Audit revision
 
-Terminal plan schema version 2 replaces the preflight-ready and SLO-complete
+Terminal plan schema version 3 preserves the one-time maintenance fixture and
+existing Evidence families while adding explicit rollout/emergency/rollback
+constraints required by #105: canary admission, selected-provider kill path,
+Publisher credential revocation, authoritative database restore/reconciliation,
+no provider fallback and no automatic database downgrade. The earlier v2 plan
+and pre-live artifact remain historical evidence and cannot qualify v3.
+
+Terminal plan schema version 2 replaced the preflight-ready and SLO-complete
 labels with `production_host_validated` and
 `source_verified_slo_evidence_accepted`. The one-time maintenance fixture is
 unchanged. The earlier v1 pre-live artifact remains historical evidence and
-must not be reused as a v2 qualification; retain a new provider-free dry run for
-this exact plan digest before any live attempt.
+must not be reused as a v2/v3 qualification; retain a new provider-free dry run
+for this exact v3 plan digest before any live attempt.

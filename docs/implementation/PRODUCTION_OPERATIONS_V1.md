@@ -300,9 +300,11 @@ Production readiness is not proven by source merge.
 The exact terminal contract is
 `docs/implementation/PRODUCTION_TERMINAL_ACCEPTANCE_V1.md`.
 
-`eng production-terminal-plan` freezes the one-time RELEASE maintenance
+`eng production-terminal-plan` v3 freezes the one-time RELEASE maintenance
 fixture, evidence procedures, human-review requirement and terminal gates before
-provider access exists.
+provider access exists. It additionally freezes the canary deployment profile,
+authoritative database restore/reconciliation policy, provider/Publisher/Worker
+emergency stops, no silent provider fallback and no automatic database downgrade.
 
 `eng production-slo-report` v2 never grants qualification. With only observations
 it emits `UNVERIFIED_SUMMARY`. To read back exact collector records, supply
@@ -317,14 +319,19 @@ protected-main artifact before the live terminal qualification.
 
 Final acceptance still requires:
 
-1. selected unattended provider qualification;
+1. selected unattended provider qualification plus proven emergency disable path
+   and no silent provider fallback;
 2. production preflight HOST_VALIDATED for the admitted source commit;
-3. operational status READY;
-4. the exact frozen RELEASE maintenance fixture;
-5. Run → model execution → Git/PR → exact-head CI → Evidence → Verification →
+3. canary deployment acceptance for the exact immutable release;
+4. operational status READY;
+5. accepted database rollback/restore policy using authoritative backup +
+   Recovery/Reconciliation and no automatic schema downgrade;
+6. proven Publisher credential revocation path;
+7. the exact frozen RELEASE maintenance fixture;
+8. Run → model execution → Git/PR → exact-head CI → Evidence → Verification →
    independent human Review → Closure;
-6. clean service shutdown/restart/recovery evidence;
-7. source-verified, provider-inclusive SLO evidence accepted by the existing
+9. clean service shutdown/restart/recovery evidence;
+10. source-verified, provider-inclusive SLO evidence accepted by the existing
    Verification/independent Review chain against measured, explicitly frozen targets.
 
 Trusted self-hosted M1 evidence remains separate and is not rerun merely to

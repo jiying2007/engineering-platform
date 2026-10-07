@@ -17,8 +17,36 @@ func TestTerminalPlanIsDeterministicAndRequiresHumanReview(t *testing.T) {
 	if first.PlanDigest != second.PlanDigest || first.PlanDigest == "" ||
 		first.Plan.FixtureID != second.Plan.FixtureID ||
 		!first.Plan.HumanReviewRequired || !first.Plan.ProviderLiveRequired ||
+		!first.Plan.NoSilentProviderFallback || !first.Plan.NoAutomaticDBDowngrade ||
+		first.Plan.DeploymentProfile != "canary-single-maintenance-fixture" ||
+		first.Plan.DatabaseRollbackPolicy != "restore-authoritative-backup-and-reconcile" ||
+		len(first.Plan.EmergencyStops) != 3 || len(first.Plan.RequiredGates) != 14 ||
 		first.Plan.TaskType != "RELEASE" {
 		t.Fatalf("unexpected terminal plan: %#v", first)
+	}
+}
+
+func TestTerminalPlanRejectsWeakenedRolloutAndEmergencyContract(t *testing.T) {
+	envelope, err := BuildTerminalPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutations := []func(*TerminalPlan){
+		func(p *TerminalPlan) { p.DeploymentProfile = "all-at-once" },
+		func(p *TerminalPlan) { p.DatabaseRollbackPolicy = "auto-downgrade" },
+		func(p *TerminalPlan) { p.EmergencyStops = p.EmergencyStops[:2] },
+		func(p *TerminalPlan) { p.NoSilentProviderFallback = false },
+		func(p *TerminalPlan) { p.NoAutomaticDBDowngrade = false },
+		func(p *TerminalPlan) { p.RequiredGates = p.RequiredGates[:10] },
+	}
+	for i, mutate := range mutations {
+		bad := envelope.Plan
+		bad.EmergencyStops = append([]string(nil), envelope.Plan.EmergencyStops...)
+		bad.RequiredGates = append([]string(nil), envelope.Plan.RequiredGates...)
+		mutate(&bad)
+		if bad.Validate() == nil {
+			t.Fatal("weakened terminal rollout contract accepted", i)
+		}
 	}
 }
 
