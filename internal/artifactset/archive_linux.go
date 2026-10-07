@@ -15,6 +15,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
@@ -320,6 +321,112 @@ func walk(ctx context.Context, p, digest, run string, dest *os.Root) (Report, er
 }
 func Verify(ctx context.Context, p, digest, run string) (Report, error) {
 	return walk(ctx, p, digest, run, nil)
+}
+
+func filesystemDevice(info os.FileInfo) (uint64, bool) {
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	return stat.Dev, ok
+}
+
+// Mirror copies one already-verified private archive to a NEW destination on a
+// different filesystem. It is a durability primitive, not a claim of geographic
+// separation, backup scheduling, encryption, retention policy or second-site
+// qualification. The exact externally anchored archive digest/Run remain the
+// authority input. No overwrite, repair or execution occurs.
+func Mirror(ctx context.Context, p, digest, run, out string) (Report, error) {
+	var zero Report
+	before, err := Verify(ctx, p, digest, run)
+	if err != nil {
+		return zero, err
+	}
+	if !filepath.IsAbs(out) || filepath.Clean(out) != out || out == p {
+		return zero, fmt.Errorf("canonical new mirror path required")
+	}
+	sourceInfo, err := os.Lstat(p)
+	if err != nil || !sourceInfo.Mode().IsRegular() {
+		return zero, fmt.Errorf("verified source archive disappeared")
+	}
+	sourceDevice, ok := filesystemDevice(sourceInfo)
+	if !ok {
+		return zero, fmt.Errorf("source filesystem identity unavailable")
+	}
+	dir, name := filepath.Dir(out), filepath.Base(out)
+	root, parent, err := privateRoot(dir)
+	if err != nil {
+		return zero, err
+	}
+	defer root.Close()
+	destinationDevice, ok := filesystemDevice(parent)
+	if !ok || sourceDevice == destinationDevice {
+		return zero, fmt.Errorf("mirror requires a distinct destination filesystem")
+	}
+	if _, err := root.Lstat(name); !errors.Is(err, os.ErrNotExist) {
+		return zero, fmt.Errorf("mirror destination already exists or cannot be inspected")
+	}
+	nonce := make([]byte, 16)
+	if _, err := rand.Read(nonce); err != nil {
+		return zero, err
+	}
+	tempName := ".artifact-mirror-" + hex.EncodeToString(nonce)
+	temp, err := root.OpenFile(tempName, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		return zero, err
+	}
+	defer func() { _ = temp.Close(); _ = root.Remove(tempName) }()
+	if err := rootUnchanged(dir, parent); err != nil {
+		return zero, err
+	}
+	source, err := openInput(p, MaxArchive)
+	if err != nil {
+		return zero, err
+	}
+	if source.before.Size() != before.ArchiveSize {
+		source.Close()
+		return zero, fmt.Errorf("source archive size changed")
+	}
+	err = copyExact(ctx, source.file, temp, before.ArchiveSize, digest)
+	if err == nil {
+		err = source.check()
+	}
+	source.Close()
+	if err != nil {
+		return zero, err
+	}
+	if err := temp.Sync(); err != nil {
+		return zero, err
+	}
+	if err := temp.Close(); err != nil {
+		return zero, err
+	}
+	tempPath := filepath.Join(dir, tempName)
+	mirrored, err := Verify(ctx, tempPath, digest, run)
+	if err != nil || mirrored != before {
+		return zero, fmt.Errorf("mirror independent readback failed")
+	}
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+	if err := rootUnchanged(dir, parent); err != nil {
+		return zero, err
+	}
+	if err := root.Link(tempName, name); err != nil {
+		return zero, err
+	}
+	if err := root.Remove(tempName); err != nil {
+		return zero, err
+	}
+	if err := syncRoot(root); err != nil {
+		return zero, err
+	}
+	if err := rootUnchanged(dir, parent); err != nil {
+		return zero, err
+	}
+	final, err := Verify(ctx, out, digest, run)
+	if err != nil || final != before {
+		return zero, fmt.Errorf("published mirror readback failed")
+	}
+	final.Status = "ARTIFACT_SET_INDEPENDENT_FILESYSTEM_MIRROR_BYTES_VERIFIED"
+	return final, nil
 }
 
 // Restore never overwrites anything. On failure a private partial destination
