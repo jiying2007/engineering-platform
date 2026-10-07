@@ -92,23 +92,28 @@ for name in "${roles[@]}"; do
   role="${name#engineering-}"
   unit="$prefix-$role-$suffix.service"
   units+=("$unit")
-  runtime="${unit%.service}"
-  sudo -n systemd-run --quiet --wait --collect --unit="$unit"     --property=Type=oneshot     --property=User="$name"     --property=Group="$group"     --property=RuntimeDirectory="$runtime"     --property=RuntimeDirectoryMode=0700     --property=UMask=0077     --property=NoNewPrivileges=yes     --property=PrivateTmp=yes     --property=PrivateDevices=yes     --property=ProtectSystem=strict     --property=ProtectHome=yes     --property=RestrictSUIDSGID=yes     --property=RestrictAddressFamilies=AF_UNIX     --property=SystemCallArchitectures=native     -- /bin/sh -eu -c 'printf "%s:%s\n" "$(id -u)" "$(id -g)" > "$RUNTIME_DIRECTORY/identity"'
-  observed="$(sudo -n cat "/run/$runtime/identity")"
-  test "$observed" = "${uids[$name]}:${gids[$name]}"
-  show="$(systemctl show "$unit" --property=User,Group,DynamicUser,Result --value 2>/dev/null || true)"
-  # The transient unit may already be collected, so the process-owned marker is
-  # the primary proof. If manager properties remain visible, they must not claim
-  # DynamicUser.
-  if systemctl show "$unit" --property=LoadState --value 2>/dev/null | grep -qx loaded; then
-    test "$(systemctl show "$unit" --property=User --value)" = "$name"
-    test "$(systemctl show "$unit" --property=Group --value)" = "$group"
-    test "$(systemctl show "$unit" --property=DynamicUser --value)" = no
-    test "$(systemctl show "$unit" --property=Result --value)" = success
-  fi
-  sudo -n rm -f -- "/run/$runtime/identity"
+  role_dir="$work/$role"
+  sudo -n install -d -m 0700 -o "$name" -g "$group" "$role_dir"
+  sudo -n systemd-run --quiet --wait --collect --unit="$unit" \
+    --property=Type=oneshot \
+    --property=User="$name" \
+    --property=Group="$group" \
+    --property=UMask=0077 \
+    --property=NoNewPrivileges=yes \
+    --property=PrivateTmp=yes \
+    --property=PrivateDevices=yes \
+    --property=ProtectSystem=strict \
+    --property=ProtectHome=yes \
+    --property=RestrictSUIDSGID=yes \
+    --property=RestrictAddressFamilies=AF_UNIX \
+    --property=ReadWritePaths="$role_dir" \
+    --property=SystemCallArchitectures=native \
+    -- /bin/sh -eu -c 'printf "%s:%s:%s:%s\n" "$(id -u)" "$(id -g)" "$(id -un)" "$(id -gn)" > "$1/identity"' _ "$role_dir"
+  observed="$(sudo -n cat "$role_dir/identity")"
+  test "$observed" = "${uids[$name]}:${gids[$name]}:$name:$group"
+  stat_out="$(sudo -n stat -c '%u:%g:%a:%h' "$role_dir/identity")"
+  test "$stat_out" = "${uids[$name]}:${gids[$name]}:600:1"
 done
-
 python3 - <<'PY'
 import json, os
 roles = ["engineering-control","engineering-publisher","engineering-admission","engineering-preparation"]
