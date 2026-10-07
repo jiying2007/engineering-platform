@@ -64,7 +64,7 @@ func TestActualPostTurnReadbackPreservesObservationsAndBytes(t *testing.T) {
 			calls, _ := canonical.Digest(c.calls)
 			r, err := workeragent.InspectPostTurn(context.Background(), q)
 			mustCheckpoint(t, err)
-			if r.CoreObservation != "NOT_OBSERVED" || r.SourceBytes != "NOT_READ" || r.BundleBytes != "NOT_READ" || !r.ControlTranscriptRetained || r.ExecutionAuthorized || r.ReplayAuthorized || r.ProductionQualified {
+			if r.CoreObservation != "NOT_OBSERVED" || r.SourceBytes != "NOT_READ" || r.BundleBytes != "NOT_READ" || !r.ControlTranscriptRetained || !r.ItemHistoryRetained || !canonical.ValidDigest(r.ItemHistoryDigest) || r.ExecutionAuthorized || r.ReplayAuthorized || r.ProductionQualified {
 				t.Fatal("invented authority", r)
 			}
 			if mode == "success" {
@@ -251,6 +251,20 @@ func TestActualPostTurnReadbackRejectsTamperingAndNeverFollowsPaths(t *testing.T
 		},
 		"public-record": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
 			mustCheckpoint(t, os.Chmod(filepath.Join(q.Records, name(":post-turn:FINALIZE")), 0644))
+		},
+		"missing-item-history": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
+			mustCheckpoint(t, os.Remove(filepath.Join(q.Records, name(":item-history"))))
+		},
+		"item-history-drift": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
+			path := filepath.Join(q.Records, name(":item-history"))
+			raw, e := os.ReadFile(path)
+			mustCheckpoint(t, e)
+			var v map[string]any
+			mustCheckpoint(t, json.Unmarshal(raw, &v))
+			v["turn_id"] = "other-turn"
+			changed, e := json.Marshal(v)
+			mustCheckpoint(t, e)
+			mustCheckpoint(t, os.WriteFile(path, changed, 0600))
 		},
 		"control-transcript-drift": func(t *testing.T, q *workeragent.PostTurnReadbackRequest) {
 			path := filepath.Join(q.Records, name(":control-transcript"))

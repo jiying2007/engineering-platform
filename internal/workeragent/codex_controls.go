@@ -12,9 +12,10 @@ import (
 )
 
 type codexController struct {
-	transport  Transport
-	binding    codexexec.ControlBinding
-	transcript codexexec.ControlTranscript
+	transport     Transport
+	binding       codexexec.ControlBinding
+	transcript    codexexec.ControlTranscript
+	retainHistory func(codexapp.EngineeringHistory) error
 }
 
 var _ codexapp.EngineeringController = (*codexController)(nil)
@@ -63,6 +64,16 @@ func (c *codexController) Report(ctx context.Context, id, outcome string) error 
 	}
 	return nil
 }
+func (c *codexController) RetainHistory(ctx context.Context, history codexapp.EngineeringHistory) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c.retainHistory == nil {
+		return fmt.Errorf("private engineering history sink required")
+	}
+	return c.retainHistory(history)
+}
+
 func (c *codexController) Close(ctx context.Context, status string, proof processscope.Proof) error {
 	request := codexexec.ControlClose{Binding: c.binding, TurnStatus: status, ProcessScope: proof}
 	var transcript codexexec.ControlTranscript
@@ -82,13 +93,13 @@ func (c *codexController) Close(ctx context.Context, status string, proof proces
 // RunCodexTurn is the shared Core-bound model-turn segment of ExecuteCodex.
 // Callers must supply the prepared workspace; this does not mint a permit,
 // relax sandbox policy, publish changes, or retry a model/control request.
-func RunCodexTurn(ctx context.Context, c Transport, p codexexec.Permit, r CodexRuntime, work, home, prompt string) (codexapp.EngineeringReceipt, codexexec.ControlTranscript, error) {
+func RunCodexTurn(ctx context.Context, c Transport, p codexexec.Permit, r CodexRuntime, work, home, prompt string, retainHistory func(codexapp.EngineeringHistory) error) (codexapp.EngineeringReceipt, codexexec.ControlTranscript, error) {
 	var receipt codexapp.EngineeringReceipt
 	var transcript codexexec.ControlTranscript
-	if c == nil || p.Check(c.Subject(), codexexec.Start{RunID: p.Token.RunID, WorkerProfile: p.Token.WorkerProfile, Profile: p.Profile}) != nil {
+	if c == nil || retainHistory == nil || p.Check(c.Subject(), codexexec.Start{RunID: p.Token.RunID, WorkerProfile: p.Token.WorkerProfile, Profile: p.Profile}) != nil {
 		return receipt, transcript, fmt.Errorf("exact Core permit required")
 	}
-	controller := &codexController{transport: c, binding: codexexec.ControlBinding{Token: p.Token, ExecutionEpoch: p.Assignment.Intent.ExecutionEpoch}}
+	controller := &codexController{transport: c, binding: codexexec.ControlBinding{Token: p.Token, ExecutionEpoch: p.Assignment.Intent.ExecutionEpoch}, retainHistory: retainHistory}
 	var err error
 	switch p.Profile.Provider.CredentialMode {
 	case provideridentity.CredentialWorkloadIdentity:

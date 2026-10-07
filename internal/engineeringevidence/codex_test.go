@@ -35,7 +35,7 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		BundleSize:         int64(len(bundle)),
 	}
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(),
+		SchemaVersion: 5, ProcessScope: testsupport.ProcessScopeFixture(),
 		CLI:                        "codex-cli",
 		Version:                    "0.157.1",
 		BinaryDigest:               "sha256:" + strings.Repeat("7", 64),
@@ -45,6 +45,8 @@ func codexEvidenceFixture(t *testing.T) CodexImportRequest {
 		FederationRuleID:           "rule-test",
 		Model:                      "gpt-5.6-sol",
 		PromptDigest:               "sha256:" + strings.Repeat("8", 64),
+		ItemHistoryDigest:          canonical.BytesDigest([]byte("test-only item history")),
+		ItemHistoryCount:           1,
 		ThreadID:                   "thread-1",
 		TurnID:                     "turn-1",
 		TurnStatus:                 "completed",

@@ -65,6 +65,7 @@ type EngineeringObservation struct {
 	FailedCommands   int
 	FileChangeCount  int
 	ApprovalRequests int
+	History          EngineeringHistory
 }
 
 type EngineeringReceipt struct {
@@ -79,6 +80,8 @@ type EngineeringReceipt struct {
 	FederationRuleID                     string                    `json:"federation_rule_id"`
 	Model                                string                    `json:"model"`
 	PromptDigest                         string                    `json:"prompt_digest"`
+	ItemHistoryDigest                    string                    `json:"item_history_digest"`
+	ItemHistoryCount                     int                       `json:"item_history_count"`
 	ThreadID                             string                    `json:"thread_id"`
 	TurnID                               string                    `json:"turn_id"`
 	TurnStatus                           string                    `json:"turn_status"`
@@ -97,6 +100,7 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 	if adapter == nil || !remoteID(threadID) || !remoteID(turnID) {
 		return out, ErrLifecycle
 	}
+	out.History = EngineeringHistory{Version: 1, ThreadID: threadID, TurnID: turnID, Items: [][]byte{}}
 	messages := []string{}
 	total := 0
 	for {
@@ -149,6 +153,9 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 			default:
 				return out, fmt.Errorf("engineering turn emitted disallowed item type %q", p.Item.Type)
 			}
+			if err := out.History.appendItem(event.Message.Params); err != nil {
+				return out, err
+			}
 		case "turn/completed":
 			var p struct {
 				ThreadID string `json:"threadId"`
@@ -159,6 +166,9 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 			}
 			if json.Unmarshal(event.Message.Params, &p) != nil || p.ThreadID != threadID || p.Turn.ID != turnID {
 				return out, ErrProtocol
+			}
+			if err := out.History.complete(event.Message.Params); err != nil {
+				return out, err
 			}
 			out.Status = p.Turn.Status
 			if out.Status == "interrupted" {
@@ -174,6 +184,21 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 			return out, nil
 		}
 	}
+}
+
+func retainEngineeringHistory(controller EngineeringController, history EngineeringHistory) (string, int, error) {
+	digest, err := history.Digest()
+	if err != nil {
+		return "", 0, err
+	}
+	if controller != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := controller.RetainHistory(ctx, history); err != nil {
+			return "", 0, err
+		}
+	}
+	return digest, len(history.Items), nil
 }
 
 func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binaryDigest, qualificationDigest, work, home, ruleID, tokenFile, auditContext, model, prompt string, controller EngineeringController) (receipt EngineeringReceipt, runErr error) {
@@ -296,8 +321,15 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	}
 	controlStarted = true
 	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
+	historyDigest, historyCount, historyErr := retainEngineeringHistory(controller, observation.History)
 	if err != nil {
+		if historyErr != nil && len(observation.History.Completion) != 0 {
+			return receipt, fmt.Errorf("%w; private item history retention failed: %v", err, historyErr)
+		}
 		return receipt, err
+	}
+	if historyErr != nil {
+		return receipt, historyErr
 	}
 	_ = client.Close()
 	joinCtx, joinCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -307,11 +339,12 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 5, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: ruleID, Model: model,
-		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
+		PromptDigest: canonical.BytesDigest([]byte(prompt)), ItemHistoryDigest: historyDigest, ItemHistoryCount: historyCount,
+		ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
 		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
@@ -422,8 +455,15 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	}
 	controlStarted = true
 	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
+	historyDigest, historyCount, historyErr := retainEngineeringHistory(controller, observation.History)
 	if err != nil {
+		if historyErr != nil && len(observation.History.Completion) != 0 {
+			return receipt, fmt.Errorf("%w; private item history retention failed: %v", err, historyErr)
+		}
 		return receipt, err
+	}
+	if historyErr != nil {
+		return receipt, historyErr
 	}
 	_ = client.Close()
 	joinCtx, joinCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -433,11 +473,12 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
 	}
 	receipt = EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
+		SchemaVersion: 5, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
 		BinaryDigest: binaryDigest, QualificationDigest: qualificationDigest,
 		EngineeringConfigDigest: EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIChatGPTTrustedSelfHosted(), FederationRuleID: "", Model: model,
-		PromptDigest: canonical.BytesDigest([]byte(prompt)), ThreadID: threadID, TurnID: turnID,
+		PromptDigest: canonical.BytesDigest([]byte(prompt)), ItemHistoryDigest: historyDigest, ItemHistoryCount: historyCount,
+		ThreadID: threadID, TurnID: turnID,
 		TurnStatus: observation.Status, Output: observation.Output,
 		OutputDigest: canonical.BytesDigest([]byte(observation.Output)),
 		CommandCount: observation.CommandCount, FailedCommands: observation.FailedCommands,
@@ -449,10 +490,11 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 }
 
 func (r EngineeringReceipt) Validate() error {
-	if r.SchemaVersion != 4 || !r.ProcessScope.Quiescent() || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
+	if r.SchemaVersion != 5 || !r.ProcessScope.Quiescent() || r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.QualificationDigest) ||
 		r.EngineeringConfigDigest != EngineeringConfigDigest() || r.Provider.Validate() != nil ||
 		strings.TrimSpace(r.Model) == "" || len(r.Model) > 128 || !canonical.ValidDigest(r.PromptDigest) ||
+		!canonical.ValidDigest(r.ItemHistoryDigest) || r.ItemHistoryCount <= 0 || r.ItemHistoryCount > MaxEngineeringHistoryItems ||
 		!remoteID(r.ThreadID) || !remoteID(r.TurnID) || r.TurnStatus != "completed" ||
 		strings.TrimSpace(r.Output) == "" || len(r.Output) > 64<<10 ||
 		r.OutputDigest != canonical.BytesDigest([]byte(r.Output)) || r.CommandCount < 0 ||

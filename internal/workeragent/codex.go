@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
 )
 
@@ -105,7 +106,11 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	if err != nil {
 		return receipt, err
 	}
-	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt)
+	historyID := sandbox.Hash([]byte(permit.Token.ID + ":item-history"))[7:]
+	retainHistory := func(history codexapp.EngineeringHistory) error {
+		return p.SaveCodex(permit.Assignment, prepared, historyID, history)
+	}
+	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt, retainHistory)
 	controlDigest, controlErr := transcript.Digest()
 	if controlErr == nil && transcript.Close.Binding.Token == permit.Token &&
 		transcript.Close.Binding.ExecutionEpoch == permit.Assignment.Intent.ExecutionEpoch {

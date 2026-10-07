@@ -218,11 +218,11 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 		ProfileDigest: digestOf("profile"), RecoveryEpoch: 0,
 	}
 	codexReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: "0.157.1",
+		SchemaVersion: 5, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: "0.157.1",
 		BinaryDigest: digestOf("binary"), QualificationDigest: digestOf("qualification"),
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Provider:                provideridentity.OpenAIWIFUnattended(), FederationRuleID: "rule-1", Model: "gpt-test",
-		PromptDigest: digestOf("prompt"), ThreadID: "thread-1", TurnID: "turn-1",
+		PromptDigest: digestOf("prompt"), ItemHistoryDigest: digestOf("item-history"), ItemHistoryCount: 1, ThreadID: "thread-1", TurnID: "turn-1",
 		TurnStatus: "completed", Output: "done", OutputDigest: canonical.BytesDigest([]byte("done")),
 		CommandCount: 1, FileChangeCount: 1, ApprovalRequests: 0, AssertionRemovedBeforeTurn: true,
 	}

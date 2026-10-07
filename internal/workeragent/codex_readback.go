@@ -65,6 +65,9 @@ type PostTurnReadback struct {
 	FailedPhase               string          `json:"failed_phase,omitempty"`
 	TranscriptDigest          string          `json:"control_transcript_digest,omitempty"`
 	ControlTranscriptRetained bool            `json:"control_transcript_retained"`
+	ItemHistoryDigest         string          `json:"item_history_digest,omitempty"`
+	ItemHistoryCount          int             `json:"item_history_count"`
+	ItemHistoryRetained       bool            `json:"item_history_retained"`
 	ExpectedResultDigest      string          `json:"expected_result_digest,omitempty"`
 	CheckpointDigest          string          `json:"checkpoint_digest,omitempty"`
 	LocalRegistrationClaim    bool            `json:"local_registration_claim"`
@@ -82,6 +85,7 @@ type PostTurnReadback struct {
 	checkpoint                *codexexec.SourceCheckpoint
 	result                    *codexexec.Result
 	controlTranscript         *codexexec.ControlTranscript
+	itemHistory               *codexapp.EngineeringHistory
 }
 
 func recordName(id, suffix string) string {
@@ -117,11 +121,17 @@ func readbackDirectory(path string) (*os.Root, os.FileInfo, error) {
 	return root, before, nil
 }
 func readbackFile(root *os.Root, name string) ([]byte, error) {
+	return readbackFileBound(root, name, strictjson.MaxBytes)
+}
+func readbackFileBound(root *os.Root, name string, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("invalid private record limit")
+	}
 	before, err := root.Lstat(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
-	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0077 != 0 || before.Size() <= 0 || before.Size() > strictjson.MaxBytes {
+	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0077 != 0 || before.Size() <= 0 || before.Size() > limit {
 		return nil, fmt.Errorf("invalid private record: %s", name)
 	}
 	f, err := openReadbackFile(root, name)
@@ -133,7 +143,7 @@ func readbackFile(root *os.Root, name string) ([]byte, error) {
 	if err != nil || !opened.Mode().IsRegular() || !os.SameFile(before, opened) || opened.Mode().Perm()&0077 != 0 {
 		return nil, fmt.Errorf("record changed: %s", name)
 	}
-	raw, err := io.ReadAll(io.LimitReader(f, strictjson.MaxBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(f, limit+1))
 	after, statErr := root.Lstat(name)
 	if err != nil || statErr != nil || !os.SameFile(before, after) || before.Size() != int64(len(raw)) || !before.ModTime().Equal(after.ModTime()) || before.Mode() != after.Mode() {
 		return nil, fmt.Errorf("record changed: %s", name)
@@ -183,11 +193,16 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 	}
 	defer root.Close()
 	observed := map[string][]byte{}
+	historyName := recordName(q.ExecutionID, ":item-history")
 	get := func(name string, out any) (bool, error) {
 		if err := ctx.Err(); err != nil {
 			return false, err
 		}
-		raw, err := readbackFile(root, name)
+		limit := int64(strictjson.MaxBytes)
+		if name == historyName {
+			limit = int64(strictjson.MaxBytes)
+		}
+		raw, err := readbackFileBound(root, name, limit)
 		if err != nil {
 			return false, err
 		}
@@ -225,6 +240,25 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		r.TranscriptDigest = digest
 		r.ControlTranscriptRetained = true
 		r.controlTranscript = &localControl
+	}
+	var history codexapp.EngineeringHistory
+	historySaved, err := get(historyName, &history)
+	if err != nil {
+		return empty, err
+	}
+	if historySaved {
+		digest, historyErr := history.Digest()
+		if historyErr != nil {
+			return empty, fmt.Errorf("retained item history invalid")
+		}
+		if r.controlTranscript != nil && (history.ThreadID != r.controlTranscript.Close.Binding.ThreadID ||
+			history.TurnID != r.controlTranscript.Close.Binding.TurnID) {
+			return empty, fmt.Errorf("retained item history/control binding mismatch")
+		}
+		r.ItemHistoryDigest = digest
+		r.ItemHistoryCount = len(history.Items)
+		r.ItemHistoryRetained = true
+		r.itemHistory = &history
 	}
 	bind := func(entry postTurnRecord) error {
 		if r.TranscriptDigest != "" && r.TranscriptDigest != entry.TranscriptDigest {
@@ -323,6 +357,10 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		if len(r.EnteredPhases) == 0 || turn.Validate() != nil || turn.Provider != profile.Provider || turn.Version != profile.CodexVersion || turn.BinaryDigest != profile.BinaryDigest || turn.QualificationDigest != profile.QualificationDigest || turn.EngineeringConfigDigest != profile.EngineeringConfigDigest || turn.Model != profile.Model {
 			return empty, fmt.Errorf("turn/permit identity mismatch")
 		}
+		if !historySaved || history.ThreadID != turn.ThreadID || history.TurnID != turn.TurnID ||
+			turn.ItemHistoryDigest != r.ItemHistoryDigest || turn.ItemHistoryCount != r.ItemHistoryCount {
+			return empty, fmt.Errorf("turn/private item history identity mismatch")
+		}
 		if r.checkpoint != nil && (r.checkpoint.Binding.ThreadID != turn.ThreadID || r.checkpoint.Binding.TurnID != turn.TurnID) {
 			return empty, fmt.Errorf("checkpoint/turn identity mismatch")
 		}
@@ -392,7 +430,7 @@ func InspectPostTurn(ctx context.Context, q PostTurnReadbackRequest) (PostTurnRe
 		return empty, fmt.Errorf("record directory changed during readback")
 	}
 	// Deterministic output; retain only names/hashes, never source/model/steer text.
-	names := []string{permitName, controlName}
+	names := []string{permitName, controlName, historyName}
 	for _, phase := range postTurnPhases {
 		names = append(names, recordName(q.ExecutionID, ":post-turn:"+phase))
 	}

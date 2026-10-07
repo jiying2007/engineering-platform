@@ -100,11 +100,11 @@ func codexResult(t *testing.T, permit codexexec.Permit) codexexec.Result {
 	promptIdentity, err := codexexec.PromptIdentityDigest(permit.Assignment, permit.Preparation)
 	workerOK(t, err)
 	modelReceipt := codexapp.EngineeringReceipt{
-		SchemaVersion: 4, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: permit.Profile.CodexVersion,
+		SchemaVersion: 5, ProcessScope: testsupport.ProcessScopeFixture(), CLI: "codex-cli", Version: permit.Profile.CodexVersion,
 		BinaryDigest: permit.Profile.BinaryDigest, QualificationDigest: permit.Profile.QualificationDigest,
 		EngineeringConfigDigest: permit.Profile.EngineeringConfigDigest,
 		Provider:                permit.Profile.Provider, FederationRuleID: "rule-test", Model: permit.Profile.Model,
-		PromptDigest: canonical.BytesDigest([]byte("rendered prompt")), ThreadID: "thread", TurnID: "turn",
+		PromptDigest: canonical.BytesDigest([]byte("rendered prompt")), ItemHistoryDigest: canonical.BytesDigest([]byte("test-only item history")), ItemHistoryCount: 1, ThreadID: "thread", TurnID: "turn",
 		TurnStatus: "completed", Output: "implemented", OutputDigest: canonical.BytesDigest([]byte("implemented")),
 		CommandCount: 2, FileChangeCount: 1, AssertionRemovedBeforeTurn: true,
 	}

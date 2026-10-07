@@ -46,6 +46,7 @@ type ExecutionCaptureReport struct {
 	RuntimeBinaryRetained     bool               `json:"runtime_binary_retained"`
 	QualificationRetained     bool               `json:"qualification_retained"`
 	ControlTranscriptRetained bool               `json:"control_transcript_retained"`
+	ItemHistoryRetained       bool               `json:"item_history_retained"`
 	ContinuationRetained      bool               `json:"continuation_retained"`
 	RuntimeBinaryDigest       string             `json:"runtime_binary_digest"`
 	QualificationDigest       string             `json:"qualification_digest"`
@@ -63,9 +64,10 @@ type ExecutionCaptureReport struct {
 // source-checkpoint archive is also mandatory and is validated with the SAME
 // ref/Task/base/profile checks used by restoration before it enters the plan.
 // Current result/checkpoint producers retain their own base Git graph. The exact
-// sealed private ControlTranscript is mandatory for current capture. This is
-// still NOT all Run dependencies: credentials/session material and full model/tool
-// item history remain outside this narrowly declared selection.
+// sealed private ControlTranscript and exact bounded completed-item history are
+// mandatory for current capture. This is still NOT all Run dependencies:
+// credential/session material and provider-internal streaming state remain outside
+// this narrowly declared selection.
 func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (report ExecutionCaptureReport, err error) {
 	var zero ExecutionCaptureReport
 	for _, p := range []string{q.ContextDirectory, q.RuntimeBinary, q.QualificationReceipt, q.Destination} {
@@ -89,6 +91,9 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	}
 	if !before.ControlTranscriptRetained {
 		return zero, fmt.Errorf("sealed private control transcript required for complete execution capture")
+	}
+	if !before.ItemHistoryRetained || !canonical.ValidDigest(before.ItemHistoryDigest) {
+		return zero, fmt.Errorf("exact private model/tool item history required for complete execution capture")
 	}
 	if before.result == nil && before.checkpoint == nil {
 		return zero, fmt.Errorf("no bound stopped source or result to retain")
@@ -215,11 +220,11 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	if err := contextInventory(q.ContextDirectory, names); err != nil {
 		return zero, err
 	}
-	selection := "EXECUTION_RECORDS_CONTROL_CONTEXT_AND_FROZEN_RUNTIME"
+	selection := "EXECUTION_RECORDS_CONTROL_HISTORY_CONTEXT_AND_FROZEN_RUNTIME"
 	if continuationRetained {
-		selection = "EXECUTION_RECORDS_CONTROL_CONTEXT_RUNTIME_AND_UPSTREAM_CONTINUATION"
+		selection = "EXECUTION_RECORDS_CONTROL_HISTORY_CONTEXT_RUNTIME_AND_UPSTREAM_CONTINUATION"
 	}
-	return ExecutionCaptureReport{Archive: packed, Selection: selection, PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil, RuntimeBinaryRetained: true, QualificationRetained: true, ControlTranscriptRetained: true, ContinuationRetained: continuationRetained, RuntimeBinaryDigest: p.Profile.BinaryDigest, QualificationDigest: p.Profile.QualificationDigest}, nil
+	return ExecutionCaptureReport{Archive: packed, Selection: selection, PermitDigest: q.Readback.PermitDigest, ContextManifestDigest: p.Preparation.Facts.BundleDigest, RecordCount: len(before.Files), ContextCount: len(p.Assignment.Input.ContextRefs), SourceCheckpointRetained: before.checkpoint != nil, ResultBundleRetained: before.result != nil, RuntimeBinaryRetained: true, QualificationRetained: true, ControlTranscriptRetained: true, ItemHistoryRetained: true, ContinuationRetained: continuationRetained, RuntimeBinaryDigest: p.Profile.BinaryDigest, QualificationDigest: p.Profile.QualificationDigest}, nil
 }
 
 func contextInventory(path string, expected []string) error {

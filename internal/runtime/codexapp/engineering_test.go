@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"io"
 	"os"
@@ -151,6 +152,50 @@ func TestObserveEngineeringTurnAcceptsLocalItems(t *testing.T) {
 	if got.Status != "completed" || got.Output != "implemented and tested" || got.CommandCount != 2 || got.FailedCommands != 1 || got.FileChangeCount != 1 || got.ApprovalRequests != 0 {
 		t.Fatalf("unexpected observation: %#v", got)
 	}
+	if err := got.History.Validate(); err != nil || len(got.History.Items) != 4 {
+		t.Fatalf("complete private item history missing: items=%d err=%v", len(got.History.Items), err)
+	}
+	if digest, err := got.History.Digest(); err != nil || !strings.HasPrefix(digest, "sha256:") {
+		t.Fatalf("item history digest invalid: %q %v", digest, err)
+	}
+}
+
+func TestEngineeringHistoryFitsStrictPrivateRecordAtBound(t *testing.T) {
+	h := EngineeringHistory{Version: 1, ThreadID: "thread-live", TurnID: "turn-live", Items: [][]byte{}}
+	padding := strings.Repeat("x", MaxEngineeringHistoryRawBytes-1024)
+	raw, err := json.Marshal(map[string]any{
+		"threadId": "thread-live", "turnId": "turn-live",
+		"item": map[string]any{"type": "agentMessage", "id": "message-large", "text": padding},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.appendItem(raw); err != nil {
+		t.Fatal(err)
+	}
+	completion := []byte(`{"threadId":"thread-live","turn":{"id":"turn-live","status":"completed"}}`)
+	if err := h.complete(completion); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) >= strictjson.MaxBytes {
+		t.Fatalf("bounded raw history encoded beyond strict private record: %d", len(encoded))
+	}
+	var restored EngineeringHistory
+	if err := strictjson.Decode(encoded, &restored); err != nil {
+		t.Fatal(err)
+	}
+	before, err := h.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := restored.Digest()
+	if err != nil || before != after {
+		t.Fatalf("strict private history round-trip drift: %q %q %v", before, after, err)
+	}
 }
 
 func TestObserveEngineeringTurnRejectsExternalTools(t *testing.T) {
@@ -203,7 +248,8 @@ func TestEngineeringWIFTurnDeletesAssertionBeforeModelReachableWork(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !receipt.AssertionRemovedBeforeTurn || receipt.CommandCount != 1 ||
+	if receipt.SchemaVersion != 5 || receipt.ItemHistoryCount <= 0 || !strings.HasPrefix(receipt.ItemHistoryDigest, "sha256:") ||
+		!receipt.AssertionRemovedBeforeTurn || receipt.CommandCount != 1 ||
 		receipt.FileChangeCount != 1 || receipt.Output != "fixture engineering change complete" {
 		t.Fatalf("unexpected engineering receipt: %#v", receipt)
 	}
@@ -255,6 +301,7 @@ func TestEngineeringSavedLoginTurnDeletesBootstrapBeforeModelReachableWork(t *te
 	if receipt.Provider != provideridentity.OpenAIChatGPTTrustedSelfHosted() ||
 		!receipt.CredentialBootstrapRemovedBeforeTurn ||
 		receipt.AssertionRemovedBeforeTurn ||
+		receipt.SchemaVersion != 5 || receipt.ItemHistoryCount <= 0 || !strings.HasPrefix(receipt.ItemHistoryDigest, "sha256:") ||
 		receipt.CommandCount != 1 || receipt.FileChangeCount != 1 ||
 		receipt.Output != "fixture engineering change complete" {
 		t.Fatalf("unexpected saved-login engineering receipt: %#v", receipt)

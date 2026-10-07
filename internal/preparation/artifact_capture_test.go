@@ -45,7 +45,7 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 			if r.FullRunBackup || r.ExecutionAuthorized || r.ProductionQualified || r.Archive.ProducerSemanticsVerified || r.Archive.ExecutionAuthorized || r.Archive.ProductionQualified {
 				t.Fatal("invented authority or coverage", r)
 			}
-			if r.Selection != "EXECUTION_RECORDS_CONTROL_CONTEXT_AND_FROZEN_RUNTIME" || !r.ControlTranscriptRetained || r.RecordCount != len(before.Files) || r.ContextCount != len(c.permit.Assignment.Input.ContextRefs) || r.ContextManifestDigest != c.permit.Preparation.Facts.BundleDigest || r.PermitDigest != q.Readback.PermitDigest || !r.RuntimeBinaryRetained || !r.QualificationRetained || r.RuntimeBinaryDigest != c.permit.Profile.BinaryDigest || r.QualificationDigest != c.permit.Profile.QualificationDigest {
+			if r.Selection != "EXECUTION_RECORDS_CONTROL_HISTORY_CONTEXT_AND_FROZEN_RUNTIME" || !r.ControlTranscriptRetained || !r.ItemHistoryRetained || r.RecordCount != len(before.Files) || r.ContextCount != len(c.permit.Assignment.Input.ContextRefs) || r.ContextManifestDigest != c.permit.Preparation.Facts.BundleDigest || r.PermitDigest != q.Readback.PermitDigest || !r.RuntimeBinaryRetained || !r.QualificationRetained || r.RuntimeBinaryDigest != c.permit.Profile.BinaryDigest || r.QualificationDigest != c.permit.Profile.QualificationDigest {
 				t.Fatal("wrong derived coverage", r)
 			}
 			// Same source identities/bytes produce the same archive regardless of new
@@ -140,7 +140,7 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 }
 
 func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
-	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-control-transcript", "missing-runtime", "changed-runtime", "missing-qualification", "changed-qualification", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "unexpected-continuation", "cancelled"} {
+	for _, bad := range []string{"missing-context", "extra-context", "changed-context", "context-link", "manifest-changed", "missing-control-transcript", "missing-item-history", "missing-runtime", "changed-runtime", "missing-qualification", "changed-qualification", "missing-source", "missing-bundle", "wrong-anchor", "output-in-context", "output-in-records", "output-exists", "context-alias", "world-writable-context", "hard-linked-context", "unexpected-continuation", "cancelled"} {
 		t.Run(bad, func(t *testing.T) {
 			q, c := captureFixture(t, "report-lost")
 			ctx := context.Background()
@@ -164,6 +164,9 @@ func TestFrozenExecutionCaptureRejectsOmissionsAndUnsafeInputs(t *testing.T) {
 				mustCheckpoint(t, os.WriteFile(m, []byte("{}"), 0600))
 			case "missing-control-transcript":
 				name := "codex-" + sandbox.Hash([]byte(q.Readback.ExecutionID + ":control-transcript"))[7:] + ".json"
+				mustCheckpoint(t, os.Remove(filepath.Join(q.Readback.Records, name)))
+			case "missing-item-history":
+				name := "codex-" + sandbox.Hash([]byte(q.Readback.ExecutionID + ":item-history"))[7:] + ".json"
 				mustCheckpoint(t, os.Remove(filepath.Join(q.Readback.Records, name)))
 			case "missing-runtime":
 				q.RuntimeBinary = ""
