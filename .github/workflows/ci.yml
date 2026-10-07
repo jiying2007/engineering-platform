@@ -228,6 +228,12 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/ci-artifact-enospc-drill.sh             "$RUNNER_TEMP/current-release-dist/eng"             "$RUNNER_TEMP/artifact-enospc-input"             "$RUNNER_TEMP/artifact-enospc-mount"
+
+      - name: Verify canonical retention maintenance under real systemd
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci-retention-systemd-maintenance.sh "$RUNNER_TEMP/current-release-dist/eng"
       - name: Checkout fixed retained rollback baseline
         uses: actions/checkout@v7
         with:
