@@ -112,7 +112,11 @@ Automatic Planner comes later. Explicit Skill routing is enough for M1.
 
 The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is proven**
 by one real retained Feature Closure chain and one separate retained Debug
-Closure chain.
+Closure chain. The current repository-side RC posture is
+**`INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`**: the approved
+small-team implementation/fault/governance slices are closed, while unattended
+provider, production-environment, WorkBuddy/device and independent human
+acceptance remain external gates. This is not production qualification.
 
 The authoritative live status is
 [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). Authentication
@@ -234,9 +238,12 @@ These are not inherited into Core automatically.
 
 ## Repository maturity
 
-**Trusted self-hosted M1 phase 1 is proven; production/unattended qualification
-is not granted.** The Feature and Debug retained chains are historical proof,
-not pending WIF prerequisites and not a substitute for production acceptance.
+**Trusted self-hosted M1 phase 1 is proven and the repository-side internal RC
+is a closed candidate; production/unattended qualification is not granted.**
+The Feature and Debug retained chains are historical proof, not pending WIF
+prerequisites and not a substitute for production acceptance. The only tracked
+open gates are #103 (WIF), #106 (optional relay/provider) and #105 (production
+acceptance).
 
 The current delivery contract includes all six executables, including
 `publisher-service`. After extracting an authenticated CI artifact and restoring
@@ -267,7 +274,10 @@ Steering acceptance, cancellation ACK, interrupted event and app-server process
 exit are separate observations. Missing or UNKNOWN receipts block successful
 delivery and are never replayed. See
 [Live Codex controls v1](docs/implementation/LIVE_CODEX_CONTROLS_V1.md).
-This does not yet provide durable pause/resume or quiescent Human Takeover.
+The `run-control` surface intentionally covers live Codex steer/interrupt only.
+Core persists pause/resume separately, and exact-epoch Human Takeover is exposed
+by `eng human-takeover`; takeover increments the execution epoch and transfers
+control to HUMAN without replaying the model turn.
 
 ### Stopped source recovery
 
@@ -286,4 +296,6 @@ RunStart + RunControl, exact checkpoint/version/epoch bindings and a new host
 preparation approval. Old execution is stopped without successful Delivery;
 it is not replayed. The new turn rechecks the complete inherited diff.
 See [source continuation contract](docs/implementation/SOURCE_CONTINUATION_V1.md).
-This does not implement model-memory resume, Human Takeover or production qualification.
+Source continuation does not reconstruct model memory and is not itself Human
+Takeover or production qualification; Human Takeover is the separate exact-epoch
+control-owner transfer path described above.
