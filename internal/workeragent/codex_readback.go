@@ -57,31 +57,31 @@ type ReadbackFile struct {
 // PostTurnReadback separates local observations, optional byte checks and an
 // optional authenticated Core observation. No field grants an effect.
 type PostTurnReadback struct {
-	Version                int             `json:"version"`
-	Token                  codexexec.Token `json:"token"`
-	PermitDigest           string          `json:"permit_digest"`
-	LocalObservation       string          `json:"local_observation"`
-	EnteredPhases          []string        `json:"entered_phases"`
-	FailedPhase            string          `json:"failed_phase,omitempty"`
-	TranscriptDigest       string          `json:"control_transcript_digest,omitempty"`
-	ControlTranscriptRetained bool         `json:"control_transcript_retained"`
-	ExpectedResultDigest   string          `json:"expected_result_digest,omitempty"`
-	CheckpointDigest       string          `json:"checkpoint_digest,omitempty"`
-	LocalRegistrationClaim bool            `json:"local_registration_claim"`
-	SourceBytes            string          `json:"source_bytes"`
-	BundleBytes            string          `json:"bundle_bytes"`
-	CoreObservation        string          `json:"core_observation"`
-	CoreCheckpoint         string          `json:"core_checkpoint"`
-	ObservedAt             time.Time       `json:"observed_at"`
-	CoreObservedAt         *time.Time      `json:"core_observed_at,omitempty"`
-	Files                  []ReadbackFile  `json:"files"`
-	ExecutionAuthorized    bool            `json:"execution_authorized"`
-	ReplayAuthorized       bool            `json:"replay_authorized"`
-	ProductionQualified    bool            `json:"production_qualified"`
-	permit                 codexexec.Permit
-	checkpoint             *codexexec.SourceCheckpoint
-	result                 *codexexec.Result
-	controlTranscript      *codexexec.ControlTranscript
+	Version                   int             `json:"version"`
+	Token                     codexexec.Token `json:"token"`
+	PermitDigest              string          `json:"permit_digest"`
+	LocalObservation          string          `json:"local_observation"`
+	EnteredPhases             []string        `json:"entered_phases"`
+	FailedPhase               string          `json:"failed_phase,omitempty"`
+	TranscriptDigest          string          `json:"control_transcript_digest,omitempty"`
+	ControlTranscriptRetained bool            `json:"control_transcript_retained"`
+	ExpectedResultDigest      string          `json:"expected_result_digest,omitempty"`
+	CheckpointDigest          string          `json:"checkpoint_digest,omitempty"`
+	LocalRegistrationClaim    bool            `json:"local_registration_claim"`
+	SourceBytes               string          `json:"source_bytes"`
+	BundleBytes               string          `json:"bundle_bytes"`
+	CoreObservation           string          `json:"core_observation"`
+	CoreCheckpoint            string          `json:"core_checkpoint"`
+	ObservedAt                time.Time       `json:"observed_at"`
+	CoreObservedAt            *time.Time      `json:"core_observed_at,omitempty"`
+	Files                     []ReadbackFile  `json:"files"`
+	ExecutionAuthorized       bool            `json:"execution_authorized"`
+	ReplayAuthorized          bool            `json:"replay_authorized"`
+	ProductionQualified       bool            `json:"production_qualified"`
+	permit                    codexexec.Permit
+	checkpoint                *codexexec.SourceCheckpoint
+	result                    *codexexec.Result
+	controlTranscript         *codexexec.ControlTranscript
 }
 
 func recordName(id, suffix string) string {
