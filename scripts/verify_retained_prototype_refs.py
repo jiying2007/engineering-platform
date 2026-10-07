@@ -13,7 +13,7 @@ DISPOSITION = "RETAINED_SUPERSEDED_PROTOTYPE"
 NAMES = (
     "docs/rc-status-after-terminal-v3",
     "feat/github-ci-core-evidence-import",
-    "feat/independent-artifact-mirror",
+    "feat/rc-independent-artifact-mirror",
     "feat/independent-publisher-service",
     "feat/independent-review-authority",
     "feat/relay-codex-config-renderer",
