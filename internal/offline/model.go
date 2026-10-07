@@ -19,6 +19,7 @@ const Kind = "WORKER_ATTESTED_OFFLINE_EXECUTION"
 const Authorized = "AUTHORIZED"
 const Finished = "FINISHED"
 const Unknown = "UNKNOWN"
+const AbandonedReconciled = "ABANDONED_RECONCILED"
 
 type Start struct {
 	RunID         string          `json:"run_id"`

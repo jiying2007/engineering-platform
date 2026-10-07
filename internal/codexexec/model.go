@@ -18,12 +18,13 @@ import (
 )
 
 const (
-	Action     = "worker.codex-execute"
-	Kind       = "WORKER_ATTESTED_CODEX_EXECUTION"
-	Authorized = "AUTHORIZED"
-	Finished   = "FINISHED"
-	Unknown    = "UNKNOWN"
-	Stopped    = "STOPPED_NO_DELIVERY"
+	Action              = "worker.codex-execute"
+	Kind                = "WORKER_ATTESTED_CODEX_EXECUTION"
+	Authorized          = "AUTHORIZED"
+	Finished            = "FINISHED"
+	Unknown             = "UNKNOWN"
+	AbandonedReconciled = "ABANDONED_RECONCILED"
+	Stopped             = "STOPPED_NO_DELIVERY"
 )
 
 var tokenID = regexp.MustCompile(`^[0-9a-f]{64}$`)

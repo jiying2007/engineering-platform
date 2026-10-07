@@ -72,3 +72,25 @@ func TestCodexExecutionMigrationIsAdditiveAndOrdered(t *testing.T) {
 		t.Fatal("Codex execution migration is not ordered after recovery proof migration")
 	}
 }
+
+func TestExecutionReconciliationMigrationPreservesStoppedCodexState(t *testing.T) {
+	for _, required := range []string{
+		"ADD COLUMN reconciliation_json jsonb",
+		"CHECK(state IN ('AUTHORIZED','FINISHED','UNKNOWN','ABANDONED_RECONCILED'))",
+		"CHECK(state IN ('AUTHORIZED','FINISHED','UNKNOWN','STOPPED_NO_DELIVERY','ABANDONED_RECONCILED'))",
+		"CHECK ((state='ABANDONED_RECONCILED') = (reconciliation_json IS NOT NULL))",
+		"INSERT INTO core_schema_migrations(version) VALUES(12)",
+	} {
+		if !strings.Contains(executionReconciliationMigration, required) {
+			t.Fatalf("execution reconciliation migration missing %q", required)
+		}
+	}
+	core := CoreMigration()
+	if strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(11)") >
+		strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(12)") {
+		t.Fatal("execution reconciliation migration is not ordered after continuation migration")
+	}
+	if strings.Count(executionReconciliationMigration, "ABANDONED_RECONCILED") < 4 {
+		t.Fatal("offline/Codex abandonment constraints are incomplete")
+	}
+}
