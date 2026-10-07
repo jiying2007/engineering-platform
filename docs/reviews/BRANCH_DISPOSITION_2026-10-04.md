@@ -75,8 +75,9 @@ explicit manifest review. Main, release refs and both retained M1 result refs
 are excluded by code, not merely by the current data. The maintenance workflow
 never bypasses branch protection.
 
-Four older prototype branches are deliberately not in this mechanical pass:
-`feat/github-ci-core-evidence-import`, `feat/independent-publisher-service`,
+Six divergent historical refs are deliberately not in this mechanical pass:
+`docs/rc-status-after-terminal-v3`, `feat/github-ci-core-evidence-import`,
+`feat/independent-artifact-mirror`, `feat/independent-publisher-service`,
 `feat/independent-review-authority`, and `feat/relay-codex-config-renderer`.
 No identical integrated tree was found for these tips in the reviewed history.
 Their superseded classification is not proof of byte-equivalent integration;
@@ -131,7 +132,7 @@ The retained receipt records 37 candidates: **32
 32 refs are gone.
 
 The remaining non-main refs deliberately include the two historical M1 evidence
-refs and four divergent prototypes
+refs and six divergent historical refs
 (`feat/github-ci-core-evidence-import`,
 `feat/independent-publisher-service`,
 `feat/independent-review-authority`,
@@ -150,7 +151,7 @@ the mutation is rejected before deletion.
 
 ## Frozen divergent prototype disposition — 2026-10-06
 
-The four non-byte-identical prototype branches are now deliberately retained as
+The six non-byte-identical historical refs are now deliberately retained as
 **RETAINED_SUPERSEDED_PROTOTYPE** history rather than deleted. Their exact remote
 heads are pinned in `.github/retained-prototype-refs.json` and required CI reads
 those four refs from origin and rejects any missing or changed head. This guard is
@@ -159,6 +160,17 @@ read-only; it is not GitHub branch protection and does not mutate refs.
 These refs are historical source lineage only and must not be merged, rebased or
 cherry-picked back into current main:
 
+- `docs/rc-status-after-terminal-v3@cffda379fb5de91973a9d73e69b7d89dc74fa586`
+  — a stale status-transport branch whose branch-only delta is an older
+  `IMPLEMENTATION_STATUS.md`; the live status authority on main has advanced
+  through later terminal/recovery/retention work. It is retained only as source
+  history, not as an alternate status authority.
+- `feat/rc-independent-artifact-mirror@54fc83d0f90bbf841ef2dc500b766446e63399a0`
+  — an exploratory different-filesystem artifact mirror. The supported main
+  path is the later externally pinned, bounded, verified scheduled replica
+  retention chain with systemd maintenance evidence. The prototype's distinct-
+  filesystem experiment remains historical source; it is not a second supported
+  retention implementation and is not byte-equivalent to main.
 - `feat/github-ci-core-evidence-import@16a147396196fabda07dc225809844802c9491eb`
   — the prototype CI Evidence line is superseded by the current
   `internal/cievidence` + `cmd/eng/import_ci.go` authority and later Delivery /
@@ -180,7 +192,7 @@ set of pending RC work. Actual mutation prevention for these historical refs
 remains a repository-administrator policy if desired; CI drift detection is the
 implemented repository-side control.
 
-Any intentional change to one of these four historical refs must first update
+Any intentional change to one of these six historical refs must first update
 this disposition and the exact-head manifest in the same reviewed change.
 Otherwise required CI fails closed; silently advancing a prototype branch is not
 an accepted maintenance path.
@@ -204,3 +216,24 @@ Only the already-reviewed post-successful-main workflow may delete it, after
 re-reading protected main, exact remote head, ancestry/tree identity and open PR
 inventory under the existing atomic SHA lease. Any drift fails the whole
 maintenance mutation before deletion.
+
+## Review-transport residue candidates — 2026-10-07
+
+Two temporary review transport refs were created while the linked GitHub actor
+could create Git commits/branches but the draft Ready transition and replacement
+PR mutations returned connector/GraphQL errors:
+
+- `chore/rc-retire-private-retention-residue-ready@1b8fd9f1e61ee9da7a1d124eceff8e0e9734c332`
+- `chore/rc-retire-private-retention-residue-review@11b71b7cecb6c14bc02cc800b3ee44da98c1d903`
+
+They contain **no unique file content**. Both resolve to complete tree
+`b6a1d55122783f8795cea764f25e99e05c3b0bda`, exactly the tree of protected
+main `6ff2589221ed9530311aeb4635271eef8f4780ba` after #198. The second ref differs only by an empty review
+transport commit; neither is a product/history authority or retained evidence ref.
+
+Both exact branch/head/tree tuples are therefore added to the existing retirement
+manifest. This change performs no direct deletion. Only the existing
+post-successful-main workflow may remove them after re-reading protected main,
+exact remote heads, integrated-commit ancestry/tree identity and open-PR
+inventory, using the existing atomic SHA leases and remote readback. Any drift
+rejects the maintenance mutation before deletion.

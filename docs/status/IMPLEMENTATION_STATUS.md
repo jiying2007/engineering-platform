@@ -178,8 +178,10 @@ retirement receipt `37476720045` applied the expanded manifest against
 `DELETED_READBACK_VERIFIED` and five were already `ABSENT`. Current governance
 also requires the exact same-repository merged PR head tree to equal verified
 main before automatically leasing deletion of that just-merged working ref.
-Four older divergent prototypes are explicitly disposed as frozen
-RETAINED_SUPERSEDED_PROTOTYPE refs. Required CI pins their exact remote heads;
+Six divergent historical refs are explicitly disposed as frozen
+RETAINED_SUPERSEDED_PROTOTYPE refs. The set includes the stale terminal-v3
+status transport and the independent-artifact-mirror experiment; both are
+exact-head guarded historical lineage, not alternate supported paths. Required CI pins their exact remote heads;
 they remain source-history lineage and are not treated as byte-identical or
 pending product work. Preserve unchanged:
 
@@ -268,8 +270,8 @@ W01-W10 remain the approved scope, not a new authority/checklist framework.
   Main-only internal RC delivery-envelope generation is implemented and each
   main push must still actually emit/read back its source-bound artifact. Broader
   sustained/soak security coverage and repository-administrator mutation
-  protection for retained historical refs remain open. The four divergent
-  prototype refs have an explicit frozen-history disposition and required
+  protection for retained historical refs remain open. The six divergent historical
+  refs have an explicit frozen-history disposition and required
   repository-side drift guard.
 
 Every slice needs exact-head CI, fresh-main and delivered-byte readback. The

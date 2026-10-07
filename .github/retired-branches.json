@@ -9,6 +9,18 @@
       "tree": "4bf3603e9305fba7c65021233db2627b31bd5871"
     },
     {
+      "branch": "chore/rc-retire-private-retention-residue-ready",
+      "expected_head": "1b8fd9f1e61ee9da7a1d124eceff8e0e9734c332",
+      "integrated_commit": "6ff2589221ed9530311aeb4635271eef8f4780ba",
+      "tree": "b6a1d55122783f8795cea764f25e99e05c3b0bda"
+    },
+    {
+      "branch": "chore/rc-retire-private-retention-residue-review",
+      "expected_head": "11b71b7cecb6c14bc02cc800b3ee44da98c1d903",
+      "integrated_commit": "6ff2589221ed9530311aeb4635271eef8f4780ba",
+      "tree": "b6a1d55122783f8795cea764f25e99e05c3b0bda"
+    },
+    {
       "branch": "docs/lifecycle-status-and-ref-closeout",
       "expected_head": "4de88e3fc94537bd134f5ba5b41795eccba24793",
       "integrated_commit": "c4eaa7aee68776999c789794839bb1c294891073",

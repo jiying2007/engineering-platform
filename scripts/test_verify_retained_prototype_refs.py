@@ -44,7 +44,7 @@ class RetainedPrototypeRefsTests(unittest.TestCase):
         report = guard.verify(self.work, self.manifest())
         self.assertEqual(report["status"], "RETAINED_PROTOTYPE_REFS_EXACT")
         self.assertFalse(report["mutation_attempted"])
-        self.assertEqual(len(report["refs"]), 4)
+        self.assertEqual(len(report["refs"]), len(guard.NAMES))
 
     def test_changed_or_missing_retained_ref_fails(self):
         newer = self.git("commit-tree", self.git("rev-parse", self.base + "^{tree}"), "-p", self.refs[0]["expected_head"], "-m", "drift")

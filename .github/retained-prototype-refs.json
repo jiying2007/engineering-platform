@@ -3,8 +3,18 @@
   "repository": "jiying2007/engineering-platform",
   "refs": [
     {
+      "branch": "docs/rc-status-after-terminal-v3",
+      "expected_head": "cffda379fb5de91973a9d73e69b7d89dc74fa586",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
       "branch": "feat/github-ci-core-evidence-import",
       "expected_head": "16a147396196fabda07dc225809844802c9491eb",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
+      "branch": "feat/rc-independent-artifact-mirror",
+      "expected_head": "54fc83d0f90bbf841ef2dc500b766446e63399a0",
       "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
     },
     {
