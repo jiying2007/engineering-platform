@@ -184,3 +184,23 @@ Any intentional change to one of these four historical refs must first update
 this disposition and the exact-head manifest in the same reviewed change.
 Otherwise required CI fails closed; silently advancing a prototype branch is not
 an accepted maintenance path.
+
+
+## Late exact-ancestor residue candidate — 2026-10-07
+
+Current remote inventory found one additional non-retained working ref that is
+mechanically stronger than the earlier squash-tree cases:
+
+- `feat/rc-private-retention@f0374a67a528280332b77739526d305e171c13e3`
+
+That ref points **directly at an existing protected-main ancestor commit** (#191),
+with tree `2fae6f76194a7548c29422f3dab73b93b9ec7098`. It has no branch-only
+commit relative to current main and is not one of the retained M1 evidence refs
+or frozen divergent prototypes.
+
+The exact branch/head/tree/integrated-commit tuple is therefore added to the
+existing retirement manifest. No direct deletion is performed by this change.
+Only the already-reviewed post-successful-main workflow may delete it, after
+re-reading protected main, exact remote head, ancestry/tree identity and open PR
+inventory under the existing atomic SHA lease. Any drift fails the whole
+maintenance mutation before deletion.
