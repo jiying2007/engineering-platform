@@ -14,6 +14,7 @@ PREFIX = "github.com/jiying2007/engineering-platform/"
 EXPECTED = {
     PREFIX + "internal/production": {
         "TestTerminalPlanIsDeterministicAndRequiresHumanReview",
+        "TestTerminalPlanRejectsWeakenedRolloutAndEmergencyContract",
         "TestSLOReportAllowsProviderPendingButRequiresAllInternalMeasurements",
         "TestSLOReportFailsClosedOnMissingOrUnknownObservation",
     },
@@ -83,8 +84,24 @@ def build_report(expected_sha, events, plan_raw):
     inventory = validate_events(events)
     plan = load(plan_raw)
     p = plan["plan"]
-    require(p["version"] == 2 and p["human_review_required"] is True and p["provider_live_required"] is True, "terminal plan version or external gate drift")
+    require(p["version"] == 3 and p["human_review_required"] is True and p["provider_live_required"] is True, "terminal plan version or external gate drift")
     require(p["repository"] == "jiying2007/engineering-platform" and p["max_engineering_model_turns"] == 1, "terminal subject drift")
+    require(p["deployment_profile"] == "canary-single-maintenance-fixture", "terminal canary profile drift")
+    require(p["database_rollback_policy"] == "restore-authoritative-backup-and-reconcile", "terminal database rollback policy drift")
+    require(p["emergency_stops"] == [
+        "provider-credential-or-rule-disable",
+        "publisher-credential-revoke",
+        "worker-execution-stop",
+    ], "terminal emergency-stop contract drift")
+    require(p["no_silent_provider_fallback"] is True and p["no_automatic_database_downgrade"] is True,
+            "terminal fallback/downgrade contract weakened")
+    for required in (
+        "canary_deployment_accepted",
+        "provider_emergency_disable_proven",
+        "publisher_revocation_proven",
+        "database_rollback_restore_policy_accepted",
+    ):
+        require(required in p["required_gates"], "terminal v3 required gate missing")
     canonical_plan = json.dumps(p, separators=(",", ":"), ensure_ascii=False).encode()
     require(plan["plan_digest"] == "sha256:" + hashlib.sha256(canonical_plan).hexdigest(), "terminal plan digest mismatch")
     return {"version": 1, "source_sha": actual, "source_tree": tree, "terminal_plan_version": p["version"],

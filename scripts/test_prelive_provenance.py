@@ -21,7 +21,7 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_full_inventory_required(self):
         events = self.events()
-        self.assertEqual(len(p.validate_events(self.encode(events))), 4)
+        self.assertEqual(len(p.validate_events(self.encode(events))), 5)
         for bad in ([], [e for e in events if not e.get("Test")], events[:-1], events[1:], events + events):
             with self.assertRaises(ValueError):
                 p.validate_events(self.encode(bad))
@@ -46,6 +46,16 @@ class ProvenanceTests(unittest.TestCase):
         for required in ("ref: ${{ github.sha }}", "test-events.json", "provenance.json", "prelive_provenance.py", "--expected-sha"):
             self.assertIn(required, workflow)
         self.assertNotIn("continue-on-error", workflow)
+
+    def test_v3_inventory_keeps_unknown_tests_fail_closed(self):
+        self.assertIn("TestTerminalPlanRejectsWeakenedRolloutAndEmergencyContract",
+                      p.EXPECTED[p.PREFIX + "internal/production"])
+        events = self.events()
+        forged = dict(events[2])
+        forged["Test"] = "TestTerminalPlanFutureUnfrozenCase"
+        events.insert(2, forged)
+        with self.assertRaises(ValueError):
+            p.validate_events(self.encode(events))
 
     def test_source_mismatch_and_dirty_tree_rejected_before_report(self):
         for answers in (("a"*40, "b"*40), ("c"*40, "b"*40, " M tracked-file")):
