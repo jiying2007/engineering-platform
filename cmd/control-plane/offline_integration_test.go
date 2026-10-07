@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"debug/elf"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -53,21 +54,29 @@ func TestOfflineCommandFreestandingFirmwareReference(t *testing.T) {
 	offlineCommandCapture(t, "firmware")
 }
 
+func TestOfflineCommandCortexM0CompilerCaptureRestore(t *testing.T) {
+	offlineCommandCapture(t, "cortex-m0")
+}
+
 func TestOfflineCommandSIGKILLLeavesUnreconciledWithoutReplay(t *testing.T) {
 	offlineCommandCapture(t, "crash")
 }
 
 func offlineCommandCapture(t *testing.T, mode string) {
 	firmware := mode == "firmware"
-	compiler := mode == "compiler" || firmware
+	cortexM := mode == "cortex-m0"
+	compiler := mode == "compiler" || firmware || cortexM
 	crash := mode == "crash"
 	if mode != "probe" && !compiler && !crash {
 		t.Fatal("unknown offline command test mode", mode)
 	}
 	var image testutil.Fixture
-	if compiler {
+	switch {
+	case cortexM:
+		image = testutil.BuildARMCompiler(t)
+	case compiler:
 		image = testutil.BuildCompiler(t)
-	} else {
+	default:
 		image = testutil.Build(t)
 	}
 	url := os.Getenv("POSTGRES_TEST_URL")
@@ -81,13 +90,23 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	guard, err := os.ReadFile(image.Guard)
 	commandOK(t, err)
 	profile := sandbox.Profile{Image: image.Image, GuardDigest: sandbox.Hash(guard), Argv: []string{"/probe", "build-output", "good"}, Seconds: 10, Outputs: []sandbox.OutputSpec{{Name: "app.bin", MaxBytes: 64}, {Name: "app.map", MaxBytes: 64}}}
-	if compiler {
+	if mode == "compiler" {
 		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/main.c", "-Wl,-e,entry,-Map=/tmp/ep-output/app.map", "-o", "/tmp/ep-output/app.elf"}
 		profile.Seconds = 15
 		profile.Outputs = []sandbox.OutputSpec{{Name: "app.elf", MaxBytes: 128 << 10}, {Name: "app.map", MaxBytes: 64 << 10}}
 	}
 	if firmware {
 		profile.Argv = []string{"/usr/bin/gcc", "-nostdlib", "-ffreestanding", "-fno-pie", "-no-pie", "/workspace/firmware.c", "-Wl,-e,reset_handler,-Map=/tmp/ep-output/firmware.map", "-o", "/tmp/ep-output/firmware.elf"}
+		profile.Outputs = []sandbox.OutputSpec{{Name: "firmware.elf", MaxBytes: 128 << 10}, {Name: "firmware.map", MaxBytes: 64 << 10}}
+	}
+	if cortexM {
+		profile.Argv = []string{
+			"/usr/bin/clang", "--target=arm-none-eabi", "-mcpu=cortex-m0", "-mthumb",
+			"-ffreestanding", "-fno-builtin", "-nostdlib", "-fuse-ld=lld",
+			"-Wl,-T,/workspace/link.ld,-Map=/tmp/ep-output/firmware.map,-e,reset_handler",
+			"/workspace/main.c", "-o", "/tmp/ep-output/firmware.elf",
+		}
+		profile.Seconds = 15
 		profile.Outputs = []sandbox.OutputSpec{{Name: "firmware.elf", MaxBytes: 128 << 10}, {Name: "firmware.map", MaxBytes: 64 << 10}}
 	}
 	if crash {
@@ -185,8 +204,19 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	gitRun("config", "user.name", "Offline Fixture")
 	gitRun("config", "user.email", "test@example.invalid")
 	commandOK(t, os.WriteFile(filepath.Join(repo, "hello.txt"), []byte("real approved source\n"), 0o600))
-	if compiler && !firmware {
+	if mode == "compiler" {
 		commandOK(t, os.WriteFile(filepath.Join(repo, "main.c"), []byte("int entry(void) { return 42; }\n"), 0600))
+	}
+	if cortexM {
+		firmwareSource := "typedef void (*handler_t)(void);\n" +
+			"void reset_handler(void);\n" +
+			"__attribute__((used,section(\".vectors\"))) const handler_t vectors[] = {(handler_t)0x20001000u, reset_handler};\n" +
+			"void reset_handler(void) { for (;;) { __asm__ volatile (\"nop\"); } }\n"
+		linker := "ENTRY(reset_handler)\n" +
+			"MEMORY {\n FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 64K\n RAM (rwx) : ORIGIN = 0x20000000, LENGTH = 8K\n}\n" +
+			"SECTIONS {\n .vectors : { KEEP(*(.vectors)) } > FLASH\n .text : { *(.text*) *(.rodata*) } > FLASH\n .data : { *(.data*) } > RAM\n .bss : { *(.bss*) *(COMMON) } > RAM\n}\n"
+		commandOK(t, os.WriteFile(filepath.Join(repo, "main.c"), []byte(firmwareSource), 0600))
+		commandOK(t, os.WriteFile(filepath.Join(repo, "link.ld"), []byte(linker), 0600))
 	}
 	if firmware {
 		const source = "volatile unsigned long boot_counter;\n" +
@@ -300,7 +330,32 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	if receipt.Result.BuildOutputs == nil || len(receipt.Result.BuildOutputs.Files) != 2 || receipt.Result.Validate(profile) != nil {
 		t.Fatal("Worker lost frozen output bytes")
 	}
-	if firmware {
+	if cortexM {
+		output := receipt.Result.BuildOutputs.Files[0]
+		linkMap := string(receipt.Result.BuildOutputs.Files[1].Bytes)
+		if output.Name != "firmware.elf" || receipt.Result.BuildOutputs.Files[1].Name != "firmware.map" {
+			t.Fatal("Cortex-M output contract drift")
+		}
+		parsed, err := elf.NewFile(bytes.NewReader(output.Bytes))
+		commandOK(t, err)
+		defer parsed.Close()
+		if parsed.Class != elf.ELFCLASS32 || parsed.Machine != elf.EM_ARM || parsed.Data != elf.ELFDATA2LSB ||
+			parsed.Section(".vectors") == nil || parsed.Entry < 0x08000000 {
+			t.Fatal("cross compiler did not produce expected Cortex-M ARM ELF identity")
+		}
+		found := false
+		symbols, err := parsed.Symbols()
+		commandOK(t, err)
+		for _, symbol := range symbols {
+			if symbol.Name == "reset_handler" {
+				found = true
+				break
+			}
+		}
+		if !found || !strings.Contains(linkMap, "reset_handler") || !strings.Contains(linkMap, ".vectors") {
+			t.Fatal("Cortex-M reset/vector facts missing")
+		}
+	} else if firmware {
 		elf := receipt.Result.BuildOutputs.Files[0]
 		linkMap := string(receipt.Result.BuildOutputs.Files[1].Bytes)
 		if elf.Name != "firmware.elf" || !strings.HasPrefix(string(elf.Bytes), "\x7fELF") ||
@@ -456,7 +511,7 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	if count != 0 {
 		t.Fatal("capture manufactured Evidence")
 	}
-	t.Logf("same-Run mode=%s Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s; host-ISA reference only=%t", mode, receipt.Result.ProfileDigest, firmware)
+	t.Logf("same-Run mode=%s Worker/Core output -> capture -> original roots removed -> raw/semantic restore PASS; profile=%s; host-ISA reference only=%t; cortex-m0=%t", mode, receipt.Result.ProfileDigest, firmware, cortexM)
 }
 
 func offlineCrashAfterPermit(t *testing.T, ctx context.Context, store *pgstore.Store, pool *pgxpool.Pool, workerBin string, env []string, subject, profileName, runID, preparedRoot string, profile sandbox.Profile, image testutil.Fixture) {

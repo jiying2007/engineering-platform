@@ -17,9 +17,10 @@ import (
 
 type Fixture struct{ Image, Guard, Socket string }
 
-func Build(t *testing.T) Fixture         { return build(t, false) }
-func BuildCompiler(t *testing.T) Fixture { return build(t, true) }
-func build(t *testing.T, compiler bool) Fixture {
+func Build(t *testing.T) Fixture            { return build(t, "") }
+func BuildCompiler(t *testing.T) Fixture    { return build(t, "native") }
+func BuildARMCompiler(t *testing.T) Fixture { return build(t, "arm") }
+func build(t *testing.T, compiler string) Fixture {
 	t.Helper()
 	if os.Getenv("EP_SANDBOX_INTEGRATION") != "1" {
 		t.Skip("set EP_SANDBOX_INTEGRATION=1 for mandatory real Docker integration")
@@ -55,9 +56,16 @@ func build(t *testing.T, compiler bool) Fixture {
 		t.Fatal(err)
 	}
 	dockerfile := "FROM scratch\nCOPY probe /probe\n"
-	if compiler {
+	switch compiler {
+	case "":
+	case "native":
 		copyCompiler(t, dir, run)
 		dockerfile += "COPY rootfs /\n"
+	case "arm":
+		copyARMCompiler(t, dir, run)
+		dockerfile += "COPY rootfs /\n"
+	default:
+		t.Fatal("unknown compiler fixture mode", compiler)
 	}
 	dockerfile += "LABEL engineering-platform.fixture=" + hex.EncodeToString(nonce) + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(dockerfile), 0o600); err != nil {
@@ -148,6 +156,56 @@ func copyCompiler(t *testing.T, dir string, run func(string, ...string) string) 
 		closeIn, closeOut := in.Close(), out.Close()
 		if copyErr != nil || closeIn != nil || closeOut != nil {
 			t.Fatal("native tool copy failed", copyErr, closeIn, closeOut)
+		}
+	}
+}
+
+func copyARMCompiler(t *testing.T, dir string, run func(string, ...string) string) {
+	t.Helper()
+	clang, err := exec.LookPath("clang")
+	if err != nil {
+		t.Fatal("Cortex-M integration requires clang on the trusted CI host", err)
+	}
+	lld, err := exec.LookPath("ld.lld")
+	if err != nil {
+		t.Fatal("Cortex-M integration requires ld.lld on the trusted CI host", err)
+	}
+	files := map[string]string{"/usr/bin/clang": clang, "/usr/bin/ld.lld": lld}
+	for dst, src := range map[string]string{"/usr/bin/clang": clang, "/usr/bin/ld.lld": lld} {
+		_ = dst
+		dependencies := run("ldd", src)
+		if strings.Contains(dependencies, "not found") {
+			t.Fatal("missing cross compiler runtime dependency", src)
+		}
+		for _, field := range strings.Fields(dependencies) {
+			if filepath.IsAbs(field) {
+				files[field] = field
+			}
+		}
+	}
+	for dst, src := range files {
+		resolved, err := filepath.EvalSymlinks(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		in, err := os.Open(resolved)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "rootfs", strings.TrimPrefix(dst, "/"))
+		if err = os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			in.Close()
+			t.Fatal(err)
+		}
+		out, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0555)
+		if err != nil {
+			in.Close()
+			t.Fatal(err)
+		}
+		_, copyErr := io.Copy(out, in)
+		closeIn, closeOut := in.Close(), out.Close()
+		if copyErr != nil || closeIn != nil || closeOut != nil {
+			t.Fatal("cross compiler tool copy failed", copyErr, closeIn, closeOut)
 		}
 	}
 }
