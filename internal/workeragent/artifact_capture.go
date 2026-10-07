@@ -255,7 +255,11 @@ func capturePrivateDependency(ctx context.Context, path string, limit int64, ret
 	}
 	n, err := io.Copy(writer, &readbackContextReader{ctx: ctx, r: io.LimitReader(file, limit+1)})
 	after, statErr := root.Lstat(name)
-	afterStat, afterOK := after.Sys().(*syscall.Stat_t)
+	var afterStat *syscall.Stat_t
+	afterOK := false
+	if after != nil {
+		afterStat, afterOK = after.Sys().(*syscall.Stat_t)
+	}
 	if err != nil || statErr != nil || !afterOK || n != before.Size() || !os.SameFile(before, after) ||
 		before.Size() != after.Size() || before.Mode() != after.Mode() ||
 		!before.ModTime().Equal(after.ModTime()) || stat.Nlink != afterStat.Nlink ||
