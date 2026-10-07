@@ -1,6 +1,8 @@
 # Stopped source checkpoint v1
 
-This is exact source preservation after a stopped engineering execution whose
+Core descriptor semantics remain v1; the private TAR encoding is now manifest
+v2 so the same archive can retain exact stopped source plus the Git graph needed
+to reconstruct its frozen base. This is exact source preservation after a stopped engineering execution whose
 completion was not confirmed by the Worker (including post-turn failure).
 It is not a paused process, a model session snapshot, automatic resume, successful
 Delivery, or a Human Takeover grant. It extends the existing Worker attestation
@@ -19,12 +21,20 @@ The Preparer rechecks the authenticated owner, frozen Task/RunInput/preparation,
 managed workspace identity and Git base/configuration, and verified approved
 Context. Changed source bytes are intentionally allowed; changed Git authority
 is not. Source and archive locations come only from that owned preparation,
-never a model-supplied path. The archive lives under the private Worker artifact
-root using a deterministic execution-ID filename and exclusive creation.
+never a model-supplied path. After the same checkpoint head validation, the
+Preparer also emits one bounded owner-private Git bundle for exactly the original
+base or the already-allowed one-direct-Finalize-child head. It imports that
+bundle into an empty object database and reproduces the frozen base tree/source
+before capture may continue. The standalone bundle is removed after it is
+embedded. The archive lives under the private Worker artifact root using a
+deterministic execution-ID filename and exclusive creation.
 
 The captured descriptor binds Task and RunInput digests, exact base commit,
 original source identity, execution/profile/epoch/thread/turn, sealed transcript,
-captured source tree, raw archive digest and size. The Worker saves a local
+captured source tree, raw archive digest and size. Archive manifest v2 also
+binds the validated Git head and the embedded `git-base.bundle` byte digest and
+size; the unchanged Core descriptor's outer archive digest authenticates those
+additional fields and bytes. The Worker saves a local
 reconciliation record then attempts exactly one authenticated Core registration.
 Lost replies and changed readback are errors, not retries or successful saves.
 The error returned to the operator preserves the archive path/digest and whether
@@ -48,10 +58,15 @@ A versioned canonical manifest and exact file bytes occupy one bounded TAR:
 
 - Capture includes modified tracked files, untracked/ignored files, empty files
   and directories, executable bits and safe relative symlinks.
-- The root `.git` is excluded. Nested Git metadata, special files, external or
-  cyclic links, including indirect link-chain escapes, are rejected.
-- Maximums are 10,000 entries, 64 MiB per file, 256 MiB source bytes and
-  320 MiB archive. Larger workspaces are rejected rather than truncated.
+- The source tree's root `.git` is excluded. Nested Git metadata, special files,
+  external or cyclic links, including indirect link-chain escapes, are rejected.
+  A separate canonical `git-base.bundle` member contains only the validated
+  checkpoint Git graph; it carries no repository config, hooks, remotes, HOME or
+  credentials and is never automatically imported on restore.
+- Maximums are 10,000 source entries, 64 MiB per source file, 256 MiB source
+  bytes, 512 MiB for the Git bundle and 800 MiB for the complete archive.
+  Core checkpoint/continuation validation uses the same 800 MiB bound. Larger
+  artifacts are rejected rather than truncated.
 - Capture checks file stability and a second complete source inventory, fsyncs,
   then independently reads back the exact manifest and archive digest.
 - Readback requires an externally obtained expected raw digest and Run ID.
@@ -77,7 +92,8 @@ eng source-checkpoint restore \
 
 The destination parent must already exist and be owner-private. Output explicitly
 states `execution_authorized=false`. Source is copied to `NEW_DIRECTORY/source`;
-`RESTORED.json` binds the verified descriptor. Existing paths cause rejection.
+the exact retained graph is copied to `NEW_DIRECTORY/git-base.bundle`; neither is
+executed or imported. `RESTORED.json` binds the verified descriptor. Existing paths cause rejection.
 A failed registration does not make local bytes disappear, but must be reconciled
 using the exact execution/descriptor, never by replaying the model or inventing a
 new command ID. This version does not add automatic registration replay.
@@ -88,9 +104,11 @@ These are **private local source archives**, never automatic public Git/Actions
 uploads. Source files and steering text may contain proprietary or sensitive
 material. This is not a secret-redaction engine: operators must apply their
 access, encryption, retention and sharing policy to the artifact store. HOME,
-login bootstrap files, process memory, Git metadata and external files are not
-collected. A source archive does not replace complete original model output,
-executable, Git bundle or database backup retention.
+login bootstrap files, process memory, live `.git` directories/configuration and
+external files are not collected. The v2 archive does retain the validated
+checkpoint-head Git object graph as an inert bundle, but it is not a full
+repository backup across unrelated refs and does not replace complete original
+model output, executable/toolchain or database backup retention.
 
 The kernel proof covers descendants of the owned namespace, not unrelated host
 processes. Capture relies on the existing trusted Worker/host filesystem boundary;
@@ -143,8 +161,8 @@ The existing bounded idempotent report retries do not repeat a model turn.
 
 Limits: ENTERED is not proof of phase completion. Abrupt Worker/host death can
 leave only the last phase entry; this slice does not add a crash-recovery daemon,
-automatic capture after restart, full Git/model/binary/database backups, or an
-automatically approved recovery decision. Local write exhaustion may prevent
+automatic capture after restart, complete repository/model/toolchain/database
+backups, or an automatically approved recovery decision. Local write exhaustion may prevent
 both capture and journaling; the error remains explicit rather than a success.
 
 

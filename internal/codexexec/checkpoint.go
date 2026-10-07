@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/core"
 )
 
 // SourceCheckpoint is a retained artifact observation, never a new execution,
@@ -23,7 +24,7 @@ type SourceCheckpoint struct {
 }
 
 func (c SourceCheckpoint) Validate() error {
-	if c.Version != 1 || c.Binding.Validate() != nil || len(c.BaseCommit) != 40 || c.ArchiveSize <= 0 || c.ArchiveSize > 320<<20 {
+	if c.Version != 1 || c.Binding.Validate() != nil || len(c.BaseCommit) != 40 || c.ArchiveSize <= 0 || c.ArchiveSize > core.MaxSourceCheckpointArchiveSize {
 		return fmt.Errorf("invalid source checkpoint")
 	}
 	for _, ch := range c.BaseCommit {

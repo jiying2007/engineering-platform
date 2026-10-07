@@ -21,7 +21,16 @@ func TestContinuationRefBindsRunInput(t *testing.T) {
 	if json.Unmarshal(data, &read) != nil || *read.Continuation != ref {
 		t.Fatal("roundtrip")
 	}
-	for _, change := range []func(*ContinuationRef){func(c *ContinuationRef) { c.SourceRunID = "next" }, func(c *ContinuationRef) { c.ArchiveSize = 0 }, func(c *ContinuationRef) { c.ArchiveSize = 321 << 20 }, func(c *ContinuationRef) { c.SourceRunID = "old\n" }, func(c *ContinuationRef) { c.CheckpointDigest = strings.Repeat("0", 64) }} {
+	for _, size := range []int64{321 << 20, MaxSourceCheckpointArchiveSize} {
+		large := ref
+		large.ArchiveSize = size
+		copy := m
+		copy.Continuation = &large
+		if _, e := copy.Digest(); e != nil {
+			t.Fatalf("valid larger checkpoint archive rejected at %d bytes: %v", size, e)
+		}
+	}
+	for _, change := range []func(*ContinuationRef){func(c *ContinuationRef) { c.SourceRunID = "next" }, func(c *ContinuationRef) { c.ArchiveSize = 0 }, func(c *ContinuationRef) { c.ArchiveSize = MaxSourceCheckpointArchiveSize + 1 }, func(c *ContinuationRef) { c.SourceRunID = "old\n" }, func(c *ContinuationRef) { c.CheckpointDigest = strings.Repeat("0", 64) }} {
 		bad := ref
 		change(&bad)
 		copy := m
