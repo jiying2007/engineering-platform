@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
+	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
 )
 
