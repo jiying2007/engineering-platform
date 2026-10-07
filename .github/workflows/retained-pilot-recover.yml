@@ -51,7 +51,7 @@ jobs:
 
       - name: Retain engineering recovery receipt
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: retained-pilot-engineering-recovery-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-pilot-engineering-recovery

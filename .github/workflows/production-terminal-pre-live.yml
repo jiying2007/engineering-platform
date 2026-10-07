@@ -95,7 +95,7 @@ jobs:
           chmod 600 "$out"/*
 
       - name: Retain pre-live dry-run artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-terminal-pre-live-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/production-terminal-pre-live

@@ -88,7 +88,7 @@ jobs:
 
       - name: Retain resumable engineering state
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: retained-pilot-engineering-${{ inputs.pilot }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-pilot-state

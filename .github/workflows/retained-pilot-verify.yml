@@ -86,7 +86,7 @@ jobs:
 
       - name: Retain verification state
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: retained-pilot-verification-${{ inputs.pilot }}-${{ inputs.engineering_run_id }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-pilot-verification

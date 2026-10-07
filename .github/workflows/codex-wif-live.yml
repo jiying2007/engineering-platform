@@ -150,7 +150,7 @@ jobs:
             > "$RUNNER_TEMP/codex-wif-live-receipt.json"
           cat "$RUNNER_TEMP/codex-wif-live-receipt.json"
       - name: Retain real live-turn receipt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codex-wif-live-${{ github.sha }}-${{ github.run_id }}
           path: |
