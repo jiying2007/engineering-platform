@@ -15,9 +15,11 @@ import (
 
 func TestArtifactSetCLIValidation(t *testing.T) {
 	for _, args := range [][]string{
-		{}, {"unknown"}, {"pack"}, {"verify"}, {"restore"},
+		{}, {"unknown"}, {"pack"}, {"verify"}, {"restore"}, {"mirror"},
 		{"verify", "--archive", "/a", "--archive-digest", "sha256:" + strings.Repeat("a", 64), "--run", "r", "--run", "x"},
 		{"restore", "--archive", "/a", "--archive-digest", "x", "--run", "r"},
+		{"mirror", "--archive", "/a", "--archive-digest", "x", "--run", "r"},
+		{"mirror", "--archive", "/a", "--archive-digest", "x", "--run", "r", "--out", "/m", "--into", "/bad"},
 		{"pack", "--plan", "/p", "--plan-digest", "x", "--out", "/o", "--core"},
 		{"verify", "--archive", "/a", "--archive-digest", "x", "--run", "r", "--out", "/o"},
 		{"pack", "--plan", "/p", "--plan-digest", "x", "--out", "/o", "extra"},
