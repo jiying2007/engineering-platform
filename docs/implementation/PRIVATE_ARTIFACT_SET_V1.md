@@ -107,9 +107,12 @@ period, encryption/key policy or geographic second site. No automatic schedule,
 overwrite, deletion, repair or garbage collection is introduced; those remain
 separate policy/operator decisions.
 
-Reports distinguish packed, verified and restored bytes and always state
-`coverage=EXPLICIT_DECLARED_MEMBERS_ONLY`, `producer_semantics_verified=false`,
-`execution_authorized=false`, `production_qualified=false`. A kind is a label,
+Reports distinguish packed, verified, restored and mirrored bytes and always
+state `coverage=EXPLICIT_DECLARED_MEMBERS_ONLY`,
+`producer_semantics_verified=false`, `execution_authorized=false` and
+`production_qualified=false`. Mirror reports additionally set
+`independent_filesystem=true` while `second_site_qualified=false`; other
+artifact-set operations keep both fields false. A kind is a label,
 not proof that a file is a valid firmware image or consistent database backup.
 Reports contain identities/digests/counts, not absolute paths or raw payloads.
 
