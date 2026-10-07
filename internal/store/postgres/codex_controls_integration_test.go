@@ -392,12 +392,13 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 				// actual mTLS/PG artifact observation -> fresh restore/readback.
 				artifactRoot := filepath.Join(base, "checkpoint-artifacts")
 				workerOK(t, os.Mkdir(artifactRoot, 0700))
-				gitBundlePath := filepath.Join(base, "checkpoint-git-base.bundle")
+				gitBundlePath := filepath.Join(artifactRoot, "checkpoint-git-base.bundle")
 				gitBundleBytes := []byte("TEST-ONLY-SOURCECHECKPOINT-GIT-BASE")
 				workerOK(t, os.WriteFile(gitBundlePath, gitBundleBytes, 0600))
 				gitBundle := sourcecheckpoint.GitBundle{Path: gitBundlePath, Digest: canonical.BytesDigest(gitBundleBytes), Size: int64(len(gitBundleBytes)), Head: permit.Preparation.Facts.BaseCommit}
 				artifact, e := sourcecheckpoint.Capture(checkCtx, work, artifactRoot, permit, result.transcript, gitBundle)
 				workerOK(t, e)
+				workerOK(t, os.Remove(gitBundlePath))
 				var checkpoint codexexec.SourceCheckpoint
 				expectHTTP(t, reader.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, nil), http.StatusForbidden)
 				workerOK(t, worker.Call(checkCtx, http.MethodPost, "/api/v1/worker/codex/source-checkpoint", artifact.Facts, &checkpoint))
