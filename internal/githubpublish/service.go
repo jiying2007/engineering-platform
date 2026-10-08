@@ -109,11 +109,15 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusForbidden, err.Error())
 		return
 	}
-	bundle, err := s.verifyBundle(req.Plan)
+	bundle, cleanup, err := s.verifyBundle(req.Plan)
 	if err != nil {
 		writePublisherError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+	// Publish consumes only the privately staged, digest-verified snapshot.
+	// The original Worker artifact may change after verification; never pass
+	// its mutable path to Git or GitHub transport.
+	defer cleanup()
 	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle)
 	if err != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication failed")
@@ -164,46 +168,67 @@ func (s *RemoteService) authorizePlan(plan Plan) error {
 	return nil
 }
 
-func (s *RemoteService) verifyBundle(plan Plan) (string, error) {
+func (s *RemoteService) verifyBundle(plan Plan) (string, func(), error) {
 	if s == nil || plan.Validate() != nil {
-		return "", fmt.Errorf("valid publication plan required")
+		return "", nil, fmt.Errorf("valid publication plan required")
 	}
 	current, err := os.Lstat(s.artifactRoot)
 	if err != nil || !current.IsDir() || !os.SameFile(current, s.artifactIdentity) {
-		return "", fmt.Errorf("publisher artifact root changed")
+		return "", nil, fmt.Errorf("publisher artifact root changed")
 	}
 	root, err := os.OpenRoot(s.artifactRoot)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	defer root.Close()
 	name := plan.ExecutionID + ".bundle"
 	before, err := root.Lstat(name)
 	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0o022 != 0 || before.Size() != plan.BundleSize {
-		return "", fmt.Errorf("retained result bundle is not the expected regular file")
+		return "", nil, fmt.Errorf("retained result bundle is not the expected regular file")
 	}
-	file, err := root.Open(name)
+	source, err := root.Open(name)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	opened, err := file.Stat()
+	opened, err := source.Stat()
 	if err != nil || !os.SameFile(before, opened) {
-		_ = file.Close()
-		return "", fmt.Errorf("retained result bundle changed before read")
+		_ = source.Close()
+		return "", nil, fmt.Errorf("retained result bundle changed before read")
+	}
+
+	// Stage a private copy under the publisher's UID. Verifying a hash and
+	// then handing Git the Worker-owned original path would allow a rename/
+	// rewrite between verification and consumption (a TOCTOU gap).
+	stage, err := os.MkdirTemp("", "engineering-publisher-verified-")
+	if err != nil {
+		_ = source.Close()
+		return "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(stage) }
+	path := filepath.Join(stage, "verified.bundle")
+	copyFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		_ = source.Close()
+		cleanup()
+		return "", nil, err
 	}
 	hash := sha256.New()
-	n, copyErr := io.Copy(hash, io.LimitReader(file, (1<<30)+1))
-	closeErr := file.Close()
+	n, copyErr := io.Copy(io.MultiWriter(copyFile, hash), io.LimitReader(source, plan.BundleSize+1))
+	closeSourceErr := source.Close()
+	syncErr := copyFile.Sync()
+	closeCopyErr := copyFile.Close()
 	after, afterErr := root.Lstat(name)
-	if copyErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(before, after) ||
-		n != plan.BundleSize || n > 1<<30 {
-		return "", fmt.Errorf("retained result bundle changed during read")
+	if copyErr != nil || closeSourceErr != nil || syncErr != nil || closeCopyErr != nil ||
+		afterErr != nil || !os.SameFile(before, after) || after.Size() != before.Size() ||
+		n != plan.BundleSize {
+		cleanup()
+		return "", nil, fmt.Errorf("retained result bundle changed or private snapshot failed")
 	}
-	actual := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-	if actual != plan.BundleDigest {
-		return "", fmt.Errorf("retained result bundle digest mismatch")
+	if "sha256:"+hex.EncodeToString(hash.Sum(nil)) != plan.BundleDigest {
+		cleanup()
+		return "", nil, fmt.Errorf("retained result bundle digest mismatch")
 	}
-	return filepath.Join(s.artifactRoot, name), nil
+	return path, cleanup, nil
 }
 
 func targetMap(version int, targets []TargetPolicy) (map[string]TargetPolicy, error) {

@@ -159,6 +159,54 @@ func TestProviderReconciliationNeverReplaysPublication(t *testing.T) {
 	}
 }
 
+func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) {
+	state, config := publisherFixture(t)
+	bundle := filepath.Join(config.ArtifactRoot, state.status.Token.ID+".bundle")
+	if err := os.Remove(bundle); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name        string
+		observation Observation
+		want        action.ReconcileOutcome
+	}{
+		{"remote-confirmed", ObservedConfirmed, action.ReconcileConfirmed},
+		{"remote-absent", ObservedAbsent, action.ReconcileManual},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			remote := &publisherRemote{observation: ObserveResult{Outcome: tc.observation}}
+			provider, err := New(config, state, remote)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := provider.Reconcile(context.Background(), action.Operation{
+				ID: "publish-unknown", RunID: state.run.ID, ExecutionEpoch: state.run.CurrentEpoch,
+				Action: Action, RiskClass: action.ControlledMutation, Capability: Capability,
+			})
+			if err != nil || got.Outcome != tc.want || remote.observeCalls != 1 || remote.publishCalls != 0 {
+				t.Fatalf("missing local bundle blocked observation: result=%#v err=%v observe=%d publish=%d",
+					got, err, remote.observeCalls, remote.publishCalls)
+			}
+		})
+	}
+	// Read-only confirmation is allowed without local source bytes. In contrast,
+	// remote absence with missing bytes is MANUAL, not a grant to retry; and new
+	// Dispatch still rejects the missing source before Git mutation.
+	remote := &publisherRemote{}
+	provider, err := New(config, state, remote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := provider.Dispatch(context.Background(), action.Request{
+		RunID: state.run.ID, ExecutionEpoch: state.run.CurrentEpoch,
+		Action: Action, RiskClass: action.ControlledMutation, Capability: Capability,
+		ParametersDigest: state.status.Receipt.ResultDigest,
+	})
+	if err != nil || got.Outcome != action.DispatchUnknown || got.ObservedState != "PRECONDITION_FAILED" || remote.publishCalls != 0 {
+		t.Fatalf("missing bundle allowed dispatch: %#v err=%v publish=%d", got, err, remote.publishCalls)
+	}
+}
+
 func TestProviderRejectsChangedOrUnsafeBundle(t *testing.T) {
 	state, config := publisherFixture(t)
 	remote := &publisherRemote{}

@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,10 +21,16 @@ import (
 type serviceRemote struct {
 	publishCalls int
 	observeCalls int
+	onPublish    func(string) error
 }
 
-func (r *serviceRemote) Publish(_ context.Context, plan Plan, _ string) (PublicationReceipt, error) {
+func (r *serviceRemote) Publish(_ context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {
 	r.publishCalls++
+	if r.onPublish != nil {
+		if err := r.onPublish(bundlePath); err != nil {
+			return PublicationReceipt{}, err
+		}
+	}
 	return PublicationReceipt{
 		Version: 1, Repository: plan.Repository, BaseRef: plan.BaseRef, BaseCommit: plan.BaseCommit,
 		Branch: plan.Branch, ResultCommit: plan.ResultCommit, PullRequestNumber: 17,
@@ -129,6 +136,47 @@ func TestRemoteServiceRejectsBundleDriftBeforeGitHub(t *testing.T) {
 	}
 	if service.remote.(*serviceRemote).publishCalls != 0 {
 		t.Fatal("drifted bundle reached GitHub remote")
+	}
+}
+
+func TestRemoteServicePublishesVerifiedPrivateSnapshotAfterSourceSwap(t *testing.T) {
+	service, plan := publisherServiceFixture(t)
+	original := filepath.Join(service.artifactRoot, plan.ExecutionID+".bundle")
+	remote := service.remote.(*serviceRemote)
+	var snapshotPath string
+	remote.onPublish = func(path string) error {
+		snapshotPath = path
+		if path == original {
+			return fmt.Errorf("mutable original path was handed to Git")
+		}
+		// Model/Worker-side original changes after Publisher verification.
+		// The Git-side consumer must still receive exactly the hashed bytes.
+		if err := os.Remove(original); err != nil {
+			return err
+		}
+		if err := os.WriteFile(original, []byte("changed-after-verification"), 0o600); err != nil {
+			return err
+		}
+		got, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, []byte("bundle-bytes")) {
+			return fmt.Errorf("publisher passed unverified bytes to Git")
+		}
+		return nil
+	}
+	body, err := json.Marshal(publishRequest{Plan: plan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	service.Handler().ServeHTTP(rec, authorizedPublisherRequest(t, http.MethodPost, "/v1/publish", body))
+	if rec.Code != http.StatusOK || remote.publishCalls != 1 || snapshotPath == "" {
+		t.Fatalf("snapshot publication status=%d calls=%d body=%s", rec.Code, remote.publishCalls, rec.Body.String())
+	}
+	if _, err := os.Stat(snapshotPath); !os.IsNotExist(err) {
+		t.Fatalf("verified temporary snapshot was not removed: %v", err)
 	}
 }
 
