@@ -159,7 +159,6 @@ func TestProviderReconciliationNeverReplaysPublication(t *testing.T) {
 	}
 }
 
-
 func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) {
 	state, config := publisherFixture(t)
 	bundle := filepath.Join(config.ArtifactRoot, state.status.Token.ID+".bundle")
@@ -167,9 +166,9 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
-		name string
+		name        string
 		observation Observation
-		want action.ReconcileOutcome
+		want        action.ReconcileOutcome
 	}{
 		{"remote-confirmed", ObservedConfirmed, action.ReconcileConfirmed},
 		{"remote-absent", ObservedAbsent, action.ReconcileManual},
