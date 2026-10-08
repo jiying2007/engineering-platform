@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# New PR heads supersede old checks. Main-push and retained evidence runs
+# always keep distinct groups and are never canceled by a newer main push.
+concurrency:
+  group: engineering-ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   actions: read
