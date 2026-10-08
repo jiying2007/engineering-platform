@@ -40,6 +40,7 @@ type TaskContract struct {
 	CapabilityIDs          []string `json:"capability_ids"`
 	SkillIDs               []string `json:"skill_ids"`
 	SkillContractDigest    string   `json:"skill_contract_digest,omitempty"`
+	SkillGuidanceVersion   int      `json:"skill_guidance_version,omitempty"`
 	Repository             string   `json:"repository"`
 	BaseCommit             string   `json:"base_commit"`
 	TargetID               string   `json:"target_id,omitempty"`

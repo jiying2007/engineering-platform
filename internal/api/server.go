@@ -340,6 +340,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	// Only newly declared typed TargetContexts freeze the selected metadata.
 	// Historical untyped Task JSON and digests remain exactly unchanged.
 	req.Contract.SkillContractDigest = ""
+	req.Contract.SkillGuidanceVersion = 0
 	if req.TargetContext != nil {
 		skillDigest, err := embedded.RoutedSkillContractDigest(route.SkillIDs)
 		if err != nil {
@@ -347,6 +348,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		req.Contract.SkillContractDigest = skillDigest
+		req.Contract.SkillGuidanceVersion = 1
 	}
 	req.Contract.Repository = req.Material.Repository
 	req.Contract.BaseCommit = req.Material.BaseCommit

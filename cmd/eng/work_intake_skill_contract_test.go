@@ -35,7 +35,7 @@ func TestWorkIntakeRejectsTamperedSkillMethodDigestBeforeRun(t *testing.T) {
 	tampered := core.TaskContract{
 		ID: spec.TaskContractID, WorkItemID: spec.WorkItemID,
 		TaskType: spec.TaskType, CapabilityIDs: route.CapabilityIDs, SkillIDs: route.SkillIDs,
-		SkillContractDigest: "sha256:" + strings.Repeat("0", 64),
+		SkillContractDigest: "sha256:" + strings.Repeat("0", 64), SkillGuidanceVersion: 1,
 		Repository:          spec.Material.Repository, BaseCommit: spec.Material.BaseCommit,
 		TargetID: spec.Material.TargetID, TargetPlatform: routing.PlatformLinuxBSP,
 		AcceptanceCriteria: spec.Material.AcceptanceCriteria,
@@ -61,7 +61,7 @@ func TestWorkIntakeRejectsTamperedSkillMethodDigestBeforeRun(t *testing.T) {
 			taskCalls++
 			var req workIntakeTaskRequest
 			if json.NewDecoder(r.Body).Decode(&req) != nil ||
-				req.Contract.SkillContractDigest != "" ||
+				req.Contract.SkillContractDigest != "" || req.Contract.SkillGuidanceVersion != 0 ||
 				req.TargetContext == nil || req.TargetContext.TargetID != spec.Material.TargetID {
 				t.Error("client supplied a second Skill authority", req)
 			}

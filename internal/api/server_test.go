@@ -814,10 +814,11 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 	request := func(taskID, materialTarget, contextTarget, platform, subsystem string) map[string]any {
 		return map[string]any{
 			"contract": map[string]any{
-				"task_contract_id":      taskID,
-				"work_item_id":          "work-typed",
-				"task_type":             "DEBUG",
-				"skill_contract_digest": "attacker-supplied-mismatch",
+				"task_contract_id":       taskID,
+				"work_item_id":           "work-typed",
+				"task_type":              "DEBUG",
+				"skill_contract_digest":  "attacker-supplied-mismatch",
+				"skill_guidance_version": 99,
 			},
 			"material": map[string]any{
 				"repository":            "repo",
@@ -855,10 +856,11 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 		http.StatusCreated)
 	var result struct {
 		Contract struct {
-			TargetID            string   `json:"target_id"`
-			TargetPlatform      string   `json:"target_platform"`
-			SkillIDs            []string `json:"skill_ids"`
-			SkillContractDigest string   `json:"skill_contract_digest"`
+			TargetID             string   `json:"target_id"`
+			TargetPlatform       string   `json:"target_platform"`
+			SkillIDs             []string `json:"skill_ids"`
+			SkillContractDigest  string   `json:"skill_contract_digest"`
+			SkillGuidanceVersion int      `json:"skill_guidance_version"`
 		} `json:"contract"`
 		Digest string `json:"digest"`
 	}
@@ -869,7 +871,8 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 	}
 	if result.Contract.TargetID != "ssc305" || result.Contract.TargetPlatform != "linux-bsp" ||
 		len(result.Contract.SkillIDs) != 3 ||
-		result.Contract.SkillIDs[2] != "linux-bsp-debug" || result.Digest == "" {
+		result.Contract.SkillIDs[2] != "linux-bsp-debug" ||
+		result.Contract.SkillGuidanceVersion != 1 || result.Digest == "" {
 
 		t.Fatalf("server routing omitted typed target: %#v", result)
 	}

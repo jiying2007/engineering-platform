@@ -74,6 +74,7 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 		t.Fatal(err)
 	}
 	contract.SkillContractDigest = selectedSkillDigest
+	contract.SkillGuidanceVersion = 1
 	planDigest, _ := spec.VerificationPlan.Digest()
 	contract.VerificationPlanDigest = planDigest
 	taskDigest, _ := contract.Digest()
@@ -105,7 +106,7 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 				len(got.Contract.CapabilityIDs) != 0 || len(got.Contract.SkillIDs) != 0 ||
 				got.TargetContext == nil || got.TargetContext.TargetID != spec.Material.TargetID ||
 				got.TargetContext.Platform != routing.PlatformLinuxBSP ||
-				got.Contract.SkillContractDigest != "" {
+				got.Contract.SkillContractDigest != "" || got.Contract.SkillGuidanceVersion != 0 {
 				t.Error("client bypassed server-side routing", got)
 			}
 			_ = json.NewEncoder(w).Encode(workIntakeTaskResponse{

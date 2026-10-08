@@ -191,7 +191,9 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 	// Validate exact selected Skill metadata before any Work/Task mutation.
 	// No typed target means the historical Task contract remains unchanged.
 	expectedSkillContractDigest := ""
+	expectedGuidanceVersion := 0
 	if spec.TargetContext != nil {
+		expectedGuidanceVersion = 1
 		expectedSkillContractDigest, err = embedded.RoutedSkillContractDigest(route.SkillIDs)
 		if err != nil {
 			return zero, fmt.Errorf("selected Skill contract invalid: %w", err)
@@ -234,6 +236,7 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 		taskResponse.Contract.TargetID != m.TargetID ||
 		taskResponse.Contract.TargetPlatform != targetPlatform(spec.TargetContext) ||
 		taskResponse.Contract.SkillContractDigest != expectedSkillContractDigest ||
+		taskResponse.Contract.SkillGuidanceVersion != expectedGuidanceVersion ||
 		!reflect.DeepEqual(taskResponse.Contract.AcceptanceCriteria, m.AcceptanceCriteria) ||
 		!reflect.DeepEqual(taskResponse.Contract.CapabilityIDs, route.CapabilityIDs) ||
 		!reflect.DeepEqual(taskResponse.Contract.SkillIDs, route.SkillIDs) ||
