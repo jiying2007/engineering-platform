@@ -103,26 +103,31 @@ func (p Permit) Check(subject string, request Start) error {
 }
 
 type PromptIdentity struct {
-	Continuation       *core.ContinuationRef `json:"continuation,omitempty"`
-	Version            int                   `json:"version"`
-	RunID              string                `json:"run_id"`
-	TaskContractDigest string                `json:"task_contract_digest"`
-	RunInputDigest     string                `json:"run_input_manifest_digest"`
-	TaskType           string                `json:"task_type"`
-	Repository         string                `json:"repository"`
-	BaseCommit         string                `json:"base_commit"`
-	TargetID           string                `json:"target_id,omitempty"`
-	CapabilityIDs      []string              `json:"capability_ids,omitempty"`
-	SkillIDs           []string              `json:"skill_ids,omitempty"`
-	AcceptanceCriteria []string              `json:"acceptance_criteria"`
-	ExpectedOutputs    []string              `json:"expected_outputs,omitempty"`
-	BundleDigest       string                `json:"context_bundle_digest"`
+	Continuation         *core.ContinuationRef `json:"continuation,omitempty"`
+	Version              int                   `json:"version"`
+	RunID                string                `json:"run_id"`
+	TaskContractDigest   string                `json:"task_contract_digest"`
+	RunInputDigest       string                `json:"run_input_manifest_digest"`
+	TaskType             string                `json:"task_type"`
+	Repository           string                `json:"repository"`
+	BaseCommit           string                `json:"base_commit"`
+	TargetID             string                `json:"target_id,omitempty"`
+	CapabilityIDs        []string              `json:"capability_ids,omitempty"`
+	SkillIDs             []string              `json:"skill_ids,omitempty"`
+	SkillContractDigest  string                `json:"skill_contract_digest,omitempty"`
+	SkillGuidanceVersion int                   `json:"skill_guidance_version,omitempty"`
+	AcceptanceCriteria   []string              `json:"acceptance_criteria"`
+	ExpectedOutputs      []string              `json:"expected_outputs,omitempty"`
+	BundleDigest         string                `json:"context_bundle_digest"`
 }
 
 func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptIdentity, string, error) {
 	if _, err := workerqueue.Validate(a); err != nil {
 		return PromptIdentity{}, "", err
 	}
+	// Historical evidence validation must depend only on frozen Task and
+	// Preparation identities, never the currently installed Skill catalog.
+	// Catalog freshness is enforced separately in Prompt, before turn/start.
 	if preparation.Verify(a, prep, prep.Facts, prep.Admission.Worker) != nil ||
 		!canonical.ValidDigest(prep.Facts.BundleDigest) {
 		return PromptIdentity{}, "", workerqueue.ErrIdentity
@@ -137,6 +142,10 @@ func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptI
 		ExpectedOutputs:    append([]string(nil), a.Task.ExpectedOutputs...),
 		BundleDigest:       prep.Facts.BundleDigest,
 	}
+	if a.Task.SkillGuidanceVersion == 1 {
+		identity.SkillContractDigest = a.Task.SkillContractDigest
+		identity.SkillGuidanceVersion = a.Task.SkillGuidanceVersion
+	}
 	digest, err := canonical.Digest(identity)
 	return identity, digest, err
 }
@@ -149,6 +158,12 @@ func PromptIdentityDigest(a workerqueue.Assignment, prep preparation.Receipt) (s
 func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath string) (string, string, error) {
 	if strings.TrimSpace(bundlePath) == "" {
 		return "", "", workerqueue.ErrIdentity
+	}
+	// Enforce current selected host catalog only when actually preparing
+	// a new turn, never while verifying immutable past Result receipts.
+	selected, err := selectedSkillsForTask(a.Task)
+	if err != nil {
+		return "", "", err
 	}
 	identity, digest, err := promptIdentity(a, prep)
 	if err != nil {
@@ -181,6 +196,11 @@ func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath strin
 		for _, output := range identity.ExpectedOutputs {
 			fmt.Fprintf(&b, "- %s\n", output)
 		}
+	}
+	// Only new typed Tasks with a Core-frozen Skill contract digest gain
+	// concrete Skill methods. Historical byte-for-byte prompt stays unchanged.
+	if identity.SkillGuidanceVersion == 1 {
+		appendSelectedSkillMethods(&b, a.Task, selected)
 	}
 	prompt := b.String()
 	if len(prompt) > 64<<10 {

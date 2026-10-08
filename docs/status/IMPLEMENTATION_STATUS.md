@@ -43,7 +43,15 @@ See [typed target routing v1](../implementation/EMBEDDED_TARGET_ROUTING_V1.md).
 
 All ten Skill catalog entries now carry complete **DEFINED-stage** input,
 required-material, method, output, blocking/prohibited-action and evaluation
-descriptions. This is a machine-readable planning contract, **not PROVEN
+descriptions. **Newly created v1 Skill-guidance TaskContracts** with an
+explicit typed TargetContext and frozen selected-Skill digest deliver the
+**actual selected methods and BLOCK/evaluation guidance** to the Core-bound
+Codex turn after an independent Worker-side source/catalog digest check.
+A new optional `skill_guidance_version=1` field separates these new tasks from
+older typed/digested or untyped Tasks; the latter continue to use the exact
+name-only PromptIdentity. Historical Task prompts and digests remain unchanged.
+See [typed Skill Runtime guidance](../implementation/TYPED_SKILL_RUNTIME_GUIDANCE_V1.md).
+This is prompt delivery and a machine-readable planning contract, **not PROVEN
 engineering quality**. No Skill was promoted from `DEFINED`; actual expert
 effectiveness and time/cost improvements remain unqualified until independent,
 repeated, real task Evidence exists. Catalog entries grant no Action permissions.

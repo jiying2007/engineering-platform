@@ -49,4 +49,20 @@ func TestTargetPlatformBindsTaskDigestWithoutChangingHistoricalEmptyField(t *tes
 	if err != nil || restored != oldDigest {
 		t.Fatal("historical Task digest was not restored", err)
 	}
+	// Existing typed Tasks were created before Skill-guidance injection was
+	// introduced. The optional version field MUST not alter their identity.
+	raw, err = json.Marshal(task)
+	if err != nil || strings.Contains(string(raw), "skill_guidance_version") {
+		t.Fatal("historical guidance version must be omitted", err)
+	}
+	task.SkillGuidanceVersion = 1
+	newDigest, err := task.Digest()
+	if err != nil || newDigest == oldDigest {
+		t.Fatal("new guidance delivery version did not bind Task digest", err)
+	}
+	task.SkillGuidanceVersion = 0
+	back, err := task.Digest()
+	if err != nil || back != oldDigest {
+		t.Fatal("historical Task guidance identity changed", err)
+	}
 }
