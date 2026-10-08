@@ -89,7 +89,7 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 	if req.Action != Action || req.Capability != Capability || req.RiskClass != action.ControlledMutation {
 		return action.DispatchResult{}, fmt.Errorf("GitHub publication requires exact controlled-mutation grant")
 	}
-	plan, bundle, err := p.derive(ctx, req.RunID, req.ExecutionEpoch, req.ParametersDigest)
+	plan, bundle, err := p.derive(ctx, req.RunID, req.ExecutionEpoch, req.ParametersDigest, true)
 	if err != nil {
 		return action.DispatchResult{
 			Outcome: action.DispatchUnknown, ObservedState: "PRECONDITION_FAILED",
@@ -117,7 +117,7 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 	if op.Action != Action || op.Capability != Capability || op.RiskClass != action.ControlledMutation {
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: "publication grant mismatch"}, nil
 	}
-	plan, _, err := p.derive(ctx, op.RunID, op.ExecutionEpoch, "")
+	plan, _, err := p.derive(ctx, op.RunID, op.ExecutionEpoch, "", false)
 	if err != nil {
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: "publication identity no longer reconciles"}, nil
 	}
@@ -145,7 +145,7 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 	}
 }
 
-func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, parametersDigest string) (Plan, string, error) {
+func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, parametersDigest string, requireBundle bool) (Plan, string, error) {
 	var empty Plan
 	if p == nil || p.state == nil || p.remote == nil || runID == "" || epoch == 0 {
 		return empty, "", fmt.Errorf("publisher is not fully configured")
@@ -206,6 +206,12 @@ func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, param
 	}
 	if err := plan.Validate(); err != nil {
 		return empty, "", err
+	}
+	// Recovery observes the external operation using the immutable Core receipt.
+	// A local bundle is required to dispatch, but its later loss must not turn
+	// an externally completed UNKNOWN publication into an unreconcilable MANUAL.
+	if !requireBundle {
+		return plan, "", nil
 	}
 	bundle, err := p.verifyBundle(status.Token.ID, change.BundleDigest, change.BundleSize)
 	if err != nil {
