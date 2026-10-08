@@ -43,12 +43,15 @@ The Worker remains unable to push or create pull requests. Its Core-bound Codex
 lane still has no GitHub credential and produces only a local result commit plus
 verified Git bundle.
 
-In the current production topology, only the separately deployed
-`publisher-service` receives `GITHUB_PUBLISHER_CONFIG_FILE` and reads the
-owner-private token file. Production Control Plane uses a non-secret publication
-plan and an authenticated mTLS remote client; it must not inherit the publisher
-configuration or token. The older in-process publisher is allowed only under
-explicit pilot deployment mode and is not a production fallback.
+In the current production topology, the separately deployed
+`publisher-service` reads its configuration from `PUBLISHER_CONFIG_FILE` and
+its owner-private GitHub token file from the referenced publisher configuration.
+`GITHUB_PUBLISHER_CONFIG_FILE` is the older **Control Plane** in-process
+publisher input, restricted to explicit pilot deployment mode. Production
+Control Plane instead receives `GITHUB_PUBLISHER_PLAN_FILE` and
+`GITHUB_PUBLISHER_REMOTE_FILE` (non-secret plan and mTLS remote client);
+it must never receive the local publisher configuration or token. There is
+no in-process production fallback.
 
 For a publication action, all three independent gates must agree:
 
