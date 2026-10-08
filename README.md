@@ -52,11 +52,11 @@ It does **not** preserve compatibility with historical digital-worker schemas, r
 
 Useful engineering principles may be re-derived, but the implementation is clean-slate.
 
-Current canonical documents:
+Current architecture, policy and status references (the M0/M1 plan is **historical**, not a live operating checklist):
 
 - [Core Architecture v1](docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md)
 - [Embedded Domain Capability Model v1](docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md)
-- [Core M0 / M1 Vertical Slice Plan v1](docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md)
+- [Historical Core M0 / M1 Vertical Slice Plan v1](docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md)
 - [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md)
 - [Codex Credential Lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md)
 - [Extension Catalog v1](docs/extensions/EXTENSION_CATALOG_V1.md)

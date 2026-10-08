@@ -122,7 +122,7 @@ jobs:
             --archive "$out/review-facts.json" --expected-digest "$digest"
 
       - name: Retain terminal review facts only
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: retained-pilot-review-facts-${{ inputs.pilot }}-${{ inputs.verification_run_id }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-pilot-review-facts

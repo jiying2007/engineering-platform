@@ -1,7 +1,12 @@
 # Core M0 / M1 Vertical Slice Plan v1
 
 Date: 2026-09-24
-Status: **CURRENT EXECUTION PLAN**
+Status: **HISTORICAL M0/M1 VERTICAL-SLICE PLAN — NOT CURRENT OPERATING AUTHORITY**
+
+This is the original planning snapshot. The trusted self-hosted M1 pilot is closed;
+production/unattended operations are not qualified. The **only live** execution
+and maturity authority is [Implementation Status](../status/IMPLEMENTATION_STATUS.md).
+Archived target-state options below are not current implementation requirements.
 
 Parents:
 - docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md
@@ -300,6 +305,12 @@ Must provide:
 ---
 
 ## 14. M1 infrastructure
+
+**Historical design candidates only.** The current small-team RC baseline
+uses Go, PostgreSQL, direct mTLS, Ubuntu Worker, Codex app-server and independent
+Publisher; Temporal, OPA, S3/MinIO and OpenTelemetry have not been adopted as
+current operational dependencies. See the live Implementation Status.
+
 
 Default:
 - Go;

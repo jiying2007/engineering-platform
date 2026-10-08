@@ -48,7 +48,7 @@ jobs:
 
       - name: Retain failing reproduction evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: retained-debug-firmware-identity-reproduction-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-debug-firmware-identity-reproduction

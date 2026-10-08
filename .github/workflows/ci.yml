@@ -137,7 +137,7 @@ jobs:
           cp -a "$dist/." "$install_root/"
           (cd "$install_root" && ./eng distribution-verify --dir "$install_root" && ./eng --help && ./eng capabilities >/dev/null)
       - name: Retain candidate binary bytes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: engineering-binaries-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/engineering-dist
@@ -382,7 +382,7 @@ jobs:
           cmp "$RUNNER_TEMP/codex-qualification.json" "$RUNNER_TEMP/codex-qualification-repeat.json"
           cat "$RUNNER_TEMP/codex-qualification.json"
       - name: Retain Codex qualification receipt
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: codex-compatibility-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -474,7 +474,7 @@ jobs:
           go run ./cmd/ci-evidence --input "$RUNNER_TEMP/ci-evidence-receipt.json" > "$RUNNER_TEMP/ci-evidence-envelope.json"
           cat "$RUNNER_TEMP/ci-evidence-envelope.json"
       - name: Retain verified CI evidence envelope
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: trusted-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/ci-evidence-envelope.json
@@ -507,7 +507,7 @@ jobs:
           cat "$RUNNER_TEMP/internal-rc-delivery-envelope.json"
       - name: Retain exact internal RC delivery envelope
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: internal-rc-delivery-${{ github.sha }}
           path: ${{ runner.temp }}/internal-rc-delivery-envelope.json

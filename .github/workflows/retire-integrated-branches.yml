@@ -42,7 +42,7 @@ jobs:
           cat "$RUNNER_TEMP/branch-retirement.json"
       - name: Retain exact maintenance receipt only
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: branch-retirement-${{ github.run_id }}
           path: ${{ runner.temp }}/branch-retirement.json
