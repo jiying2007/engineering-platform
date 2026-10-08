@@ -262,9 +262,14 @@ speculative services.
   Publisher endpoint health, and five consecutive 96-Run/8-Worker security
   matrices are required CI. Each matrix also runs three interleaved security
   rounds (48 denied probes), so one exact-head qualification covers 480 Runs and
-  240 denied probes. p50/p95/max remain characterization only. Actual deployed
-  capacity, upstream publication health and calibrated SLO targets require the
-  selected production environment/provider and stay under #105.
+  240 denied probes. p50/p95/max remain characterization only. The required
+  evidence job additionally readbacks GitHub's exact four completed upstream
+  job/step timelines and retains a SHA/run-bound, fail-closed **runner-wall
+  characterization** report; this is not GitHub billing, utilization or an SLO.
+  See [CI job timing characterization](../implementation/CI_JOB_TIMING_CHARACTERIZATION_V1.md).
+  Actual deployed capacity, upstream publication health, operating cost and
+  calibrated SLO targets require the selected production environment/provider
+  and stay under #105.
 - **W02 — external provider gate.** Account-free isolated startup and exact
   compatibility identity are implemented. Real auth/model/tool qualification is
   intentionally deferred to #103 or an explicitly qualified #106 provider; no
