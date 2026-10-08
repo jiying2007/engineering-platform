@@ -172,7 +172,7 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 		want action.ReconcileOutcome
 	}{
 		{"remote-confirmed", ObservedConfirmed, action.ReconcileConfirmed},
-		{"remote-absent", ObservedAbsent, action.ReconcileSafeToRetry},
+		{"remote-absent", ObservedAbsent, action.ReconcileManual},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			remote := &publisherRemote{observation: ObserveResult{Outcome: tc.observation}}
@@ -190,8 +190,9 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 			}
 		})
 	}
-	// This exception applies only to read-only reconciliation. New Dispatch
-	// still must reject absent exact artifact bytes before any Git mutation.
+	// Read-only confirmation is allowed without local source bytes. In contrast,
+	// remote absence with missing bytes is MANUAL, not a grant to retry; and new
+	// Dispatch still rejects the missing source before Git mutation.
 	remote := &publisherRemote{}
 	provider, err := New(config, state, remote)
 	if err != nil {
