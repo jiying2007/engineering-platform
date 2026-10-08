@@ -2,11 +2,13 @@ package codexexec
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
+	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
 )
 
@@ -23,8 +25,19 @@ func selectedSkillsForTask(task core.TaskContract) ([]embedded.Skill, error) {
 	}
 	if !canonical.ValidDigest(task.SkillContractDigest) ||
 		task.TargetID == "" ||
-		(task.TargetPlatform != "linux-bsp" && task.TargetPlatform != "mcu-rtos") {
+		(task.TargetPlatform != routing.PlatformLinuxBSP && task.TargetPlatform != routing.PlatformMCURTOS) {
 		return nil, fmt.Errorf("%w: invalid typed Skill contract identity", workerqueue.ErrIdentity)
+	}
+	// Core routes from a reviewed TargetContext. Before any new model turn,
+	// independently re-derive that route from frozen TaskType and platform.
+	// A self-consistent Task/Intent/Preparation and an otherwise valid Skill
+	// digest must not smuggle another platform's methods into this Task.
+	route, err := routing.ResolveForTarget(task.TaskType, "", &routing.TargetContext{
+		TargetID: task.TargetID, Platform: task.TargetPlatform,
+	})
+	if err != nil || !slices.Equal(task.CapabilityIDs, route.CapabilityIDs) ||
+		!slices.Equal(task.SkillIDs, route.SkillIDs) {
+		return nil, fmt.Errorf("%w: typed Task Capability/Skill route differs from frozen TargetContext", workerqueue.ErrIdentity)
 	}
 	skills, digest, err := embedded.RoutedSkillContracts(task.SkillIDs)
 	if err != nil || digest != task.SkillContractDigest {
