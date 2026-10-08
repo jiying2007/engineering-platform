@@ -10,9 +10,18 @@ already checks their exact name and expected head from frozen manifests. Those
 eight refs are **not** administrator-protected; CI detects unexpected changes
 only when CI runs. It cannot prevent a direct ref mutation.
 
+**Availability limit:** GitHub may delay scheduled events and automatically
+**disable schedules in a public repository after 60 days of inactivity**.
+Thus this is a best-effort first-party detection improvement, not a guarantee
+of permanent monitoring for an arbitrarily quiet repository. After long idle
+periods, an operator must verify the workflow is enabled or independently run
+the two existing read-only verifier scripts from a trusted, current checkout.
+An operator-controlled external scheduler is required for a strict continuous
+cadence; this PR does not create, authorize or operate such a scheduler.
+
 The additive workflow
-`.github/workflows/retained-ref-drift-watch.yml` closes the *quiet-repository
-detection gap*. It runs once daily, supports operator `workflow_dispatch` and
+`.github/workflows/retained-ref-drift-watch.yml` reduces the *quiet-repository
+detection gap* while GitHub scheduling remains active. It runs once daily, supports operator `workflow_dispatch` and
 rechecks itself on protected-main changes to its manifests/verifiers/workflow.
 Runs on forks are excluded. On the canonical repository it requires exact
 protected default `main` checkout and uses only `contents:read` permissions

@@ -217,8 +217,10 @@ exact-head guarded historical lineage, not alternate supported paths. Required C
 they remain source-history lineage and are not treated as byte-identical or
 pending product work. Required main CI catches drift on each change. A separate
 [read-only daily retained-ref drift sentinel](../implementation/RETAINED_REF_DRIFT_SENTINEL_V1.md)
-also checks the actual remote inventory while the repository is otherwise quiet,
-with a 90-day bounded diagnostic receipt. This is **not** GitHub administrator
+also checks the actual remote inventory while GitHub scheduling remains active,
+with a 90-day bounded diagnostic receipt. Public-repository schedules may be
+delayed or automatically disabled after 60 days of no repository activity, so
+continuous monitoring after extended inactivity remains an operator/scheduler gate. This is **not** GitHub administrator
 mutation protection and cannot repair or promote retained refs.
 Preserve unchanged:
 
