@@ -330,9 +330,10 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
+          package-manager-cache: false
       - name: Install CI compatibility-baseline Codex package
         shell: bash
         run: |
