@@ -180,9 +180,10 @@ The original M1 pilot used the earlier in-process publication arrangement;
 its historical configuration must not be copied into production. **Do not set
 `GITHUB_PUBLISHER_CONFIG_FILE` on the production Control Plane.** The current
 production topology runs an independent `publisher-service` under a separate
-identity; only that service receives the owner-private GitHub publisher token
-and its publisher configuration. Control Plane carries a non-secret publication
-plan and the authenticated mTLS remote-publisher client configuration.
+identity. That service reads `PUBLISHER_CONFIG_FILE` and the referenced
+owner-private GitHub publisher token. Production Control Plane instead carries
+`GITHUB_PUBLISHER_PLAN_FILE` and `GITHUB_PUBLISHER_REMOTE_FILE` for its
+non-secret publication plan and authenticated mTLS remote-publisher client.
 
 The Publisher service verifies its read-only shared view of the Worker's
 retained Codex `artifacts/` directory. Prefer a scoped short-lived GitHub App
