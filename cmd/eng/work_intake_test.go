@@ -15,6 +15,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
@@ -68,6 +69,11 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 		TargetPlatform:  routing.PlatformLinuxBSP,
 		ExpectedOutputs: spec.ExpectedOutputs, VerificationPlanID: spec.VerificationPlan.ID, Revision: 1,
 	}
+	selectedSkillDigest, err := embedded.RoutedSkillContractDigest(route.SkillIDs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract.SkillContractDigest = selectedSkillDigest
 	planDigest, _ := spec.VerificationPlan.Digest()
 	contract.VerificationPlanDigest = planDigest
 	taskDigest, _ := contract.Digest()
@@ -98,7 +104,8 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 			if json.NewDecoder(r.Body).Decode(&got) != nil ||
 				len(got.Contract.CapabilityIDs) != 0 || len(got.Contract.SkillIDs) != 0 ||
 				got.TargetContext == nil || got.TargetContext.TargetID != spec.Material.TargetID ||
-				got.TargetContext.Platform != routing.PlatformLinuxBSP {
+				got.TargetContext.Platform != routing.PlatformLinuxBSP ||
+				got.Contract.SkillContractDigest != "" {
 				t.Error("client bypassed server-side routing", got)
 			}
 			_ = json.NewEncoder(w).Encode(workIntakeTaskResponse{

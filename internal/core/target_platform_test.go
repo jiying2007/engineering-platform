@@ -35,4 +35,18 @@ func TestTargetPlatformBindsTaskDigestWithoutChangingHistoricalEmptyField(t *tes
 	if err != nil || actual != oldDigest {
 		t.Fatal("historical Task digest changed with empty optional platform", err)
 	}
+	raw, err = json.Marshal(task)
+	if err != nil || strings.Contains(string(raw), "skill_contract_digest") {
+		t.Fatal("historical Skill contract field must remain absent", err)
+	}
+	task.SkillContractDigest = "sha256:" + strings.Repeat("c", 64)
+	bound, err := task.Digest()
+	if err != nil || bound == oldDigest {
+		t.Fatal("selected Skill contract did not bind Task digest", err)
+	}
+	task.SkillContractDigest = ""
+	restored, err := task.Digest()
+	if err != nil || restored != oldDigest {
+		t.Fatal("historical Task digest was not restored", err)
+	}
 }
