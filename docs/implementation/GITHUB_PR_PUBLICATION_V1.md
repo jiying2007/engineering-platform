@@ -96,6 +96,12 @@ host-controlled paths. The token file must be owner-private. Prefer a
 short-lived GitHub App installation token with only the target repository
 permissions needed to read refs, write contents/branches and create/update pull
 requests. Token bytes are never placed in Git URLs or command arguments.
+GitHub REST calls carrying the publisher token and Git's credentialed HTTPS
+fetch/push both **refuse HTTP redirects**, including same-origin redirects.
+A repository rename, proxy-injected redirect or unexpected API migration must
+fail closed and be reviewed as an operator policy change; it must not silently
+redirect a push, PR mutation or bearer credential to another endpoint. The
+publisher does not automatically retry an ambiguous side effect.
 
 ## Publication algorithm
 

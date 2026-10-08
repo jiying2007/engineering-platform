@@ -59,7 +59,14 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 	}
 	return &githubRemote{
 		git: canonicalGit, tokenFile: canonicalToken,
-		client:  &http.Client{Timeout: 20 * time.Second},
+		client: &http.Client{
+			Timeout: 20 * time.Second,
+			// A credentialed GitHub API request must never be redirected to
+			// another endpoint or replay a mutation through an HTTP redirect.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 		apiBase: "https://api.github.com",
 	}, nil
 }
@@ -413,6 +420,9 @@ func (g *githubRemote) gitOutput(ctx context.Context, token, directory, home str
 		"-c", "protocol.allow=never",
 		"-c", "protocol.https.allow=always",
 		"-c", "protocol.file.allow=always",
+		// Explicit URL policy: never follow a Git remote redirect with the
+		// scoped GitHub publisher credential, even on the first request.
+		"-c", "http.followRedirects=false",
 		"-c", "fetch.fsckObjects=true",
 		"-c", "transfer.fsckObjects=true",
 		"-c", "gc.auto=0",
