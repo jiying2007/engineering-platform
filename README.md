@@ -115,6 +115,15 @@ See [typed target routing and Skill contracts](docs/implementation/EMBEDDED_TARG
 These metadata records cannot authorize device actions or replace real Skill
 qualification.
 
+The team's long-lived reusable engineering Skill/method assets remain in
+[agent-dev-kit](https://github.com/jiying2007/agent-dev-kit). The ten existing
+`DEFINED` entries here provide bounded, versioned Task/Prompt guidance for this
+platform; they are **not** a second team-wide Skill source of truth and do not
+claim parity or automatic synchronization with agent-dev-kit. Separate Skill
+effectiveness evaluation, maturity promotion and catalog expansion are deferred.
+This does not relax current Task routing, prompt identity or Action Gateway
+gates, or add a cross-repository runtime dependency.
+
 ## Current implementation status
 
 The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is proven**

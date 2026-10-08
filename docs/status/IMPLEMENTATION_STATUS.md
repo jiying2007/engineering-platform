@@ -63,6 +63,18 @@ engineering quality**. No Skill was promoted from `DEFINED`; actual expert
 effectiveness and time/cost improvements remain unqualified until independent,
 repeated, real task Evidence exists. Catalog entries grant no Action permissions.
 
+**Team Skill ownership / deferred work:** The existing team-wide reusable
+engineering Skill/method assets are maintained in
+[agent-dev-kit](https://github.com/jiying2007/agent-dev-kit). This platform's
+ten locally versioned, `DEFINED` Skill entries remain bounded Task/Prompt
+method and identity contracts, not a replacement team-wide Skill authority.
+No catalog parity, synchronization, migration, additional runtime dependency
+or proven engineering effectiveness is claimed. Independent Skill evaluation,
+maturity promotion and catalog expansion are deferred. Keep the shipped routing,
+method-digest, prompt-byte and historical Result verification fences; do not
+create a second Skill delivery/qualification service to resolve this ownership
+boundary. This deferral does not affect RC or production acceptance gates.
+
 ## Current contracts and limits
 
 | Area | Implemented | Not implied |

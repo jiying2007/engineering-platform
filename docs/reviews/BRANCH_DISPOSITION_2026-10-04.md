@@ -154,7 +154,7 @@ the mutation is rejected before deletion.
 The six non-byte-identical historical refs are now deliberately retained as
 **RETAINED_SUPERSEDED_PROTOTYPE** history rather than deleted. Their exact remote
 heads are pinned in `.github/retained-prototype-refs.json` and required CI reads
-those four refs from origin and rejects any missing or changed head. This guard is
+those six refs from origin and rejects any missing or changed head. This guard is
 read-only; it is not GitHub branch protection and does not mutate refs.
 
 These refs are historical source lineage only and must not be merged, rebased or
