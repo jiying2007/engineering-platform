@@ -146,7 +146,13 @@ dispatch becomes UNKNOWN. Reconciliation is observation-only:
 - exact branch + exact open PR => CONFIRMED;
 - partial branch-only state or any conflicting ref/PR => MANUAL.
 
-Reconciliation never replays a push or PR mutation.
+Reconciliation never replays a push or PR mutation. It derives the immutable
+publication Plan from the retained Core-bound Run/Task/Codex receipts, so an
+already **CONFIRMED** remote branch and exact PR can be recognized even if the
+local Git bundle was lost after dispatch. A remote **ABSENT** observation
+permits `SAFE_TO_RETRY` only if the local bundle still passes exact byte
+verification; without those bytes the result remains `MANUAL`. Neither
+observation invokes publication again.
 
 ## Historical pilot closeout and current external gates
 
@@ -184,7 +190,12 @@ The Publisher service:
 - accepts only TLS 1.3 clients signed by its configured CA;
 - rechecks the exact configured Control Plane URI subject;
 - rechecks repository/base-ref/branch-prefix target policy;
-- independently re-hashes the retained shared bundle before publication;
+- reads the retained shared bundle through a scoped path and copies it to
+  an owner-private, short-lived snapshot while hashing the **copied bytes**;
+- compares snapshot byte size and SHA-256 to the frozen Plan before any Git
+  operation; Git consumes the verified private copy rather than re-opening
+  the original Worker-owned path; cleanup follows the publication attempt,
+  and storage/copy errors fail closed without performing a GitHub mutation;
 - performs Git/GitHub mutation through the existing GitHub Remote implementation;
 - never receives DATABASE_URL, model/provider credentials, Review or Closure
   authority.
