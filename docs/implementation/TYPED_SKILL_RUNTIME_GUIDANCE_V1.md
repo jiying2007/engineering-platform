@@ -43,6 +43,29 @@ the currently installed catalog. Only constructing a **new** turn with
 mismatch. Otherwise, upgrading Skill methods could retroactively make a valid
 historic Codex result unverifiable — an unacceptable audit regression.
 
+### Observed prompt-byte attestation
+
+The frozen `PromptIdentityDigest` binds the Task, RunInput, selected Skill
+method identity and approved ContextBundle manifest, but intentionally excludes
+the host-local bundle locator. The real Codex `EngineeringReceipt` separately
+retains the **exact UTF-8 prompt bytes SHA-256 digest** observed at
+`turn/start`.
+
+Before post-turn workspace finalization, the Core-bound Worker now **must**
+compare the receipt's observed `PromptDigest` with the exact text returned by
+`codexexec.Prompt`, and independently validate the frozen PromptIdentity.
+Wrong content, stale identity, malformed digest or oversized/non-UTF-8 prompt
+fails closed and cannot become a finished execution or delivery receipt.
+Failure follows existing stopped-source and sealed-control handling; no
+retries or authority expansion. This is a Worker-to-adapter content-binding
+check, **not evidence that the model obeyed Skill instructions**.
+
+The byte-level check applies only while executing new turns. Archived receipt
+verification remains based on immutable retained identities and receipts;
+it never attempts to re-render a historical prompt with a newer Skill catalog
+or a different host-local ContextBundle path. It introduces no new Result
+field, schema migration or retroactive requirement on retained M1 evidence.
+
 The existing `workspace-write`, `approvalPolicy=never`, no-network
    profile and Action Gateway authority remain unchanged. Guidance is not a
    new tool/profile, permission, credential, model role or automatic optimizer.

@@ -111,6 +111,13 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 		return p.SaveCodex(permit.Assignment, prepared, historyID, history)
 	}
 	codexReceipt, transcript, err := RunCodexTurn(runCtx, c, permit, runtime, prepared.Workspace.WorktreePath, prepared.Workspace.HomePath, prompt, retainHistory)
+	// A valid Codex receipt alone only attests that some bounded prompt
+	// digest was observed. Before anything is finalized or reported, prove
+	// it matches our exact frozen-Task prompt bytes for this turn.
+	if err == nil {
+		err = codexexec.VerifyTurnPromptBinding(permit.Assignment, permit.Preparation,
+			prompt, promptIdentityDigest, codexReceipt.PromptDigest)
+	}
 	controlDigest, controlErr := transcript.Digest()
 	if controlErr == nil && transcript.Close.Binding.Token == permit.Token &&
 		transcript.Close.Binding.ExecutionEpoch == permit.Assignment.Intent.ExecutionEpoch {

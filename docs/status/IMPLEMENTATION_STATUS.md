@@ -47,6 +47,11 @@ descriptions. **Newly created v1 Skill-guidance TaskContracts** with an
 explicit typed TargetContext and frozen selected-Skill digest deliver the
 **actual selected methods and BLOCK/evaluation guidance** to the Core-bound
 Codex turn after an independent Worker-side source/catalog digest check.
+Before any new Codex turn can be finalized/delivered, the Worker also checks
+the real provider-turn receipt's PromptDigest against the **exact rendered
+prompt bytes** and its frozen PromptIdentity; a mismatch stops delivery.
+This is not proof the model obeyed instructions, and archived Result readback
+does not re-render prompts with a newer Skill catalog.
 A new optional `skill_guidance_version=1` field separates these new tasks from
 older typed/digested or untyped Tasks; the latter continue to use the exact
 name-only PromptIdentity. Historical Task prompts and digests remain unchanged.
