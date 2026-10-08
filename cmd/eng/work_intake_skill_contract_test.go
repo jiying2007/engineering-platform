@@ -36,10 +36,10 @@ func TestWorkIntakeRejectsTamperedSkillMethodDigestBeforeRun(t *testing.T) {
 		ID: spec.TaskContractID, WorkItemID: spec.WorkItemID,
 		TaskType: spec.TaskType, CapabilityIDs: route.CapabilityIDs, SkillIDs: route.SkillIDs,
 		SkillContractDigest: "sha256:" + strings.Repeat("0", 64),
-		Repository: spec.Material.Repository, BaseCommit: spec.Material.BaseCommit,
+		Repository:          spec.Material.Repository, BaseCommit: spec.Material.BaseCommit,
 		TargetID: spec.Material.TargetID, TargetPlatform: routing.PlatformLinuxBSP,
 		AcceptanceCriteria: spec.Material.AcceptanceCriteria,
-		ExpectedOutputs: spec.ExpectedOutputs, VerificationPlanID: spec.VerificationPlan.ID,
+		ExpectedOutputs:    spec.ExpectedOutputs, VerificationPlanID: spec.VerificationPlan.ID,
 		VerificationPlanDigest: planDigest, Revision: 1,
 	}
 	tamperedDigest, err := tampered.Digest()

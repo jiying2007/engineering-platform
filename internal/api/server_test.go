@@ -814,9 +814,9 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 	request := func(taskID, materialTarget, contextTarget, platform, subsystem string) map[string]any {
 		return map[string]any{
 			"contract": map[string]any{
-				"task_contract_id": taskID,
-				"work_item_id":     "work-typed",
-				"task_type":        "DEBUG",
+				"task_contract_id":      taskID,
+				"work_item_id":          "work-typed",
+				"task_type":             "DEBUG",
 				"skill_contract_digest": "attacker-supplied-mismatch",
 			},
 			"material": map[string]any{
