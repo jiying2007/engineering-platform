@@ -2,10 +2,16 @@
 
 Base readiness: main `316bba9fab02f9cdbbf0278cf89a21a25eea10fd`.
 
-This runbook is intentionally operational. It does not add a Runtime lane,
-Evidence family or Recovery mechanism. It describes how to exercise the
-already-implemented authorities with one real Feature task and one real Debug
-task.
+> **Historical M1 operator record — not current production setup guidance.**
+> Trusted self-hosted Feature #54 and Debug #55 reached Closure in September
+> 2026; this original runbook is retained for audit, not as a request to rerun
+> their subjects. Current authority: [Implementation Status](../status/IMPLEMENTATION_STATUS.md),
+> [Credential Lanes](CODEX_CREDENTIAL_LANES_V1.md) and
+> [Production Operations](PRODUCTION_OPERATIONS_V1.md).
+
+This document records the historical operational M1 pilot method. It does
+not add a Runtime lane, Evidence family or Recovery mechanism. Its historical
+configuration examples are not instructions for the current production topology.
 
 A pilot is retained only when the exact chain reaches Closure:
 
@@ -168,18 +174,22 @@ window. The host still prewarms the workload-identity exchange and removes the
 upstream assertion before the model-reachable turn. Longer production turns
 require a separately reviewed host-owned assertion refresh design.
 
-### Publisher credential
+### Publisher credential — historic pilot versus current production
 
-Start the production Control Plane with `GITHUB_PUBLISHER_CONFIG_FILE` pointing
-to an operator-owned config conforming to
-`examples/github-publisher.json`.
+The original M1 pilot used the earlier in-process publication arrangement;
+its historical configuration must not be copied into production. **Do not set
+`GITHUB_PUBLISHER_CONFIG_FILE` on the production Control Plane.** The current
+production topology runs an independent `publisher-service` under a separate
+identity; only that service receives the owner-private GitHub publisher token
+and its publisher configuration. Control Plane carries a non-secret publication
+plan and the authenticated mTLS remote-publisher client configuration.
 
-Prefer a short-lived GitHub App installation token in the configured owner-private
-`token_file`. The publisher credential belongs to the Control Plane provider,
-never to the Worker/Codex process.
-
-The publisher artifact root must be a read-only shared view of the Worker's
-retained Codex `artifacts/` directory.
+The Publisher service verifies its read-only shared view of the Worker's
+retained Codex `artifacts/` directory. Prefer a scoped short-lived GitHub App
+installation token. Neither Worker nor Codex receives publisher credentials.
+For the current host/deployment contract use
+[Production Operations](PRODUCTION_OPERATIONS_V1.md) rather than replaying
+this historical M1 setup.
 
 ### Control identities
 
@@ -551,5 +561,8 @@ Stop the pilot rather than weakening authority when any of these occurs:
 - any required artifact digest changes;
 - Verification or independent Review is not PASS.
 
-Two complete retained Closure chains — one Feature and one Debug — are the next
-evidence needed before reassessing M1.
+Those two M1 Closure chains are already completed and retained; see
+[M1 phase-1 closure](../status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md).
+They are not outstanding acceptance work. Managed WIF and production/unattended
+operation remain separate external qualification gates; see
+[Implementation Status](../status/IMPLEMENTATION_STATUS.md).
