@@ -137,6 +137,12 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 			ObservedState: observed,
 		}, nil
 	case ObservedAbsent:
+		// External absence alone is not enough to retry: the frozen source
+		// bundle must still be available and byte-exact. Confirmation of an
+		// already-finished external effect does not need these local bytes.
+		if _, err := p.verifyBundle(plan.ExecutionID, plan.BundleDigest, plan.BundleSize); err != nil {
+			return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: "source bundle unavailable for retry"}, nil
+		}
 		return action.ReconcileResult{Outcome: action.ReconcileSafeToRetry, ObservedState: string(result.Outcome)}, nil
 	case ObservedPartial, ObservedConflict:
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: string(result.Outcome)}, nil
