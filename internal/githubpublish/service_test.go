@@ -21,7 +21,7 @@ import (
 type serviceRemote struct {
 	publishCalls int
 	observeCalls int
-	onPublish func(string) error
+	onPublish    func(string) error
 }
 
 func (r *serviceRemote) Publish(_ context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {
