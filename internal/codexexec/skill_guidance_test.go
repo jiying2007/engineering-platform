@@ -175,7 +175,18 @@ func TestLegacyTypedTaskAndUntypedTaskKeepOriginalPrompt(t *testing.T) {
 	legacy.Assignment.Task.SkillContractDigest = legacySkillDigest
 	rebindTypedPermit(t, &legacy)
 	after, afterIdentity, err := Prompt(legacy.Assignment, legacy.Preparation, "/approved")
-	if err != nil || after != before || afterIdentity == historicalDigest {
-		t.Fatal("existing typed-with-digest Task prompt unexpectedly changed", err)
+	if err != nil || afterIdentity == historicalDigest ||
+		!strings.Contains(after, "Skills: material-readiness, log-triage, linux-bsp-debug") ||
+		strings.Contains(after, "Selected Skill methods") {
+		t.Fatal("existing typed-with-digest Task unexpectedly received new methods", err)
+	}
+	// Adding the old Skill-contract digest changes frozen Task/Context digests,
+	// so the literal bundle SHA in the prompt legitimately changes. What must
+	// remain unchanged is the old name-only guidance and identity JSON schema.
+	identity, _, err := promptIdentity(legacy.Assignment, legacy.Preparation)
+	raw, jsonErr := json.Marshal(identity)
+	if err != nil || jsonErr != nil || strings.Contains(string(raw), "skill_guidance_version") ||
+		strings.Contains(string(raw), "skill_contract_digest") {
+		t.Fatal("historical typed-with-digest PromptIdentity was silently upgraded", err, jsonErr)
 	}
 }
