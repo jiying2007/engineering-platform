@@ -24,11 +24,16 @@ For a new Task whose **optional `skill_guidance_version` equals 1** and whose
 `skill_contract_digest` is present:
 
 1. Verify the Task/Intent/RunInput and attested preparation as before.
-2. Independently resolve **only selected ordered Skills** from the host binary
-   catalog and verify the full v1 selected metadata digest equals the frozen
-   Task field. Missing, duplicate, stale, unsupported-version or contradictory v1 identities
-   reject before the model turn; version-zero historical subjects remain
-   unchanged.
+2. Independently re-derive the **exact ordered Capability/Skill route**
+   from the frozen `task_type` and explicit `target_platform`/`target_id`
+   using the same bounded typed router as Core. Verify both ordered ID lists
+   match the frozen Task before resolving **only those selected Skills** from
+   the host binary catalog and checking their full v1 metadata digest.
+   A valid method digest alone is insufficient: a self-consistent Linux/BSP
+   Task cannot switch to MCU Skills or another TaskType's route. Missing,
+   duplicate, stale, unknown, reordered, unsupported-version or contradictory
+   v1 identities reject before the model turn; version-zero historical
+   subjects remain unchanged.
 3. Include the selected Skills' version, owner, declared maturity, purpose,
    input/material contracts, methods, outputs, BLOCK/prohibited conditions and
    evaluation methods as a bounded host-generated guidance section.
@@ -95,6 +100,12 @@ known selected BSP methods/blocks, omission of unrelated MCU Skills, locator
 independence, direct method-digest mismatches, and *internally self-consistent*
 forged Task/Intent/Preparation identities. The last case must reject before
 model execution, not just because the Task digest was obviously broken.
+The positive route matrix covers both explicit platforms across all eight Task
+types. Negative cases additionally recompute valid Skill-method digests
+and every nested Task/RunInput/Intent/Preparation identity after substituting
+MCU-vs-Linux methods, capabilities, route order or TaskType. A correctly
+hashed yet wrongly routed Task must be rejected **before a new Codex turn**;
+historical Result verification remains independent of today's router/catalog.
 
 These tests show what the host **would send** in a Core-bound Codex turn. They
 do **not** prove a live model read, obeyed, or correctly applied the methods,

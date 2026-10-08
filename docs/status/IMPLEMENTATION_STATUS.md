@@ -46,8 +46,10 @@ required-material, method, output, blocking/prohibited-action and evaluation
 descriptions. **Newly created v1 Skill-guidance TaskContracts** with an
 explicit typed TargetContext and frozen selected-Skill digest deliver the
 **actual selected methods and BLOCK/evaluation guidance** to the Core-bound
-Codex turn after an independent Worker-side source/catalog digest check.
-Before any new Codex turn can be finalized/delivered, the Worker also checks
+Codex turn after an independent Worker-side **typed TaskType/TargetContext
+Capability/Skill route check plus source/catalog digest check**. Even a
+self-consistent Task/Intent/Preparation with a valid Skill digest cannot
+substitute another platform's methods. Before any new Codex turn can be finalized/delivered, the Worker also checks
 the real provider-turn receipt's PromptDigest against the **exact rendered
 prompt bytes** and its frozen PromptIdentity; a mismatch stops delivery.
 This is not proof the model obeyed instructions, and archived Result readback

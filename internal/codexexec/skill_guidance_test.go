@@ -8,6 +8,8 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
+	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/workerqueue"
 )
 
@@ -57,6 +59,7 @@ func rebindTypedPermit(t *testing.T, permit *Permit) {
 func typedSkillPermit(t *testing.T) Permit {
 	t.Helper()
 	_, p := contractFixture(t)
+	p.Assignment.Task.TaskType = "DEBUG"
 	p.Assignment.Task.TargetID = "ssc305"
 	p.Assignment.Task.TargetPlatform = "linux-bsp"
 	p.Assignment.Task.CapabilityIDs = []string{"embedded.debug-reliability", "embedded.linux-bsp"}
@@ -188,5 +191,104 @@ func TestLegacyTypedTaskAndUntypedTaskKeepOriginalPrompt(t *testing.T) {
 	if err != nil || jsonErr != nil || strings.Contains(string(raw), "skill_guidance_version") ||
 		strings.Contains(string(raw), "skill_contract_digest") {
 		t.Fatal("historical typed-with-digest PromptIdentity was silently upgraded", err, jsonErr)
+	}
+}
+
+func TestTypedPromptRoutingAcrossTaskAndPlatformFamilies(t *testing.T) {
+	for _, taskType := range []string{"DEBUG", "FEATURE", "BRINGUP", "COMPATIBILITY", "DEVICE_TEST", "RELEASE", "PERFORMANCE", "REFACTOR"} {
+		for _, platform := range []string{routing.PlatformLinuxBSP, routing.PlatformMCURTOS} {
+			t.Run(taskType+"-"+platform, func(t *testing.T) {
+				p := typedSkillPermit(t)
+				p.Assignment.Task.TaskType = taskType
+				p.Assignment.Task.TargetPlatform = platform
+				if platform == routing.PlatformMCURTOS {
+					p.Assignment.Task.TargetID = "mm32spin023c"
+				}
+				route, err := routing.ResolveForTarget(taskType, "", &routing.TargetContext{
+					TargetID: p.Assignment.Task.TargetID, Platform: platform,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				p.Assignment.Task.CapabilityIDs = append([]string(nil), route.CapabilityIDs...)
+				p.Assignment.Task.SkillIDs = append([]string(nil), route.SkillIDs...)
+				p.Assignment.Task.SkillContractDigest, err = embedded.RoutedSkillContractDigest(route.SkillIDs)
+				if err != nil {
+					t.Fatal(err)
+				}
+				rebindTypedPermit(t, &p)
+				text, _, err := Prompt(p.Assignment, p.Preparation, "/approved/context")
+				if err != nil {
+					t.Fatal("Core-routed typed Task was rejected by Worker", err)
+				}
+				for _, id := range route.SkillIDs {
+					if !strings.Contains(text, "Skill "+id+" v1") {
+						t.Fatalf("selected Skill %q omitted from typed prompt", id)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestTypedPromptRejectsSelfConsistentWrongRouting(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*Permit)
+	}{
+		{"MCU-Skill-on-Linux", func(p *Permit) {
+			p.Assignment.Task.SkillIDs[2] = "mcu-rtos-debug"
+		}},
+		{"Linux-Skill-on-MCU", func(p *Permit) {
+			p.Assignment.Task.TargetPlatform = routing.PlatformMCURTOS
+			p.Assignment.Task.TargetID = "mm32spin023c"
+		}},
+		{"different-capability", func(p *Permit) {
+			p.Assignment.Task.CapabilityIDs[1] = "embedded.mcu-rtos"
+		}},
+		{"reordered-capabilities", func(p *Permit) {
+			p.Assignment.Task.CapabilityIDs[0], p.Assignment.Task.CapabilityIDs[1] =
+				p.Assignment.Task.CapabilityIDs[1], p.Assignment.Task.CapabilityIDs[0]
+		}},
+		{"reordered-Skills", func(p *Permit) {
+			p.Assignment.Task.SkillIDs[0], p.Assignment.Task.SkillIDs[1] =
+				p.Assignment.Task.SkillIDs[1], p.Assignment.Task.SkillIDs[0]
+		}},
+		{"unexpected-extra-Skill", func(p *Permit) {
+			p.Assignment.Task.SkillIDs = append(p.Assignment.Task.SkillIDs, "verification-plan-builder")
+		}},
+		{"different-task-type", func(p *Permit) {
+			p.Assignment.Task.TaskType = "FEATURE"
+		}},
+		{"invalid-TargetID", func(p *Permit) {
+			p.Assignment.Task.TargetID = "ssc305\nlinux"
+		}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			p := typedSkillPermit(t)
+			tt.mutate(&p)
+			// The malicious replacement includes valid catalog entries and
+			// rebinds the exact content digest and every nested frozen identity.
+			// A conventional digest-only check will accept this substitution.
+			digest, err := embedded.RoutedSkillContractDigest(p.Assignment.Task.SkillIDs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			p.Assignment.Task.SkillContractDigest = digest
+			rebindTypedPermit(t, &p)
+			if _, err := workerqueue.Validate(p.Assignment); err != nil {
+				t.Fatal("test fixture was not internally self-consistent", err)
+			}
+			if err := preparation.Verify(p.Assignment, p.Preparation, p.Preparation.Facts, p.Preparation.Admission.Worker); err != nil {
+				t.Fatal("attested preparation was not internally self-consistent", err)
+			}
+			if _, err := PromptIdentityDigest(p.Assignment, p.Preparation); err != nil {
+				t.Fatal("archival Task/Prompt identity must not depend on latest route", err)
+			}
+			if _, _, err := Prompt(p.Assignment, p.Preparation, "/approved/context"); !errors.Is(err, workerqueue.ErrIdentity) {
+				t.Fatalf("self-consistent but wrong typed Target/Skill route admitted: %v", err)
+			}
+		})
 	}
 }
