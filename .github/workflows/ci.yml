@@ -115,11 +115,30 @@ jobs:
       - name: Prepared Runtime and Context repeated regression
         run: go test -race -count=10 -timeout 2m ./internal/runtime/codexapp ./internal/contextbundle
       - name: Worker admission repeated regression
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          set -euo pipefail
           go test -race -count=20 -timeout 2m ./internal/workerqueue ./internal/workeragent ./internal/workerloop ./internal/controlclient
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestWorkerInbox
           go test -race -count=3 -timeout 2m ./cmd/control-plane -run TestWorkerCommand
-          go test -race -v -count=5 -timeout 5m ./cmd/control-plane -run TestSustainedAdmissionSecurityMatrix
+          python3 -B scripts/test_ci_admission_characterization.py
+          go test -race -json -count=5 -timeout 5m ./cmd/control-plane -run '^TestSustainedAdmissionSecurityMatrix$' |
+            tee "$RUNNER_TEMP/admission-matrix-events.jsonl"
+          python3 -B scripts/ci_admission_characterization.py \
+            --events "$RUNNER_TEMP/admission-matrix-events.jsonl" \
+            --source-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --attempt "$GITHUB_RUN_ATTEMPT" \
+            --out "$RUNNER_TEMP/admission-characterization.json"
+      - name: Retain bounded admission characterization (not a production SLO)
+        uses: actions/upload-artifact@v6
+        with:
+          name: admission-characterization-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/admission-characterization.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Worker preparation and independent workspace regression
         run: |
           go test -race -count=5 -timeout 2m ./internal/workspace ./internal/preparation
