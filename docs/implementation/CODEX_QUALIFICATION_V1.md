@@ -8,6 +8,13 @@ A qualification is non-model protocol evidence: it does not perform
 `turn/start`, does not consume a retained engineering turn, does not provision a
 provider credential, and does not grant GitHub/publication authority.
 
+**Current admission is Profile v3, not the historic Profile v2.** The
+qualification receipt remains a binary/protocol observation; a newly created
+`codexexec.Profile{Version: 3}` additionally freezes one admitted Provider identity (`provider_id`, `credential_mode`, `execution_mode`,
+`provider_config_digest`). Existing Profile v2 evidence is immutable history;
+there is no v2 compatibility shim for new Run authorization. See
+[Credential Lanes](CODEX_CREDENTIAL_LANES_V1.md).
+
 ## Admission model
 
 Runtime admission is based on compatibility proof, not exact version equality:
@@ -22,7 +29,8 @@ actual Codex executable
   -> real initialize / initialized / ephemeral thread/start
   -> deterministic QualificationReceipt
   -> qualification_digest
-  -> Codex Profile v2
+  -> Codex Profile v3
+       frozen provider identity (provider / credential / execution / config digest)
        actual codex_version
        binary_digest
        qualification_digest
@@ -84,14 +92,41 @@ The deterministic receipt records at least:
 - required protocol/profile checks;
 - thread-start model used for this compatibility check.
 
-The canonical receipt digest is frozen into `codexexec.Profile v2`. The
-Profile digest is then the Worker capability and RunInput tool-profile identity.
+The canonical receipt digest is frozen into `codexexec.Profile v3` alongside
+the independently admitted provider identity. The complete Profile digest then
+becomes the Worker capability and RunInput tool-profile identity.
 
 The Worker configuration also carries the full QualificationReceipt. Before a
 model-reachable engineering turn, the Worker **reruns compatibility
 qualification on the current executable** and requires the new deterministic
 receipt/digest to equal the frozen receipt/Profile. This prevents a hand-written
 Profile or stale qualification JSON from admitting an unqualified binary.
+
+## Current operator invocation (trusted Ubuntu / ChatGPT session)
+
+The installed `eng codex-profile` CLI requires an explicit provider,
+credential and execution selection, not just the qualified model/binary. For
+the already-proven trusted self-hosted internal lane:
+
+```sh
+eng codex-profile \
+  --codex "$CODEX_NATIVE" \
+  --qualification codex-qualification.json \
+  --model "$QUALIFIED_MODEL" \
+  --provider openai-codex \
+  --credential chatgpt-session \
+  --execution trusted-self-hosted \
+  > codex-profile.json
+```
+
+`CODEX_NATIVE` is the absolute native executable path. `QUALIFIED_MODEL`
+must equal the model in the frozen QualificationReceipt. Do not substitute a
+different executable/version, model or provider after qualification. For
+`workload-identity / unattended`, the corresponding Profile v3 selection is
+structurally admitted but requires separate live WIF qualification (#103);
+changing CLI flags alone is never credential/provider qualification. Unknown
+provider/credential/execution combinations fail closed. No shared team Codex
+version pin is introduced.
 
 ## CI sentinel baseline
 
