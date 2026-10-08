@@ -31,8 +31,13 @@ those subjects or rewrite their receipts to manufacture current production proof
 The post-RC domain hardening adds an **optional explicit target_context**
 (`target_id` and `platform`) to existing Work/Task intake. Both CLI and
 Core require the exact declared target to match MaterialManifest; contradictory
-platform/subsystem inputs fail closed. The selected target platform is frozen into the TaskContract digest, without
-changing existing untyped/historical Task digests. No chip-name heuristic,
+platform/subsystem inputs fail closed. The exact target platform and **selected v1 Skill metadata contract digest**
+are bound into new typed TaskContracts. Core derives the digest from its
+catalog, and `eng work-intake` independently verifies Task readback before
+creating a Run; selected methods, version, evaluation and prohibitions cannot
+silently drift with unchanged Skill IDs. Untyped/historical Task JSON and
+digests remain unchanged. A digest is an identity, **not** evidence that a
+Skill is EVALUATED, PILOTED or PROVEN. No chip-name heuristic,
 second Target authority, Device/HIL entitlement or new Runtime mode is introduced.
 See [typed target routing v1](../implementation/EMBEDDED_TARGET_ROUTING_V1.md).
 

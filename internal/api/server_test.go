@@ -11,6 +11,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/store"
@@ -816,6 +817,7 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 				"task_contract_id": taskID,
 				"work_item_id":     "work-typed",
 				"task_type":        "DEBUG",
+				"skill_contract_digest": "attacker-supplied-mismatch",
 			},
 			"material": map[string]any{
 				"repository":            "repo",
@@ -853,16 +855,22 @@ func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
 		http.StatusCreated)
 	var result struct {
 		Contract struct {
-			TargetID       string   `json:"target_id"`
-			TargetPlatform string   `json:"target_platform"`
-			SkillIDs       []string `json:"skill_ids"`
+			TargetID            string   `json:"target_id"`
+			TargetPlatform      string   `json:"target_platform"`
+			SkillIDs            []string `json:"skill_ids"`
+			SkillContractDigest string   `json:"skill_contract_digest"`
 		} `json:"contract"`
 		Digest string `json:"digest"`
 	}
 	mustJSON(t, body, &result)
+	expectedSkillDigest, err := embedded.RoutedSkillContractDigest([]string{"material-readiness", "log-triage", "linux-bsp-debug"})
+	if err != nil || result.Contract.SkillContractDigest != expectedSkillDigest {
+		t.Fatalf("Skill method contract not server-bound: got %q, want %q, err %v", result.Contract.SkillContractDigest, expectedSkillDigest, err)
+	}
 	if result.Contract.TargetID != "ssc305" || result.Contract.TargetPlatform != "linux-bsp" ||
 		len(result.Contract.SkillIDs) != 3 ||
 		result.Contract.SkillIDs[2] != "linux-bsp-debug" || result.Digest == "" {
+
 		t.Fatalf("server routing omitted typed target: %#v", result)
 	}
 }

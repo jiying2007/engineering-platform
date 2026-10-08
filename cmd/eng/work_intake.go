@@ -12,6 +12,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
+	"github.com/jiying2007/engineering-platform/internal/embedded"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/routing"
@@ -187,6 +188,15 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 	if err != nil {
 		return zero, err
 	}
+	// Validate exact selected Skill metadata before any Work/Task mutation.
+	// No typed target means the historical Task contract remains unchanged.
+	expectedSkillContractDigest := ""
+	if spec.TargetContext != nil {
+		expectedSkillContractDigest, err = embedded.RoutedSkillContractDigest(route.SkillIDs)
+		if err != nil {
+			return zero, fmt.Errorf("selected Skill contract invalid: %w", err)
+		}
+	}
 	work := core.WorkItem{
 		ID: spec.WorkItemID, Title: spec.Title, SourceRef: spec.SourceRef,
 		HumanOwner: client.Subject(), TargetID: spec.Material.TargetID, AssuranceClass: spec.AssuranceClass,
@@ -223,6 +233,7 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 		taskResponse.Contract.BaseCommit != m.BaseCommit ||
 		taskResponse.Contract.TargetID != m.TargetID ||
 		taskResponse.Contract.TargetPlatform != targetPlatform(spec.TargetContext) ||
+		taskResponse.Contract.SkillContractDigest != expectedSkillContractDigest ||
 		!reflect.DeepEqual(taskResponse.Contract.AcceptanceCriteria, m.AcceptanceCriteria) ||
 		!reflect.DeepEqual(taskResponse.Contract.CapabilityIDs, route.CapabilityIDs) ||
 		!reflect.DeepEqual(taskResponse.Contract.SkillIDs, route.SkillIDs) ||

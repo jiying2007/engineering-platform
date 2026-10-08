@@ -36,6 +36,23 @@ into the immutable TaskContract digest. `target_platform` is optional for
 historical or untyped tasks and is emitted only for a declared TargetContext;
 Core overrides any prefilled contract value with its verified declaration.
 
+For **new typed TargetContext tasks only**, Core also freezes
+`skill_contract_digest` into the immutable TaskContract. Digest v1 covers
+the **ordered selected** Skill records: IDs, versions, owner, purpose,
+required materials, input/method/output, negative conditions, action hints,
+evaluation method and declared maturity. The digest excludes unrelated Skills
+and does not authorize actions or certify competence.
+
+The Core computes this value from its own in-repository catalog and overwrites
+any caller-supplied value; `eng work-intake` independently computes the same
+digest **before Work creation**, then requires the exact value on server Task
+readback before it can start a Run. Duplicate, missing, incomplete or reordered
+Skill definitions fail closed. Historical/untyped Tasks omit the field entirely
+and their stored digests are not rewritten; older retained M1 Closure receipts
+are immutable. Full selected metadata bytes belong to the corresponding
+source-controlled catalog, and this digest alone is not a standalone archive
+or Skill maturity qualification.
+
 The target declaration does not grant Device/HIL, flashing, signing, Git push,
 model or production permissions; the existing Material, Task, Action Gateway
 and independent Verification constraints still apply.
@@ -62,6 +79,9 @@ Required unit tests cover:
 - rejecting malformed, contradictory and mixed-family target declarations;
 - preserving existing routes when typed target context is absent;
 - complete explicit catalog contracts and independent copies returned to callers.
+- selected Skill metadata change/route reorder alters digest; unrelated Skill changes do not;
+- malicious prefilled Core Task digest is overwritten, malicious Task readback blocks Run;
+- legacy Task JSON remains unchanged when no typed context is supplied.
 
 Device firmware boot/timing/electrical suitability, complete WorkBuddy UX,
 production SLOs and effective expert quality are **not** implied by this patch.

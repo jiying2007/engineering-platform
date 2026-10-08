@@ -337,6 +337,17 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Contract.CapabilityIDs = route.CapabilityIDs
 	req.Contract.SkillIDs = route.SkillIDs
+	// Only newly declared typed TargetContexts freeze the selected metadata.
+	// Historical untyped Task JSON and digests remain exactly unchanged.
+	req.Contract.SkillContractDigest = ""
+	if req.TargetContext != nil {
+		skillDigest, err := embedded.RoutedSkillContractDigest(route.SkillIDs)
+		if err != nil {
+			writeError(w, http.StatusServiceUnavailable, "selected Skill contract catalog is invalid")
+			return
+		}
+		req.Contract.SkillContractDigest = skillDigest
+	}
 	req.Contract.Repository = req.Material.Repository
 	req.Contract.BaseCommit = req.Material.BaseCommit
 	req.Contract.TargetID = req.Material.TargetID
