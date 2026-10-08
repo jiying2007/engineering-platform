@@ -1,0 +1,76 @@
+name: Retained ref drift watch
+
+# GitHub public-repo schedules can be delayed and auto-disabled after 60 days
+# without repository activity. This is best-effort drift detection, not 24/7 custody.
+
+on:
+  schedule:
+    - cron: '31 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/retained-ref-drift-watch.yml
+      - .github/retained-evidence-refs.json
+      - .github/retained-prototype-refs.json
+      - scripts/verify_retained_evidence_refs.py
+      - scripts/verify_retained_prototype_refs.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: retained-ref-drift-watch
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'jiying2007/engineering-platform'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Require exact protected default main
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = jiying2007/engineering-platform
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_REF_PROTECTED" = true
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Recheck protected M1 evidence and frozen prototype refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/verify_retained_evidence_refs.py \
+            --manifest .github/retained-evidence-refs.json \
+            > "$RUNNER_TEMP/retained-evidence-inventory.json"
+          python3 -B scripts/verify_retained_prototype_refs.py \
+            --manifest .github/retained-prototype-refs.json \
+            > "$RUNNER_TEMP/retained-prototype-inventory.json"
+          jq -e '.status == "RETAINED_EVIDENCE_REFS_EXACT" and .mutation_attempted == false' \
+            "$RUNNER_TEMP/retained-evidence-inventory.json" >/dev/null
+          jq -e '.status == "RETAINED_PROTOTYPE_REFS_EXACT" and .mutation_attempted == false' \
+            "$RUNNER_TEMP/retained-prototype-inventory.json" >/dev/null
+          jq -n \
+            --arg sha "$GITHUB_SHA" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --slurpfile evidence "$RUNNER_TEMP/retained-evidence-inventory.json" \
+            --slurpfile prototypes "$RUNNER_TEMP/retained-prototype-inventory.json" \
+            '{version:1,source_sha:$sha,run_id:$run_id,run_attempt:$run_attempt,
+              scope:"read-only-retained-ref-drift-detection",
+              evidence:$evidence[0],prototypes:$prototypes[0],
+              mutation_attempted:false,ref_mutation_prevented:false,
+              production_qualified:false}' \
+            > "$RUNNER_TEMP/retained-ref-drift-watch.json"
+      - name: Retain bounded read-only drift receipt
+        uses: actions/upload-artifact@v6
+        with:
+          name: retained-ref-drift-watch-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/retained-ref-drift-watch.json
+          if-no-files-found: error
+          retention-days: 90

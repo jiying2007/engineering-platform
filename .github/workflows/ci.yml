@@ -499,6 +499,28 @@ jobs:
           fi
           go run ./cmd/ci-evidence --input "$RUNNER_TEMP/ci-evidence-receipt.json" > "$RUNNER_TEMP/ci-evidence-envelope.json"
           cat "$RUNNER_TEMP/ci-evidence-envelope.json"
+      - name: Verify fail-closed required-job timing parser
+        shell: bash
+        run: python3 -B scripts/test_ci_job_timing.py
+      - name: Build exact required-job timing characterization
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          python3 -B scripts/ci_job_timing.py \
+            --jobs "$RUNNER_TEMP/jobs.json" \
+            --source-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --attempt "$GITHUB_RUN_ATTEMPT" \
+            --out "$RUNNER_TEMP/ci-job-timing.json"
+      - name: Retain required-job timing characterization (not billing or SLO)
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-job-timing-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/ci-job-timing.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Retain verified CI evidence envelope
         uses: actions/upload-artifact@v6
         with:

@@ -215,7 +215,14 @@ RETAINED_SUPERSEDED_PROTOTYPE refs. The set includes the stale terminal-v3
 status transport and the independent-artifact-mirror experiment; both are
 exact-head guarded historical lineage, not alternate supported paths. Required CI pins their exact remote heads;
 they remain source-history lineage and are not treated as byte-identical or
-pending product work. Preserve unchanged:
+pending product work. Required main CI catches drift on each change. A separate
+[read-only daily retained-ref drift sentinel](../implementation/RETAINED_REF_DRIFT_SENTINEL_V1.md)
+also checks the actual remote inventory while GitHub scheduling remains active,
+with a 90-day bounded diagnostic receipt. Public-repository schedules may be
+delayed or automatically disabled after 60 days of no repository activity, so
+continuous monitoring after extended inactivity remains an operator/scheduler gate. This is **not** GitHub administrator
+mutation protection and cannot repair or promote retained refs.
+Preserve unchanged:
 
 - Feature `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
   `engineering-platform/3ac04fc7097e8375e5f7c1f8`.
@@ -262,9 +269,14 @@ speculative services.
   Publisher endpoint health, and five consecutive 96-Run/8-Worker security
   matrices are required CI. Each matrix also runs three interleaved security
   rounds (48 denied probes), so one exact-head qualification covers 480 Runs and
-  240 denied probes. p50/p95/max remain characterization only. Actual deployed
-  capacity, upstream publication health and calibrated SLO targets require the
-  selected production environment/provider and stay under #105.
+  240 denied probes. p50/p95/max remain characterization only. The required
+  evidence job additionally readbacks GitHub's exact four completed upstream
+  job/step timelines and retains a SHA/run-bound, fail-closed **runner-wall
+  characterization** report; this is not GitHub billing, utilization or an SLO.
+  See [CI job timing characterization](../implementation/CI_JOB_TIMING_CHARACTERIZATION_V1.md).
+  Actual deployed capacity, upstream publication health, operating cost and
+  calibrated SLO targets require the selected production environment/provider
+  and stay under #105.
 - **W02 — external provider gate.** Account-free isolated startup and exact
   compatibility identity are implemented. Real auth/model/tool qualification is
   intentionally deferred to #103 or an explicitly qualified #106 provider; no
