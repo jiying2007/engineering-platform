@@ -42,6 +42,7 @@ type TaskContract struct {
 	Repository             string   `json:"repository"`
 	BaseCommit             string   `json:"base_commit"`
 	TargetID               string   `json:"target_id,omitempty"`
+	TargetPlatform         string   `json:"target_platform,omitempty"`
 	AcceptanceCriteria     []string `json:"acceptance_criteria"`
 	AllowedActions         []string `json:"allowed_actions,omitempty"`
 	ExpectedOutputs        []string `json:"expected_outputs,omitempty"`

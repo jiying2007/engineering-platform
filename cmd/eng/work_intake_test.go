@@ -16,6 +16,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/material"
+	"github.com/jiying2007/engineering-platform/internal/routing"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
@@ -51,6 +52,10 @@ func workIntakeFixture() workIntakeSpec {
 
 func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 	spec := workIntakeFixture()
+	// Use an opaque chip label: only the explicit platform, tied to material,
+	// may select the Linux/BSP Skill. Both client and Core re-derive the route.
+	spec.Subsystem = "SSC305"
+	spec.TargetContext = &routing.TargetContext{TargetID: spec.Material.TargetID, Platform: routing.PlatformLinuxBSP}
 	route, readiness, err := spec.validate()
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +65,7 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 		CapabilityIDs: route.CapabilityIDs, SkillIDs: route.SkillIDs,
 		Repository: spec.Material.Repository, BaseCommit: spec.Material.BaseCommit,
 		TargetID: spec.Material.TargetID, AcceptanceCriteria: spec.Material.AcceptanceCriteria,
+		TargetPlatform:  routing.PlatformLinuxBSP,
 		ExpectedOutputs: spec.ExpectedOutputs, VerificationPlanID: spec.VerificationPlan.ID, Revision: 1,
 	}
 	planDigest, _ := spec.VerificationPlan.Digest()
@@ -90,7 +96,9 @@ func TestWorkIntakeUsesCertificateOwnerAndExistingCoreAPIs(t *testing.T) {
 		case "/api/v1/task-contracts":
 			var got workIntakeTaskRequest
 			if json.NewDecoder(r.Body).Decode(&got) != nil ||
-				len(got.Contract.CapabilityIDs) != 0 || len(got.Contract.SkillIDs) != 0 {
+				len(got.Contract.CapabilityIDs) != 0 || len(got.Contract.SkillIDs) != 0 ||
+				got.TargetContext == nil || got.TargetContext.TargetID != spec.Material.TargetID ||
+				got.TargetContext.Platform != routing.PlatformLinuxBSP {
 				t.Error("client bypassed server-side routing", got)
 			}
 			_ = json.NewEncoder(w).Encode(workIntakeTaskResponse{
@@ -193,5 +201,24 @@ func TestWorkIntakeRejectsDuplicateTaskAndTargetAuthorities(t *testing.T) {
 	spec.Material.TaskType = spec.TaskType
 	if _, _, err := spec.validate(); err == nil {
 		t.Fatal("duplicate material task_type accepted")
+	}
+}
+
+func TestWorkIntakeExplicitTargetCannotDriftFromMaterial(t *testing.T) {
+	spec := workIntakeFixture()
+	spec.Subsystem = "opaque SSC305 board"
+	spec.TargetContext = &routing.TargetContext{TargetID: "ssc305", Platform: routing.PlatformLinuxBSP}
+	route, _, err := spec.validate()
+	if err != nil || route.SkillIDs[len(route.SkillIDs)-1] != "linux-bsp-integration" {
+		t.Fatalf("valid explicit routing failed: %#v %v", route, err)
+	}
+	spec.TargetContext.TargetID = "another-board"
+	if _, _, err := spec.validate(); err == nil {
+		t.Fatal("accepted mismatched material target identity")
+	}
+	spec.TargetContext.TargetID = "ssc305"
+	spec.Subsystem = "MCU motor"
+	if _, _, err := spec.validate(); err == nil {
+		t.Fatal("accepted contradictory subsystem classification")
 	}
 }

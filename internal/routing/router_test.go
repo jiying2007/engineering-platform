@@ -90,3 +90,51 @@ func TestUnsupportedTaskFailsClosed(t *testing.T) {
 		t.Fatal("expected unsupported task error")
 	}
 }
+
+func TestStructuredTargetRoutingWithOpaqueChipIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		task, subsystem, targetID, platform, want string
+	}{
+		{"DEBUG", "SSC305", "ssc305", PlatformLinuxBSP, "linux-bsp-debug"},
+		{"FEATURE", "MM32SPIN023C", "mm32spin023c", PlatformMCURTOS, "mcu-rtos-integration"},
+		{"DEBUG", "GD32L235", "gd32l235", PlatformMCURTOS, "mcu-rtos-debug"},
+		{"FEATURE", "opaque board", "board-rev-a", PlatformLinuxBSP, "linux-bsp-integration"},
+	} {
+		t.Run(tc.targetID, func(t *testing.T) {
+			got, err := ResolveForTarget(tc.task, tc.subsystem, &TargetContext{TargetID: tc.targetID, Platform: tc.platform})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.SkillIDs[len(got.SkillIDs)-1] != tc.want {
+				t.Fatalf("unexpected route: %#v", got)
+			}
+		})
+	}
+}
+
+func TestStructuredTargetContradictionsFailClosed(t *testing.T) {
+	for _, tc := range []struct {
+		subsystem string
+		target    TargetContext
+	}{
+		{"linux storage", TargetContext{TargetID: "mcu-1", Platform: PlatformMCURTOS}},
+		{"mcu motor", TargetContext{TargetID: "soc-1", Platform: PlatformLinuxBSP}},
+		{"Linux MCU", TargetContext{TargetID: "board-a", Platform: PlatformLinuxBSP}},
+		{"unknown", TargetContext{TargetID: "", Platform: PlatformLinuxBSP}},
+		{"unknown", TargetContext{TargetID: "board-a", Platform: "unknown"}},
+		{"unknown", TargetContext{TargetID: " board-a", Platform: PlatformLinuxBSP}},
+		{"unknown", TargetContext{TargetID: "board-a\n", Platform: PlatformLinuxBSP}},
+	} {
+		if got, err := ResolveForTarget("DEBUG", tc.subsystem, &tc.target); err == nil {
+			t.Fatalf("accepted contradictory target: %#v", got)
+		}
+	}
+	legacy, err := Resolve("DEBUG", "generic subsystem")
+	if err != nil {
+		t.Fatal(err)
+	}
+	absent, err := ResolveForTarget("DEBUG", "generic subsystem", nil)
+	if err != nil || !reflect.DeepEqual(legacy, absent) {
+		t.Fatalf("absent structured target changed existing route: %#v %v", absent, err)
+	}
+}

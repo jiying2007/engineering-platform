@@ -291,10 +291,11 @@ func (s *Server) handleGetWork(w http.ResponseWriter, r *http.Request) {
 }
 
 type createTaskRequest struct {
-	Contract         core.TaskContract `json:"contract"`
-	Material         material.Manifest `json:"material"`
-	Subsystem        string            `json:"subsystem,omitempty"`
-	VerificationPlan verification.Plan `json:"verification_plan"`
+	Contract         core.TaskContract      `json:"contract"`
+	Material         material.Manifest      `json:"material"`
+	Subsystem        string                 `json:"subsystem,omitempty"`
+	TargetContext    *routing.TargetContext `json:"target_context,omitempty"`
+	VerificationPlan verification.Plan      `json:"verification_plan"`
 }
 
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
@@ -324,7 +325,12 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	route, err := routing.Resolve(req.Contract.TaskType, req.Subsystem)
+	// A target classification must bind the exact frozen material.
+	if req.TargetContext != nil && req.TargetContext.TargetID != req.Material.TargetID {
+		writeError(w, http.StatusUnprocessableEntity, "target_context target_id must match material target_id")
+		return
+	}
+	route, err := routing.ResolveForTarget(req.Contract.TaskType, req.Subsystem, req.TargetContext)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -334,6 +340,11 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	req.Contract.Repository = req.Material.Repository
 	req.Contract.BaseCommit = req.Material.BaseCommit
 	req.Contract.TargetID = req.Material.TargetID
+	if req.TargetContext != nil {
+		req.Contract.TargetPlatform = req.TargetContext.Platform
+	} else {
+		req.Contract.TargetPlatform = ""
+	}
 	req.Contract.AcceptanceCriteria = append([]string(nil), req.Material.AcceptanceCriteria...)
 	if !verification.ValidatePlan(req.VerificationPlan, req.Contract.AcceptanceCriteria) {
 		writeError(w, http.StatusUnprocessableEntity, "verification plan must cover every acceptance criterion with at least one evidence requirement")
