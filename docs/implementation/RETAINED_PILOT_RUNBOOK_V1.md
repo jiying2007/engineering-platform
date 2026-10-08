@@ -221,18 +221,30 @@ codex-qualifier \
   > codex-qualification.json
 ```
 
-Then derive the exact Core Profile from the same executable and receipt:
+The original M1 run used its own frozen profile identity. The command below
+shows **current Profile v3 CLI syntax for new trusted-self-hosted work only**;
+it does not recreate, upgrade or reinterpret historical M1 receipts. For
+current operator requirements see [Codex Qualification](CODEX_QUALIFICATION_V1.md)
+and [Credential Lanes](CODEX_CREDENTIAL_LANES_V1.md).
+
+Then derive a new exact Core Profile from the same executable and receipt:
 
 ```sh
 eng codex-profile \
   --codex /absolute/path/to/codex \
   --qualification codex-qualification.json \
   --model gpt-5.6-sol \
+  --provider openai-codex \
+  --credential chatgpt-session \
+  --execution trusted-self-hosted \
   > codex-profile.json
 ```
 
-The Profile freezes the actual Codex version, exact binary digest,
-qualification digest and engineering configuration digest.
+The current Profile v3 freezes one admitted Provider identity as well as
+the actual Codex version, exact binary digest, qualification digest and
+engineering configuration digest. WIF requires its separately qualified
+`workload-identity / unattended` provider lane (#103); the above command
+does not qualify WIF or unattended execution.
 
 Use the returned values without editing:
 
