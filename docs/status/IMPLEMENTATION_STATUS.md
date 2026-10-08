@@ -215,7 +215,12 @@ RETAINED_SUPERSEDED_PROTOTYPE refs. The set includes the stale terminal-v3
 status transport and the independent-artifact-mirror experiment; both are
 exact-head guarded historical lineage, not alternate supported paths. Required CI pins their exact remote heads;
 they remain source-history lineage and are not treated as byte-identical or
-pending product work. Preserve unchanged:
+pending product work. Required main CI catches drift on each change. A separate
+[read-only daily retained-ref drift sentinel](../implementation/RETAINED_REF_DRIFT_SENTINEL_V1.md)
+also checks the actual remote inventory while the repository is otherwise quiet,
+with a 90-day bounded diagnostic receipt. This is **not** GitHub administrator
+mutation protection and cannot repair or promote retained refs.
+Preserve unchanged:
 
 - Feature `6009ea95785237ad6ff9f5c9cba911b4891dfa58`,
   `engineering-platform/3ac04fc7097e8375e5f7c1f8`.
