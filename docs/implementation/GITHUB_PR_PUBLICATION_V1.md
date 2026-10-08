@@ -1,5 +1,11 @@
 # Independent GitHub PR Publication V1
 
+> **Historical implementation slice.** The authoritative current production
+> topology is the [independent Publisher service](PRODUCTION_OPERATIONS_V1.md)
+> and the [production remote boundary](#production-remote-publisher-boundary)
+> below. The trusted M1 Feature/Debug pilots were closed after this slice;
+> do not interpret the original prerequisites as currently open M1 work.
+
 ## Purpose
 
 This slice publishes exactly one retained Core-bound Codex result without giving
@@ -37,10 +43,12 @@ The Worker remains unable to push or create pull requests. Its Core-bound Codex
 lane still has no GitHub credential and produces only a local result commit plus
 verified Git bundle.
 
-The publisher is enabled only in authenticated production assembly when
-`GITHUB_PUBLISHER_CONFIG_FILE` is present. The configured credential is read
-from a separate owner-private token file by the publisher process. The
-unauthenticated development server rejects publication configuration.
+In the current production topology, only the separately deployed
+`publisher-service` receives `GITHUB_PUBLISHER_CONFIG_FILE` and reads the
+owner-private token file. Production Control Plane uses a non-secret publication
+plan and an authenticated mTLS remote client; it must not inherit the publisher
+configuration or token. The older in-process publisher is allowed only under
+explicit pilot deployment mode and is not a production fallback.
 
 For a publication action, all three independent gates must agree:
 
@@ -137,19 +145,18 @@ dispatch becomes UNKNOWN. Reconciliation is observation-only:
 
 Reconciliation never replays a push or PR mutation.
 
-## Remaining external gates
+## Historical pilot closeout and current external gates
 
-This implementation does not satisfy the two retained pilot gates by itself.
-Before reassessing M1:
-
-1. the ChatGPT workspace administrator must configure the real Codex WIF
-   provider/rule and one real model execution must be retained;
-2. one Feature and one Debug task must each complete:
-   Requirement -> Codex engineering -> result commit/bundle -> Git/PR ->
-   trusted CI -> Evidence -> Verification -> independent Review -> Closure.
-
-Repository fake app-server tests remain protocol/filesystem evidence only and
-must not be represented as live model evidence.
+This publication slice alone did not prove end-to-end M1 at the time it was
+introduced. Trusted self-hosted Feature #54 and Debug #55 have since completed
+Requirement -> Codex -> Git/PR -> trusted CI -> Evidence -> Verification ->
+independent Review -> Closure; see
+[M1 closure evidence](../status/M1_RETAINED_PHASE1_CLOSURE_2026-09-29.md).
+Neither is pending repetition. Managed-workspace WIF is an optional separate
+unattended credential qualification (#103), not a prerequisite for the already
+completed trusted self-hosted M1 proof. Optional relay (#106) and production
+acceptance (#105) are also separate external gates. Repository fake app-server
+tests remain protocol/filesystem evidence, not live model or production proof.
 
 
 ## Production remote publisher boundary
