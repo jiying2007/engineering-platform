@@ -10,8 +10,7 @@ provider credential, and does not grant GitHub/publication authority.
 
 **Current admission is Profile v3, not the historic Profile v2.** The
 qualification receipt remains a binary/protocol observation; a newly created
-`codexexec.Profile{Version: 3}` additionally freezes one admitted Provider v3
-identity (`provider_id`, `credential_mode`, `execution_mode`,
+`codexexec.Profile{Version: 3}` additionally freezes one admitted Provider identity (`provider_id`, `credential_mode`, `execution_mode`,
 `provider_config_digest`). Existing Profile v2 evidence is immutable history;
 there is no v2 compatibility shim for new Run authorization. See
 [Credential Lanes](CODEX_CREDENTIAL_LANES_V1.md).
@@ -94,7 +93,7 @@ The deterministic receipt records at least:
 - thread-start model used for this compatibility check.
 
 The canonical receipt digest is frozen into `codexexec.Profile v3` alongside
-the independent admitted provider identity. The complete Profile digest then
+the independently admitted provider identity. The complete Profile digest then
 becomes the Worker capability and RunInput tool-profile identity.
 
 The Worker configuration also carries the full QualificationReceipt. Before a
