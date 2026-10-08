@@ -139,7 +139,6 @@ func TestRemoteServiceRejectsBundleDriftBeforeGitHub(t *testing.T) {
 	}
 }
 
-
 func TestRemoteServicePublishesVerifiedPrivateSnapshotAfterSourceSwap(t *testing.T) {
 	service, plan := publisherServiceFixture(t)
 	original := filepath.Join(service.artifactRoot, plan.ExecutionID+".bundle")
