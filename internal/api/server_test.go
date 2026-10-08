@@ -803,3 +803,66 @@ func TestGenericRunCannotInjectSourceContinuation(t *testing.T) {
 	}, http.StatusBadRequest)
 	mustRequest(t, h, http.MethodGet, "/api/v1/runs/next", nil, http.StatusNotFound)
 }
+
+func TestTaskStructuredTargetBoundToMaterialAndServerRoute(t *testing.T) {
+	h := NewServer(store.NewMemory()).Handler()
+	mustRequest(t, h, http.MethodPost, "/api/v1/work-items", map[string]any{
+		"work_item_id": "work-typed", "title": "typed target",
+		"human_owner": "owner",
+	}, http.StatusCreated)
+	request := func(taskID, materialTarget, contextTarget, platform, subsystem string) map[string]any {
+		return map[string]any{
+			"contract": map[string]any{
+				"task_contract_id": taskID,
+				"work_item_id":     "work-typed",
+				"task_type":        "DEBUG",
+			},
+			"material": map[string]any{
+				"repository":            "repo",
+				"base_commit":           "0123456789abcdef0123456789abcdef01234567",
+				"target_id":             materialTarget,
+				"acceptance_criteria":   []string{"diagnosis has evidence"},
+				"has_authoritative_log": true,
+			},
+			"subsystem": subsystem,
+			"target_context": map[string]any{
+				"target_id": contextTarget,
+				"platform":  platform,
+			},
+			"verification_plan": map[string]any{
+				"verification_plan_id": "vp-" + taskID,
+				"criteria": []any{map[string]any{
+					"criterion_id": "ac-1",
+					"statement":    "diagnosis has evidence",
+					"evidence_requirements": []any{map[string]any{
+						"requirement_id": "req-1",
+						"procedure":      "ci.test",
+					}},
+				}},
+			},
+		}
+	}
+	mustRequest(t, h, http.MethodPost, "/api/v1/task-contracts",
+		request("task-bad-id", "ssc305", "wrong-target", "linux-bsp", "SSC305"),
+		http.StatusUnprocessableEntity)
+	mustRequest(t, h, http.MethodPost, "/api/v1/task-contracts",
+		request("task-bad-family", "ssc305", "ssc305", "mcu-rtos", "Linux UBI"),
+		http.StatusUnprocessableEntity)
+	body := mustRequest(t, h, http.MethodPost, "/api/v1/task-contracts",
+		request("task-typed", "ssc305", "ssc305", "linux-bsp", "SSC305"),
+		http.StatusCreated)
+	var result struct {
+		Contract struct {
+			TargetID       string   `json:"target_id"`
+			TargetPlatform string   `json:"target_platform"`
+			SkillIDs       []string `json:"skill_ids"`
+		} `json:"contract"`
+		Digest string `json:"digest"`
+	}
+	mustJSON(t, body, &result)
+	if result.Contract.TargetID != "ssc305" || result.Contract.TargetPlatform != "linux-bsp" ||
+		len(result.Contract.SkillIDs) != 3 ||
+		result.Contract.SkillIDs[2] != "linux-bsp-debug" || result.Digest == "" {
+		t.Fatalf("server routing omitted typed target: %#v", result)
+	}
+}

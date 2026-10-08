@@ -26,6 +26,23 @@ schema/runtime compatibility obligation.
 #54 and Debug #55 closure. It does not qualify later runtime changes. Do not rerun
 those subjects or rewrite their receipts to manufacture current production proof.
 
+## Typed embedded routing and Skill maturity
+
+The post-RC domain hardening adds an **optional explicit target_context**
+(`target_id` and `platform`) to existing Work/Task intake. Both CLI and
+Core require the exact declared target to match MaterialManifest; contradictory
+platform/subsystem inputs fail closed. The selected target platform is frozen into the TaskContract digest, without
+changing existing untyped/historical Task digests. No chip-name heuristic,
+second Target authority, Device/HIL entitlement or new Runtime mode is introduced.
+See [typed target routing v1](../implementation/EMBEDDED_TARGET_ROUTING_V1.md).
+
+All ten Skill catalog entries now carry complete **DEFINED-stage** input,
+required-material, method, output, blocking/prohibited-action and evaluation
+descriptions. This is a machine-readable planning contract, **not PROVEN
+engineering quality**. No Skill was promoted from `DEFINED`; actual expert
+effectiveness and time/cost improvements remain unqualified until independent,
+repeated, real task Evidence exists. Catalog entries grant no Action permissions.
+
 ## Current contracts and limits
 
 | Area | Implemented | Not implied |

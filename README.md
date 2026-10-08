@@ -100,13 +100,20 @@ material-readiness
 architecture-impact-analysis
 interface-contract-review
 linux-bsp-debug
+linux-bsp-integration
 mcu-rtos-debug
+mcu-rtos-integration
 driver-integration-review
 log-triage
 verification-plan-builder
 ~~~
 
 Automatic Planner comes later. Explicit Skill routing is enough for M1.
+All ten Skill contracts remain `DEFINED`, not `PROVEN`; callers can supply
+an optional material-bound `target_context` for typed Linux BSP/MCU routing.
+See [typed target routing and Skill contracts](docs/implementation/EMBEDDED_TARGET_ROUTING_V1.md).
+These metadata records cannot authorize device actions or replace real Skill
+qualification.
 
 ## Current implementation status
 

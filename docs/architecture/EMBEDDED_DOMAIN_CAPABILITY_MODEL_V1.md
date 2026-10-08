@@ -321,6 +321,14 @@ Optional:
 
 Tool/runtime instructions are not the Skill itself.
 
+Current implementation materializes these method/contract fields directly in
+the ten `internal/embedded` Skill definitions and returns independent copies
+through the Capability API. `allowed_actions` is empty for every currently
+DEFINED Skill; textual methods are not privileged capabilities. Exact Task,
+Worker and Action Gateway authority remains separate. The optional, declared
+TargetContext route is documented in
+[Typed embedded TargetContext and Skill contracts](../implementation/EMBEDDED_TARGET_ROUTING_V1.md).
+
 ---
 
 ## 6. Skill maturity

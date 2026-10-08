@@ -22,25 +22,26 @@ import (
 )
 
 type workIntakeSpec struct {
-	Version          int               `json:"version"`
-	WorkItemID       string            `json:"work_item_id"`
-	TaskContractID   string            `json:"task_contract_id"`
-	RunID            string            `json:"run_id"`
-	AttemptID        string            `json:"attempt_id"`
-	Title            string            `json:"title"`
-	SourceRef        string            `json:"source_ref,omitempty"`
-	AssuranceClass   string            `json:"assurance_class,omitempty"`
-	TaskType         string            `json:"task_type"`
-	Subsystem        string            `json:"subsystem"`
-	AllowedActions   []string          `json:"allowed_actions,omitempty"`
-	ExpectedOutputs  []string          `json:"expected_outputs,omitempty"`
-	Material         material.Manifest `json:"material"`
-	VerificationPlan verification.Plan `json:"verification_plan"`
-	ContextRefs      []core.ContextRef `json:"context_refs,omitempty"`
-	RuntimeProfile   string            `json:"runtime_profile"`
-	ToolProfile      string            `json:"tool_profile"`
-	WorkerProfile    string            `json:"worker_profile"`
-	PolicyProfile    string            `json:"policy_profile"`
+	Version          int                    `json:"version"`
+	WorkItemID       string                 `json:"work_item_id"`
+	TaskContractID   string                 `json:"task_contract_id"`
+	RunID            string                 `json:"run_id"`
+	AttemptID        string                 `json:"attempt_id"`
+	Title            string                 `json:"title"`
+	SourceRef        string                 `json:"source_ref,omitempty"`
+	AssuranceClass   string                 `json:"assurance_class,omitempty"`
+	TaskType         string                 `json:"task_type"`
+	Subsystem        string                 `json:"subsystem"`
+	TargetContext    *routing.TargetContext `json:"target_context,omitempty"`
+	AllowedActions   []string               `json:"allowed_actions,omitempty"`
+	ExpectedOutputs  []string               `json:"expected_outputs,omitempty"`
+	Material         material.Manifest      `json:"material"`
+	VerificationPlan verification.Plan      `json:"verification_plan"`
+	ContextRefs      []core.ContextRef      `json:"context_refs,omitempty"`
+	RuntimeProfile   string                 `json:"runtime_profile"`
+	ToolProfile      string                 `json:"tool_profile"`
+	WorkerProfile    string                 `json:"worker_profile"`
+	PolicyProfile    string                 `json:"policy_profile"`
 }
 
 type workIntakeReceipt struct {
@@ -117,11 +118,21 @@ func (s workIntakeSpec) validate() (routing.Route, material.Result, error) {
 	if !verification.ValidatePlan(s.VerificationPlan, m.AcceptanceCriteria) {
 		return routing.Route{}, readiness, fmt.Errorf("verification plan does not cover acceptance criteria exactly")
 	}
-	route, err := routing.Resolve(s.TaskType, s.Subsystem)
+	if s.TargetContext != nil && s.TargetContext.TargetID != s.Material.TargetID {
+		return routing.Route{}, readiness, fmt.Errorf("target_context target_id must match material target_id")
+	}
+	route, err := routing.ResolveForTarget(s.TaskType, s.Subsystem, s.TargetContext)
 	if err != nil {
 		return routing.Route{}, readiness, err
 	}
 	return route, readiness, nil
+}
+
+func targetPlatform(ctx *routing.TargetContext) string {
+	if ctx == nil {
+		return ""
+	}
+	return ctx.Platform
 }
 
 func loadWorkIntake(path string) (workIntakeSpec, string, error) {
@@ -143,10 +154,11 @@ func loadWorkIntake(path string) (workIntakeSpec, string, error) {
 }
 
 type workIntakeTaskRequest struct {
-	Contract         core.TaskContract `json:"contract"`
-	Material         material.Manifest `json:"material"`
-	Subsystem        string            `json:"subsystem,omitempty"`
-	VerificationPlan verification.Plan `json:"verification_plan"`
+	Contract         core.TaskContract      `json:"contract"`
+	Material         material.Manifest      `json:"material"`
+	Subsystem        string                 `json:"subsystem,omitempty"`
+	TargetContext    *routing.TargetContext `json:"target_context,omitempty"`
+	VerificationPlan verification.Plan      `json:"verification_plan"`
 }
 type workIntakeTaskResponse struct {
 	Contract  core.TaskContract `json:"contract"`
@@ -197,7 +209,7 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 			AllowedActions:  append([]string(nil), spec.AllowedActions...),
 			ExpectedOutputs: append([]string(nil), spec.ExpectedOutputs...),
 		},
-		Material: m, Subsystem: spec.Subsystem, VerificationPlan: spec.VerificationPlan,
+		Material: m, Subsystem: spec.Subsystem, TargetContext: spec.TargetContext, VerificationPlan: spec.VerificationPlan,
 	}
 	var taskResponse workIntakeTaskResponse
 	if err := client.Call(ctx, http.MethodPost, "/api/v1/task-contracts", request, &taskResponse); err != nil {
@@ -210,6 +222,7 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 		taskResponse.Contract.Repository != m.Repository ||
 		taskResponse.Contract.BaseCommit != m.BaseCommit ||
 		taskResponse.Contract.TargetID != m.TargetID ||
+		taskResponse.Contract.TargetPlatform != targetPlatform(spec.TargetContext) ||
 		!reflect.DeepEqual(taskResponse.Contract.AcceptanceCriteria, m.AcceptanceCriteria) ||
 		!reflect.DeepEqual(taskResponse.Contract.CapabilityIDs, route.CapabilityIDs) ||
 		!reflect.DeepEqual(taskResponse.Contract.SkillIDs, route.SkillIDs) ||
