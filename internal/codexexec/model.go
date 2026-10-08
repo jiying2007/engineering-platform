@@ -125,11 +125,9 @@ func promptIdentity(a workerqueue.Assignment, prep preparation.Receipt) (PromptI
 	if _, err := workerqueue.Validate(a); err != nil {
 		return PromptIdentity{}, "", err
 	}
-	// A frozen v1 method digest must equal the selected current binary catalog
-	// before constructing a prompt identity or initiating a Codex turn.
-	if _, err := selectedSkillsForTask(a.Task); err != nil {
-		return PromptIdentity{}, "", err
-	}
+	// Historical evidence validation must depend only on frozen Task and
+	// Preparation identities, never the currently installed Skill catalog.
+	// Catalog freshness is enforced separately in Prompt, before turn/start.
 	if preparation.Verify(a, prep, prep.Facts, prep.Admission.Worker) != nil ||
 		!canonical.ValidDigest(prep.Facts.BundleDigest) {
 		return PromptIdentity{}, "", workerqueue.ErrIdentity
@@ -160,6 +158,12 @@ func PromptIdentityDigest(a workerqueue.Assignment, prep preparation.Receipt) (s
 func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath string) (string, string, error) {
 	if strings.TrimSpace(bundlePath) == "" {
 		return "", "", workerqueue.ErrIdentity
+	}
+	// Enforce current selected host catalog only when actually preparing
+	// a new turn, never while verifying immutable past Result receipts.
+	selected, err := selectedSkillsForTask(a.Task)
+	if err != nil {
+		return "", "", err
 	}
 	identity, digest, err := promptIdentity(a, prep)
 	if err != nil {
@@ -196,10 +200,6 @@ func Prompt(a workerqueue.Assignment, prep preparation.Receipt, bundlePath strin
 	// Only new typed Tasks with a Core-frozen Skill contract digest gain
 	// concrete Skill methods. Historical byte-for-byte prompt stays unchanged.
 	if identity.SkillGuidanceVersion == 1 {
-		selected, err := selectedSkillsForTask(a.Task)
-		if err != nil {
-			return "", "", err
-		}
 		appendSelectedSkillMethods(&b, a.Task, selected)
 	}
 	prompt := b.String()

@@ -122,11 +122,15 @@ func TestTypedPromptRejectsSelfConsistentCatalogMismatch(t *testing.T) {
 		p := typedSkillPermit(t)
 		mutation(&p)
 		rebindTypedPermit(t, &p)
-		if _, err := PromptIdentityDigest(p.Assignment, p.Preparation); !errors.Is(err, workerqueue.ErrIdentity) {
-			t.Fatalf("malformed typed Skill method prompt accepted: %v", err)
+		// Archived receipt identity is derived solely from retained data.
+		// It must remain independently auditable even when current catalog
+		// verification would reject a NEW model turn.
+		identity, err := PromptIdentityDigest(p.Assignment, p.Preparation)
+		if err != nil || !canonical.ValidDigest(identity) {
+			t.Fatalf("frozen prompt identity cannot be verified: %v", err)
 		}
 		if _, _, err := Prompt(p.Assignment, p.Preparation, "/approved"); !errors.Is(err, workerqueue.ErrIdentity) {
-			t.Fatalf("malformed typed Skill method prompt text accepted: %v", err)
+			t.Fatalf("malformed typed Skill method NEW turn accepted: %v", err)
 		}
 	}
 }

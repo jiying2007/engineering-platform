@@ -36,7 +36,14 @@ For a new Task whose **optional `skill_guidance_version` equals 1** and whose
    inside PromptIdentity, which remains bound to the resulting Codex receipt and
    Core-bound engineering Result. The real EngineeringReceipt separately retains
    the exact prompt **bytes digest**.
-5. The existing `workspace-write`, `approvalPolicy=never`, no-network
+5. **Evidence stability:** `PromptIdentityDigest` and immutable Result readback
+are computed from the frozen Task/Intent/Preparation fields without looking up
+the currently installed catalog. Only constructing a **new** turn with
+`codexexec.Prompt` re-resolves the selected Skill records and fails on
+mismatch. Otherwise, upgrading Skill methods could retroactively make a valid
+historic Codex result unverifiable — an unacceptable audit regression.
+
+The existing `workspace-write`, `approvalPolicy=never`, no-network
    profile and Action Gateway authority remain unchanged. Guidance is not a
    new tool/profile, permission, credential, model role or automatic optimizer.
 
