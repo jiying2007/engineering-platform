@@ -1,5 +1,11 @@
 # Durable Worker admission v1
 
+> **Historical admission-only implementation milestone.** Its original
+> unfinished execution checklist is preserved as slice history, not the live
+> repository roadmap. Trusted self-hosted M1 Feature/Debug Closure has since
+> been proven; production/unattended qualification remains open. See
+> [Implementation Status](../status/IMPLEMENTATION_STATUS.md).
+
 Reviewed integration base: `4c1a226b696221e5a3fa82b6a7e425fc301b21bb` (Runtime/Context #32).
 This is the reviewed/rebased implementation of the earlier unmerged Worker
 candidate, not a blind application of its #31-base patch. No new domain or service.
@@ -149,11 +155,14 @@ Exact PR-head CI and fresh main CI are required evidence, not this document or
 old candidate/local tests. Test-only schemas and temporary fixture certificates
 are independently cleaned; no shared public schema is reset.
 
-## Remaining execution gates
+## Original remaining execution gates (historical)
 
 Bind prepared approved Context + exact workspace to a durable execution receipt,
 with an OS isolation boundary and current Run/lease authority. Qualify a pinned
 real Codex binary/schema, add authorized interactive approvals, gather actual
 Git/CI/Artifact-byte facts and independent Review, and retain Feature/Debug plus
 restore/recovery pilots. INPUT_VALIDATED must not substitute for any of these.
-**M1, real model execution and production readiness are not claimed.**
+**At this admission-only milestone**, M1, real model execution and production
+readiness were not claimed. **Current repository status:** trusted self-hosted
+M1 proof is complete, but production/unattended readiness is still unqualified;
+see [Implementation Status](../status/IMPLEMENTATION_STATUS.md).
