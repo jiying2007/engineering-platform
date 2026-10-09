@@ -50,8 +50,14 @@ func TestLiveProcessDoubleReadRejectsReplacementOrMissingService(t *testing.T) {
 	}{
 		{"lost-service", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { return x[:3] }},
 		{"changed-pid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[1].PID++; return x }},
-		{"reused-pid-new-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[1].StartTicks++; return x }},
-		{"missing-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[2].StartTicks = 0; return x }},
+		{"reused-pid-new-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[1].StartTicks++
+			return x
+		}},
+		{"missing-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[2].StartTicks = 0
+			return x
+		}},
 		{"wrong-uid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
 			x[2].ServiceUser = "root"
 			return x
