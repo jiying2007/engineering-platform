@@ -45,15 +45,27 @@ func TestLiveProcessDoubleReadRejectsReplacementOrMissingService(t *testing.T) {
 		t.Fatal("stable double-read process identities rejected")
 	}
 	for _, tc := range []struct {
-		name string
+		name   string
 		change func([]production.LiveServiceObservation) []production.LiveServiceObservation
 	}{
 		{"lost-service", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { return x[:3] }},
 		{"changed-pid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[1].PID++; return x }},
-		{"wrong-uid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[2].ServiceUser = "root"; return x }},
-		{"wrong-binary", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[0].Binary = "other"; return x }},
-		{"wrong-unit", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[0].Unit = "alternate.service"; return x }},
-		{"old-fact", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[0].ObservedAt = now.Add(-time.Second); return x }},
+		{"wrong-uid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[2].ServiceUser = "root"
+			return x
+		}},
+		{"wrong-binary", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[0].Binary = "other"
+			return x
+		}},
+		{"wrong-unit", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[0].Unit = "alternate.service"
+			return x
+		}},
+		{"old-fact", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[0].ObservedAt = now.Add(-time.Second)
+			return x
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			input := append([]production.LiveServiceObservation(nil), second...)
@@ -67,13 +79,13 @@ func TestLiveProcessDoubleReadRejectsReplacementOrMissingService(t *testing.T) {
 func TestProductionLiveObservationNeverClaimsCapacityOrProduction(t *testing.T) {
 	report := productionLiveReport{
 		Version: 1, Scope: "bounded-host-live-service-observations",
-		SourceCommit: strings.Repeat("a", 40),
-		ObservedAt: time.Unix(1700000000, 0).UTC(),
-		DatabaseAuthorityClear: true,
-		PublisherEndpointObserved: true,
+		SourceCommit:                  strings.Repeat("a", 40),
+		ObservedAt:                    time.Unix(1700000000, 0).UTC(),
+		DatabaseAuthorityClear:        true,
+		PublisherEndpointObserved:     true,
 		LocalServiceProcessesObserved: true,
-		Services: []production.LiveServiceObservation{},
-		State: "LOCAL_COMPONENTS_OBSERVED_PROVIDER_CAPACITY_PENDING",
+		Services:                      []production.LiveServiceObservation{},
+		State:                         "LOCAL_COMPONENTS_OBSERVED_PROVIDER_CAPACITY_PENDING",
 	}
 	raw, err := json.Marshal(report)
 	if err != nil {
