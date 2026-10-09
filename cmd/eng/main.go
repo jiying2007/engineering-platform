@@ -137,6 +137,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-live-observe":
+		if err := productionLiveObserve(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "relay-verify-qualification-kit":
 		if err := relayVerifyQualificationKit(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -275,13 +280,14 @@ func usage() {
 	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
 	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
+	fmt.Println("  production-live-observe --config FILE          source-bind actual local service PIDs/UIDs/binaries and authenticated endpoints; NOT READY")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")
 	fmt.Println("  relay-qualification-kit <flags>                materialize immutable offline relay qualification bundle")
 	fmt.Println("  relay-runtime-handoff <flags>                  bind live manifest to exact Codex qualification/binary without model access")
 	fmt.Println("  relay-live-manifest --contract FILE            freeze future read-only/no-tool live qualification plan")
 	fmt.Println("  relay-render-codex-config --contract FILE --out FILE  render exact owner-private user-level Codex provider config")
 	fmt.Println("  relay-prequalification --contract FILE       validate/digest relay provider contract without live account use")
-	fmt.Println("  codex-profile --codex PATH --model MODEL derive exact Core-bound Codex profile/tool grant")
+	fmt.Println("  codex-profile --codex PATH --qualification FILE --model MODEL --provider ID --credential MODE --execution MODE  derive qualified Profile v3")
 	fmt.Println("  pilot-preflight <flags>                   validate retained-pilot local/deployment readiness")
 	fmt.Println("  codex-receipt-digest --run ID            compute immutable Core-bound Codex receipt digest")
 	fmt.Println("  import-codex-evidence <flags>            verify Codex receipt/bundle and register Evidence")
