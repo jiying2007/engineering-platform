@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 )
 
 var _ action.Repository = (*Store)(nil)
@@ -26,6 +27,76 @@ func mapActionWriteError(err error) error {
 	return err
 }
 
+// checkActionAdmission locks recovery before Run and Session, matching the
+// existing platform -> Run -> Session authority order. An earlier API/Worker
+// read is advisory: only this transaction decides whether a NEW action may
+// be reserved or enter DISPATCHED. No lock is held during the remote effect;
+// Recovery must still reconcile any previously dispatched operation.
+func checkActionAdmission(ctx context.Context, tx pgx.Tx, op action.Operation) error {
+	if op.State != action.Planned && op.State != action.Dispatched {
+		return action.ErrDenied
+	}
+	switch op.RiskClass {
+	case action.Observe, action.ControlledMutation, action.HighRisk:
+	default:
+		return action.ErrDenied
+	}
+	var recoveryEpoch uint64
+	var recoveryMode string
+	if err := tx.QueryRow(ctx,
+		"SELECT recovery_epoch,recovery_mode FROM platform_state WHERE singleton_id=true FOR SHARE",
+	).Scan(&recoveryEpoch, &recoveryMode); err != nil {
+		return err
+	}
+	if op.RecoveryEpoch != recoveryEpoch {
+		return recovery.ErrStaleEpoch
+	}
+	if recoveryMode != "NORMAL" && recoveryMode != "RECOVERY_RECONCILIATION" {
+		return action.ErrDenied
+	}
+	if op.RiskClass != action.Observe && recoveryMode != "NORMAL" {
+		return recovery.ErrRecoveryMode
+	}
+	var epoch uint64
+	var runState, runOwner string
+	if err := tx.QueryRow(ctx,
+		"SELECT current_epoch,state,control_owner FROM runs WHERE run_id=$1 FOR SHARE", op.RunID,
+	).Scan(&epoch, &runState, &runOwner); err != nil {
+		return err
+	}
+	var sessionEpoch uint64
+	var sessionOwner string
+	var sessionPaused bool
+	if err := tx.QueryRow(ctx,
+		"SELECT execution_epoch,control_owner,paused FROM sessions WHERE run_id=$1 FOR SHARE", op.RunID,
+	).Scan(&sessionEpoch, &sessionOwner, &sessionPaused); err != nil {
+		return err
+	}
+	if epoch != op.ExecutionEpoch || sessionEpoch != epoch ||
+		runOwner != "RUNTIME" || sessionOwner != "RUNTIME" {
+		return action.ErrDenied
+	}
+	// Read-only observations remain possible for a paused Runtime Run.
+	// Mutations require a non-paused Runtime-owned RUNNING state.
+	if op.RiskClass == action.Observe {
+		if runState != "RUNNING" && runState != "PAUSED" {
+			return action.ErrDenied
+		}
+	} else if runState != "RUNNING" || sessionPaused {
+		return action.ErrDenied
+	}
+	var continued bool
+	if err := tx.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM codex_continuations WHERE source_run_id=$1)", op.RunID,
+	).Scan(&continued); err != nil {
+		return err
+	}
+	if continued {
+		return action.ErrDenied
+	}
+	return nil
+}
+
 func (s *Store) Create(op action.Operation) error {
 	input, err := auditInput("action.planned", "ExternalOperation", op.ID, op)
 	if err != nil {
@@ -33,19 +104,8 @@ func (s *Store) Create(op action.Operation) error {
 	}
 	_, err = s.Mutate(bg(), Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
-			// Serialize a previously authorized action with source continuation.
-			// Validation before this transaction cannot prevent a stale request
-			// from arriving after the source Run has been fenced.
-			var epoch uint64
-			if err := tx.QueryRow(ctx, "SELECT current_epoch FROM runs WHERE run_id=$1 FOR SHARE", op.RunID).Scan(&epoch); err != nil {
+			if err := checkActionAdmission(ctx, tx, op); err != nil {
 				return err
-			}
-			var continued bool
-			if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM codex_continuations WHERE source_run_id=$1)", op.RunID).Scan(&continued); err != nil {
-				return err
-			}
-			if epoch != op.ExecutionEpoch || continued {
-				return action.ErrDenied
 			}
 			const q = `
 INSERT INTO external_operations (
@@ -112,6 +172,11 @@ func (s *Store) Update(op action.Operation) error {
 	}
 	_, err = s.Mutate(bg(), Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
+			if op.State == action.Dispatched {
+				if err := checkActionAdmission(ctx, tx, op); err != nil {
+					return err
+				}
+			}
 			const q = `
 UPDATE external_operations
 SET state=$1,external_ref=$2,observed_state=$3,updated_at=$4

@@ -12,11 +12,14 @@ implementation and automated tests are not production/unattended qualification.*
 **Internal RC posture: `INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`.**
 For the current small-team baseline, the approved repository-side W01-W10
 implementation slices are closed behind required CI, retained byte/evidence
-readback and explicit fail-closed boundaries. The only open GitHub issues are
-#103 (managed-workspace WIF live qualification), #106 (optional relay/provider
-qualification) and #105 (production/unattended acceptance). Those require
-external provider, administrator or production-environment facts and cannot be
-manufactured by more repository code or local fixtures.
+readback and explicit fail-closed boundaries. External qualification
+issues remain #103 (managed-workspace WIF), #106 (optional relay/provider) and
+#105 (production/unattended acceptance); none can be satisfied by repository
+fixtures or CI alone. The independently identified internal P0 #228 covers
+crash-orphaned Action PLANNED/DISPATCHED/RECONCILING/MANUAL states: visibility
+and transaction fencing do not constitute a verified terminal no-replay
+disposition. Recovery Proof stays blocked until the exact operation is
+independently reconciled under its existing authority.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
