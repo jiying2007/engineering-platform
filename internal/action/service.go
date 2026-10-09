@@ -170,6 +170,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		return receiptFromOperation(req.ID, *op, s.now()), nil
 	}
 
+	invalidDispatchOutcome := false
 	switch result.Outcome {
 	case DispatchConfirmed:
 		if err := op.Transition(Confirmed, s.now()); err != nil {
@@ -180,12 +181,24 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 			return Receipt{}, err
 		}
 	default:
-		return Receipt{}, fmt.Errorf("unsupported dispatch outcome %q", result.Outcome)
+		// The Provider may have completed the external effect even when its
+		// response is malformed. Persist UNKNOWN before reporting an error;
+		// never leave DISPATCHED as the last known ledger fact or accept
+		// an untrusted external reference from this response.
+		invalidDispatchOutcome = true
+		if err := op.Transition(Unknown, s.now()); err != nil {
+			return Receipt{}, err
+		}
+		result.ExternalRef = ""
+		result.ObservedState = "INVALID_PROVIDER_DISPATCH_OUTCOME"
 	}
 	op.ExternalRef = result.ExternalRef
 	op.ObservedState = result.ObservedState
 	if err := s.repository.Update(*op); err != nil {
 		return Receipt{}, err
+	}
+	if invalidDispatchOutcome {
+		return Receipt{}, fmt.Errorf("unsupported provider dispatch outcome; durable reconciliation required")
 	}
 	return receiptFromOperation(req.ID, *op, s.now()), nil
 }
@@ -224,6 +237,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 		return receiptFromOperation("", op, s.now()), nil
 	}
 
+	invalidReconcileOutcome := false
 	switch result.Outcome {
 	case ReconcileConfirmed:
 		err = op.Transition(Confirmed, s.now())
@@ -232,7 +246,13 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	case ReconcileManual:
 		err = op.Transition(Manual, s.now())
 	default:
-		return Receipt{}, fmt.Errorf("unsupported reconcile outcome %q", result.Outcome)
+		// An unknown observation cannot settle an ambiguous external effect.
+		// Move to MANUAL rather than leaving a terminal-looking RECONCILING
+		// row which the normal UNKNOWN entrypoint cannot safely resume.
+		invalidReconcileOutcome = true
+		err = op.Transition(Manual, s.now())
+		result.ExternalRef = ""
+		result.ObservedState = "INVALID_PROVIDER_RECONCILE_OUTCOME"
 	}
 	if err != nil {
 		return Receipt{}, err
@@ -241,6 +261,9 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	op.ObservedState = result.ObservedState
 	if err := s.repository.Update(op); err != nil {
 		return Receipt{}, err
+	}
+	if invalidReconcileOutcome {
+		return Receipt{}, fmt.Errorf("unsupported provider reconcile outcome; manual reconciliation required")
 	}
 	return receiptFromOperation("", op, s.now()), nil
 }
