@@ -106,9 +106,10 @@ func TestProviderNeverConfirmsUnboundIndependentPublisherReceipts(t *testing.T) 
 				t.Fatalf("invalid external publication was confirmed: result=%#v err=%v calls=%d", result, err, remote.publishCalls)
 			}
 
-			bad.PublicationOutcome = "OBSERVED"
+			badObservation := boundPublicationReceipt(plan, "OBSERVED")
+			tc.mutate(&badObservation)
 			observed := &publisherRemote{observation: ObserveResult{
-				Outcome: ObservedConfirmed, Receipt: bad,
+				Outcome: ObservedConfirmed, Receipt: badObservation,
 			}}
 			reconciler, err := New(config, state, observed)
 			if err != nil {
