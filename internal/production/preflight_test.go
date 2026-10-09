@@ -99,7 +99,6 @@ func TestCheckProductionBaselineRejectsSharedServiceIdentityAndAutoMigrate(t *te
 	}
 }
 
-
 func TestCheckConfigurationRejectsWorkerEndpointOutsideDeployedControl(t *testing.T) {
 	for _, role := range []string{"admission", "preparation", "control-listener"} {
 		t.Run(role, func(t *testing.T) {
@@ -129,4 +128,3 @@ func TestCheckConfigurationRejectsWorkerEndpointOutsideDeployedControl(t *testin
 		})
 	}
 }
-
