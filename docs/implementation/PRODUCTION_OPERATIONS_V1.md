@@ -110,11 +110,11 @@ PostgreSQL-backed operational snapshot containing:
 - pending Worker intents;
 - active and expired Worker leases;
 - pending/leased/dead-letter outbox counts;
-- UNKNOWN/RECONCILING/MANUAL external Action counts;
+- PLANNED/DISPATCHED/UNKNOWN/RECONCILING/MANUAL external Action counts;
 - UNKNOWN Core-bound Codex execution count.
 
 `eng production-status` reads this endpoint through the existing direct-mTLS
-Control client. Snapshot v3 deliberately separates `authority_state=CLEAR` from
+Control client. Snapshot v4 deliberately separates `authority_state=CLEAR` from
 `service_readiness=NOT_OBSERVED`. It also exposes bounded per-worker-profile
 poll history from the existing `workers.last_seen_at` rows: the latest poll
 timestamp and number of known identities for that profile. Claim attempts update
@@ -125,6 +125,14 @@ historical progress demonstrates current worker/publisher capacity. `ready=false
 and `production_qualified=false` remain explicit. `--require-ready` therefore
 fails closed without an implemented service-readiness observation. The separate
 `--require-authority-clear` checks only the narrower database authority condition.
+
+Snapshot v4 adds read-only PLANNED/DISPATCHED Action reservations, so a crashed
+process cannot leave an apparently CLEAR database while its action ledger still
+blocks Recovery Proof. An in-flight reservation may transiently cause
+`authority_state=DEGRADED` even when no fault is yet established; this is a
+conservative quiescence signal, not proof of an incident, timeout, provider
+effect or permission to replay. No automatic state change or operator authority
+is created.
 
 Authority blockers include Recovery/Reconciliation, expired Worker leases,
 dead-letter Outbox records, UNKNOWN/RECONCILING/MANUAL external operations and
