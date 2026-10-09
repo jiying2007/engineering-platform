@@ -13,7 +13,7 @@ func boundPublicationReceipt(plan Plan, outcome string) PublicationReceipt {
 		Version: 1, Repository: plan.Repository, BaseRef: plan.BaseRef,
 		BaseCommit: plan.BaseCommit, Branch: plan.Branch,
 		ResultCommit: plan.ResultCommit, PullRequestNumber: 17,
-		PullRequestURL: "https://github.com/" + plan.Repository + "/pull/17",
+		PullRequestURL:   "https://github.com/" + plan.Repository + "/pull/17",
 		PullRequestState: "open", PublicationOutcome: outcome,
 	}
 }
