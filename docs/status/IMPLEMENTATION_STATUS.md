@@ -9,7 +9,7 @@ parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b
 **Trusted self-hosted M1 phase 1 has historical proof. Current repository
 implementation and automated tests are not production/unattended qualification.**
 
-**Internal RC posture: `INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`.**
+**Internal posture: `INTERNAL_P0_RECOVERY_OPEN_EXTERNAL_QUALIFICATION_PENDING` (historical W01-W10 accepted; new internal P0 #228 open).**
 For the current small-team baseline, the approved repository-side W01-W10
 implementation slices are closed behind required CI, retained byte/evidence
 readback and explicit fail-closed boundaries. External qualification
