@@ -63,16 +63,16 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 	// network policy: Go's default HTTP Transport otherwise reads HTTP_PROXY
 	// and HTTPS_PROXY from the publisher-service host environment.
 	transport := &http.Transport{
-		Proxy: nil,
-		DialContext: (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		TLSHandshakeTimeout: 5 * time.Second,
-		ResponseHeaderTimeout: 15 * time.Second,
-		IdleConnTimeout: 30 * time.Second,
-		MaxIdleConnsPerHost: 2,
-		MaxConnsPerHost: 2,
+		Proxy:                  nil,
+		DialContext:            (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		TLSHandshakeTimeout:    5 * time.Second,
+		ResponseHeaderTimeout:  15 * time.Second,
+		IdleConnTimeout:        30 * time.Second,
+		MaxIdleConnsPerHost:    2,
+		MaxConnsPerHost:        2,
 		MaxResponseHeaderBytes: 32 << 10,
-		DisableCompression: true,
-		ForceAttemptHTTP2: true,
+		DisableCompression:     true,
+		ForceAttemptHTTP2:      true,
 	}
 	return &githubRemote{
 		git: canonicalGit, tokenFile: canonicalToken,
