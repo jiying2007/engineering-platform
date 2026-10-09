@@ -3,6 +3,7 @@ package production
 import (
 	"bufio"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -113,6 +114,14 @@ func CheckConfiguration(config Config) (Result, error) {
 	}
 	if err := validateWorkerEnv(preparation, true); err != nil {
 		return result, fmt.Errorf("preparation worker environment: %w", err)
+	}
+	// A valid HTTPS URI alone does not prove it targets this deployed Control.
+	// Without this check a Worker could disclose its client identity or claim
+	// another environment's work through a different trusted endpoint.
+	controlEndpoint := "https://" + net.JoinHostPort(control["LISTEN_HOST"], control["PORT"])
+	if strings.TrimSuffix(admission["CONTROL_ENDPOINT"], "/") != controlEndpoint ||
+		strings.TrimSuffix(preparation["CONTROL_ENDPOINT"], "/") != controlEndpoint {
+		return result, fmt.Errorf("worker Control endpoints must match this deployment's listener")
 	}
 	result.WorkerPreparation = StateConfigValidated
 
