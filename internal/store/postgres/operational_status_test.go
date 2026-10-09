@@ -49,11 +49,21 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err := s.Create(*op); err != nil {
 		t.Fatal(err)
 	}
+	status, err = s.ReadOperationalStatus(ctx)
+	if err != nil || status.AuthorityClear || status.Ready || status.Snapshot.PlannedOperations != 1 ||
+		status.Snapshot.DispatchedOperations != 0 || status.State != "DEGRADED" {
+		t.Fatalf("PLANNED operation concealed from status: %#v err=%v", status, err)
+	}
 	if err := op.Transition(action.Dispatched, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Update(*op); err != nil {
 		t.Fatal(err)
+	}
+	status, err = s.ReadOperationalStatus(ctx)
+	if err != nil || status.AuthorityClear || status.Ready || status.Snapshot.PlannedOperations != 0 ||
+		status.Snapshot.DispatchedOperations != 1 || status.State != "DEGRADED" {
+		t.Fatalf("DISPATCHED operation concealed from status: %#v err=%v", status, err)
 	}
 	if err := op.Transition(action.Unknown, now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)

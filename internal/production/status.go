@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	OperationalStatusVersion = 3
+	OperationalStatusVersion = 4
 
 	OperationalObservationRequired = "OBSERVATION_REQUIRED"
 	OperationalAuthorityClear      = "CLEAR"
@@ -36,6 +36,8 @@ type Snapshot struct {
 	PendingOutbox          int64     `json:"pending_outbox"`
 	LeasedOutbox           int64     `json:"leased_outbox"`
 	DeadLetterOutbox       int64     `json:"dead_letter_outbox"`
+	PlannedOperations      int64     `json:"planned_operations"`
+	DispatchedOperations   int64     `json:"dispatched_operations"`
 	UnknownOperations      int64     `json:"unknown_operations"`
 	ReconcilingOperations  int64     `json:"reconciling_operations"`
 	ManualOperations       int64     `json:"manual_operations"`
@@ -72,7 +74,8 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 	counts := []int64{
 		snapshot.ActiveRuns, snapshot.PendingWorkerIntents, snapshot.ActiveWorkerLeases,
 		snapshot.ExpiredWorkerLeases, snapshot.PendingOutbox, snapshot.LeasedOutbox,
-		snapshot.DeadLetterOutbox, snapshot.UnknownOperations, snapshot.ReconcilingOperations,
+		snapshot.DeadLetterOutbox, snapshot.PlannedOperations, snapshot.DispatchedOperations,
+		snapshot.UnknownOperations, snapshot.ReconcilingOperations,
 		snapshot.ManualOperations, snapshot.UnknownCodexExecutions,
 	}
 	for _, count := range counts {
@@ -125,6 +128,11 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 	}{
 		{"expired_worker_leases", snapshot.ExpiredWorkerLeases},
 		{"dead_letter_outbox", snapshot.DeadLetterOutbox},
+		// PLANNED and DISPATCHED are live reservations during normal dispatch,
+		// but they are also the durable survivors of an interrupted process.
+		// Never claim an authority-clear quiescent snapshot while either exists.
+		{"planned_external_actions", snapshot.PlannedOperations},
+		{"dispatched_external_actions", snapshot.DispatchedOperations},
 		{"unknown_external_actions", snapshot.UnknownOperations},
 		{"reconciling_actions", snapshot.ReconcilingOperations},
 		{"manual_actions", snapshot.ManualOperations},

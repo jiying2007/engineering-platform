@@ -142,3 +142,53 @@ func TestEvaluateSnapshotValidatesWorkerPollFactsWithoutInferringReadiness(t *te
 		}
 	}
 }
+
+func TestOperationalStatusV4NeverHidesPreEffectOrInFlightActions(t *testing.T) {
+	if OperationalStatusVersion != 4 {
+		t.Fatal("PLANNED/DISPATCHED facts require a distinct v4 snapshot")
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Snapshot)
+		reason string
+	}{
+		{"planned", func(s *Snapshot) { s.PlannedOperations = 1 }, "planned_external_actions"},
+		{"dispatched", func(s *Snapshot) { s.DispatchedOperations = 1 }, "dispatched_external_actions"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := cleanSnapshot()
+			tc.mutate(&s)
+			status, err := EvaluateSnapshot(s)
+			if err != nil || status.AuthorityClear || status.Ready ||
+				status.State != OperationalDegraded || status.ProductionQualified {
+				t.Fatalf("unsettled action hidden from operational status: %#v err=%v", status, err)
+			}
+			found := false
+			for _, reason := range status.Reasons {
+				found = found || reason == tc.reason
+			}
+			if !found {
+				t.Fatalf("missing exact unsettled action reason: %#v", status.Reasons)
+			}
+			if err := status.ValidateAt(s.CapturedAt); err != nil {
+				t.Fatal(err)
+			}
+			// A tampered transport envelope must not conceal a durable action.
+			forged := status
+			forged.AuthorityClear, forged.Ready = true, true
+			if forged.ValidateAt(s.CapturedAt) == nil {
+				t.Fatal("forged authority-clear envelope was trusted")
+			}
+		})
+	}
+	for _, mutate := range []func(*Snapshot){
+		func(s *Snapshot) { s.PlannedOperations = -1 },
+		func(s *Snapshot) { s.DispatchedOperations = -1 },
+	} {
+		s := cleanSnapshot()
+		mutate(&s)
+		if _, err := EvaluateSnapshot(s); err == nil {
+			t.Fatal("negative pre-effect or in-flight Action count accepted")
+		}
+	}
+}

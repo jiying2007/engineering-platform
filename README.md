@@ -126,13 +126,17 @@ gates, or add a cross-repository runtime dependency.
 
 ## Current implementation status
 
-The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is proven**
-by one real retained Feature Closure chain and one separate retained Debug
-Closure chain. The current repository-side RC posture is
-**`INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`**: the approved
-small-team implementation/fault/governance slices are closed, while unattended
-provider, production-environment, WorkBuddy/device and independent human
-acceptance remain external gates. This is not production qualification.
+The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is
+historically proven** by retained Feature and Debug Closure chains. The
+current posture is **`INTERNAL_P0_RECOVERY_OPEN_EXTERNAL_QUALIFICATION_PENDING`**:
+the originally approved W01-W10 small-team repository slices are closed, but
+the new internal P0 [#228](https://github.com/jiying2007/engineering-platform/issues/228)
+still requires independently verified, no-replay disposal of crash-orphaned
+external Action states. Transactional admission (#226) and observability (#227)
+are partial hardening, not that terminal Recovery disposition. Unattended
+Provider, real production-host, WorkBuddy/device and independent human
+acceptance are also pending. **This is neither a clean internal RC nor
+production qualification.**
 
 The authoritative live status is
 [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). Authentication

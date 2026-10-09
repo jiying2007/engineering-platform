@@ -18,7 +18,7 @@ import (
 )
 
 // This is a live host diagnostic assembled from existing, independent
-// authorized observations. It never changes OperationalStatus v3 or grants
+// authorized observations. It never changes OperationalStatus v4 or grants
 // production READY, provider credentials, execution, capacity or publication.
 type productionLiveReport struct {
 	Version                       int                                 `json:"version"`

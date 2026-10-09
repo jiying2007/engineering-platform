@@ -9,14 +9,17 @@ parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b
 **Trusted self-hosted M1 phase 1 has historical proof. Current repository
 implementation and automated tests are not production/unattended qualification.**
 
-**Internal RC posture: `INTERNAL_CLOSED_CANDIDATE_EXTERNAL_QUALIFICATION_PENDING`.**
+**Internal posture: `INTERNAL_P0_RECOVERY_OPEN_EXTERNAL_QUALIFICATION_PENDING` (historical W01-W10 accepted; new internal P0 #228 open).**
 For the current small-team baseline, the approved repository-side W01-W10
 implementation slices are closed behind required CI, retained byte/evidence
-readback and explicit fail-closed boundaries. The only open GitHub issues are
-#103 (managed-workspace WIF live qualification), #106 (optional relay/provider
-qualification) and #105 (production/unattended acceptance). Those require
-external provider, administrator or production-environment facts and cannot be
-manufactured by more repository code or local fixtures.
+readback and explicit fail-closed boundaries. External qualification
+issues remain #103 (managed-workspace WIF), #106 (optional relay/provider) and
+#105 (production/unattended acceptance); none can be satisfied by repository
+fixtures or CI alone. The independently identified internal P0 #228 covers
+crash-orphaned Action PLANNED/DISPATCHED/RECONCILING/MANUAL states: visibility
+and transaction fencing do not constitute a verified terminal no-replay
+disposition. Recovery Proof stays blocked until the exact operation is
+independently reconciled under its existing authority.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
@@ -94,7 +97,7 @@ boundary. This deferral does not affect RC or production acceptance gates.
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
-| Operational status | v3 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
+| Operational status | v4 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v3 with frozen single-canary, emergency-stop, no-provider-fallback and no-automatic-DB-downgrade gates, exact nonempty no-skip test inventory, and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Passing the frozen external canary/provider-revoke/Publisher-revoke/DB-restore gates, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
