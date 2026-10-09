@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/recovery"
 )
 
 func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
@@ -30,20 +31,21 @@ func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
 		t.Fatalf("PLANNED operation did not block proof: %v", err)
 	}
+	// Recovery cannot retroactively authorize a pre-effect PLANNED reservation
+	// to become a new external mutation. Its outstanding identity must remain
+	// blocked until an independently authorized explicit disposition exists.
 	if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
-		t.Fatal(err)
+	if err := s.Update(*op); !errors.Is(err, recovery.ErrStaleEpoch) {
+		t.Fatalf("Recovery authorized new external dispatch: %v", err)
 	}
-	if err := op.Transition(action.Confirmed, time.Now().UTC()); err != nil {
-		t.Fatal(err)
+	stored, err := s.Get(op.ID)
+	if err != nil || stored.State != action.Planned {
+		t.Fatalf("Recovery changed pre-effect reservation: %#v err=%v", stored, err)
 	}
-	if err := s.Update(*op); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); err != nil {
-		t.Fatal(err)
+	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
+		t.Fatalf("orphaned PLANNED Action was silently cleared: %v", err)
 	}
 }
 
@@ -66,6 +68,45 @@ func TestRecoveryProofBlocksLiveMutationOutboxLease(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(ctx, 1, "urn:engineering-platform:operator:reconciler"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T) {
+	s := newIsolatedIntegrationStore(t)
+	runID := setupPostgresActionRun(t, s, "recovery-inflight")
+	now := time.Now().UTC()
+	req := action.Request{
+		ID: "recovery-inflight-op", RunID: runID, ExecutionEpoch: 1, RecoveryEpoch: 0,
+		Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci",
+		ParametersDigest: "sha256:" + strings.Repeat("3", 64), IdempotencyKey: "recovery-inflight-op",
+		RequestedBy: "runtime", RequestedAt: now,
+	}
+	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("4", 64), now)
+	if err := s.Create(*op); err != nil {
+		t.Fatal(err)
+	}
+	if err := op.Transition(action.Dispatched, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.BeginRecovery(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
+		t.Fatalf("in-flight dispatch was erased from Recovery: %v", err)
+	}
+	// Recovery must allow an old dispatched operation to settle; it must not
+	// authorize a NEW dispatch during the reconciliation epoch.
+	if err := op.Transition(action.Confirmed, now.Add(2*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); err != nil {
 		t.Fatal(err)
 	}
 }
