@@ -146,6 +146,16 @@ observations, not calibrated SLOs. Clients rederive the full response and reject
 snapshots older than 30 seconds or more than 5 seconds in the future; these
 transport freshness bounds are not production performance targets.
 
+The bounded on-host diagnostic `eng production-live-observe --config
+/etc/engineering-platform/production-preflight.json` independently binds
+four actual named systemd main processes (including UID, executable inode,
+role-specific argv) to the exact installed source and rechecks Control mTLS
+database authority and Publisher mTLS endpoint before/after service identity
+sampling. Use a separately authorized read-only host/Control diagnostic
+context; do not grant these credentials to the model or Worker. Its result
+reports **local wiring observed**, with `ready=false`, unknown provider and
+no inferred capacity. This does not replace the terminal READY gate.
+
 Publisher endpoint reachability is observed separately with
 `eng production-publisher-health --config FILE`. That performs one bounded
 authenticated mTLS `GET /healthz`, binds the observation to the exact remote
