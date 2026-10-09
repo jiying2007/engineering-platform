@@ -98,6 +98,12 @@ permissions needed to read refs, write contents/branches and create/update pull
 requests. Token bytes are never placed in Git URLs or command arguments.
 GitHub REST calls carrying the publisher token and Git's credentialed HTTPS
 fetch/push both **refuse HTTP redirects**, including same-origin redirects.
+The Publisher Git subprocess already uses an explicitly bounded environment;
+the REST client now uses a matching **direct-only** HTTP Transport and ignores
+ambient `HTTP_PROXY`, `HTTPS_PROXY` and related host proxy settings. There is
+no implicit or automatic proxy failover for credential-bearing publication.
+If a team requires an egress proxy, it must be separately specified, reviewed
+and qualified rather than silently inherited from systemd or the shell.
 A repository rename, proxy-injected redirect or unexpected API migration must
 fail closed and be reviewed as an operator policy change; it must not silently
 redirect a push, PR mutation or bearer credential to another endpoint. The
