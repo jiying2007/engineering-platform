@@ -157,3 +157,25 @@ func TestGitHubPublishNeverReopensClosedDeterministicBranch(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHubHistoricalPullNullResponseFailsClosed(t *testing.T) {
+	plan, config := historicalPullProbePlan(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/"+plan.Repository+"/pulls" ||
+			r.URL.Query().Get("state") != "all" {
+			t.Errorf("unexpected history query: %s", r.URL)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("null"))
+	}))
+	defer server.Close()
+	g, err := newGitHubRemote(config.GitExecutable, config.TokenFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.apiBase = server.URL
+	prior, err := g.hasHistoricalPull(context.Background(), "test-token", plan)
+	if err == nil || prior {
+		t.Fatalf("missing PR history array was treated as empty verified history: %v %v", prior, err)
+	}
+}
