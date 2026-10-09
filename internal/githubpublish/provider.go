@@ -99,6 +99,12 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 	if err != nil {
 		return action.DispatchResult{}, err
 	}
+	// The independent Publisher is a separate trust boundary. Never
+	// authorize CONFIRMED from a remote receipt without binding every
+	// externally observed identity back to the frozen Core plan.
+	if err := receipt.Validate(plan); err != nil {
+		return action.DispatchResult{}, fmt.Errorf("publisher returned an unbound publication receipt: %w", err)
+	}
 	observed, err := encodeReceipt(receipt)
 	if err != nil {
 		return action.DispatchResult{}, err
@@ -127,6 +133,13 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 	}
 	switch result.Outcome {
 	case ObservedConfirmed:
+		// Readback is not authority by itself: malformed or retargeted
+		// remote observations cannot settle an UNKNOWN effect as CONFIRMED.
+		if err := result.Receipt.Validate(plan); err != nil {
+			return action.ReconcileResult{
+				Outcome: action.ReconcileManual, ObservedState: "publication receipt does not bind frozen plan",
+			}, nil
+		}
 		observed, err := encodeReceipt(result.Receipt)
 		if err != nil {
 			return action.ReconcileResult{}, err
@@ -242,7 +255,7 @@ func (r PublicationReceipt) Validate(plan Plan) error {
 	if plan.Validate() != nil || r.Version != 1 || r.Repository != plan.Repository ||
 		r.BaseRef != plan.BaseRef || r.BaseCommit != plan.BaseCommit || r.Branch != plan.Branch ||
 		r.ResultCommit != plan.ResultCommit || r.PullRequestNumber <= 0 || r.PullRequestState != "open" ||
-		!strings.HasPrefix(r.PullRequestURL, "https://github.com/"+plan.Repository+"/pull/") {
+		r.PullRequestURL != fmt.Sprintf("https://github.com/%s/pull/%d", plan.Repository, r.PullRequestNumber) {
 		return fmt.Errorf("GitHub publication receipt does not bind the plan")
 	}
 	switch r.PublicationOutcome {
