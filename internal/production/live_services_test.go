@@ -136,3 +136,50 @@ func TestVerifyLiveProcessChecksActualUIDBinaryAndRoleFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestProcessStartTicksBindsLinuxPIDGeneration(t *testing.T) {
+	fields := make([]string, 24)
+	for i := range fields {
+		fields[i] = "0"
+	}
+	fields[0] = "S"
+	fields[19] = "123456"
+	good := []byte("7321 (worker ) unusual name) " + strings.Join(fields, " ") + "\n")
+	ticks, err := parseProcessStartTicks(good, 7321)
+	if err != nil || ticks != 123456 {
+		t.Fatalf("valid start tick identity rejected: %d %v", ticks, err)
+	}
+	for _, tc := range []struct {
+		name string
+		raw  []byte
+		pid  int
+	}{
+		{"wrong-pid", good, 7322},
+		{"missing-close", []byte("7321 (worker " + strings.Join(fields, " ") + "\n"), 7321},
+		{"short-record", []byte("7321 (worker) S 1 2 3\n"), 7321},
+		{"zero-generation", []byte(strings.Replace(string(good), "123456", "0", 1)), 7321},
+		{"negative-generation", []byte(strings.Replace(string(good), "123456", "-1", 1)), 7321},
+		{"noncanonical-generation", []byte(strings.Replace(string(good), "123456", "00123456", 1)), 7321},
+		{"overflow-generation", []byte(strings.Replace(string(good), "123456", "18446744073709551616", 1)), 7321},
+		{"injected-null", append(append([]byte{}, good...), 0), 7321},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, err := parseProcessStartTicks(tc.raw, tc.pid); err == nil {
+				t.Fatalf("malformed generation accepted: ticks=%d", got)
+			}
+		})
+	}
+	if runtime.GOOS != "linux" {
+		return
+	}
+	pid := os.Getpid()
+	live, err := processStartTicks(pid)
+	if err != nil || live == 0 {
+		t.Fatalf("real proc start ticks unavailable: pid=%d ticks=%d err=%v", pid, live, err)
+	}
+	again, err := processStartTicks(pid)
+	if err != nil || again != live {
+		t.Fatalf("same running process generation changed: before=%d after=%d err=%v", live, again, err)
+	}
+}
