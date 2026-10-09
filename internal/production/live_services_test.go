@@ -137,7 +137,6 @@ func TestVerifyLiveProcessChecksActualUIDBinaryAndRoleFlags(t *testing.T) {
 	}
 }
 
-
 func TestProcessStartTicksBindsLinuxPIDGeneration(t *testing.T) {
 	fields := make([]string, 24)
 	for i := range fields {
