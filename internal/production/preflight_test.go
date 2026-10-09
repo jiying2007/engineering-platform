@@ -98,3 +98,33 @@ func TestCheckProductionBaselineRejectsSharedServiceIdentityAndAutoMigrate(t *te
 		t.Fatal("AUTO_MIGRATE=1 accepted for production")
 	}
 }
+
+func TestCheckConfigurationRejectsWorkerEndpointOutsideDeployedControl(t *testing.T) {
+	for _, role := range []string{"admission", "preparation", "control-listener"} {
+		t.Run(role, func(t *testing.T) {
+			config := validConfig(t)
+			path := config.AdmissionEnvFile
+			from, to := "CONTROL_ENDPOINT=https://127.0.0.1:18443", "CONTROL_ENDPOINT=https://127.0.0.1:18444"
+			switch role {
+			case "preparation":
+				path = config.PreparationEnvFile
+			case "control-listener":
+				path = config.ControlEnvFile
+				from, to = "PORT=18443", "PORT=18444"
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(data), from) {
+				t.Fatal("missing frozen endpoint fixture")
+			}
+			if err := os.WriteFile(path, []byte(strings.Replace(string(data), from, to, 1)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := CheckConfiguration(config); err == nil || !strings.Contains(err.Error(), "must match this deployment") {
+				t.Fatalf("same-CA alternate Control endpoint was admitted: %v", err)
+			}
+		})
+	}
+}

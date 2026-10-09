@@ -18,18 +18,9 @@ func productionPreflight(args []string) error {
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *configFile == "" {
 		return fmt.Errorf("usage: eng production-preflight --config CONFIG.json")
 	}
-	info, err := os.Lstat(*configFile)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 ||
-		info.Size() <= 0 || info.Size() > 64<<10 {
-		return fmt.Errorf("owner-private bounded regular production config required")
-	}
-	data, err := os.ReadFile(*configFile)
+	config, err := loadProductionConfig(*configFile)
 	if err != nil {
 		return err
-	}
-	var config production.Config
-	if err := strictjson.Decode(data, &config); err != nil {
-		return fmt.Errorf("strict production config: %w", err)
 	}
 	var result production.Result
 	if *configOnly {
@@ -42,4 +33,21 @@ func productionPreflight(args []string) error {
 	}
 	printJSON(result)
 	return nil
+}
+
+func loadProductionConfig(path string) (production.Config, error) {
+	var config production.Config
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 ||
+		info.Size() <= 0 || info.Size() > 64<<10 {
+		return config, fmt.Errorf("owner-private bounded regular production config required")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return config, err
+	}
+	if err := strictjson.Decode(data, &config); err != nil {
+		return config, fmt.Errorf("strict production config: %w", err)
+	}
+	return config, nil
 }

@@ -333,6 +333,16 @@ speculative services.
   provisioning, live external-effect acceptance and the frozen canary/
   backup-restore/emergency-stop gates require the selected production
   environment under #105. Binary rollback never downgrades the database.
+  **Read-only live-host diagnostics are now implemented but unqualified on an
+  actual production host.** `eng production-live-observe` reuses the existing
+  immutable host preflight and authenticated Core/Publisher probes and checks
+  canonical systemd role PIDs/UIDs/executables/argv with a second identity
+  readback. It cannot grant capacity, selected Provider qualification or
+  `operational_status_ready`; those require real deployment evidence under
+  #105. A separate config gate rejects admission/preparation Workers whose
+  otherwise-valid mTLS `CONTROL_ENDPOINT` points outside the deployed
+  Control listener. No Worker/model/publisher credential is provisioned or
+  disclosed by this diagnostic.
 - **W07/W08 — generic platform journey complete; product/hardware integrations
   external.** Authenticated Work -> Task -> Run intake, exact-epoch Human
   Takeover, host-ISA firmware and no-network Cortex-M0 cross-toolchain
