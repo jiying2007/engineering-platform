@@ -32,10 +32,10 @@ func TestProductionLiveObserveCLIRequiresExplicitSingleOwnerConfig(t *testing.T)
 func TestLiveProcessDoubleReadRejectsReplacementOrMissingService(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	first := []production.LiveServiceObservation{
-		{Unit: "engineering-control-plane.service", ServiceUser: "control", PID: 1001, Binary: "control-plane", ObservedAt: now},
-		{Unit: "engineering-worker-admission.service", ServiceUser: "admission", PID: 1002, Binary: "worker", ObservedAt: now},
-		{Unit: "engineering-worker-preparation.service", ServiceUser: "preparation", PID: 1003, Binary: "worker", ObservedAt: now},
-		{Unit: "engineering-publisher.service", ServiceUser: "publisher", PID: 1004, Binary: "publisher-service", ObservedAt: now},
+		{Unit: "engineering-control-plane.service", ServiceUser: "control", PID: 1001, StartTicks: 501, Binary: "control-plane", ObservedAt: now},
+		{Unit: "engineering-worker-admission.service", ServiceUser: "admission", PID: 1002, StartTicks: 502, Binary: "worker", ObservedAt: now},
+		{Unit: "engineering-worker-preparation.service", ServiceUser: "preparation", PID: 1003, StartTicks: 503, Binary: "worker", ObservedAt: now},
+		{Unit: "engineering-publisher.service", ServiceUser: "publisher", PID: 1004, StartTicks: 504, Binary: "publisher-service", ObservedAt: now},
 	}
 	second := append([]production.LiveServiceObservation(nil), first...)
 	for i := range second {
@@ -50,6 +50,14 @@ func TestLiveProcessDoubleReadRejectsReplacementOrMissingService(t *testing.T) {
 	}{
 		{"lost-service", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { return x[:3] }},
 		{"changed-pid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation { x[1].PID++; return x }},
+		{"reused-pid-new-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[1].StartTicks++
+			return x
+		}},
+		{"missing-generation", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
+			x[2].StartTicks = 0
+			return x
+		}},
 		{"wrong-uid", func(x []production.LiveServiceObservation) []production.LiveServiceObservation {
 			x[2].ServiceUser = "root"
 			return x
