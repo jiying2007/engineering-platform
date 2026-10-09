@@ -21,6 +21,7 @@ type LiveServiceObservation struct {
 	Unit        string    `json:"unit"`
 	ServiceUser string    `json:"service_user"`
 	PID         int       `json:"pid"`
+	StartTicks  uint64    `json:"start_ticks"`
 	Binary      string    `json:"binary"`
 	ObservedAt  time.Time `json:"observed_at"`
 }
@@ -95,6 +96,42 @@ func readProcessBounded(name string, max int64) ([]byte, error) {
 		return nil, fmt.Errorf("process identity source unreadable or oversized")
 	}
 	return data, nil
+}
+
+// Linux /proc/[pid]/stat field 22 is the process generation's start time
+// in boot ticks. PID alone may be reused after a service restarts.
+func parseProcessStartTicks(raw []byte, pid int) (uint64, error) {
+	line := strings.TrimSuffix(string(raw), "\n")
+	prefix := strconv.Itoa(pid) + " ("
+	if !strings.HasPrefix(line, prefix) || strings.ContainsAny(line, "\x00\r") {
+		return 0, fmt.Errorf("process stat PID identity mismatch")
+	}
+	end := strings.LastIndex(line, ") ")
+	if end < len(prefix) {
+		return 0, fmt.Errorf("unparseable process stat command")
+	}
+	// Remaining fields start at Linux stat field 3 (state). Field 22,
+	// starttime, is therefore element 19. The comm may contain spaces/).
+	fields := strings.Fields(line[end+2:])
+	if len(fields) < 20 {
+		return 0, fmt.Errorf("process stat start time unavailable")
+	}
+	ticks, err := strconv.ParseUint(fields[19], 10, 64)
+	if err != nil || ticks == 0 || strconv.FormatUint(ticks, 10) != fields[19] {
+		return 0, fmt.Errorf("invalid process generation start ticks")
+	}
+	return ticks, nil
+}
+
+func processStartTicks(pid int) (uint64, error) {
+	if pid <= 1 {
+		return 0, fmt.Errorf("invalid live process PID")
+	}
+	raw, err := readProcessBounded(filepath.Join("/proc", strconv.Itoa(pid), "stat"), 4096)
+	if err != nil {
+		return 0, err
+	}
+	return parseProcessStartTicks(raw, pid)
 }
 
 func verifyLiveProcess(pid int, spec liveServiceSpec) error {
@@ -181,13 +218,21 @@ func ObserveLiveServices(ctx context.Context, c Config) ([]LiveServiceObservatio
 		if err != nil || seenPIDs[pid] {
 			return nil, fmt.Errorf("service unit %s is not independently running: %v", spec.unit, err)
 		}
+		beforeTicks, err := processStartTicks(pid)
+		if err != nil {
+			return nil, fmt.Errorf("service unit %s: process generation unavailable: %w", spec.unit, err)
+		}
 		if err := verifyLiveProcess(pid, spec); err != nil {
 			return nil, fmt.Errorf("service unit %s: %w", spec.unit, err)
+		}
+		afterTicks, err := processStartTicks(pid)
+		if err != nil || afterTicks != beforeTicks {
+			return nil, fmt.Errorf("service unit %s restarted or its PID was reused during inspection", spec.unit)
 		}
 		seenPIDs[pid] = true
 		result = append(result, LiveServiceObservation{
 			Unit: spec.unit, ServiceUser: spec.user, PID: pid,
-			Binary: filepath.Base(spec.binary), ObservedAt: time.Now().UTC(),
+			Binary: filepath.Base(spec.binary), StartTicks: beforeTicks, ObservedAt: time.Now().UTC(),
 		})
 	}
 	return result, nil
