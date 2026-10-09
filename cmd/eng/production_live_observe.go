@@ -21,21 +21,21 @@ import (
 // authorized observations. It never changes OperationalStatus v3 or grants
 // production READY, provider credentials, execution, capacity or publication.
 type productionLiveReport struct {
-	Version int `json:"version"`
-	Scope string `json:"scope"`
-	SourceCommit string `json:"source_commit"`
-	ObservedAt time.Time `json:"observed_at"`
-	RecoveryEpoch uint64 `json:"recovery_epoch"`
-	DatabaseAuthorityClear bool `json:"database_authority_clear"`
-	PublisherConfigDigest string `json:"publisher_config_digest"`
-	PublisherEndpointObserved bool `json:"publisher_endpoint_observed"`
-	LocalServiceProcessesObserved bool `json:"local_service_processes_observed"`
-	Services []production.LiveServiceObservation `json:"services"`
-	ProviderLiveQualified bool `json:"provider_live_qualified"`
-	CapacityObserved bool `json:"capacity_observed"`
-	Ready bool `json:"ready"`
-	ProductionQualified bool `json:"production_qualified"`
-	State string `json:"state"`
+	Version                       int                                 `json:"version"`
+	Scope                         string                              `json:"scope"`
+	SourceCommit                  string                              `json:"source_commit"`
+	ObservedAt                    time.Time                           `json:"observed_at"`
+	RecoveryEpoch                 uint64                              `json:"recovery_epoch"`
+	DatabaseAuthorityClear        bool                                `json:"database_authority_clear"`
+	PublisherConfigDigest         string                              `json:"publisher_config_digest"`
+	PublisherEndpointObserved     bool                                `json:"publisher_endpoint_observed"`
+	LocalServiceProcessesObserved bool                                `json:"local_service_processes_observed"`
+	Services                      []production.LiveServiceObservation `json:"services"`
+	ProviderLiveQualified         bool                                `json:"provider_live_qualified"`
+	CapacityObserved              bool                                `json:"capacity_observed"`
+	Ready                         bool                                `json:"ready"`
+	ProductionQualified           bool                                `json:"production_qualified"`
+	State                         string                              `json:"state"`
 }
 
 func parseProductionLiveObserve(args []string) (string, error) {
@@ -146,7 +146,7 @@ func productionLiveObserve(args []string) error {
 		Version: 1, Scope: "bounded-host-live-service-observations",
 		SourceCommit: host.SourceCommit, ObservedAt: time.Now().UTC(),
 		RecoveryEpoch: status.Snapshot.RecoveryEpoch, DatabaseAuthorityClear: true,
-		PublisherConfigDigest: publisher.ConfigurationDigest,
+		PublisherConfigDigest:     publisher.ConfigurationDigest,
 		PublisherEndpointObserved: true, LocalServiceProcessesObserved: true,
 		Services: after, State: "LOCAL_COMPONENTS_OBSERVED_PROVIDER_CAPACITY_PENDING",
 	})
