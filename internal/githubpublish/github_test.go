@@ -2,6 +2,7 @@ package githubpublish
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,4 +72,50 @@ func TestPublisherGitCredentialNeverFollowsRemoteRedirect(t *testing.T) {
 	if err != nil || strings.TrimSpace(got) != "false" {
 		t.Fatalf("Git transport redirects not disabled: value=%q err=%v", got, err)
 	}
+}
+
+
+func TestGitHubPublisherRESTIgnoresInheritedProxyEnvironment(t *testing.T) {
+	// The Git subprocess already runs without ambient HTTPS_PROXY. REST must
+	// not silently route the same credential through an operator-unapproved
+	// proxy, even if an unrelated host process set HTTP(S)_PROXY.
+	t.Setenv("HTTP_PROXY", "http://proxy.invalid:8888")
+	t.Setenv("HTTPS_PROXY", "http://proxy.invalid:8888")
+	t.Setenv("NO_PROXY", "")
+	dir := t.TempDir()
+	gitPath := filepath.Join(dir, "git")
+	if err := os.WriteFile(gitPath, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tokenPath := filepath.Join(dir, "token")
+	if err := os.WriteFile(tokenPath, []byte("test-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	g, err := newGitHubRemote(gitPath, tokenPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport, ok := g.client.Transport.(*http.Transport)
+	if !ok || transport.Proxy != nil {
+		t.Fatal("credentialed GitHub REST transport inherits ambient proxy policy")
+	}
+	var dialed string
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != "publisher-api.test.invalid" || r.URL.Path != "/v1/check" ||
+			r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("request unexpectedly changed by proxy routing: host=%q url=%q", r.Host, r.URL)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer origin.Close()
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialed = addr
+		return (&net.Dialer{}).DialContext(ctx, network, origin.Listener.Addr().String())
+	}
+	g.apiBase = "http://publisher-api.test.invalid"
+	status, err := g.request(context.Background(), "test-token", http.MethodGet, "/v1/check", nil, nil, nil)
+	if err != nil || status != http.StatusOK || dialed != "publisher-api.test.invalid:80" {
+		t.Fatalf("unexpected implicit REST proxy: status=%d dialed=%q err=%v", status, dialed, err)
+	}
+	g.client.CloseIdleConnections()
 }
