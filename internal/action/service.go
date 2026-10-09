@@ -162,7 +162,11 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		if transitionErr := op.Transition(Unknown, s.now()); transitionErr != nil {
 			return Receipt{}, transitionErr
 		}
-		_ = s.repository.Update(*op)
+		if updateErr := s.repository.Update(*op); updateErr != nil {
+			// The external effect is ambiguous; an in-memory UNKNOWN
+			// receipt must not pretend the authoritative ledger settled.
+			return Receipt{}, fmt.Errorf("cannot persist UNKNOWN external operation: %w", updateErr)
+		}
 		return receiptFromOperation(req.ID, *op, s.now()), nil
 	}
 
@@ -212,7 +216,11 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	if err != nil {
 		op.State = Manual
 		op.UpdatedAt = s.now()
-		_ = s.repository.Update(op)
+		if updateErr := s.repository.Update(op); updateErr != nil {
+			// A reconciliation failure followed by a ledger write failure
+			// must not be reported as durable MANUAL settlement.
+			return Receipt{}, fmt.Errorf("cannot persist MANUAL external operation: %w", updateErr)
+		}
 		return receiptFromOperation("", op, s.now()), nil
 	}
 
