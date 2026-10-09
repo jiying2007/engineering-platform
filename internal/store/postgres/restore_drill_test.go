@@ -283,6 +283,26 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, ready.Version, executing); err != nil {
 		t.Fatal(err)
 	}
+	// The Action is admitted and CONFIRMED while the Run is still active.
+	// The later Delivery/Review/Closure and Recovery restore read back this
+	// historical operation; none may fabricate a new action after Run Complete.
+	req := action.Request{ID: "restore-operation", RunID: value.ID, ExecutionEpoch: 1, RecoveryEpoch: 0, Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci", ParametersDigest: "sha256:" + strings.Repeat("c", 64), IdempotencyKey: "restore-operation", RequestedBy: "runtime", RequestedAt: now.Add(6 * time.Second)}
+	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("d", 64), now.Add(6*time.Second))
+	if err := s.Create(*op); err != nil {
+		t.Fatal(err)
+	}
+	if err := op.Transition(action.Dispatched, now.Add(7*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
+	if err := op.Transition(action.Confirmed, now.Add(8*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
 	currentRun, currentSession, _ := s.GetExecution(value.ID)
 	currentWork, _ := s.GetWork(work.ID)
 	if err := currentRun.Complete(currentRun.CurrentEpoch); err != nil {
@@ -332,23 +352,6 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 		t.Fatal(err)
 	}
 	if err := s.CreateClosureAndUpdateWork(closure, reviewing.Version, closed); err != nil {
-		t.Fatal(err)
-	}
-	req := action.Request{ID: "restore-operation", RunID: value.ID, ExecutionEpoch: 1, RecoveryEpoch: 0, Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci", ParametersDigest: "sha256:" + strings.Repeat("c", 64), IdempotencyKey: "restore-operation", RequestedBy: "runtime", RequestedAt: now.Add(6 * time.Second)}
-	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("d", 64), now.Add(6*time.Second))
-	if err := s.Create(*op); err != nil {
-		t.Fatal(err)
-	}
-	if err := op.Transition(action.Dispatched, now.Add(7*time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Update(*op); err != nil {
-		t.Fatal(err)
-	}
-	if err := op.Transition(action.Confirmed, now.Add(8*time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Update(*op); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.BeginRecovery(0); err != nil {
