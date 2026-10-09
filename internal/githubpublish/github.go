@@ -78,7 +78,7 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 		git: canonicalGit, tokenFile: canonicalToken,
 		client: &http.Client{
 			Transport: transport,
-			Timeout: 20 * time.Second,
+			Timeout:   20 * time.Second,
 			// A credentialed GitHub API request must never be redirected to
 			// another endpoint or replay a mutation through an HTTP redirect.
 			CheckRedirect: func(*http.Request, []*http.Request) error {
