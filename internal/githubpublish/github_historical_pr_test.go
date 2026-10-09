@@ -51,8 +51,10 @@ func serveHistoricalPullFixture(t *testing.T, plan Plan, branchExists, historica
 		case prefix + "/pulls":
 			q := r.URL.Query()
 			wantHead := strings.SplitN(plan.Repository, "/", 2)[0] + ":" + plan.Branch
-			if q.Get("head") != wantHead || q.Get("base") != "" {
-				t.Errorf("historical pull query must bind owner/head without a mutable base filter: %v", q)
+			if q.Get("head") != wantHead ||
+				(q.Get("state") == "all" && q.Get("base") != "") ||
+				(q.Get("state") == "open" && q.Get("base") != plan.BaseRef) {
+				t.Errorf("GitHub PR query used incorrect head/state/base filter: %v", q)
 			}
 			if failHistory && q.Get("state") == "all" {
 				w.WriteHeader(http.StatusServiceUnavailable)
