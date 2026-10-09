@@ -119,6 +119,16 @@ func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string
 		return empty, fmt.Errorf("publication branch already points at a different commit")
 	}
 	if !branchExists {
+		// A deleted branch does not prove no external PR mutation occurred.
+		// Preserve a prior human-closed/merged PR decision even after its ref
+		// disappears, before attempting any new Git push.
+		prior, err := g.hasHistoricalPull(ctx, token, plan)
+		if err != nil {
+			return empty, err
+		}
+		if prior {
+			return empty, fmt.Errorf("publication branch has prior pull request history; independent reconciliation required")
+		}
 		if err := g.push(ctx, token, stage, plan); err != nil {
 			return empty, err
 		}
@@ -149,6 +159,16 @@ func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string
 			outcome = "UPDATED"
 		}
 	} else {
+		// A closed PR may coexist with the exact result branch. Do not create
+		// another PR from that deterministic publication identity in order to
+		// bypass a previous external closure/review decision.
+		prior, err := g.hasHistoricalPull(ctx, token, plan)
+		if err != nil {
+			return empty, err
+		}
+		if prior {
+			return empty, fmt.Errorf("publication branch has prior pull request history; independent reconciliation required")
+		}
 		pr, err = g.createPull(ctx, token, plan, title, body)
 		if err != nil {
 			return empty, err
@@ -185,6 +205,16 @@ func (g *githubRemote) Observe(ctx context.Context, plan Plan) (ObserveResult, e
 		return ObserveResult{}, err
 	}
 	if !exists {
+		// A deleted ref may belong to a closed/merged PR. GitHub retains
+		// closed PR history under the original head branch even after that ref
+		// was removed. Only ref AND PR-history absence can be considered ABSENT.
+		prior, err := g.hasHistoricalPull(ctx, token, plan)
+		if err != nil {
+			return ObserveResult{}, err
+		}
+		if prior {
+			return ObserveResult{Outcome: ObservedPartial}, nil
+		}
 		return ObserveResult{Outcome: ObservedAbsent}, nil
 	}
 	if branch != plan.ResultCommit {
@@ -237,6 +267,27 @@ func (g *githubRemote) getRef(ctx context.Context, token, repository, ref string
 		return "", false, fmt.Errorf("GitHub returned invalid ref SHA")
 	}
 	return strings.ToLower(record.Object.SHA), true, nil
+}
+
+// hasHistoricalPull is a read-only tombstone check for a deterministic
+// publication branch. The GitHub REST head filter includes closed/merged PRs
+// after deletion of their source branch; a previously changed external state
+// must not be mistaken for a pristine target of publication or SAFE_TO_RETRY.
+func (g *githubRemote) hasHistoricalPull(ctx context.Context, token string, plan Plan) (bool, error) {
+	owner := strings.SplitN(plan.Repository, "/", 2)[0]
+	query := url.Values{}
+	query.Set("state", "all")
+	query.Set("head", owner+":"+plan.Branch)
+	query.Set("base", plan.BaseRef)
+	query.Set("per_page", "100")
+	var pulls []pullRecord
+	_, err := g.request(ctx, token, http.MethodGet, "/repos/"+plan.Repository+"/pulls", query, nil, &pulls)
+	if err != nil {
+		return false, err
+	}
+	// Any historical PR on the frozen branch is an external effect, even if
+	// later closed, merged, deleted or no longer points to the expected SHA.
+	return len(pulls) != 0, nil
 }
 
 func (g *githubRemote) findOpenPull(ctx context.Context, token string, plan Plan) (pullRecord, bool, error) {
