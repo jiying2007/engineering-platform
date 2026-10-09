@@ -74,7 +74,6 @@ func TestPublisherGitCredentialNeverFollowsRemoteRedirect(t *testing.T) {
 	}
 }
 
-
 func TestGitHubPublisherRESTIgnoresInheritedProxyEnvironment(t *testing.T) {
 	// The Git subprocess already runs without ambient HTTPS_PROXY. REST must
 	// not silently route the same credential through an operator-unapproved
