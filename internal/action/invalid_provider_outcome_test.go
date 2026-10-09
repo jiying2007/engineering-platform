@@ -14,8 +14,8 @@ func TestInvalidProviderDispatchOutcomePersistsUnknownAndNeverReplays(t *testing
 		fixedGuard{},
 		fakeProvider{
 			dispatch: DispatchResult{
-				Outcome: "INVALID_PROVIDER_SUCCESS",
-				ExternalRef: "untrusted-external-reference",
+				Outcome:       "INVALID_PROVIDER_SUCCESS",
+				ExternalRef:   "untrusted-external-reference",
 				ObservedState: "invented-success",
 			},
 			dispatchCalls: &calls,
@@ -57,8 +57,8 @@ func TestInvalidProviderReconcileOutcomePersistsManual(t *testing.T) {
 		AllowCapabilities{"ci.dispatch": true},
 		fixedGuard{},
 		fakeProvider{reconcile: ReconcileResult{
-			Outcome: "UNRECOGNIZED_SAFE_TO_RETRY",
-			ExternalRef: "untrusted-observation",
+			Outcome:       "UNRECOGNIZED_SAFE_TO_RETRY",
+			ExternalRef:   "untrusted-observation",
 			ObservedState: "invented-safe-retry",
 		}},
 		repository,
