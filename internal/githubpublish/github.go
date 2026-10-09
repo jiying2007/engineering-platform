@@ -287,6 +287,11 @@ func (g *githubRemote) hasHistoricalPull(ctx context.Context, token string, plan
 	if err != nil {
 		return false, err
 	}
+	// A 200/null response is not an empty historical PR list. Only a real
+	// JSON array (including []) can establish an absence-of-history fact.
+	if pulls == nil {
+		return false, fmt.Errorf("GitHub PR history response must be an array")
+	}
 	// Any historical PR on the frozen branch is an external effect, even if
 	// later closed, merged, deleted or no longer points to the expected SHA.
 	return len(pulls) != 0, nil
