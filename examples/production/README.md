@@ -148,8 +148,8 @@ transport freshness bounds are not production performance targets.
 
 The bounded on-host diagnostic `eng production-live-observe --config
 /etc/engineering-platform/production-preflight.json` independently binds
-four actual named systemd main processes (including UID, executable inode,
-role-specific argv) to the exact installed source and rechecks Control mTLS
+four actual named systemd main processes (including PID generation start ticks,
+UID, executable inode, role-specific argv) to the exact installed source and rechecks Control mTLS
 database authority and Publisher mTLS endpoint before/after service identity
 sampling. Use a separately authorized read-only host/Control diagnostic
 context; do not grant these credentials to the model or Worker. Its result
