@@ -270,15 +270,17 @@ func (g *githubRemote) getRef(ctx context.Context, token, repository, ref string
 }
 
 // hasHistoricalPull is a read-only tombstone check for a deterministic
-// publication branch. The GitHub REST head filter includes closed/merged PRs
+// publication branch, independent of retargetable PR base. GitHub's owner/head
+// filter includes closed/merged PRs
 // after deletion of their source branch; a previously changed external state
 // must not be mistaken for a pristine target of publication or SAFE_TO_RETRY.
 func (g *githubRemote) hasHistoricalPull(ctx context.Context, token string, plan Plan) (bool, error) {
 	owner := strings.SplitN(plan.Repository, "/", 2)[0]
 	query := url.Values{}
 	query.Set("state", "all")
+	// Do not filter by base: a human may retarget a prior PR before closing
+	// and deleting the branch. The deterministic owner/head is the authority.
 	query.Set("head", owner+":"+plan.Branch)
-	query.Set("base", plan.BaseRef)
 	query.Set("per_page", "100")
 	var pulls []pullRecord
 	_, err := g.request(ctx, token, http.MethodGet, "/repos/"+plan.Repository+"/pulls", query, nil, &pulls)
