@@ -336,7 +336,7 @@ speculative services.
   **Read-only live-host diagnostics are now implemented but unqualified on an
   actual production host.** `eng production-live-observe` reuses the existing
   immutable host preflight and authenticated Core/Publisher probes and checks
-  canonical systemd role PIDs/UIDs/executables/argv with a second identity
+  canonical systemd role PIDs/start-ticks/UIDs/executables/argv with a second identity
   readback. It cannot grant capacity, selected Provider qualification or
   `operational_status_ready`; those require real deployment evidence under
   #105. A separate config gate rejects admission/preparation Workers whose
