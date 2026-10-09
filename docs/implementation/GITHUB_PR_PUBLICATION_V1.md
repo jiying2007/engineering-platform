@@ -154,7 +154,7 @@ A deterministic local precondition failure is retained as
 `PRECONDITION_FAILED` and reconciles to MANUAL. A transport error after
 dispatch becomes UNKNOWN. Reconciliation is observation-only:
 
-- exact base + no branch + no historical PR for the deterministic head/base + exact local bundle => SAFE_TO_RETRY;
+- exact base + no branch + no historical PR for the deterministic owner/head (regardless of retargeted base) + exact local bundle => SAFE_TO_RETRY;
 - exact branch + exact open PR => CONFIRMED;
 - missing branch with any closed/merged/prior PR history, partial branch-only state, or conflicting ref/PR => MANUAL.
 
