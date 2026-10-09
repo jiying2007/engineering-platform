@@ -65,7 +65,8 @@ func sameLiveServiceIdentities(first, second []production.LiveServiceObservation
 	}
 	for i := range first {
 		if first[i].Unit != second[i].Unit || first[i].ServiceUser != second[i].ServiceUser ||
-			first[i].PID != second[i].PID || first[i].Binary != second[i].Binary ||
+			first[i].PID != second[i].PID || first[i].StartTicks == 0 ||
+			first[i].StartTicks != second[i].StartTicks || first[i].Binary != second[i].Binary ||
 			first[i].ObservedAt.IsZero() || second[i].ObservedAt.IsZero() ||
 			second[i].ObservedAt.Before(first[i].ObservedAt) {
 			return false
