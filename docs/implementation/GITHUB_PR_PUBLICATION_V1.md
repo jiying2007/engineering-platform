@@ -154,17 +154,23 @@ A deterministic local precondition failure is retained as
 `PRECONDITION_FAILED` and reconciles to MANUAL. A transport error after
 dispatch becomes UNKNOWN. Reconciliation is observation-only:
 
-- exact base + no branch => SAFE_TO_RETRY;
+- exact base + no branch + no historical PR for the deterministic owner/head (regardless of retargeted base) + exact local bundle => SAFE_TO_RETRY;
 - exact branch + exact open PR => CONFIRMED;
-- partial branch-only state or any conflicting ref/PR => MANUAL.
+- missing branch with any closed/merged/prior PR history, partial branch-only state, or conflicting ref/PR => MANUAL.
 
 Reconciliation never replays a push or PR mutation. It derives the immutable
 publication Plan from the retained Core-bound Run/Task/Codex receipts, so an
 already **CONFIRMED** remote branch and exact PR can be recognized even if the
-local Git bundle was lost after dispatch. A remote **ABSENT** observation
-permits `SAFE_TO_RETRY` only if the local bundle still passes exact byte
-verification; without those bytes the result remains `MANUAL`. Neither
-observation invokes publication again.
+local Git bundle was lost after dispatch. A remote **ABSENT** observation is permitted only when both the exact
+publication branch and its full GitHub PR history are absent. It permits
+`SAFE_TO_RETRY` only if the local bundle still passes exact byte verification;
+without those bytes the result remains `MANUAL`. GitHub's `state=all` query
+retains closed/merged PRs even after their head ref is deleted: those are
+prior external effects, not proof that nothing occurred. New Publish also
+refuses to push or recreate a PR on the same deterministic branch if such a
+prior PR exists, even when no PR is currently open. Upstream query failure
+never authorizes a retry. Neither reconciliation observation invokes
+publication again.
 
 ## Historical pilot closeout and current external gates
 
