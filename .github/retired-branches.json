@@ -123,6 +123,12 @@
       "tree": "19fc158e9c512d8d65a7254d1a09dc06cff5b34d"
     },
     {
+      "branch": "fix/publisher-authenticated-redirect-policy-20261008",
+      "expected_head": "41a24723b8a935831f9d4e2a5f5f1373d474a3ac",
+      "integrated_commit": "53d7c48f35623873bcd27756d628e14e347e8b18",
+      "tree": "2e9f82c28873238df4cecf205631bd2551a081cb"
+    },
+    {
       "branch": "fix/rc-control-terminal-ordering",
       "expected_head": "97f734bc7172d7d73d2235966d8dad973db4fdb1",
       "integrated_commit": "fb368684f30213ffb2ef73cd6674f2d45e0a582c",
