@@ -181,6 +181,43 @@ without that permission fails before reaching the Store. The Store's changing
 snapshots in these tests are explicitly synthetic; they do not substitute for
 PostgreSQL service, real consumer heartbeat or deployment acceptance.
 
+**Read-only source-bound local service observation (non-READY).** After deploying
+the exact immutable distribution, four named systemd services and their private
+configuration, an authorized host operator can run:
+
+```sh
+# Use an operator mTLS environment with core:read access. Run in a
+# privileged host diagnostic context authorized to inspect production unit
+# identities/configuration; do not copy service keys to Worker or Codex.
+eng production-live-observe --config /etc/engineering-platform/production-preflight.json
+```
+
+The command first re-runs full `production-preflight` host validation and pins
+the actual delivered source SHA. It requires the operator's Control mTLS
+endpoint and **both Worker Control endpoints** to equal this deployment's
+Control listener. It then checks all four fixed systemd unit names against
+their live main PID, Linux UID (real/effective/saved/filesystem), exact
+deployed executable inode and approved process arguments. Control database
+authority is read using authenticated `core:read`; Publisher endpoint health
+uses the exact Control deployment's mTLS remote configuration. The four
+process identities are independently read again and must not change while
+the network observations are collected. Missing/silent/restarting units,
+wrong binary/UID/argv, changed source, alternate endpoint, stale status and
+Publisher TLS failure all stop the command without a successful report.
+
+The resulting bounded JSON explicitly keeps `provider_live_qualified=false`,
+`capacity_observed=false`, `ready=false` and `production_qualified=false`.
+This is a **one-shot diagnostic of source-bound wiring**, not a heartbeat,
+durable independent Evidence, systemd restart authority, GitHub upstream
+qualification, model authentication, worker queue capacity or the final
+`operational_status_ready` terminal gate. Read-only diagnostics cannot
+manufacture live WIF/relay qualification or the independent human Review.
+The operator must retain any accepted diagnostic externally under the
+existing source/subject Evidence policy. Production READY requires separate
+real and source-authenticated per-component capacity/health, provider and
+human acceptance under #105; the original database-only
+`production-status --require-ready` intentionally stays fail-closed.
+
 `eng production-publisher-health --config FILE` performs exactly one bounded
 GET to the configured Publisher `/healthz` through the same direct TLS 1.3
 client certificate/server-CA configuration used by publication. The response
