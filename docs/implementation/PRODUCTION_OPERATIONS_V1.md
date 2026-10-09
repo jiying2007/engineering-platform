@@ -196,8 +196,9 @@ The command first re-runs full `production-preflight` host validation and pins
 the actual delivered source SHA. It requires the operator's Control mTLS
 endpoint and **both Worker Control endpoints** to equal this deployment's
 Control listener. It then checks all four fixed systemd unit names against
-their live main PID, Linux UID (real/effective/saved/filesystem), exact
-deployed executable inode and approved process arguments. Control database
+their live main PID **and Linux process start ticks** (rejecting PID reuse),
+Linux UID (real/effective/saved/filesystem), exact deployed executable inode
+and approved process arguments. Control database
 authority is read using authenticated `core:read`; Publisher endpoint health
 uses the exact Control deployment's mTLS remote configuration. The four
 process identities are independently read again and must not change while
