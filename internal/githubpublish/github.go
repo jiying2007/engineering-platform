@@ -337,7 +337,8 @@ func (g *githubRemote) updatePull(ctx context.Context, token string, plan Plan, 
 }
 
 func pullMatches(pr pullRecord, plan Plan) bool {
-	return pr.Number > 0 && pr.State == "open" && pr.HTMLURL != "" &&
+	return pr.Number > 0 && pr.State == "open" &&
+		pr.HTMLURL == fmt.Sprintf("https://github.com/%s/pull/%d", plan.Repository, pr.Number) &&
 		pr.Head.Ref == plan.Branch && strings.ToLower(pr.Head.SHA) == plan.ResultCommit &&
 		pr.Base.Ref == plan.BaseRef && strings.ToLower(pr.Base.SHA) == plan.BaseCommit
 }
