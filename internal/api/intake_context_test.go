@@ -73,8 +73,8 @@ func TestCancelledWorkHTTPCallCannotCreateCoreRecord(t *testing.T) {
 	h := NewServer(p).Handler()
 	raw, err := json.Marshal(map[string]any{
 		"work_item_id": "cancelled-work-http",
-		"title": "cancelled intake",
-		"human_owner": "engineer",
+		"title":        "cancelled intake",
+		"human_owner":  "engineer",
 	})
 	if err != nil {
 		t.Fatal(err)
