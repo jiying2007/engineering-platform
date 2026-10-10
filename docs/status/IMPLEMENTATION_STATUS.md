@@ -24,6 +24,12 @@ it does not prove or settle already-dispatched effects. The remaining
 DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
 Recovery Proof pending provider-specific, independently retained observations.
 
+The production PostgreSQL connection path additionally enforces bounded
+server-side query, lock and idle-transaction waits and retains stricter
+operator limits. This bounds waits but does not propagate HTTP/Worker caller
+cancellation through existing context-free methods or resolve COMMIT ambiguity;
+P1 #229 remains open pending that end-to-end qualification.
+
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
 schema/runtime compatibility obligation.
