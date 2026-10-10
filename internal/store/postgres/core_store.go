@@ -616,6 +616,12 @@ func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (
 }
 
 func (s *Store) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
+	return s.UpdateExecutionContext(context.Background(), id, expectedVersion, value, sess)
+}
+
+// UpdateExecutionContext atomically persists Run/Session ownership and audit,
+// honoring the request deadline even when a competing Run row is locked.
+func (s *Store) UpdateExecutionContext(ctx context.Context, id string, expectedVersion uint64, value run.Run, sess session.Session) error {
 	payload := struct {
 		ExpectedVersion uint64          `json:"expected_version"`
 		Run             run.Run         `json:"run"`
@@ -625,7 +631,7 @@ func (s *Store) UpdateExecution(id string, expectedVersion uint64, value run.Run
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const updateRun = `
 UPDATE runs
@@ -767,6 +773,21 @@ func (s *Store) UpdateExecutionAndWork(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	return s.UpdateExecutionAndWorkContext(context.Background(), id, expectedRunVersion, value, sess, expectedWorkVersion, work)
+}
+
+// UpdateExecutionAndWorkContext preserves completed Run/Session and Work
+// versions in the existing single audited Core transaction. A lost COMMIT
+// outcome requires authoritative readback before any follow-up action.
+func (s *Store) UpdateExecutionAndWorkContext(
+	ctx context.Context,
+	id string,
+	expectedRunVersion uint64,
+	value run.Run,
+	sess session.Session,
+	expectedWorkVersion uint64,
+	work core.WorkItem,
+) error {
 	payload := struct {
 		Run  run.Run         `json:"run"`
 		Work core.WorkItem   `json:"work"`
@@ -776,7 +797,7 @@ func (s *Store) UpdateExecutionAndWork(
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const updateRun = `
 UPDATE runs
