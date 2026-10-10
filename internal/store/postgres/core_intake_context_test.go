@@ -85,7 +85,7 @@ func TestPostgresTaskFreezeHonorsCallerCancellationDuringWorkRowLock(t *testing.
 	plan := verification.Plan{
 		ID: "plan-" + suffix,
 		Criteria: []verification.Criterion{{
-			ID: "acceptance",
+			ID:        "acceptance",
 			Statement: "CI passes",
 			Requirements: []verification.EvidenceRequirement{{
 				ID: "ci", Issuer: "ci", Procedure: "ci.test",
@@ -99,11 +99,11 @@ func TestPostgresTaskFreezeHonorsCallerCancellationDuringWorkRowLock(t *testing.
 	task := core.TaskContract{
 		ID: "task-" + suffix, WorkItemID: work.ID,
 		TaskType: "FEATURE", Revision: 1,
-		Repository: "jiying2007/engineering-platform",
-		BaseCommit: "0123456789abcdef0123456789abcdef01234567",
+		Repository:         "jiying2007/engineering-platform",
+		BaseCommit:         "0123456789abcdef0123456789abcdef01234567",
 		VerificationPlanID: plan.ID, VerificationPlanDigest: planDigest,
 		AcceptanceCriteria: []string{"CI passes"},
-		AllowedActions: []string{"ci.dispatch"},
+		AllowedActions:     []string{"ci.dispatch"},
 	}
 	taskDigest, err := task.Digest()
 	if err != nil {
