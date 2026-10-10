@@ -96,6 +96,19 @@ process restarted.
 SIGTERM is the normal stop path. Control Plane already performs bounded HTTP
 shutdown and cancels its relay loop. Worker loops use signal-bound contexts.
 
+### Action cancellation and external side-effect boundary
+
+After a synchronous idempotency lookup, Core authorization, epoch guards or
+durable reservation/update, Action Gateway checks the request cancellation
+signal again before calling an external Publisher/CI/device Provider. A client
+that disconnects while a PostgreSQL lock wait is in progress can leave a
+PLANNED or DISPATCHED reservation, but must not initiate a **new** Provider
+call after cancellation becomes visible. Both states remain independently
+audited: a PLANNED reservation may be reconciled under the exact no-replay
+Recovery path; a DISPATCHED reservation remains ambiguous and is never
+silently replayed. This safety fence does not shorten the ongoing database
+request itself or prove that any earlier COMMIT failed.
+
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
 The production `postgres.Open` entrypoint installs PostgreSQL startup
