@@ -116,6 +116,12 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if req.IdempotencyKey == "" {
 		return Receipt{}, fmt.Errorf("idempotency key is required")
 	}
+	// A request cancelled before reservation must never reach a model, CI,
+	// Git/PR or device provider. A database-side timeout alone cannot infer
+	// the caller's intent after a lock wait.
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	digest, err := requestDigest(req)
 	if err != nil {
 		return Receipt{}, err
@@ -141,6 +147,12 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if err := s.guard.CheckRecoveryEpoch(ctx, req.RecoveryEpoch, req.RiskClass); err != nil {
 		return Receipt{}, err
 	}
+	// Authorization and guard implementations can block. Recheck the caller
+	// after each logical pre-dispatch phase; the database transaction below
+	// independently fences current Core authority.
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 
 	now := s.now()
 	op := NewWithRequestDigest(req, digest, now)
@@ -156,10 +168,22 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		}
 		return Receipt{}, err
 	}
+	// Create may have committed PLANNED before its caller was cancelled.
+	// Stop without dispatching: the reserved idempotency key remains durable
+	// and the exact PLANNED row can be handled by Recovery's no-replay path.
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	if err := op.Transition(Dispatched, now); err != nil {
 		return Receipt{}, err
 	}
 	if err := s.repository.Update(*op); err != nil {
+		return Receipt{}, err
+	}
+	// No external provider call may start after cancellation is observed.
+	// A committed DISPATCHED row remains ambiguous (and never replayable)
+	// even if the caller was cancelled immediately before the remote call.
+	if err := ctx.Err(); err != nil {
 		return Receipt{}, err
 	}
 
