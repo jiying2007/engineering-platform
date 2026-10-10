@@ -41,6 +41,9 @@ func TestProductionConnectionDeadlinesNeverSilentlyWiden(t *testing.T) {
 	for _, setting := range databaseDeadlines {
 		t.Run(setting.name, func(t *testing.T) {
 			stricter := deadlineConfig(t)
+			if stricter.ConnConfig.RuntimeParams == nil {
+				stricter.ConnConfig.RuntimeParams = make(map[string]string)
+			}
 			stricter.ConnConfig.RuntimeParams[setting.name] = "100ms"
 			if err := applyConnectionDeadlines(stricter); err != nil ||
 				stricter.ConnConfig.RuntimeParams[setting.name] != "100ms" {
@@ -48,6 +51,9 @@ func TestProductionConnectionDeadlinesNeverSilentlyWiden(t *testing.T) {
 			}
 			for _, bad := range []string{"0", "0ms", "-1", "bad", "2m", "3600000"} {
 				looser := deadlineConfig(t)
+				if looser.ConnConfig.RuntimeParams == nil {
+					looser.ConnConfig.RuntimeParams = make(map[string]string)
+				}
 				looser.ConnConfig.RuntimeParams[setting.name] = bad
 				if applyConnectionDeadlines(looser) == nil {
 					t.Fatalf("%s allowed unbounded/unsupported timeout %q", setting.name, bad)
@@ -106,9 +112,11 @@ func TestProductionOpenActuallyUsesDatabaseSideLockDeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 	start := time.Now()
-	// Deliberately uncancelled caller context: the PostgreSQL server, not the
-	// HTTP or Go client, must bound this independent row-lock wait.
-	_, err = bounded.pool.Exec(context.Background(),
+	// The client permits five seconds; PostgreSQL must reject this lock wait
+	// well before that deadline using its own stricter 200ms setting.
+	lockCtx, lockStop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer lockStop()
+	_, err = bounded.pool.Exec(lockCtx,
 		"UPDATE platform_state SET updated_at=clock_timestamp() WHERE singleton_id=true")
 	elapsed := time.Since(start)
 	var pgErr *pgconn.PgError
