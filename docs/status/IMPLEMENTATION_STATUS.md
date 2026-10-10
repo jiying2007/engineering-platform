@@ -52,10 +52,11 @@ cancelled lock waits leaving no record or audit residue. Evidence
 registration and Verification create/get now also carry the same caller
 Context into the frozen Delivery/Task/Plan/Evidence readback and their original
 single PostgreSQL record+audit transactions. A cancelled lock wait must not
-create PASS, a record or an audit fragment. Steering, Review/Closure and
-some internal Core/CLI Store paths remain context-free. P1 #229 remains
-open for those separate migrations, ambiguous COMMIT readback and long-run
-qualification.
+create PASS, a record or an audit fragment. Review/Closure create/get now also carry caller Context across frozen
+Delivery/Verification/Work/Run readback and single audit-backed Review/Closure
+mutations. Steering and some internal Core/CLI Store paths remain context-free.
+P1 #229 remains open for those separate migrations, ambiguous COMMIT readback
+and long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
@@ -404,10 +405,12 @@ speculative services.
   refs requires administrator permissions; the repository-side guard is
   intentionally read-only and must not be mislabeled as admin protection.
 
-Only three GitHub issues remain open by design: **#103, #106 and #105**. No
-additional repository implementation is required solely to change the internal
-RC state. Any future code slice must be justified by evidence from one of those
-external gates or a newly observed defect.
+Five GitHub issues remain open at this checkpoint: internal P0 **#228**
+(effectful Action recovery) and P1 **#229** (remaining caller-context,
+commit-ambiguity and maintenance qualification), plus external **#103**
+(managed WIF), **#106** (provider relay) and **#105** (production acceptance).
+The earlier W01–W10 repository milestones alone do not close newly observed
+internal safety defects. Do not treat CI fixtures as external production proof.
 
 Every future code slice still requires exact-head CI, fresh-main and
 delivered-byte readback. The internal RC envelope proves only that exact

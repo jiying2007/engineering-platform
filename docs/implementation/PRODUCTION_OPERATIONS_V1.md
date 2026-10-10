@@ -198,6 +198,17 @@ permission, authorize any new Publisher/Device effect, or change the Recovery
 Proof requirements. Steering, Review/Closure and internal Core callers still
 require P1 #229 qualification.
 
+### Review and Closure caller-cancellation boundary
+
+Authenticated Review/Closure HTTP calls carry the original caller Context
+through frozen Delivery/Verification/Work/Run readback and their existing
+version-fenced single PostgreSQL transaction plus audit. A cancelled lock
+wait must not create an independent Review PASS, Closure receipt or Work
+transition. A lost/ambiguous COMMIT response requires exact report/receipt,
+subject and Work version readback; cancellation alone is not rollback proof.
+Reviewer/verifier/owner separation and original immutable provenance checks
+are unchanged. This does not qualify the human review or production provider.
+
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
 The production `postgres.Open` entrypoint installs PostgreSQL startup
