@@ -14,8 +14,8 @@ import (
 
 type recoveryContextProbe struct {
 	*store.Memory
-	reads int
-	begins int
+	reads     int
+	begins    int
 	completes int
 }
 
