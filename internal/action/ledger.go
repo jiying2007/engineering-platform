@@ -15,6 +15,10 @@ const (
 	Reconciling State = "RECONCILING"
 	SafeToRetry State = "SAFE_TO_RETRY"
 	Manual      State = "MANUAL"
+	// AbandonedReconciled is a non-success, no-replay terminal state admitted
+	// only by the independently authorized Recovery transaction. Normal
+	// Action.Operation.Transition deliberately cannot enter this state.
+	AbandonedReconciled State = "ABANDONED_RECONCILED"
 )
 
 var ErrInvalidTransition = errors.New("invalid external operation transition")
