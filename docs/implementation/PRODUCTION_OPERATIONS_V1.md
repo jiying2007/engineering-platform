@@ -96,6 +96,30 @@ process restarted.
 SIGTERM is the normal stop path. Control Plane already performs bounded HTTP
 shutdown and cancels its relay loop. Worker loops use signal-bound contexts.
 
+### PostgreSQL-side execution ceilings (repository hardening, not SLO)
+
+The production `postgres.Open` entrypoint installs PostgreSQL startup
+parameters on **every pooled connection**:
+
+- `statement_timeout=20000ms`: a query must not wait or execute indefinitely;
+- `lock_timeout=5000ms`: database lock waits fail closed;
+- `idle_in_transaction_session_timeout=20000ms`: an abandoned transaction
+  cannot retain locks indefinitely.
+
+Explicit tighter nonzero DSN values are preserved; disabled, unsupported or
+looser values are rejected before any database connection is opened. The
+independently supplied test/pilot `postgres.New(pool)` path retains the
+caller's explicit pool configuration. Schema migration is a separate
+quiesced administrative operation, never an implicit production startup action.
+
+These are conservative *safety ceilings*, not calibrated performance targets,
+proof of a particular provider's behavior, or evidence of production
+availability. PostgreSQL cancellation, lock timeout, lost transport or a
+timeout during COMMIT does **not** prove that a write rolled back. Read back
+the exact Action/idempotency/audit state before any external retry. Caller
+context propagation through legacy context-free Core/Action interfaces
+remains separate P1 #229 work.
+
 ## 5. Health versus readiness
 
 `GET /healthz` proves only that the HTTP process is serving. It is deliberately
