@@ -137,11 +137,22 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	} else if !errors.Is(getErr, ErrOperationAbsent) {
 		return Receipt{}, getErr
 	}
+	// The idempotency lookup is a database call and can outlive cancellation
+	// until its bounded SQL deadline. Do not turn an absent lookup into new work.
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 
 	if err := s.authorizer.Authorize(ctx, req); err != nil {
 		return Receipt{}, fmt.Errorf("%w: %v", ErrDenied, err)
 	}
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	if err := s.guard.CheckRunEpoch(ctx, req.RunID, req.ExecutionEpoch); err != nil {
+		return Receipt{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return Receipt{}, err
 	}
 	if err := s.guard.CheckRecoveryEpoch(ctx, req.RecoveryEpoch, req.RiskClass); err != nil {
