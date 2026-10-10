@@ -131,8 +131,10 @@ historically proven** by retained Feature and Debug Closure chains. The
 current posture is **`INTERNAL_P0_RECOVERY_OPEN_EXTERNAL_QUALIFICATION_PENDING`**:
 the originally approved W01-W10 small-team repository slices are closed, but
 the new internal P0 [#228](https://github.com/jiying2007/engineering-platform/issues/228)
-still requires independently verified, no-replay disposal of crash-orphaned
-external Action states. Transactional admission (#226) and observability (#227)
+still requires independent reconciliation of potentially effectful
+DISPATCHED/UNKNOWN/RECONCILING/MANUAL Action states. The recovery-only
+schema-v13 planned-reservation path closes only the no-dispatch PLANNED
+subset; it neither confirms remote publication nor authorizes a retry. Transactional admission (#226) and observability (#227)
 are partial hardening, not that terminal Recovery disposition. Unattended
 Provider, real production-host, WorkBuddy/device and independent human
 acceptance are also pending. **This is neither a clean internal RC nor
