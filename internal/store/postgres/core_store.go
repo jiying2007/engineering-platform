@@ -1109,6 +1109,15 @@ func (s *Store) CreateReviewAndUpdateWork(
 	expectedVersion uint64,
 	work core.WorkItem,
 ) error {
+	return s.CreateReviewAndUpdateWorkContext(context.Background(), report, expectedVersion, work)
+}
+
+func (s *Store) CreateReviewAndUpdateWorkContext(
+	ctx context.Context,
+	report review.Report,
+	expectedVersion uint64,
+	work core.WorkItem,
+) error {
 	if err := report.Validate(); err != nil {
 		return err
 	}
@@ -1124,7 +1133,7 @@ func (s *Store) CreateReviewAndUpdateWork(
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const subjectQuery = `
 SELECT vr.verifier,vr.result,vr.delivery_receipt_id,vr.subject_digest,
@@ -1206,8 +1215,12 @@ WHERE work_item_id=$2 AND version=$3 AND state=$4
 }
 
 func (s *Store) GetReview(id string) (review.Report, error) {
+	return s.GetReviewContext(context.Background(), id)
+}
+
+func (s *Store) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
 	var raw []byte
-	if err := s.pool.QueryRow(bg(), "SELECT report_json FROM review_reports WHERE review_report_id=$1", id).Scan(&raw); err != nil {
+	if err := s.pool.QueryRow(ctx, "SELECT report_json FROM review_reports WHERE review_report_id=$1", id).Scan(&raw); err != nil {
 		return review.Report{}, mapReadError(err)
 	}
 	var report review.Report
@@ -1218,6 +1231,15 @@ func (s *Store) GetReview(id string) (review.Report, error) {
 }
 
 func (s *Store) CreateClosureAndUpdateWork(
+	item core.ClosureReceipt,
+	expectedVersion uint64,
+	work core.WorkItem,
+) error {
+	return s.CreateClosureAndUpdateWorkContext(context.Background(), item, expectedVersion, work)
+}
+
+func (s *Store) CreateClosureAndUpdateWorkContext(
+	ctx context.Context,
 	item core.ClosureReceipt,
 	expectedVersion uint64,
 	work core.WorkItem,
@@ -1234,7 +1256,7 @@ func (s *Store) CreateClosureAndUpdateWork(
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const reviewQuery = `
 SELECT result,delivery_receipt_id,verification_report_id,task_contract_digest,subject_digest
@@ -1293,9 +1315,13 @@ WHERE work_item_id=$4 AND version=$5 AND state=$6
 }
 
 func (s *Store) GetClosure(id string) (core.ClosureReceipt, error) {
+	return s.GetClosureContext(context.Background(), id)
+}
+
+func (s *Store) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT receipt_json FROM closure_receipts WHERE closure_receipt_id=$1",
 		id,
 	).Scan(&raw); err != nil {

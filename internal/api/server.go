@@ -1057,12 +1057,12 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "review_report_id, delivery_receipt_id, verification_report_id, reviewer and result are required")
 		return
 	}
-	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	delivery, err := s.getDeliveryForRequest(r.Context(), req.DeliveryReceiptID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	verificationReport, err := s.store.GetVerification(req.VerificationReportID)
+	verificationReport, err := s.getVerificationForRequest(r.Context(), req.VerificationReportID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1073,7 +1073,7 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "review requires PASS verification for the exact delivery subject")
 		return
 	}
-	work, err := s.store.GetWork(delivery.WorkItemID)
+	work, err := s.getWorkForRequest(r.Context(), delivery.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1112,7 +1112,7 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.store.CreateReviewAndUpdateWork(report, expectedVersion, nextWork); err != nil {
+	if err := s.createReviewForRequest(r.Context(), report, expectedVersion, nextWork); err != nil {
 		writeMutationError(w, err)
 		return
 	}
@@ -1120,7 +1120,7 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetReview(w http.ResponseWriter, r *http.Request) {
-	report, err := s.store.GetReview(r.PathValue("id"))
+	report, err := s.getReviewForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1144,12 +1144,12 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "closure_receipt_id, delivery_receipt_id, verification_report_id and review_report_id are required")
 		return
 	}
-	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	delivery, err := s.getDeliveryForRequest(r.Context(), req.DeliveryReceiptID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	report, err := s.store.GetVerification(req.VerificationReportID)
+	report, err := s.getVerificationForRequest(r.Context(), req.VerificationReportID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1158,7 +1158,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "closure requires PASS verification for the exact delivery subject")
 		return
 	}
-	reviewReport, err := s.store.GetReview(req.ReviewReportID)
+	reviewReport, err := s.getReviewForRequest(r.Context(), req.ReviewReportID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1171,7 +1171,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "closure requires PASS independent review for the exact verified delivery subject")
 		return
 	}
-	value, _, err := s.store.GetExecution(delivery.RunID)
+	value, _, err := s.getRunForRequest(r.Context(), delivery.RunID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1180,7 +1180,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "delivery does not match a completed run")
 		return
 	}
-	work, err := s.store.GetWork(delivery.WorkItemID)
+	work, err := s.getWorkForRequest(r.Context(), delivery.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -1206,7 +1206,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 		Result:               "CLOSED",
 		CreatedAt:            s.now(),
 	}
-	if err := s.store.CreateClosureAndUpdateWork(closure, expectedVersion, work); err != nil {
+	if err := s.createClosureForRequest(r.Context(), closure, expectedVersion, work); err != nil {
 		writeMutationError(w, err)
 		return
 	}
@@ -1214,7 +1214,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetClosure(w http.ResponseWriter, r *http.Request) {
-	item, err := s.store.GetClosure(r.PathValue("id"))
+	item, err := s.getClosureForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
