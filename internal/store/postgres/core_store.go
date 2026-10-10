@@ -341,9 +341,13 @@ func (s *Store) readTaskContext(ctx context.Context, query string, args ...any) 
 }
 
 func (s *Store) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
+	return s.GetVerificationPlanByDigestContext(context.Background(), digest)
+}
+
+func (s *Store) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT plan_json FROM verification_plans WHERE plan_digest=$1",
 		digest,
 	).Scan(&raw); err != nil {
@@ -974,18 +978,25 @@ func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.Deliver
 }
 
 func (s *Store) CreateEvidence(item core.EvidenceRef) error {
-	delivery, err := s.GetDelivery(item.DeliveryReceiptID)
+	return s.CreateEvidenceContext(context.Background(), item)
+}
+
+// Evidence verification and its immutable audit share the same PostgreSQL
+// ledger, now bound to the caller's cancellation. A lost COMMIT response does
+// not authorize another evidence registration without exact ID readback.
+func (s *Store) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
+	delivery, err := s.GetDeliveryContext(ctx, item.DeliveryReceiptID)
 	if err != nil {
 		return err
 	}
 	if item.SubjectDigest != delivery.SubjectDigest {
 		return corestore.ErrConflict
 	}
-	task, err := s.GetTaskByDigest(delivery.TaskContractDigest)
+	task, err := s.GetTaskByDigestContext(ctx, delivery.TaskContractDigest)
 	if err != nil {
 		return err
 	}
-	plan, err := s.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	plan, err := s.GetVerificationPlanByDigestContext(ctx, task.VerificationPlanDigest)
 	if err != nil {
 		return err
 	}
@@ -1000,7 +1011,7 @@ func (s *Store) CreateEvidence(item core.EvidenceRef) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 INSERT INTO evidence (
@@ -1019,9 +1030,13 @@ INSERT INTO evidence (
 }
 
 func (s *Store) GetEvidence(id string) (core.EvidenceRef, error) {
+	return s.GetEvidenceContext(context.Background(), id)
+}
+
+func (s *Store) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT evidence_json FROM evidence WHERE evidence_id=$1",
 		id,
 	).Scan(&raw); err != nil {
@@ -1035,6 +1050,12 @@ func (s *Store) GetEvidence(id string) (core.EvidenceRef, error) {
 }
 
 func (s *Store) CreateVerification(report verification.Report) error {
+	return s.CreateVerificationContext(context.Background(), report)
+}
+
+// Verification report and audit retain their original single transaction;
+// request cancellation never creates PASS or bypasses frozen Evidence.
+func (s *Store) CreateVerificationContext(ctx context.Context, report verification.Report) error {
 	raw, err := encodeJSON(report)
 	if err != nil {
 		return err
@@ -1043,7 +1064,7 @@ func (s *Store) CreateVerification(report verification.Report) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 INSERT INTO verification_reports (
@@ -1064,9 +1085,13 @@ INSERT INTO verification_reports (
 }
 
 func (s *Store) GetVerification(id string) (verification.Report, error) {
+	return s.GetVerificationContext(context.Background(), id)
+}
+
+func (s *Store) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT report_json FROM verification_reports WHERE verification_report_id=$1",
 		id,
 	).Scan(&raw); err != nil {
