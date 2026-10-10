@@ -21,7 +21,7 @@ func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 		dst *uint64
 		q   string
 	}{
-		{&facts.ExternalUnresolved, `SELECT count(*) FROM external_operations WHERE state NOT IN ('CONFIRMED','SAFE_TO_RETRY')`},
+		{&facts.ExternalUnresolved, `SELECT count(*) FROM external_operations WHERE state NOT IN ('CONFIRMED','SAFE_TO_RETRY','ABANDONED_RECONCILED')`},
 		{&facts.MutationOutboxLeases, `SELECT count(*) FROM outbox_events WHERE state='LEASED' AND risk_class<>'OBSERVE' AND lease_until>clock_timestamp()`},
 		{&facts.WorkerLeases, `SELECT count(*) FROM worker_inbox WHERE state='LEASED' AND lease_until>clock_timestamp()`},
 		{&facts.OfflineUnresolved, `SELECT count(*) FROM worker_offline_executions WHERE state IN ('AUTHORIZED','UNKNOWN')`},

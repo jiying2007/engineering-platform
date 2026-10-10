@@ -4,7 +4,7 @@ import _ "embed"
 
 // CurrentSchemaVersion is the latest migration understood by this binary.
 // Migration 0001 predates the ledger; recorded versions start at 0002.
-const CurrentSchemaVersion = 12
+const CurrentSchemaVersion = 13
 
 //go:embed migrations/0001_core.sql
 var coreMigration string
@@ -42,6 +42,9 @@ var codexContinuationsMigration string
 //go:embed migrations/0012_execution_reconciliation.sql
 var executionReconciliationMigration string
 
+//go:embed migrations/0013_action_planned_reconciliation.sql
+var actionPlannedReconciliationMigration string
+
 func CoreMigration() string {
-	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration + "\n" + codexExecutionMigration + "\n" + codexControlsMigration + "\n" + codexSourceCheckpointsMigration + "\n" + codexContinuationsMigration + "\n" + executionReconciliationMigration
+	return coreMigration + "\n" + outboxAuthorityMigration + "\n" + workerInboxMigration + "\n" + workerPreparationMigration + "\n" + offlineExecutionMigration + "\n" + reviewReportsMigration + "\n" + recoveryReconciliationMigration + "\n" + codexExecutionMigration + "\n" + codexControlsMigration + "\n" + codexSourceCheckpointsMigration + "\n" + codexContinuationsMigration + "\n" + executionReconciliationMigration + "\n" + actionPlannedReconciliationMigration
 }

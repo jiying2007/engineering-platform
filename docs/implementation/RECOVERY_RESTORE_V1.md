@@ -20,7 +20,7 @@ caller. PostgreSQL computes them while the exact recovery epoch is locked.
 
 A proof is created only when all machine-observable ambiguity is clear:
 
-- no ExternalOperation outside CONFIRMED or SAFE_TO_RETRY;
+- no ExternalOperation outside CONFIRMED, SAFE_TO_RETRY or explicitly no-replay ABANDONED_RECONCILED;
 - no live non-OBSERVE outbox lease;
 - no live Worker inbox lease;
 - no offline execution in AUTHORIZED or UNKNOWN.
@@ -39,6 +39,54 @@ the one-Run reservation still prevents replay.
 
 The immutable proof binds the recovery epoch, reconciler identity, canonical facts
 digest, audit-journal head and creation time. One proof exists per epoch.
+
+## Migration v13 — Recovery of pre-dispatch PLANNED Actions only
+
+An Action may crash with a durable PLANNED reservation but before any
+DISPATCHED transition. The Core's only permitted call to an external Provider
+occurs **after** a successfully persisted DISPATCHED transition. The existing
+#226 PostgreSQL guard locks Recovery/Run/Session when granting that transition.
+
+Migration `0013_action_planned_reconciliation.sql` therefore adds a
+Recovery-only, non-success `ABANDONED_RECONCILED` Action state and immutable
+`reconciliation_json`. The old idempotency key, Run/execution/recovery epochs,
+source request digest and audit history remain intact. The state is not
+accessible through normal Action Transition or generic Update.
+
+A separate mTLS `recovery:reconcile` identity may invoke:
+
+- `POST /api/v1/recovery/actions/abandon-planned`
+- `GET /api/v1/recovery/actions/{id}/abandon-planned` (`core:read`)
+
+The POST accepts version 1, exact operation/Run/execution/original-Recovery
+identity, the **current** Recovery epoch, original idempotency key/request
+digest, an independently retained operator observation digest, and the fixed
+`ABANDON_NO_REPLAY` disposition. Under a single bounded serializable
+transaction, PostgreSQL locks the current Recovery row before the exact
+Action row. Only an effect-free `PLANNED` row without external/receipt
+material may transition, accompanied by its audit event. A duplicate with
+exact same bytes and principal returns the same stored receipt; conflicting
+identity, observation or actor is rejected. The read-only GET works after
+Recovery completion, including when the response to the original POST was
+lost after commit.
+
+**PLANNED is the only state for which the database can establish that this
+Core-mediated Provider path was never dispatched.** A caller-supplied
+observation digest alone is NOT independent proof of external absence.
+`DISPATCHED`, `UNKNOWN`, `RECONCILING` and `MANUAL` cannot use this path,
+even with a matching observation digest. A prior nonterminal in-flight
+publication may still have produced a remote effect; only provider-specific
+external readback and an independent quiescence/settlement procedure can
+resolve it. Those cases remain internal P0 #228.
+
+The non-success receipt explicitly forbids effect-confirmation, execution,
+replay and production-readiness claims. Recovery Proof counts it as closed
+only for the **specific pre-dispatch reservation**; every other unresolved
+Action continues to block. Recovery completion still requires a separate
+authenticated principal and retained proof of the exact epoch. A successful
+local fixture/CI is not proof of production, publisher, provider or operator
+qualification. Existing installations require explicit quiescence and
+migration before running binaries that require schema v13.
 
 ## Double check on completion
 
