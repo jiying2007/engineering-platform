@@ -37,7 +37,7 @@ func TestPostgresActionIndependentBoundedSettlementAfterCallerCancellation(t *te
 	authority := gateway.NewAuthority(s)
 	service := action.NewService(authority, authority, provider, s)
 	request := action.Request{
-		ID: "action-" + suffix,
+		ID:    "action-" + suffix,
 		RunID: runID, ExecutionEpoch: 1, RecoveryEpoch: 0,
 		Action: "ci.dispatch", RiskClass: action.ControlledMutation,
 		Capability: "ci.dispatch", IdempotencyKey: "once-" + suffix,
