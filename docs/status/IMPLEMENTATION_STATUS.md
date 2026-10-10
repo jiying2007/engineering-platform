@@ -37,9 +37,14 @@ CONFIRMED. The WorkItem/TaskContract HTTP intake additionally passes its
 caller Context into PostgreSQL Work insert/read/update and atomic Task/Plan/Work
 freeze/read operations, including the original audit transaction. Cancelled
 Work/Task lock waits must not generate any committed Task or audit fragment.
-The remaining Run/steering/delivery/evidence/review/closure and other Core
-Store APIs still have context-free call sites; P1 #229 remains open for their
-request-scoped migration, ambiguous COMMIT readback and long-run qualification.
+The Run start/get HTTP path now carries caller Context through frozen Task
+digest readback, Work readback, and the single Run/Attempt/Session/Work
+transaction with the original audit and run.started Outbox. A cancelled
+Run-start lock wait must not persist any Run, input, audit or Outbox fragment.
+This only changes the request-bound start/read path: Pause/Resume/Takeover,
+Run completion, steering, delivery/evidence/review/closure and some internal
+Core/CLI Store calls remain context-free. P1 #229 stays open for those
+separate migrations, COMMIT readback and long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter

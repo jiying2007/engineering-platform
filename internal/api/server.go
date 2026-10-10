@@ -449,12 +449,12 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	task, err := s.store.GetTaskByDigest(req.TaskContractDigest)
+	task, err := s.getFrozenTaskForRequest(r.Context(), req.TaskContractDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	work, err := s.store.GetWork(task.WorkItemID)
+	work, err := s.getWorkForRequest(r.Context(), task.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -480,7 +480,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.store.CreateExecutionAndUpdateWork(*value, attempt, *sess, req.RunInput, expectedWorkVersion, work); err != nil {
+	if err := s.startRunForRequest(r.Context(), *value, attempt, *sess, req.RunInput, expectedWorkVersion, work); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -497,12 +497,12 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
-	value, sess, err := s.store.GetExecution(r.PathValue("id"))
+	value, sess, err := s.getRunForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	input, err := s.store.GetRunInputByDigest(value.RunInputManifestDigest)
+	input, err := s.getRunInputForRequest(r.Context(), value.RunInputManifestDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
