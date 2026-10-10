@@ -49,7 +49,7 @@ func TestPostgresActionCancellationDuringLockedAdmissionLeavesOnlyPlannedReserva
 	authority := gateway.NewAuthority(s)
 	service := action.NewService(authority, authority, provider, repository)
 	request := action.Request{
-		ID: fmt.Sprintf("cancelled-postgres-action-%d", time.Now().UnixNano()),
+		ID:    fmt.Sprintf("cancelled-postgres-action-%d", time.Now().UnixNano()),
 		RunID: runID, ExecutionEpoch: 1, RecoveryEpoch: 0,
 		Action: "ci.dispatch", RiskClass: action.ControlledMutation,
 		Capability: "ci.dispatch", IdempotencyKey: "frozen-once",
