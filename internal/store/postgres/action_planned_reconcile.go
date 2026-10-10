@@ -101,7 +101,7 @@ func (s *Store) ReconcilePlannedActionAbandoned(ctx context.Context, reconciler 
 		return zero, err
 	}
 	retained := recovery.ActionPlannedAbandonReceipt{
-		Kind: recovery.ActionPlannedAbandonmentKind,
+		Kind:    recovery.ActionPlannedAbandonmentKind,
 		Request: request, RequestDigest: requestDigest,
 		Reconciler: reconciler, PreviousState: string(action.Planned),
 		CreatedAt: now,
