@@ -44,7 +44,7 @@ func (s *Store) Mutate(ctx context.Context, mutation Mutation) (MutationResult, 
 	// If the caller disconnects while a SQL lock is held, rollback must not
 	// inherit its cancelled Context. The existing shared rollback helper has
 	// an independent finite deadline and never commits or replays an effect.
-	defer rollbackOutbox(tx)()
+	defer rollbackOutbox(tx)
 	if mutation.Apply != nil {
 		if err := mutation.Apply(ctx, tx); err != nil {
 			return MutationResult{}, fmt.Errorf("apply business mutation: %w", err)
