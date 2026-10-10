@@ -48,10 +48,14 @@ version transition and its original audit. Cancelled row-lock waits
 cannot leave a partial takeover or completion. Checkpoint and Delivery
 create/get HTTP operations now also carry the caller Context into the
 single original PostgreSQL record+audit transaction and readback, with
-cancelled lock waits leaving no record or audit residue. Steering,
-Evidence/Verification/Review/Closure and some internal Core/CLI Store paths
-remain context-free. P1 #229 remains open for those separate migrations,
-ambiguous COMMIT readback and real long-run qualification.
+cancelled lock waits leaving no record or audit residue. Evidence
+registration and Verification create/get now also carry the same caller
+Context into the frozen Delivery/Task/Plan/Evidence readback and their original
+single PostgreSQL record+audit transactions. A cancelled lock wait must not
+create PASS, a record or an audit fragment. Steering, Review/Closure and
+some internal Core/CLI Store paths remain context-free. P1 #229 remains
+open for those separate migrations, ambiguous COMMIT readback and long-run
+qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
