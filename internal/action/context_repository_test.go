@@ -58,7 +58,7 @@ type cancelAfterEffectProvider struct {
 }
 
 func (p cancelAfterEffectProvider) Dispatch(_ context.Context, _ Request) (DispatchResult, error) {
-	*p.calls++
+	(*p.calls)++
 	p.cancel()
 	return p.result, p.err
 }
