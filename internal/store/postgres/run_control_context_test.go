@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -189,6 +188,3 @@ func TestPostgresRunCompletionCancellationPreservesWorkAndAudit(t *testing.T) {
 	}
 }
 
-// A stable unique Run identifier is used in every fault injection, while
-// postgres.New(pool) confines the test to its own disposable schema.
-var _ = fmt.Sprintf
