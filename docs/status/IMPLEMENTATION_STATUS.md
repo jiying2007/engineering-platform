@@ -41,10 +41,14 @@ The Run start/get HTTP path now carries caller Context through frozen Task
 digest readback, Work readback, and the single Run/Attempt/Session/Work
 transaction with the original audit and run.started Outbox. A cancelled
 Run-start lock wait must not persist any Run, input, audit or Outbox fragment.
-This only changes the request-bound start/read path: Pause/Resume/Takeover,
-Run completion, steering, delivery/evidence/review/closure and some internal
-Core/CLI Store calls remain context-free. P1 #229 stays open for those
-separate migrations, COMMIT readback and long-run qualification.
+The Pause/Resume/Takeover routes now use the same request Context for
+Run/Session readback and their optimistic-versioned atomic transaction.
+Run completion also binds that caller to the combined Run/Session/Work
+version transition and its original audit. Cancelled row-lock waits
+cannot leave a partial takeover or completion. Steering, checkpoints,
+delivery/evidence/review/closure and some internal Core/CLI Store paths
+remain context-free. P1 #229 remains open for those later migrations,
+ambiguous COMMIT readback and real long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
