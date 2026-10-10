@@ -45,9 +45,12 @@ The Pause/Resume/Takeover routes now use the same request Context for
 Run/Session readback and their optimistic-versioned atomic transaction.
 Run completion also binds that caller to the combined Run/Session/Work
 version transition and its original audit. Cancelled row-lock waits
-cannot leave a partial takeover or completion. Steering, checkpoints,
-delivery/evidence/review/closure and some internal Core/CLI Store paths
-remain context-free. P1 #229 remains open for those later migrations,
+cannot leave a partial takeover or completion. Checkpoint and Delivery
+create/get HTTP operations now also carry the caller Context into the
+single original PostgreSQL record+audit transaction and readback, with
+cancelled lock waits leaving no record or audit residue. Steering,
+Evidence/Verification/Review/Closure and some internal Core/CLI Store paths
+remain context-free. P1 #229 remains open for those separate migrations,
 ambiguous COMMIT readback and real long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
