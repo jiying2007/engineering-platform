@@ -56,14 +56,14 @@ func (p *runStartContextProbe) GetRunInputByDigestContext(ctx context.Context, d
 
 func runStartBody(runID, taskDigest string) map[string]any {
 	return map[string]any{
-		"run_id": runID,
+		"run_id":               runID,
 		"task_contract_digest": taskDigest,
-		"attempt_id": "attempt-" + runID,
+		"attempt_id":           "attempt-" + runID,
 		"run_input": map[string]any{
 			"runtime_profile": "codex/default",
-			"tool_profile": "tools/m1",
-			"worker_profile": "worker/ubuntu",
-			"policy_profile": "policy/m1",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
 		},
 	}
 }
