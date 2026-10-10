@@ -135,6 +135,25 @@ delivery/evidence/review/closure interfaces still require request-scoped
 migration under P1 #229. These changes do not authorize model execution,
 Publisher mutations or automatic retry.
 
+### Core Run start/read cancellation and one-transaction authority
+
+The authenticated `POST /api/v1/runs` route now carries its caller Context
+through frozen Task-digest and Work reads and the original atomic
+Run/Attempt/Session/Work insertion. The `run.started` Outbox event and audit
+remain in **that same PostgreSQL transaction**. The `GET /api/v1/runs/{id}`
+route likewise uses request-bound Run/Session and immutable Run-input reads.
+A cancellation while the Run start waits for a Work row lock must interrupt
+the SQL transaction; no partial Run, manifest, Work mutation, audit or Outbox
+may remain. The legacy in-process Store entrypoints still share the same
+authority and are not a second execution system.
+
+A canceled or disconnected response around COMMIT does not establish that
+the Run was absent. Always check the exact Run ID, frozen input/Task digests,
+Work version and `run.started` Outbox identity before attempting to start
+a new Run. This stage does not migrate Pause/Resume/Takeover, steering,
+completion, delivery/evidence/review/closure or all internal Core/CLI calls;
+P1 #229 remains open.
+
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
 The production `postgres.Open` entrypoint installs PostgreSQL startup
