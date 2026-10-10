@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 )
@@ -143,4 +142,3 @@ func TestDeliveryContextCancelsDatabaseLockWithoutAuditOrSubject(t *testing.T) {
 	}
 }
 
-var _ = core.DeliveryReceipt{}
