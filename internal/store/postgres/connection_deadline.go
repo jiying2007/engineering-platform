@@ -16,9 +16,9 @@ import (
 // Pilot/test stores created from a supplied pool with New(pool) retain the
 // caller's explicit connection policy; production Control calls Open.
 const (
-	maxStatementTimeout       = 20 * time.Second
-	maxLockTimeout            = 5 * time.Second
-	maxIdleInTransaction      = 20 * time.Second
+	maxStatementTimeout  = 20 * time.Second
+	maxLockTimeout       = 5 * time.Second
+	maxIdleInTransaction = 20 * time.Second
 )
 
 type databaseDeadline struct {
