@@ -913,17 +913,17 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "delivery_receipt_id, evidence_id, requirement_id, issuer, procedure and result are required")
 		return
 	}
-	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	delivery, err := s.getDeliveryForRequest(r.Context(), req.DeliveryReceiptID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	task, err := s.store.GetTaskByDigest(delivery.TaskContractDigest)
+	task, err := s.getFrozenTaskForRequest(r.Context(), delivery.TaskContractDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	plan, err := s.store.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	plan, err := s.getVerificationPlanForRequest(r.Context(), task.VerificationPlanDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -944,7 +944,7 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, "evidence artifact_refs must be unique artifacts from the exact delivery")
 		return
 	}
-	if err := s.store.CreateEvidence(item); err != nil {
+	if err := s.registerEvidenceForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -960,7 +960,7 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetEvidence(w http.ResponseWriter, r *http.Request) {
-	item, err := s.store.GetEvidence(r.PathValue("id"))
+	item, err := s.getEvidenceForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -984,24 +984,24 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "verification_report_id, delivery_receipt_id and verifier are required")
 		return
 	}
-	delivery, err := s.store.GetDelivery(req.DeliveryReceiptID)
+	delivery, err := s.getDeliveryForRequest(r.Context(), req.DeliveryReceiptID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	task, err := s.store.GetTaskByDigest(delivery.TaskContractDigest)
+	task, err := s.getFrozenTaskForRequest(r.Context(), delivery.TaskContractDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	plan, err := s.store.GetVerificationPlanByDigest(task.VerificationPlanDigest)
+	plan, err := s.getVerificationPlanForRequest(r.Context(), task.VerificationPlanDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
 	evidence := make([]core.EvidenceRef, 0, len(req.EvidenceIDs))
 	for _, id := range req.EvidenceIDs {
-		item, err := s.store.GetEvidence(id)
+		item, err := s.getEvidenceForRequest(r.Context(), id)
 		if err != nil {
 			writeStoreError(w, err)
 			return
@@ -1014,7 +1014,7 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 	report.DeliveryReceiptID = delivery.ID
 	report.Verifier = req.Verifier
 	report.CreatedAt = s.now()
-	if err := s.store.CreateVerification(report); err != nil {
+	if err := s.createVerificationForRequest(r.Context(), report); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -1030,7 +1030,7 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleGetVerification(w http.ResponseWriter, r *http.Request) {
-	report, err := s.store.GetVerification(r.PathValue("id"))
+	report, err := s.getVerificationForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
