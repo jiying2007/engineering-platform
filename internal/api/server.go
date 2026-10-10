@@ -144,8 +144,8 @@ func (s *Server) handleOperationalStatus(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, status)
 }
 
-func (s *Server) handleGetRecovery(w http.ResponseWriter, _ *http.Request) {
-	state, err := s.store.GetRecovery()
+func (s *Server) handleGetRecovery(w http.ResponseWriter, r *http.Request) {
+	state, err := s.getRecoveryForRequest(r.Context())
 	if err != nil {
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 		return
@@ -162,7 +162,7 @@ func (s *Server) handleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	state, err := s.store.BeginRecovery(req.ExpectedRecoveryEpoch)
+	state, err := s.beginRecoveryForRequest(r.Context(), req.ExpectedRecoveryEpoch)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrAlreadyRecovering):
@@ -188,7 +188,7 @@ func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "recovery_epoch is required")
 		return
 	}
-	state, err := s.store.CompleteRecovery(req.RecoveryEpoch, true)
+	state, err := s.completeRecoveryForRequest(r.Context(), req.RecoveryEpoch, true)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch):
