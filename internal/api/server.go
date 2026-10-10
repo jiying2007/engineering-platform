@@ -272,7 +272,7 @@ func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
 	if item.CreatedAt.IsZero() {
 		item.CreatedAt = s.now()
 	}
-	if err := s.store.CreateWork(item); err != nil {
+	if err := s.createWorkForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -284,7 +284,7 @@ func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetWork(w http.ResponseWriter, r *http.Request) {
-	item, err := s.store.GetWork(r.PathValue("id"))
+	item, err := s.getWorkForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -309,7 +309,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "task_contract_id, work_item_id and task_type are required")
 		return
 	}
-	work, err := s.store.GetWork(req.Contract.WorkItemID)
+	work, err := s.getWorkForRequest(r.Context(), req.Contract.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -389,7 +389,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.store.CreateTaskAndUpdateWork(req.Contract, req.VerificationPlan, expectedWorkVersion, work); err != nil {
+	if err := s.freezeTaskForRequest(r.Context(), req.Contract, req.VerificationPlan, expectedWorkVersion, work); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -405,7 +405,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
-	task, err := s.store.GetTask(r.PathValue("id"))
+	task, err := s.getTaskForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
