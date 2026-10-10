@@ -55,20 +55,20 @@ func TestCheckpointDeliveryHTTPRoutesUseRequestContext(t *testing.T) {
 	handler := NewServer(probe).Handler()
 	digest := createWorkAndTask(t, handler, "cd-work", "cd-task", "FEATURE", "driver")
 	mustRequest(t, handler, http.MethodPost, "/api/v1/runs", map[string]any{
-		"run_id": "cd-run",
+		"run_id":               "cd-run",
 		"task_contract_digest": digest,
-		"attempt_id": "cd-attempt",
+		"attempt_id":           "cd-attempt",
 		"run_input": map[string]any{
 			"runtime_profile": "codex/default",
-			"tool_profile": "tools/m1",
-			"worker_profile": "worker/ubuntu",
-			"policy_profile": "policy/m1",
+			"tool_profile":    "tools/m1",
+			"worker_profile":  "worker/ubuntu",
+			"policy_profile":  "policy/m1",
 		},
 	}, http.StatusCreated)
 
 	mustRequest(t, handler, http.MethodPost, "/api/v1/runs/cd-run/checkpoints", map[string]any{
-		"checkpoint_id": "cd-checkpoint",
-		"execution_epoch": 1,
+		"checkpoint_id":      "cd-checkpoint",
+		"execution_epoch":    1,
 		"source_tree_digest": "sha256:tree",
 	}, http.StatusCreated)
 	mustRequest(t, handler, http.MethodGet, "/api/v1/checkpoints/cd-checkpoint", nil, http.StatusOK)
@@ -77,8 +77,8 @@ func TestCheckpointDeliveryHTTPRoutesUseRequestContext(t *testing.T) {
 	}, http.StatusOK)
 	mustRequest(t, handler, http.MethodPost, "/api/v1/deliveries", map[string]any{
 		"delivery_receipt_id": "cd-delivery",
-		"run_id": "cd-run",
-		"result_commit": "0123456789abcdef0123456789abcdef01234567",
+		"run_id":              "cd-run",
+		"result_commit":       "0123456789abcdef0123456789abcdef01234567",
 	}, http.StatusCreated)
 	mustRequest(t, handler, http.MethodGet, "/api/v1/deliveries/cd-delivery", nil, http.StatusOK)
 	if probe.createCheckpointCalls != 1 || probe.readCheckpointCalls != 1 ||
@@ -90,8 +90,8 @@ func TestCheckpointDeliveryHTTPRoutesUseRequestContext(t *testing.T) {
 	cancel()
 	body, err := json.Marshal(map[string]any{
 		"delivery_receipt_id": "must-not-create",
-		"run_id": "cd-run",
-		"result_commit": "1111111111111111111111111111111111111111",
+		"run_id":              "cd-run",
+		"result_commit":       "1111111111111111111111111111111111111111",
 	})
 	if err != nil {
 		t.Fatal(err)
