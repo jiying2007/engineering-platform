@@ -29,6 +29,7 @@ var startupSchemaColumns = map[string][]string{
 	"steering_commands":         {"execution_id", "control_payload", "dispatched_at", "resolved_at"},
 	"worker_offline_executions": {"reconciliation_json"},
 	"worker_codex_executions":   {"reconciliation_json"},
+	"external_operations":      {"reconciliation_json"},
 }
 
 // CheckWorkerSchema is the existing pre-listen startup gate. It now requires the
