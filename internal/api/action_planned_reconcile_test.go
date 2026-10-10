@@ -41,10 +41,10 @@ func plannedActionAPIFixture() recovery.ActionPlannedAbandonRequest {
 	return recovery.ActionPlannedAbandonRequest{
 		Version: 1, OperationID: "op-test", RunID: "run-test",
 		ExecutionEpoch: 1, OriginalRecoveryEpoch: 0, RecoveryEpoch: 1,
-		IdempotencyKey: "frozen-key",
+		IdempotencyKey:        "frozen-key",
 		OriginalRequestDigest: "sha256:" + strings.Repeat("a", 64),
-		ObservationDigest: "sha256:" + strings.Repeat("b", 64),
-		Disposition: recovery.AbandonNoReplay,
+		ObservationDigest:     "sha256:" + strings.Repeat("b", 64),
+		Disposition:           recovery.AbandonNoReplay,
 	}
 }
 
