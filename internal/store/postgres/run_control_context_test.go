@@ -62,7 +62,7 @@ func TestPostgresRunControlCancellationStopsLockedRunUpdate(t *testing.T) {
 	select {
 	case err := <-done:
 		t.Fatalf("locked Run control unexpectedly completed: %v", err)
-	case <-time.After(80*time.Millisecond):
+	case <-time.After(80 * time.Millisecond):
 	}
 	cancel()
 	select {
@@ -138,7 +138,7 @@ func TestPostgresRunCompletionCancellationPreservesWorkAndAudit(t *testing.T) {
 	select {
 	case err := <-done:
 		t.Fatalf("locked Run completion unexpectedly finished: %v", err)
-	case <-time.After(80*time.Millisecond):
+	case <-time.After(80 * time.Millisecond):
 	}
 	cancel()
 	select {
@@ -187,4 +187,3 @@ func TestPostgresRunCompletionCancellationPreservesWorkAndAudit(t *testing.T) {
 		}
 	}
 }
-
