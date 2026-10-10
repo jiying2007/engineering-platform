@@ -54,16 +54,16 @@ func (r ActionPlannedAbandonRequest) Digest() (string, error) {
 }
 
 type ActionPlannedAbandonReceipt struct {
-	Kind                string                     `json:"kind"`
+	Kind                string                      `json:"kind"`
 	Request             ActionPlannedAbandonRequest `json:"request"`
-	RequestDigest       string                     `json:"request_digest"`
-	Reconciler          string                     `json:"reconciler"`
-	PreviousState       string                     `json:"previous_state"`
-	CreatedAt           time.Time                  `json:"created_at"`
-	EffectConfirmed     bool                       `json:"effect_confirmed"`
-	ExecutionAuthorized bool                       `json:"execution_authorized"`
-	ReplayAuthorized    bool                       `json:"replay_authorized"`
-	ProductionQualified bool                       `json:"production_qualified"`
+	RequestDigest       string                      `json:"request_digest"`
+	Reconciler          string                      `json:"reconciler"`
+	PreviousState       string                      `json:"previous_state"`
+	CreatedAt           time.Time                   `json:"created_at"`
+	EffectConfirmed     bool                        `json:"effect_confirmed"`
+	ExecutionAuthorized bool                        `json:"execution_authorized"`
+	ReplayAuthorized    bool                        `json:"replay_authorized"`
+	ProductionQualified bool                        `json:"production_qualified"`
 }
 
 func (r ActionPlannedAbandonReceipt) Validate() error {
