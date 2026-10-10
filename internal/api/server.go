@@ -712,7 +712,7 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.completeRunForRequest(r.Context(), 
+	if err := s.completeRunForRequest(r.Context(),
 		runID,
 		expectedRunVersion,
 		value,
