@@ -24,6 +24,15 @@ it does not prove or settle already-dispatched effects. The remaining
 DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
 Recovery Proof pending provider-specific, independently retained observations.
 
+The Action Gateway now rechecks caller cancellation after idempotency lookup,
+authorization, Run/Recovery guards and durable PLANNED/DISPATCHED writes,
+before any external Provider call. This prevents a cancelled request from
+initiating a fresh external effect after a blocked database reservation
+eventually completes. A retained PLANNED/DISPATCHED row is *not* automatically
+replayed or classified as CONFIRMED. This is an execution-path fence, not
+end-to-end caller-context propagation through the legacy Store API; P1 #229
+remains open for exact database request cancellation and COMMIT ambiguity.
+
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
 operator limits. This bounds waits but does not propagate HTTP/Worker caller
