@@ -519,7 +519,7 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.Context(), r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		if err := value.Pause(req.ExecutionEpoch); err != nil {
 			return err
 		}
@@ -529,7 +529,7 @@ func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 		writeMutationError(w, err)
 		return
 	}
-	s.writeExecution(w, r.PathValue("id"))
+	s.writeExecution(w, r.Context(), r.PathValue("id"))
 }
 
 func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
@@ -537,7 +537,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.Context(), r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		if err := value.Resume(req.ExecutionEpoch); err != nil {
 			return err
 		}
@@ -547,7 +547,7 @@ func (s *Server) handleResume(w http.ResponseWriter, r *http.Request) {
 		writeMutationError(w, err)
 		return
 	}
-	s.writeExecution(w, r.PathValue("id"))
+	s.writeExecution(w, r.Context(), r.PathValue("id"))
 }
 
 type steerRequest = codexexec.ControlInput
@@ -571,7 +571,7 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var newEpoch uint64
-	err := s.mutateExecution(r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
+	err := s.mutateExecution(r.Context(), r.PathValue("id"), func(value *run.Run, sess *session.Session) error {
 		epoch, err := value.Takeover(req.ExecutionEpoch)
 		if err != nil {
 			return err
@@ -681,7 +681,7 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	runID := r.PathValue("id")
-	value, sess, err := s.store.GetExecution(runID)
+	value, sess, err := s.getRunForRequest(r.Context(), runID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -691,12 +691,12 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		writeMutationError(w, err)
 		return
 	}
-	task, err := s.store.GetTaskByDigest(value.TaskContractDigest)
+	task, err := s.getFrozenTaskForRequest(r.Context(), value.TaskContractDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	work, err := s.store.GetWork(task.WorkItemID)
+	work, err := s.getWorkForRequest(r.Context(), task.WorkItemID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -712,7 +712,7 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
-	if err := s.store.UpdateExecutionAndWork(
+	if err := s.completeRunForRequest(r.Context(), 
 		runID,
 		expectedRunVersion,
 		value,
@@ -723,7 +723,7 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 		writeMutationError(w, err)
 		return
 	}
-	s.writeExecution(w, runID)
+	s.writeExecution(w, r.Context(), runID)
 }
 
 type createActionRequest struct {
@@ -1222,12 +1222,12 @@ func (s *Server) handleGetClosure(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
-func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) error) error {
-	value, sess, err := s.store.GetExecution(id)
+func (s *Server) mutateExecution(ctx context.Context, id string, fn func(*run.Run, *session.Session) error) error {
+	value, sess, err := s.getRunForRequest(ctx, id)
 	if err != nil {
 		return err
 	}
-	input, err := s.store.GetRunInputByDigest(value.RunInputManifestDigest)
+	input, err := s.getRunInputForRequest(ctx, value.RunInputManifestDigest)
 	if err != nil {
 		return err
 	}
@@ -1238,11 +1238,11 @@ func (s *Server) mutateExecution(id string, fn func(*run.Run, *session.Session) 
 	if err := fn(&value, &sess); err != nil {
 		return err
 	}
-	return s.store.UpdateExecution(id, expectedVersion, value, sess)
+	return s.updateRunForRequest(ctx, id, expectedVersion, value, sess)
 }
 
-func (s *Server) writeExecution(w http.ResponseWriter, id string) {
-	value, sess, err := s.store.GetExecution(id)
+func (s *Server) writeExecution(w http.ResponseWriter, ctx context.Context, id string) {
+	value, sess, err := s.getRunForRequest(ctx, id)
 	if err != nil {
 		writeStoreError(w, err)
 		return
