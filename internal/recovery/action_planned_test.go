@@ -11,8 +11,8 @@ func plannedActionFixture() ActionPlannedAbandonRequest {
 		Version: 1, OperationID: "action-1", RunID: "run-1", ExecutionEpoch: 1,
 		OriginalRecoveryEpoch: 0, RecoveryEpoch: 1, IdempotencyKey: "action-once",
 		OriginalRequestDigest: "sha256:" + strings.Repeat("a", 64),
-		ObservationDigest: "sha256:" + strings.Repeat("b", 64),
-		Disposition: AbandonNoReplay,
+		ObservationDigest:     "sha256:" + strings.Repeat("b", 64),
+		Disposition:           AbandonNoReplay,
 	}
 }
 
@@ -46,9 +46,9 @@ func TestPlannedActionReceiptCannotClaimEffectOrExecution(t *testing.T) {
 	req := plannedActionFixture()
 	digest, _ := req.Digest()
 	good := ActionPlannedAbandonReceipt{
-		Kind: ActionPlannedAbandonmentKind,
+		Kind:    ActionPlannedAbandonmentKind,
 		Request: req, RequestDigest: digest,
-		Reconciler: "urn:engineering-platform:operator:reconciler",
+		Reconciler:    "urn:engineering-platform:operator:reconciler",
 		PreviousState: "PLANNED", CreatedAt: time.Now().UTC(),
 	}
 	if err := good.Validate(); err != nil {
