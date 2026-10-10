@@ -124,6 +124,9 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		if existing.RequestDigest != digest {
 			return Receipt{}, ErrIdempotencyConflict
 		}
+		if existing.State == AbandonedReconciled {
+			return Receipt{}, fmt.Errorf("%w: abandoned external reservation has no replay authority", ErrDenied)
+		}
 		return receiptFromOperation(req.ID, existing, s.now()), nil
 	} else if !errors.Is(getErr, ErrOperationAbsent) {
 		return Receipt{}, getErr
@@ -145,6 +148,9 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		if errors.Is(err, ErrOperationExists) {
 			existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey)
 			if getErr == nil && existing.RequestDigest == digest {
+				if existing.State == AbandonedReconciled {
+					return Receipt{}, fmt.Errorf("%w: abandoned external reservation has no replay authority", ErrDenied)
+				}
 				return receiptFromOperation(req.ID, existing, s.now()), nil
 			}
 		}
