@@ -65,20 +65,20 @@ func TestEvidenceVerificationHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T)
 	mustRequest(t, handler, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "ev-context",
+			"evidence_id":    "ev-context",
 			"requirement_id": "req-1",
-			"issuer": "ci",
-			"procedure": "ci.test",
-			"result": "PASS",
-			"applicable": true,
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 	mustRequest(t, handler, http.MethodGet, "/api/v1/evidence/ev-context", nil, http.StatusOK)
 	mustRequest(t, handler, http.MethodPost, "/api/v1/verifications", map[string]any{
 		"verification_report_id": "verify-context",
-		"delivery_receipt_id": delivery.ID,
-		"verifier": "independent-verifier",
-		"evidence_ids": []string{"ev-context"},
+		"delivery_receipt_id":    delivery.ID,
+		"verifier":               "independent-verifier",
+		"evidence_ids":           []string{"ev-context"},
 	}, http.StatusCreated)
 	mustRequest(t, handler, http.MethodGet, "/api/v1/verifications/verify-context", nil, http.StatusOK)
 	if probe.getPlanCalls != 2 || probe.registerEvidenceCalls != 1 ||
@@ -90,11 +90,11 @@ func TestEvidenceVerificationHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T)
 	body, err := json.Marshal(map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "never-create-cancelled",
+			"evidence_id":    "never-create-cancelled",
 			"requirement_id": "req-1",
-			"issuer": "ci",
-			"procedure": "ci.test",
-			"result": "PASS",
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
 		},
 	})
 	if err != nil {
