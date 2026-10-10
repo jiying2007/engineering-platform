@@ -65,6 +65,10 @@ func (s *Store) ApplyCoreMigration(ctx context.Context) error {
 }
 
 func (s *Store) GetRecovery() (recovery.Manager, error) {
+	return s.GetRecoveryContext(context.Background())
+}
+
+func (s *Store) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -72,7 +76,7 @@ func (s *Store) GetRecovery() (recovery.Manager, error) {
 
 	var epoch uint64
 	var mode string
-	if err := s.pool.QueryRow(context.Background(), query).Scan(&epoch, &mode); err != nil {
+	if err := s.pool.QueryRow(ctx, query).Scan(&epoch, &mode); err != nil {
 		return recovery.Manager{}, fmt.Errorf("read recovery state: %w", err)
 	}
 	state := recovery.Manager{Epoch: epoch, Mode: recovery.Mode(mode)}
@@ -83,6 +87,10 @@ func (s *Store) GetRecovery() (recovery.Manager, error) {
 }
 
 func (s *Store) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
+	return s.BeginRecoveryContext(context.Background(), expectedEpoch)
+}
+
+func (s *Store) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -95,7 +103,7 @@ func (s *Store) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
 		return recovery.Manager{}, err
 	}
 	var result recovery.Manager
-	_, err = s.Mutate(context.Background(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const query = `
 UPDATE platform_state
@@ -126,18 +134,26 @@ RETURNING recovery_epoch,recovery_mode`
 }
 
 func (s *Store) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
+	return s.CompleteRecoveryContext(context.Background(), epoch, reconciled)
+}
+
+// CompleteRecoveryContext verifies the original immutable Recovery Proof and
+// independent completion authorization in its existing serializable transaction.
+// Caller cancellation is not proof that a possibly-issued COMMIT rolled back.
+func (s *Store) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
 	if !reconciled {
 		return recovery.Manager{}, recovery.ErrReconciliationRequired
 	}
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
-	ctx := context.Background()
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
 	if err != nil {
 		return recovery.Manager{}, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	// Independently bounded rollback must not inherit an already-cancelled
+	// HTTP Context. The shared helper never performs a commit or replay.
+	defer rollbackOutbox(tx)
 	var currentEpoch uint64
 	var mode string
 	if err := tx.QueryRow(ctx, `SELECT recovery_epoch,recovery_mode FROM platform_state WHERE singleton_id=true FOR UPDATE`).Scan(&currentEpoch, &mode); err != nil {

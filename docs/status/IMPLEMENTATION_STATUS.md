@@ -54,7 +54,10 @@ Context into the frozen Delivery/Task/Plan/Evidence readback and their original
 single PostgreSQL record+audit transactions. A cancelled lock wait must not
 create PASS, a record or an audit fragment. Review/Closure create/get now also carry caller Context across frozen
 Delivery/Verification/Work/Run readback and single audit-backed Review/Closure
-mutations. Steering and some internal Core/CLI Store paths remain context-free.
+mutations. Recovery get/begin/complete HTTP operations now also carry caller Context
+through PostgreSQL readback and the existing audit/epoch/proof-bound
+transactions, with independently bounded cleanup after cancellation.
+Steering and some internal Core/CLI Store paths remain context-free.
 P1 #229 remains open for those separate migrations, ambiguous COMMIT readback
 and long-run qualification.
 

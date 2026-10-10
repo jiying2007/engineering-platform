@@ -400,6 +400,15 @@ A restore does not immediately re-enable external mutation. The platform enters
 Recovery/Reconciliation and only returns to NORMAL after independently retained
 reconciliation facts satisfy the existing recovery proof contract.
 
+Recovery GET/Begin/Complete now propagate the HTTP caller Context into the
+original PostgreSQL state read or serialized epoch/proof/audit transaction.
+Cancelled lock waits must not issue new Recovery state/audit transitions.
+The cleanup path uses an independent bounded rollback context; it never
+replays Provider/model/publication. A lost/ambiguous COMMIT response must be
+resolved by authoritative Recovery epoch, mode, immutable Proof and audit
+readback, not by assuming rollback or blindly resubmitting the mutation.
+Distinct reconciliation/completion identities remain required.
+
 Backup/restore operational targets are measured by the later SLO harness.
 
 ## 8. Rollout and rollback
