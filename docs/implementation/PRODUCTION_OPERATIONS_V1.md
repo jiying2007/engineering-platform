@@ -130,9 +130,10 @@ authority, not a second Work/Task service.
 
 A lost or canceled HTTP response, especially around COMMIT, does not prove
 that the write rolled back. Check the exact Work ID/version and immutable
-Task digest before attempting any new revision. Other Core Run and
-delivery/evidence/review/closure interfaces still require request-scoped
-migration under P1 #229. These changes do not authorize model execution,
+Task digest before attempting any new revision. Run and
+Checkpoint/Delivery request-scoped slices are described separately below;
+Steering and Evidence/Verification/Review/Closure interfaces still require
+request-scoped migration under P1 #229. These changes do not authorize model execution,
 Publisher mutations or automatic retry.
 
 ### Core Run start/read cancellation and one-transaction authority
@@ -162,6 +163,23 @@ Steering, checkpoints, delivery/evidence/review/closure and several internal
 Core/CLI calls are not yet covered by this change. The existing
 no-replay / fail-closed Core and Action gates remain authoritative; P1 #229
 is not fully qualified or closed.
+
+### Checkpoint and Delivery request-scoped records
+
+The authenticated Checkpoint and Delivery create/get routes now propagate
+the HTTP caller Context into the existing Core PostgreSQL Store.
+`CreateCheckpointContext` and `CreateDeliveryContext` preserve their
+original immutable record and audit in a single transaction; the matching
+readback uses `GetCheckpointContext` and `GetDeliveryContext`. Live Run
+and frozen Task lookups in these handlers also use the already established
+request-bound Core methods. PostgreSQL lock contention plus caller cancellation
+must not leave any new record, subject digest or audit fragment.
+
+A timeout near COMMIT is not proof of rollback. Never create another
+Checkpoint/Delivery based only on a cancelled HTTP response; read back the
+exact Checkpoint ID/digest or Delivery ID/subject digest before deciding
+whether a duplicate request is safe. No external Git/CI/Device effect,
+recovery disposition or production qualification follows from this slice.
 
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
