@@ -28,6 +28,11 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse PostgreSQL config: %w", err)
 	}
+	// Every production connection must have an independent database-side
+	// deadline even when a legacy Store method still uses context.Background.
+	if err := applyConnectionDeadlines(config); err != nil {
+		return nil, err
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("open PostgreSQL pool: %w", err)
