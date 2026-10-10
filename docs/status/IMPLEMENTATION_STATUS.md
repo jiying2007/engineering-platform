@@ -33,9 +33,13 @@ happened, its authoritative settlement is attempted under a separate bounded
 five-second, cancellation-independent context, with **no repeat Provider
 call**. Any failed/ambiguous COMMIT still requires exact persisted readback.
 A retained PLANNED/DISPATCHED row is *not* automatically replayed or classified
-CONFIRMED. Other Core Store APIs still use context-free paths; P1 #229
-remains open for full Core/CLI request cancellation, COMMIT ambiguity and
-independent long-run qualification.
+CONFIRMED. The WorkItem/TaskContract HTTP intake additionally passes its
+caller Context into PostgreSQL Work insert/read/update and atomic Task/Plan/Work
+freeze/read operations, including the original audit transaction. Cancelled
+Work/Task lock waits must not generate any committed Task or audit fragment.
+The remaining Run/steering/delivery/evidence/review/closure and other Core
+Store APIs still have context-free call sites; P1 #229 remains open for their
+request-scoped migration, ambiguous COMMIT readback and long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
