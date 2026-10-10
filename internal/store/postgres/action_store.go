@@ -13,6 +13,7 @@ import (
 )
 
 var _ action.Repository = (*Store)(nil)
+var _ action.ContextRepository = (*Store)(nil)
 
 func mapActionWriteError(err error) error {
 	if err == nil {
@@ -98,11 +99,18 @@ func checkActionAdmission(ctx context.Context, tx pgx.Tx, op action.Operation) e
 }
 
 func (s *Store) Create(op action.Operation) error {
+	return s.CreateContext(context.Background(), op)
+}
+
+// CreateContext propagates the exact request cancellation into the same
+// authoritative PostgreSQL admission transaction. If COMMIT becomes
+// ambiguous, callers must read back the idempotency key rather than retry.
+func (s *Store) CreateContext(ctx context.Context, op action.Operation) error {
 	input, err := auditInput("action.planned", "ExternalOperation", op.ID, op)
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			if err := checkActionAdmission(ctx, tx, op); err != nil {
 				return err
@@ -130,14 +138,22 @@ INSERT INTO external_operations (
 }
 
 func (s *Store) Get(id string) (action.Operation, error) {
-	return s.readOperation("WHERE operation_id=$1", id)
+	return s.GetContext(context.Background(), id)
+}
+
+func (s *Store) GetContext(ctx context.Context, id string) (action.Operation, error) {
+	return s.readOperation(ctx, "WHERE operation_id=$1", id)
 }
 
 func (s *Store) GetByIdempotencyKey(key string) (action.Operation, error) {
-	return s.readOperation("WHERE idempotency_key=$1", key)
+	return s.GetByIdempotencyKeyContext(context.Background(), key)
 }
 
-func (s *Store) readOperation(where string, arg any) (action.Operation, error) {
+func (s *Store) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
+	return s.readOperation(ctx, "WHERE idempotency_key=$1", key)
+}
+
+func (s *Store) readOperation(ctx context.Context, where string, arg any) (action.Operation, error) {
 	const selectBase = `
 SELECT operation_id,run_id,execution_epoch,recovery_epoch,action,risk_class,capability,
        idempotency_key,request_digest,state,COALESCE(external_ref,''),
@@ -145,7 +161,7 @@ SELECT operation_id,run_id,execution_epoch,recovery_epoch,action,risk_class,capa
 FROM external_operations `
 	var op action.Operation
 	var riskClass, state string
-	if err := s.pool.QueryRow(bg(), selectBase+where, arg).Scan(
+	if err := s.pool.QueryRow(ctx, selectBase+where, arg).Scan(
 		&op.ID, &op.RunID, &op.ExecutionEpoch, &op.RecoveryEpoch,
 		&op.Action, &riskClass, &op.Capability, &op.IdempotencyKey,
 		&op.RequestDigest, &state, &op.ExternalRef, &op.ObservedState,
@@ -162,6 +178,13 @@ FROM external_operations `
 }
 
 func (s *Store) Update(op action.Operation) error {
+	return s.UpdateContext(context.Background(), op)
+}
+
+// UpdateContext binds the caller deadline to pre-effect DISPATCHED authority
+// and exact ledger updates. Post-provider settlements use a separate bounded
+// context at the Action Service level and never re-dispatch the remote effect.
+func (s *Store) UpdateContext(ctx context.Context, op action.Operation) error {
 	allowedPrevious, err := previousStates(op.State)
 	if err != nil {
 		return err
@@ -170,7 +193,7 @@ func (s *Store) Update(op action.Operation) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			if op.State == action.Dispatched {
 				if err := checkActionAdmission(ctx, tx, op); err != nil {
