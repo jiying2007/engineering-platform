@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/core"
+	corestore "github.com/jiying2007/engineering-platform/internal/store"
 	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
@@ -56,8 +57,7 @@ func TestPostgresCoreWorkCreateHonorsCallerCancellationDuringTableLock(t *testin
 	if err := tx.Rollback(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.GetWorkContext(ctx, item.ID); !errors.Is(err, ErrNotFound) {
-		// ErrNotFound is in the core/store package, checked separately below.
+	if _, err := s.GetWorkContext(ctx, item.ID); !errors.Is(err, corestore.ErrNotFound) {
 		t.Fatalf("unexpected Work after cancelled admission: %v", err)
 	}
 	var auditCount int
@@ -155,7 +155,7 @@ func TestPostgresTaskFreezeHonorsCallerCancellationDuringWorkRowLock(t *testing.
 		got.Version != 1 {
 		t.Fatalf("canceled Task freeze changed Work: %#v err=%v", got, err)
 	}
-	if _, err := s.GetTaskContext(ctx, task.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.GetTaskContext(ctx, task.ID); !errors.Is(err, corestore.ErrNotFound) {
 		t.Fatalf("canceled Task freeze persisted Task: %v", err)
 	}
 	var auditCount int
