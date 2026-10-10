@@ -619,7 +619,7 @@ func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	runID := r.PathValue("id")
-	value, sess, err := s.store.GetExecution(runID)
+	value, sess, err := s.getRunForRequest(r.Context(), runID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -648,7 +648,7 @@ func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) 
 		ExternalOperationCursor: req.ExternalOperationCursor,
 		CreatedAt:               s.now(),
 	}
-	digest, err := s.store.CreateCheckpoint(item)
+	digest, err := s.createCheckpointForRequest(r.Context(), item)
 	if err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
@@ -664,7 +664,7 @@ func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleGetCheckpoint(w http.ResponseWriter, r *http.Request) {
-	item, digest, err := s.store.GetCheckpoint(r.PathValue("id"))
+	item, digest, err := s.getCheckpointForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -838,7 +838,7 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "delivery_receipt_id and run_id are required")
 		return
 	}
-	value, _, err := s.store.GetExecution(req.RunID)
+	value, _, err := s.getRunForRequest(r.Context(), req.RunID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -847,7 +847,7 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "run must be COMPLETED before creating delivery")
 		return
 	}
-	task, err := s.store.GetTaskByDigest(value.TaskContractDigest)
+	task, err := s.getFrozenTaskForRequest(r.Context(), value.TaskContractDigest)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -879,7 +879,7 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if err := s.store.CreateDelivery(item); err != nil {
+	if err := s.createDeliveryForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -891,7 +891,7 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetDelivery(w http.ResponseWriter, r *http.Request) {
-	item, err := s.store.GetDelivery(r.PathValue("id"))
+	item, err := s.getDeliveryForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return
