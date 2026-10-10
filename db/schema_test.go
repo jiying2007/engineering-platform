@@ -94,3 +94,26 @@ func TestExecutionReconciliationMigrationPreservesStoppedCodexState(t *testing.T
 		t.Fatal("offline/Codex abandonment constraints are incomplete")
 	}
 }
+
+func TestActionPlannedReconciliationMigrationIsNoReplayAndOrdered(t *testing.T) {
+	for _, required := range []string{
+		"ALTER TABLE external_operations ADD COLUMN reconciliation_json jsonb",
+		"CHECK (",
+		"'ABANDONED_RECONCILED'",
+		"(state='ABANDONED_RECONCILED') = (reconciliation_json IS NOT NULL)",
+		"INSERT INTO core_schema_migrations(version) VALUES(13)",
+	} {
+		if !strings.Contains(actionPlannedReconciliationMigration, required) {
+			t.Fatalf("planned Action migration missing %q", required)
+		}
+	}
+	core := CoreMigration()
+	if strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(12)") >
+		strings.LastIndex(core, "INSERT INTO core_schema_migrations(version) VALUES(13)") {
+		t.Fatal("planned Action reconciliation migration is not ordered after execution reconciliation")
+	}
+	if strings.Contains(strings.ToLower(actionPlannedReconciliationMigration), "insert into external_operations") ||
+		strings.Contains(strings.ToLower(actionPlannedReconciliationMigration), "update external_operations") {
+		t.Fatal("schema upgrade must not fabricate historical Action dispositions")
+	}
+}
