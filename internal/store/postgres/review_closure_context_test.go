@@ -33,13 +33,13 @@ func TestReviewClosureContextCancelsRealPostgresLockWithoutAuditResidue(t *testi
 	// deliberately exercise blocked SQL cancellation, not authorization to
 	// review/close again. The full valid transition is covered separately.
 	for _, tc := range []struct {
-		name       string
-		table      string
-		id         string
-		eventType  string
-		auditID    string
-		attempt    func(context.Context) error
-		read       func() error
+		name      string
+		table     string
+		id        string
+		eventType string
+		auditID   string
+		attempt   func(context.Context) error
+		read      func() error
 	}{
 		{
 			name:      "review",
