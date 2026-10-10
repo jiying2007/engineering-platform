@@ -856,6 +856,12 @@ WHERE work_item_id=$4 AND version=$5`
 }
 
 func (s *Store) CreateCheckpoint(item session.Checkpoint) (string, error) {
+	return s.CreateCheckpointContext(context.Background(), item)
+}
+
+// CreateCheckpointContext retains the original checkpoint/audit transaction,
+// while honoring the HTTP/Worker caller's cancellation during lock waits.
+func (s *Store) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
 	digest, err := item.Digest()
 	if err != nil {
 		return "", err
@@ -868,7 +874,7 @@ func (s *Store) CreateCheckpoint(item session.Checkpoint) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 INSERT INTO checkpoints (
@@ -892,10 +898,14 @@ INSERT INTO checkpoints (
 }
 
 func (s *Store) GetCheckpoint(id string) (session.Checkpoint, string, error) {
+	return s.GetCheckpointContext(context.Background(), id)
+}
+
+func (s *Store) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
 	var raw []byte
 	var digest string
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT checkpoint_json,content_digest FROM checkpoints WHERE checkpoint_id=$1",
 		id,
 	).Scan(&raw, &digest); err != nil {
@@ -909,6 +919,12 @@ func (s *Store) GetCheckpoint(id string) (session.Checkpoint, string, error) {
 }
 
 func (s *Store) CreateDelivery(item core.DeliveryReceipt) error {
+	return s.CreateDeliveryContext(context.Background(), item)
+}
+
+// Delivery creation and its existing audit are one caller-bound transaction.
+// Cancellation or an ambiguous COMMIT never proves that a Delivery was absent.
+func (s *Store) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
 	raw, err := encodeJSON(item)
 	if err != nil {
 		return err
@@ -917,7 +933,7 @@ func (s *Store) CreateDelivery(item core.DeliveryReceipt) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 INSERT INTO delivery_receipts (
@@ -938,9 +954,13 @@ INSERT INTO delivery_receipts (
 }
 
 func (s *Store) GetDelivery(id string) (core.DeliveryReceipt, error) {
+	return s.GetDeliveryContext(context.Background(), id)
+}
+
+func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT receipt_json FROM delivery_receipts WHERE delivery_receipt_id=$1",
 		id,
 	).Scan(&raw); err != nil {
