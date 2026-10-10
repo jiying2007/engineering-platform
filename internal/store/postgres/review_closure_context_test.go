@@ -33,18 +33,20 @@ func TestReviewClosureContextCancelsRealPostgresLockWithoutAuditResidue(t *testi
 	// deliberately exercise blocked SQL cancellation, not authorization to
 	// review/close again. The full valid transition is covered separately.
 	for _, tc := range []struct {
-		name string
-		table string
-		id string
-		eventType string
-		attempt func(context.Context) error
-		read func() error
+		name       string
+		table      string
+		id         string
+		eventType  string
+		auditID    string
+		attempt    func(context.Context) error
+		read       func() error
 	}{
 		{
-			name: "review",
-			table: "review_reports",
-			id: "cancelled-review",
+			name:      "review",
+			table:     "verification_reports",
+			id:        "cancelled-review",
 			eventType: "review.created",
+			auditID:   "cancelled-review",
 			attempt: func(c context.Context) error {
 				r := reviewReport
 				r.ID = "cancelled-review"
@@ -58,10 +60,11 @@ func TestReviewClosureContextCancelsRealPostgresLockWithoutAuditResidue(t *testi
 			},
 		},
 		{
-			name: "closure",
-			table: "closure_receipts",
-			id: "cancelled-closure",
+			name:      "closure",
+			table:     "review_reports",
+			id:        "cancelled-closure",
 			eventType: "work.closed",
+			auditID:   "restore-work",
 			attempt: func(c context.Context) error {
 				r := closure
 				r.ID = "cancelled-closure"
@@ -76,6 +79,10 @@ func TestReviewClosureContextCancelsRealPostgresLockWithoutAuditResidue(t *testi
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			var baseline int
+			if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type=$1 AND aggregate_id=$2", tc.eventType, tc.auditID).Scan(&baseline); err != nil {
+				t.Fatal(err)
+			}
 			lock, err := s.pool.Begin(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -109,8 +116,8 @@ func TestReviewClosureContextCancelsRealPostgresLockWithoutAuditResidue(t *testi
 				t.Fatalf("cancelled mutation persisted an authority record: %v", err)
 			}
 			var count int
-			if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type=$1 AND aggregate_id=$2", tc.eventType, tc.id).Scan(&count); err != nil || count != 0 {
-				t.Fatalf("cancelled mutation left audit residue: count=%d err=%v", count, err)
+			if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type=$1 AND aggregate_id=$2", tc.eventType, tc.auditID).Scan(&count); err != nil || count != baseline {
+				t.Fatalf("cancelled mutation changed audit count: before=%d after=%d err=%v", baseline, count, err)
 			}
 		})
 	}
