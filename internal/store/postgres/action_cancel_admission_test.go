@@ -16,21 +16,21 @@ type cancellationAdmissionStore struct {
 	entered chan struct{}
 }
 
-func (s *cancellationAdmissionStore) Create(op action.Operation) error {
+func (s *cancellationAdmissionStore) CreateContext(ctx context.Context, op action.Operation) error {
 	close(s.entered)
-	return s.Store.Create(op)
+	return s.Store.CreateContext(ctx, op)
 }
 
-func TestPostgresActionCancellationDuringLockedAdmissionLeavesOnlyPlannedReservation(t *testing.T) {
+func TestPostgresActionCancellationInterruptsLockedAdmissionWithoutDispatch(t *testing.T) {
 	s := newIsolatedIntegrationStore(t)
 	runID := setupPostgresActionRun(t, s, fmt.Sprintf("cancel-%d", time.Now().UnixNano()))
 	ctx, stop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stop()
 
-	// Force Create to block on the actual PostgreSQL platform-state lock.
-	// The Action Service currently uses a legacy context-free repository, so
-	// the lock may outlive the caller's cancellation until it is released.
-	// It must NEVER initiate an external Provider call after that wait.
+	// Force the caller-bound CreateContext to block on the PostgreSQL
+	// platform-state lock. Cancellation must interrupt the waiting SQL while
+	// the blocker is still held, not merely suppress the Provider after a
+	// delayed, context-free reservation commit.
 	blocker, err := s.pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -71,12 +71,10 @@ func TestPostgresActionCancellationDuringLockedAdmissionLeavesOnlyPlannedReserva
 	case <-ctx.Done():
 		t.Fatal("Action never entered PostgreSQL admission")
 	}
-	// Cancellation is observable before the blocked SQL reservation is
-	// permitted to commit, but the synchronous DB call is still in flight.
+	// A cancelled Core action must return while the blocker still owns the
+	// lock, proving that the request Context reached the actual PostgreSQL
+	// statement rather than waiting for a server-side lock timeout.
 	cancel()
-	if err := blocker.Rollback(ctx); err != nil {
-		t.Fatal(err)
-	}
 	select {
 	case result := <-done:
 		if !errors.Is(result.err, context.Canceled) ||
@@ -85,15 +83,15 @@ func TestPostgresActionCancellationDuringLockedAdmissionLeavesOnlyPlannedReserva
 				result.receipt, result.err, provider.dispatchCalls)
 		}
 	case <-ctx.Done():
-		t.Fatal("PostgreSQL action did not terminate after lock release")
+		t.Fatal("PostgreSQL action did not honor caller cancellation")
 	}
-	stored, err := s.Get(request.ID)
-	if err != nil || stored.State != action.Planned {
-		t.Fatalf("cancelled request did not retain safe pre-dispatch reservation: %#v err=%v", stored, err)
+	if err := blocker.Rollback(ctx); err != nil {
+		t.Fatal(err)
 	}
-	again, err := service.Execute(context.Background(), request)
-	if err != nil || again.Result != string(action.Planned) || provider.dispatchCalls != 0 {
-		t.Fatalf("original idempotency request replayed cancelled publication: %#v err=%v calls=%d",
-			again, err, provider.dispatchCalls)
+	if stored, err := s.Get(request.ID); !errors.Is(err, action.ErrOperationAbsent) {
+		t.Fatalf("cancelled SQL created a false reservation: %#v err=%v", stored, err)
+	}
+	if stored, err := s.GetByIdempotencyKey(request.IdempotencyKey); !errors.Is(err, action.ErrOperationAbsent) {
+		t.Fatalf("cancelled SQL retained an unexpected idempotency key: %#v err=%v", stored, err)
 	}
 }

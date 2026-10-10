@@ -24,19 +24,24 @@ it does not prove or settle already-dispatched effects. The remaining
 DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
 Recovery Proof pending provider-specific, independently retained observations.
 
-The Action Gateway now rechecks caller cancellation after idempotency lookup,
-authorization, Run/Recovery guards and durable PLANNED/DISPATCHED writes,
-before any external Provider call. This prevents a cancelled request from
-initiating a fresh external effect after a blocked database reservation
-eventually completes. A retained PLANNED/DISPATCHED row is *not* automatically
-replayed or classified as CONFIRMED. This is an execution-path fence, not
-end-to-end caller-context propagation through the legacy Store API; P1 #229
-remains open for exact database request cancellation and COMMIT ambiguity.
+The Action Gateway rechecks caller cancellation after each pre-dispatch
+phase and the production PostgreSQL Action repository now propagates the exact
+request Context through idempotency reads, PLANNED/DISPATCHED transactions and
+pre-observation reconciliation. A cancelled blocked SQL admission must stop
+without dispatching a new external effect. Once a Provider operation may have
+happened, its authoritative settlement is attempted under a separate bounded
+five-second, cancellation-independent context, with **no repeat Provider
+call**. Any failed/ambiguous COMMIT still requires exact persisted readback.
+A retained PLANNED/DISPATCHED row is *not* automatically replayed or classified
+CONFIRMED. Other Core Store APIs still use context-free paths; P1 #229
+remains open for full Core/CLI request cancellation, COMMIT ambiguity and
+independent long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter
-operator limits. This bounds waits but does not propagate HTTP/Worker caller
-cancellation through existing context-free methods or resolve COMMIT ambiguity;
+operator limits. This bounds waits but does not universally propagate HTTP/Worker
+caller cancellation through the remaining context-free Core methods or
+resolve COMMIT ambiguity;
 P1 #229 remains open pending that end-to-end qualification.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex

@@ -65,6 +65,17 @@ type Repository interface {
 	Update(Operation) error
 }
 
+// ContextRepository is a storage capability, not another Action authority.
+// Production PostgreSQL implements it so cancellation can interrupt a blocked
+// transaction; in-memory test doubles may still implement Repository directly.
+// All mutations keep the same single authoritative ledger and audit journal.
+type ContextRepository interface {
+	CreateContext(context.Context, Operation) error
+	GetContext(context.Context, string) (Operation, error)
+	GetByIdempotencyKeyContext(context.Context, string) (Operation, error)
+	UpdateContext(context.Context, Operation) error
+}
+
 type Service struct {
 	authorizer Authorizer
 	guard      AuthorityGuard
@@ -81,6 +92,46 @@ func NewService(authorizer Authorizer, guard AuthorityGuard, provider Provider, 
 		repository: repository,
 		now:        func() time.Time { return time.Now().UTC() },
 	}
+}
+
+// Prefer caller-bound database operations when supported. Plain Repository
+// remains the deliberately bounded test-double interface. Production Core
+// injects the PostgreSQL Store, whose contextual methods use the same
+// transaction/operation identifiers and cannot bypass authorization.
+func (s *Service) createOperation(ctx context.Context, op Operation) error {
+	if store, ok := s.repository.(ContextRepository); ok {
+		return store.CreateContext(ctx, op)
+	}
+	return s.repository.Create(op)
+}
+func (s *Service) getByKey(ctx context.Context, key string) (Operation, error) {
+	if store, ok := s.repository.(ContextRepository); ok {
+		return store.GetByIdempotencyKeyContext(ctx, key)
+	}
+	return s.repository.GetByIdempotencyKey(key)
+}
+func (s *Service) getOperation(ctx context.Context, id string) (Operation, error) {
+	if store, ok := s.repository.(ContextRepository); ok {
+		return store.GetContext(ctx, id)
+	}
+	return s.repository.Get(id)
+}
+func (s *Service) updateOperation(ctx context.Context, op Operation) error {
+	if store, ok := s.repository.(ContextRepository); ok {
+		return store.UpdateContext(ctx, op)
+	}
+	return s.repository.Update(op)
+}
+
+// Once a remote effect or a provider observation may have happened, the
+// database settlement must not be abandoned just because the HTTP client
+// disconnected. Attempt one independently bounded ledger write, never a
+// second model/publication call. Any failed or ambiguous COMMIT returns an
+// error and requires exact persisted readback before retry.
+func (s *Service) settleExternalEffect(ctx context.Context, op Operation) error {
+	settleCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return s.updateOperation(settleCtx, op)
 }
 
 type requestIdentity struct {
@@ -126,7 +177,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if err != nil {
 		return Receipt{}, err
 	}
-	if existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey); getErr == nil {
+	if existing, getErr := s.getByKey(ctx, req.IdempotencyKey); getErr == nil {
 		if existing.RequestDigest != digest {
 			return Receipt{}, ErrIdempotencyConflict
 		}
@@ -167,9 +218,9 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 
 	now := s.now()
 	op := NewWithRequestDigest(req, digest, now)
-	if err := s.repository.Create(*op); err != nil {
+	if err := s.createOperation(ctx, *op); err != nil {
 		if errors.Is(err, ErrOperationExists) {
-			existing, getErr := s.repository.GetByIdempotencyKey(req.IdempotencyKey)
+			existing, getErr := s.getByKey(ctx, req.IdempotencyKey)
 			if getErr == nil && existing.RequestDigest == digest {
 				if existing.State == AbandonedReconciled {
 					return Receipt{}, fmt.Errorf("%w: abandoned external reservation has no replay authority", ErrDenied)
@@ -188,7 +239,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	if err := op.Transition(Dispatched, now); err != nil {
 		return Receipt{}, err
 	}
-	if err := s.repository.Update(*op); err != nil {
+	if err := s.updateOperation(ctx, *op); err != nil {
 		return Receipt{}, err
 	}
 	// No external provider call may start after cancellation is observed.
@@ -203,7 +254,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		if transitionErr := op.Transition(Unknown, s.now()); transitionErr != nil {
 			return Receipt{}, transitionErr
 		}
-		if updateErr := s.repository.Update(*op); updateErr != nil {
+		if updateErr := s.settleExternalEffect(ctx, *op); updateErr != nil {
 			// The external effect is ambiguous; an in-memory UNKNOWN
 			// receipt must not pretend the authoritative ledger settled.
 			return Receipt{}, fmt.Errorf("cannot persist UNKNOWN external operation: %w", updateErr)
@@ -235,7 +286,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	}
 	op.ExternalRef = result.ExternalRef
 	op.ObservedState = result.ObservedState
-	if err := s.repository.Update(*op); err != nil {
+	if err := s.settleExternalEffect(ctx, *op); err != nil {
 		return Receipt{}, err
 	}
 	if invalidDispatchOutcome {
@@ -252,7 +303,7 @@ func (s *Service) Get(operationID string) (Operation, error) {
 }
 
 func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, error) {
-	op, err := s.repository.Get(operationID)
+	op, err := s.getOperation(ctx, operationID)
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -262,7 +313,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	if err := op.Transition(Reconciling, s.now()); err != nil {
 		return Receipt{}, err
 	}
-	if err := s.repository.Update(op); err != nil {
+	if err := s.updateOperation(ctx, op); err != nil {
 		return Receipt{}, err
 	}
 
@@ -270,7 +321,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	if err != nil {
 		op.State = Manual
 		op.UpdatedAt = s.now()
-		if updateErr := s.repository.Update(op); updateErr != nil {
+		if updateErr := s.settleExternalEffect(ctx, op); updateErr != nil {
 			// A reconciliation failure followed by a ledger write failure
 			// must not be reported as durable MANUAL settlement.
 			return Receipt{}, fmt.Errorf("cannot persist MANUAL external operation: %w", updateErr)
@@ -300,7 +351,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	}
 	op.ExternalRef = result.ExternalRef
 	op.ObservedState = result.ObservedState
-	if err := s.repository.Update(op); err != nil {
+	if err := s.settleExternalEffect(ctx, op); err != nil {
 		return Receipt{}, err
 	}
 	if invalidReconcileOutcome {
