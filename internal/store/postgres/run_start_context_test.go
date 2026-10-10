@@ -15,13 +15,13 @@ import (
 )
 
 type runStartContextFixture struct {
-	store    *Store
-	run      run.Run
-	attempt  run.Attempt
-	session  session.Session
-	input    core.RunInputManifest
-	version  uint64
-	work     core.WorkItem
+	store   *Store
+	run     run.Run
+	attempt run.Attempt
+	session session.Session
+	input   core.RunInputManifest
+	version uint64
+	work    core.WorkItem
 }
 
 func newRunStartContextFixture(t *testing.T) runStartContextFixture {
@@ -30,13 +30,13 @@ func newRunStartContextFixture(t *testing.T) runStartContextFixture {
 	ctx := context.Background()
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	work := core.WorkItem{
-		ID: "start-work-" + suffix,
-		Title: "run cancellation",
+		ID:         "start-work-" + suffix,
+		Title:      "run cancellation",
 		HumanOwner: "integration-test",
-		TargetID: "target-linux",
-		State: core.WorkDraft,
-		Version: 1,
-		CreatedAt: time.Now().UTC(),
+		TargetID:   "target-linux",
+		State:      core.WorkDraft,
+		Version:    1,
+		CreatedAt:  time.Now().UTC(),
 	}
 	if err := s.CreateWorkContext(ctx, work); err != nil {
 		t.Fatal(err)
@@ -58,10 +58,10 @@ func newRunStartContextFixture(t *testing.T) runStartContextFixture {
 		ID: "start-task-" + suffix, WorkItemID: work.ID,
 		TaskType: "FEATURE", Repository: "jiying2007/example",
 		BaseCommit: "0123456789abcdef0123456789abcdef01234567",
-		TargetID: work.TargetID, Revision: 1,
+		TargetID:   work.TargetID, Revision: 1,
 		VerificationPlanID: plan.ID, VerificationPlanDigest: planDigest,
 		AcceptanceCriteria: []string{"CI passes"},
-		AllowedActions: []string{"ci.dispatch"},
+		AllowedActions:     []string{"ci.dispatch"},
 	}
 	digest, err := task.Digest()
 	if err != nil {
@@ -209,4 +209,3 @@ func TestPostgresRunStartContextDoesNotUseCancelledReads(t *testing.T) {
 		t.Fatal("cancelled Run input read returned success")
 	}
 }
-
