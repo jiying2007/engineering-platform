@@ -99,15 +99,23 @@ shutdown and cancels its relay loop. Worker loops use signal-bound contexts.
 ### Action cancellation and external side-effect boundary
 
 After a synchronous idempotency lookup, Core authorization, epoch guards or
-durable reservation/update, Action Gateway checks the request cancellation
-signal again before calling an external Publisher/CI/device Provider. A client
-that disconnects while a PostgreSQL lock wait is in progress can leave a
-PLANNED or DISPATCHED reservation, but must not initiate a **new** Provider
-call after cancellation becomes visible. Both states remain independently
-audited: a PLANNED reservation may be reconciled under the exact no-replay
-Recovery path; a DISPATCHED reservation remains ambiguous and is never
-silently replayed. This safety fence does not shorten the ongoing database
-request itself or prove that any earlier COMMIT failed.
+durable reservation/update, Action Gateway checks cancellation before invoking
+an external Publisher/CI/device Provider. Its production PostgreSQL Action
+Store now carries that same caller Context through exact idempotency reads and
+pre-effect PLANNED/DISPATCHED transactions. A cancellation during a blocked
+SQL admission aborts that SQL instead of waiting for its independent session
+lock deadline. The durable result must still be checked on any ambiguous
+commit. A PLANNED reservation may be reconciled through the explicit
+pre-dispatch no-replay Recovery path; DISPATCHED remains potentially effectful,
+and is never silently retried.
+
+Once a Provider was called, a disconnected client must **not** prevent best-effort
+recording of CONFIRMED/UNKNOWN/MANUAL in the existing Action ledger. The
+settlement uses one independent, bounded five-second Context retaining
+request trace values, never a fresh Provider call. If the ledger write or COMMIT
+is ambiguous, no invented completion receipt or automatic external replay
+is allowed. Other Core Store operations remain subject to separate
+caller-Context propagation under P1 #229.
 
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
