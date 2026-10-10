@@ -21,14 +21,14 @@ func TestCheckpointContextCancelsDatabaseLockWithoutAuditOrReservation(t *testin
 		t.Fatal(err)
 	}
 	cp := session.Checkpoint{
-		ID: "cancel-checkpoint-" + suffix,
-		RunID: runID,
-		TaskContractDigest: value.TaskContractDigest,
+		ID:                     "cancel-checkpoint-" + suffix,
+		RunID:                  runID,
+		TaskContractDigest:     value.TaskContractDigest,
 		RunInputManifestDigest: value.RunInputManifestDigest,
-		ExecutionEpoch: value.CurrentEpoch,
-		SourceTreeDigest: "sha256:source-tree",
-		Objective: "test caller cancellation",
-		CreatedAt: time.Now().UTC(),
+		ExecutionEpoch:         value.CurrentEpoch,
+		SourceTreeDigest:       "sha256:source-tree",
+		Objective:              "test caller cancellation",
+		CreatedAt:              time.Now().UTC(),
 	}
 	if _, err := cp.Digest(); err != nil {
 		t.Fatal(err)
@@ -141,4 +141,3 @@ func TestDeliveryContextCancelsDatabaseLockWithoutAuditOrSubject(t *testing.T) {
 		t.Fatalf("cancellation mutated immutable original delivery: %#v err=%v", existing, err)
 	}
 }
-
