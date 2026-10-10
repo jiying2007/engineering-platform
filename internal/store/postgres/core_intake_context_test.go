@@ -48,7 +48,7 @@ func TestPostgresCoreWorkCreateHonorsCallerCancellationDuringTableLock(t *testin
 	// The real SQL must stop BEFORE releasing this independent table lock.
 	select {
 	case err := <-done:
-		if !errors.Is(err, context.Canceled) {
+		if err == nil || cancelled.Err() != context.Canceled {
 			t.Fatalf("cancelled Work insert claimed success: %v", err)
 		}
 	case <-ctx.Done():
@@ -141,7 +141,7 @@ func TestPostgresTaskFreezeHonorsCallerCancellationDuringWorkRowLock(t *testing.
 	cancel()
 	select {
 	case err := <-done:
-		if !errors.Is(err, context.Canceled) {
+		if err == nil || cancelled.Err() != context.Canceled {
 			t.Fatalf("cancelled Task freeze reported success: %v", err)
 		}
 	case <-ctx.Done():
