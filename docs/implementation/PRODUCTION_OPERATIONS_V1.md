@@ -150,9 +150,18 @@ authority and are not a second execution system.
 A canceled or disconnected response around COMMIT does not establish that
 the Run was absent. Always check the exact Run ID, frozen input/Task digests,
 Work version and `run.started` Outbox identity before attempting to start
-a new Run. This stage does not migrate Pause/Resume/Takeover, steering,
-completion, delivery/evidence/review/closure or all internal Core/CLI calls;
-P1 #229 remains open.
+a new Run. Pause/Resume/Takeover and Run completion are now also request-bound.
+The Run/Session ownership and execution-epoch update remains one audited
+optimistic-versioned transaction. Completion uses one Run/Session/Work
+transaction: if the HTTP caller cancels while a Run row is locked, neither
+a completed Run nor a verifying Work nor a completion audit may be
+partially persisted. Independent readback is required when COMMIT may have
+succeeded before a response was lost.
+
+Steering, checkpoints, delivery/evidence/review/closure and several internal
+Core/CLI calls are not yet covered by this change. The existing
+no-replay / fail-closed Core and Action gates remain authoritative; P1 #229
+is not fully qualified or closed.
 
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
