@@ -18,8 +18,11 @@ issues remain #103 (managed-workspace WIF), #106 (optional relay/provider) and
 fixtures or CI alone. The independently identified internal P0 #228 covers
 crash-orphaned Action PLANNED/DISPATCHED/RECONCILING/MANUAL states: visibility
 and transaction fencing do not constitute a verified terminal no-replay
-disposition. Recovery Proof stays blocked until the exact operation is
-independently reconciled under its existing authority.
+disposition. Migration v13 adds an **explicit, audited, no-replay
+disposition only for a database-proven pre-dispatch PLANNED reservation**;
+it does not prove or settle already-dispatched effects. The remaining
+DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
+Recovery Proof pending provider-specific, independently retained observations.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
