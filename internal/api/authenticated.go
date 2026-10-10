@@ -41,6 +41,8 @@ var routeCapabilities = map[string]string{
 	"POST /api/v1/recovery/proofs":             access.RecoveryReconcile,
 	"GET /api/v1/recovery/proofs/{epoch}":      access.Read,
 	"POST /api/v1/recovery/executions/abandon": access.RecoveryReconcile,
+	"POST /api/v1/recovery/actions/abandon-planned": access.RecoveryReconcile,
+	"GET /api/v1/recovery/actions/{id}/abandon-planned": access.Read,
 	"POST /api/v1/work-items":                  access.WorkCreate,
 	"GET /api/v1/work-items/{id}":              access.Read,
 	"POST /api/v1/task-contracts":              access.TaskCreate,
@@ -188,6 +190,11 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 		}
 		if body.Reviewer != id.Subject() {
 			return http.StatusForbidden
+		}
+	case "POST /api/v1/recovery/actions/abandon-planned":
+		var body recovery.ActionPlannedAbandonRequest
+		if strictjson.Decode(data, &body) != nil || body.Validate() != nil {
+			return http.StatusBadRequest
 		}
 	case "POST /api/v1/recovery/executions/abandon":
 		var body recovery.ExecutionAbandonRequest
