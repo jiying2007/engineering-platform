@@ -32,12 +32,12 @@ func actionPlannedRecoveryFixture(t *testing.T) (*Store, *action.Operation, reco
 	op := action.NewWithRequestDigest(req, original, time.Now().UTC())
 	abandon := recovery.ActionPlannedAbandonRequest{
 		Version: 1, OperationID: op.ID, RunID: op.RunID,
-		ExecutionEpoch: op.ExecutionEpoch,
+		ExecutionEpoch:        op.ExecutionEpoch,
 		OriginalRecoveryEpoch: op.RecoveryEpoch, RecoveryEpoch: 1,
-		IdempotencyKey: op.IdempotencyKey,
+		IdempotencyKey:        op.IdempotencyKey,
 		OriginalRequestDigest: op.RequestDigest,
-		ObservationDigest: canonical.BytesDigest([]byte("independently-retained-operator-observation:" + suffix)),
-		Disposition: recovery.AbandonNoReplay,
+		ObservationDigest:     canonical.BytesDigest([]byte("independently-retained-operator-observation:" + suffix)),
+		Disposition:           recovery.AbandonNoReplay,
 	}
 	return s, op, abandon
 }
@@ -223,7 +223,9 @@ func TestPlannedActionRecoveryRequestMustMatchFrozenReservation(t *testing.T) {
 		func(r *recovery.ActionPlannedAbandonRequest) { r.RunID = "wrong-run" },
 		func(r *recovery.ActionPlannedAbandonRequest) { r.ExecutionEpoch++ },
 		func(r *recovery.ActionPlannedAbandonRequest) { r.IdempotencyKey = "different" },
-		func(r *recovery.ActionPlannedAbandonRequest) { r.OriginalRequestDigest = canonical.BytesDigest([]byte("different")) },
+		func(r *recovery.ActionPlannedAbandonRequest) {
+			r.OriginalRequestDigest = canonical.BytesDigest([]byte("different"))
+		},
 	} {
 		bad := req
 		mutate(&bad)
