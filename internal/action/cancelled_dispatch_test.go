@@ -80,20 +80,20 @@ func TestActionCancelledBeforeExternalDispatchPreservesDurableNoReplayBoundary(t
 			}
 			dispatchCalls := 0
 			svc := NewService(authorizer, guard, fakeProvider{
-				dispatch: DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "fake-remote-effect"},
+				dispatch:      DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "fake-remote-effect"},
 				dispatchCalls: &dispatchCalls,
 			}, repo)
 			req := Request{
-				ID: "action-cancelled-" + phase,
-				RunID: "run-1",
-				ExecutionEpoch: 1,
-				RecoveryEpoch: 0,
-				Action: "ci.dispatch",
-				RiskClass: ControlledMutation,
-				Capability: "ci.dispatch",
+				ID:               "action-cancelled-" + phase,
+				RunID:            "run-1",
+				ExecutionEpoch:   1,
+				RecoveryEpoch:    0,
+				Action:           "ci.dispatch",
+				RiskClass:        ControlledMutation,
+				Capability:       "ci.dispatch",
 				ParametersDigest: "sha256:frozen-input",
-				IdempotencyKey: "once-" + phase,
-				RequestedBy: "runtime",
+				IdempotencyKey:   "once-" + phase,
+				RequestedBy:      "runtime",
 			}
 			receipt, err := svc.Execute(ctx, req)
 			if !errors.Is(err, context.Canceled) || dispatchCalls != 0 ||
@@ -134,7 +134,7 @@ func TestActionCancellationDoesNotRedefineConfirmedRemoteEffects(t *testing.T) {
 	calls := 0
 	svc := NewService(AllowCapabilities{"ci.dispatch": true}, fixedGuard{},
 		fakeProvider{
-			dispatch: DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "actual-receipt"},
+			dispatch:      DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "actual-receipt"},
 			dispatchCalls: &calls,
 		}, repo)
 	req := Request{
