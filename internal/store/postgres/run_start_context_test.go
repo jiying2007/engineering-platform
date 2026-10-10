@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
@@ -211,5 +210,3 @@ func TestPostgresRunStartContextDoesNotUseCancelledReads(t *testing.T) {
 	}
 }
 
-// Compile-time shape keeps audit+outbox in the same Store.Mutate transaction.
-var _ pgx.Tx = (pgx.Tx)(nil)
