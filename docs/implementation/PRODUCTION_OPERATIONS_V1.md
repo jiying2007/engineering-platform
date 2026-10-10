@@ -159,8 +159,9 @@ a completed Run nor a verifying Work nor a completion audit may be
 partially persisted. Independent readback is required when COMMIT may have
 succeeded before a response was lost.
 
-Steering, checkpoints, delivery/evidence/review/closure and several internal
-Core/CLI calls are not yet covered by this change. The existing
+Steering, Evidence/Verification/Review/Closure and several internal
+Core/CLI calls remain independent later slices. Checkpoint and Delivery are
+covered below; the existing
 no-replay / fail-closed Core and Action gates remain authoritative; P1 #229
 is not fully qualified or closed.
 
@@ -180,6 +181,22 @@ Checkpoint/Delivery based only on a cancelled HTTP response; read back the
 exact Checkpoint ID/digest or Delivery ID/subject digest before deciding
 whether a duplicate request is safe. No external Git/CI/Device effect,
 recovery disposition or production qualification follows from this slice.
+
+### Evidence and Verification request-scoped facts
+
+Evidence registration and Verification create/get routes reuse the same
+Core PostgreSQL authority, now passing the caller Context through immutable
+Delivery, frozen Task and Verification Plan reads, associated Evidence reads
+and the original record+audit transactions. No Evidence or Verification
+result may be manufactured after a cancelled lock wait. The independent
+verification algorithm and requirement/issuer/artifact binding are unchanged.
+
+An ambiguous COMMIT cannot be classified as rollback or PASS: read back
+the exact Evidence ID, delivery subject digest, Verification report ID and
+its frozen plan/evidence identity. These changes do not grant Review/Closure
+permission, authorize any new Publisher/Device effect, or change the Recovery
+Proof requirements. Steering, Review/Closure and internal Core callers still
+require P1 #229 qualification.
 
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
