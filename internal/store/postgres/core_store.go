@@ -71,6 +71,12 @@ func auditInput(eventType, aggregateType, aggregateID string, payload any) (audi
 }
 
 func (s *Store) CreateWork(item core.WorkItem) error {
+	return s.CreateWorkContext(context.Background(), item)
+}
+
+// CreateWorkContext uses the request context for Work/audit transactions.
+// A cancelled COMMIT does not establish rollback: use exact Work readback.
+func (s *Store) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
 	if item.Version == 0 {
 		item.Version = 1
 	}
@@ -78,7 +84,7 @@ func (s *Store) CreateWork(item core.WorkItem) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 INSERT INTO work_items (
@@ -100,6 +106,10 @@ INSERT INTO work_items (
 }
 
 func (s *Store) GetWork(id string) (core.WorkItem, error) {
+	return s.GetWorkContext(context.Background(), id)
+}
+
+func (s *Store) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
 	const q = `
 SELECT work_item_id,COALESCE(source_ref,''),title,human_owner,COALESCE(target_id,''),
        COALESCE(assurance_class,''),COALESCE(active_task_contract_digest,''),
@@ -108,7 +118,7 @@ FROM work_items
 WHERE work_item_id=$1`
 	var item core.WorkItem
 	var state string
-	err := s.pool.QueryRow(bg(), q, id).Scan(
+	err := s.pool.QueryRow(ctx, q, id).Scan(
 		&item.ID, &item.SourceRef, &item.Title, &item.HumanOwner, &item.TargetID,
 		&item.AssuranceClass, &item.ActiveTaskContractDigest, &item.ActiveRunID,
 		&state, &item.Version, &item.CreatedAt,
@@ -121,6 +131,10 @@ WHERE work_item_id=$1`
 }
 
 func (s *Store) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
+	return s.UpdateWorkContext(context.Background(), id, expectedVersion, item)
+}
+
+func (s *Store) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
 	payload := struct {
 		ExpectedVersion uint64        `json:"expected_version"`
 		Work            core.WorkItem `json:"work"`
@@ -129,7 +143,7 @@ func (s *Store) UpdateWork(id string, expectedVersion uint64, item core.WorkItem
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			const q = `
 UPDATE work_items
@@ -157,6 +171,18 @@ WHERE work_item_id=$9 AND version=$10`
 }
 
 func (s *Store) CreateTaskAndUpdateWork(
+	task core.TaskContract,
+	plan verification.Plan,
+	expectedWorkVersion uint64,
+	work core.WorkItem,
+) error {
+	return s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, expectedWorkVersion, work)
+}
+
+// The frozen Task/Plan/Work commit and its audit must share caller cancellation.
+// A lost reply after COMMIT is ambiguous, not authorization to create a second Task.
+func (s *Store) CreateTaskAndUpdateWorkContext(
+	ctx context.Context,
 	task core.TaskContract,
 	plan verification.Plan,
 	expectedWorkVersion uint64,
@@ -195,7 +221,7 @@ func (s *Store) CreateTaskAndUpdateWork(
 		return err
 	}
 
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			var currentVersion uint64
 			var currentState string
@@ -271,13 +297,17 @@ WHERE work_item_id=$4 AND version=$5`
 }
 
 func (s *Store) GetTask(id string) (core.TaskContract, error) {
+	return s.GetTaskContext(context.Background(), id)
+}
+
+func (s *Store) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
 	const q = `
 SELECT contract_json
 FROM task_contracts
 WHERE task_contract_id=$1
 ORDER BY revision DESC
 LIMIT 1`
-	return s.readTask(q, id)
+	return s.readTaskContext(ctx, q, id)
 }
 
 func (s *Store) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
@@ -291,8 +321,12 @@ func (s *Store) GetTaskByDigest(digest string) (core.TaskContract, error) {
 }
 
 func (s *Store) readTask(query string, args ...any) (core.TaskContract, error) {
+	return s.readTaskContext(context.Background(), query, args...)
+}
+
+func (s *Store) readTaskContext(ctx context.Context, query string, args ...any) (core.TaskContract, error) {
 	var raw []byte
-	if err := s.pool.QueryRow(bg(), query, args...).Scan(&raw); err != nil {
+	if err := s.pool.QueryRow(ctx, query, args...).Scan(&raw); err != nil {
 		return core.TaskContract{}, mapReadError(err)
 	}
 	var task core.TaskContract
