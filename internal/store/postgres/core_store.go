@@ -316,8 +316,12 @@ func (s *Store) GetTaskRevision(id string, revision uint64) (core.TaskContract, 
 }
 
 func (s *Store) GetTaskByDigest(digest string) (core.TaskContract, error) {
+	return s.GetTaskByDigestContext(context.Background(), digest)
+}
+
+func (s *Store) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
 	const q = "SELECT contract_json FROM task_contracts WHERE content_digest=$1"
-	return s.readTask(q, digest)
+	return s.readTaskContext(ctx, q, digest)
 }
 
 func (s *Store) readTask(query string, args ...any) (core.TaskContract, error) {
@@ -360,6 +364,22 @@ func (s *Store) CreateExecutionAndUpdateWork(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	return s.CreateExecutionAndUpdateWorkContext(context.Background(), value, attempt, sess, inputManifest, expectedWorkVersion, work)
+}
+
+// CreateExecutionAndUpdateWorkContext preserves Run/Attempt/Session/Work,
+// audit and outbox as one PostgreSQL transaction while honoring caller
+// cancellation. Ambiguous COMMIT requires exact Run/readback: never restart
+// the same Run or publish a second external effect on an uncertain result.
+func (s *Store) CreateExecutionAndUpdateWorkContext(
+	ctx context.Context,
+	value run.Run,
+	attempt run.Attempt,
+	sess session.Session,
+	inputManifest core.RunInputManifest,
+	expectedWorkVersion uint64,
+	work core.WorkItem,
+) error {
 	if inputManifest.Continuation != nil {
 		return corestore.ErrConflict
 	}
@@ -391,7 +411,7 @@ func (s *Store) CreateExecutionAndUpdateWork(
 		return err
 	}
 
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			var currentVersion uint64
 			var currentState string
@@ -528,6 +548,10 @@ VALUES ($1,$2,$3,$4,$5)`
 }
 
 func (s *Store) GetExecution(id string) (run.Run, session.Session, error) {
+	return s.GetExecutionContext(context.Background(), id)
+}
+
+func (s *Store) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
 	const q = `
 SELECT r.run_id,r.task_contract_digest,r.run_input_manifest_digest,r.state,r.version,
        r.current_epoch,COALESCE(r.current_attempt_id,''),r.control_owner,
@@ -539,7 +563,7 @@ WHERE r.run_id=$1`
 	var sess session.Session
 	var runState string
 	var sessionOwner string
-	if err := s.pool.QueryRow(bg(), q, id).Scan(
+	if err := s.pool.QueryRow(ctx, q, id).Scan(
 		&value.ID, &value.TaskContractDigest, &value.RunInputManifestDigest,
 		&runState, &value.Version, &value.CurrentEpoch, &value.CurrentAttemptID,
 		&value.ControlOwner, &sess.ExecutionEpoch, &sessionOwner,
@@ -572,9 +596,13 @@ WHERE run_id=$1 AND attempt_id=$2`
 }
 
 func (s *Store) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
+	return s.GetRunInputByDigestContext(context.Background(), digest)
+}
+
+func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
-		bg(),
+		ctx,
 		"SELECT manifest_json FROM run_input_manifests WHERE run_input_manifest_digest=$1",
 		digest,
 	).Scan(&raw); err != nil {
