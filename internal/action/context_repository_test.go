@@ -9,7 +9,7 @@ import (
 type trackingActionContextStore struct {
 	*MemoryRepository
 	failedSettlement State
-	settledStates     []State
+	settledStates    []State
 }
 
 func (r *trackingActionContextStore) CreateContext(ctx context.Context, op Operation) error {
@@ -98,10 +98,10 @@ func TestActionContextRepositorySettlesRemoteEffectAfterCallerCancel(t *testing.
 			service := NewService(AllowCapabilities{"ci.dispatch": true},
 				fixedGuard{}, provider, repo)
 			req := Request{
-				ID: "effect-" + tc.name,
+				ID:    "effect-" + tc.name,
 				RunID: "run-1", ExecutionEpoch: 1,
 				Action: "ci.dispatch", RiskClass: ControlledMutation,
-				Capability: "ci.dispatch",
+				Capability:     "ci.dispatch",
 				IdempotencyKey: "effect-once-" + tc.name,
 			}
 			receipt, err := service.Execute(ctx, req)
@@ -129,7 +129,7 @@ func TestActionContextRepositoryNeverFabricatesSettlementAfterAmbiguousCommit(t 
 		cancelAfterEffectProvider{
 			cancel: cancel,
 			result: DispatchResult{Outcome: DispatchConfirmed, ExternalRef: "could-have-completed"},
-			calls: &calls,
+			calls:  &calls,
 		}, repo)
 	req := Request{
 		ID: "ambiguous-commit-after-provider", RunID: "run-1",
