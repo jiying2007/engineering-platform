@@ -117,6 +117,24 @@ is ambiguous, no invented completion receipt or automatic external replay
 is allowed. Other Core Store operations remain subject to separate
 caller-Context propagation under P1 #229.
 
+### Core Work/Task intake request-scoped transactions
+
+The authenticated WorkItem create/get and TaskContract create/get HTTP
+handlers use the same Core PostgreSQL authority through request-bound
+`CreateWorkContext`, `GetWorkContext`, `CreateTaskAndUpdateWorkContext`
+and `GetTaskContext`. The Task/verification-plan/Work version transition
+and audit remain one transaction; a caller cancellation while waiting for
+a Work row lock must abort before any Task can be frozen. Internal callers
+using the existing Store interface continue to use that same database and
+authority, not a second Work/Task service.
+
+A lost or canceled HTTP response, especially around COMMIT, does not prove
+that the write rolled back. Check the exact Work ID/version and immutable
+Task digest before attempting any new revision. Other Core Run and
+delivery/evidence/review/closure interfaces still require request-scoped
+migration under P1 #229. These changes do not authorize model execution,
+Publisher mutations or automatic retry.
+
 ### PostgreSQL-side execution ceilings (repository hardening, not SLO)
 
 The production `postgres.Open` entrypoint installs PostgreSQL startup
