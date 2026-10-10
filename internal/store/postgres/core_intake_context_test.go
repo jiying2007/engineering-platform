@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 	"github.com/jiying2007/engineering-platform/internal/verification"
@@ -164,5 +165,35 @@ func TestPostgresTaskFreezeHonorsCallerCancellationDuringWorkRowLock(t *testing.
 		task.ID,
 	).Scan(&auditCount); err != nil || auditCount != 0 {
 		t.Fatalf("cancelled Task freeze wrote audit: count=%d err=%v", auditCount, err)
+	}
+}
+
+func TestCoreMutationCancelledAfterLockReleasesDatabaseAuthority(t *testing.T) {
+	s := newIsolatedIntegrationStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, err := s.Mutate(ctx, Mutation{
+		Apply: func(queryCtx context.Context, tx pgx.Tx) error {
+			if _, err := tx.Exec(queryCtx,
+				"UPDATE platform_state SET recovery_epoch=recovery_epoch WHERE singleton_id=true",
+			); err != nil {
+				return err
+			}
+			// A cancelled caller cannot serve as the rollback Context.
+			// The bounded independent rollback must release this row lock.
+			cancel()
+			return context.Canceled
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled transaction unexpectedly settled: %v", err)
+	}
+	probe, stop := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stop()
+	if _, err := s.pool.Exec(probe,
+		"UPDATE platform_state SET recovery_epoch=recovery_epoch WHERE singleton_id=true",
+	); err != nil {
+		t.Fatalf("cancelled Core transaction retained PostgreSQL lock: %v", err)
 	}
 }
