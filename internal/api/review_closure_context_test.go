@@ -60,32 +60,32 @@ func TestReviewClosureHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T) {
 	mustRequest(t, handler, http.MethodPost, "/api/v1/evidence", map[string]any{
 		"delivery_receipt_id": delivery.ID,
 		"evidence": map[string]any{
-			"evidence_id": "review-context-evidence",
+			"evidence_id":    "review-context-evidence",
 			"requirement_id": "req-1",
-			"issuer": "ci",
-			"procedure": "ci.test",
-			"result": "PASS",
-			"applicable": true,
+			"issuer":         "ci",
+			"procedure":      "ci.test",
+			"result":         "PASS",
+			"applicable":     true,
 		},
 	}, http.StatusCreated)
 	mustRequest(t, handler, http.MethodPost, "/api/v1/verifications", map[string]any{
 		"verification_report_id": "review-context-verification",
-		"delivery_receipt_id": delivery.ID,
-		"verifier": "verifier",
-		"evidence_ids": []string{"review-context-evidence"},
+		"delivery_receipt_id":    delivery.ID,
+		"verifier":               "verifier",
+		"evidence_ids":           []string{"review-context-evidence"},
 	}, http.StatusCreated)
 	reviewPayload := map[string]any{
-		"review_report_id": "review-context-report",
-		"delivery_receipt_id": delivery.ID,
+		"review_report_id":       "review-context-report",
+		"delivery_receipt_id":    delivery.ID,
 		"verification_report_id": "review-context-verification",
-		"reviewer": "independent-reviewer",
-		"result": "PASS",
+		"reviewer":               "independent-reviewer",
+		"result":                 "PASS",
 	}
 	closurePayload := map[string]any{
-		"closure_receipt_id": "review-context-closure",
-		"delivery_receipt_id": delivery.ID,
+		"closure_receipt_id":     "review-context-closure",
+		"delivery_receipt_id":    delivery.ID,
 		"verification_report_id": "review-context-verification",
-		"review_report_id": "review-context-report",
+		"review_report_id":       "review-context-report",
 	}
 	sendCancelled := func(path string, payload map[string]any) {
 		t.Helper()
