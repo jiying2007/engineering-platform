@@ -117,6 +117,17 @@ is ambiguous, no invented completion receipt or automatic external replay
 is allowed. Other Core Store operations remain subject to separate
 caller-Context propagation under P1 #229.
 
+### Action Gateway pre-dispatch caller Context and Action readback
+
+Frozen Task authorization and both Run/Recovery epoch prechecks now use
+the original HTTP/Worker Context in PostgreSQL, and the Action GET endpoint
+inherits its request Context. Locked reads are cancelled before a new Provider
+call or a misleading successful Action readback. Existing Core/Action ledger,
+idempotency reservation, serializable admission and separate Publisher remain
+the only authorities; the final Action transaction independently checks
+Recovery/Run/Session epochs. A cancelled request or ambiguous COMMIT is never
+proof that a remote effect did not occur. Do not replay.
+
 ### Core Work/Task intake request-scoped transactions
 
 The authenticated WorkItem create/get and TaskContract create/get HTTP

@@ -785,7 +785,7 @@ func (s *Server) handleGetAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "action gateway provider is not configured")
 		return
 	}
-	item, err := s.actions.Get(r.PathValue("id"))
+	item, err := s.getActionForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeActionError(w, err)
 		return

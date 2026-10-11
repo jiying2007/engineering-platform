@@ -302,10 +302,19 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 }
 
 func (s *Service) Get(operationID string) (Operation, error) {
+	return s.GetContext(context.Background(), operationID)
+}
+
+// GetContext binds authoritative Action readback to the initiating caller.
+// No observation, reconciliation, publication or replay happens on GET.
+func (s *Service) GetContext(ctx context.Context, operationID string) (Operation, error) {
 	if s == nil || s.repository == nil {
 		return Operation{}, fmt.Errorf("action service repository is not configured")
 	}
-	return s.repository.Get(operationID)
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
+	return s.getOperation(ctx, operationID)
 }
 
 func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, error) {
