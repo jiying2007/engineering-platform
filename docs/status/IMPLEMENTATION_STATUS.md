@@ -81,6 +81,13 @@ Delivery/Verification/Work/Run readback and single audit-backed Review/Closure
 mutations. Recovery get/begin/complete HTTP operations now also carry caller Context
 through PostgreSQL readback and the existing audit/epoch/proof-bound
 transactions, with independently bounded cleanup after cancellation.
+The Core Store interface now **requires** those three caller-bound Recovery
+methods at compile time, not via an optional API type assertion; the legacy
+context-free HTTP fallback was removed. Both the existing PostgreSQL backend
+and in-memory DEV/test Core implement the same Recovery epoch authority, with
+cancelled Begin/Complete negative tests. Direct concrete-store maintenance
+methods remain independently inventoried under #229 and do not authorize any
+external Action replay or effectful terminal reconciliation.
 The historical Steering record/read and the Attempt/Task-revision read paths
 now also offer caller-bound PostgreSQL variants; Steering HTTP readback uses the
 same request Context while live Codex steering retains its existing control
