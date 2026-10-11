@@ -141,7 +141,7 @@ func (s *Store) StartOffline(ctx context.Context, subject string, req offline.St
 	if err != nil {
 		return empty, mapWriteError(err)
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return offline.Permit{Token: token, Assignment: a, Preparation: prep, Profile: req.Profile, LeaseUntil: until}, nil
@@ -213,7 +213,7 @@ func (s *Store) RenewOffline(ctx context.Context, subject string, t offline.Toke
 	if err != nil {
 		return until, err
 	}
-	return until, tx.Commit(ctx)
+	return until, commitAuthority(ctx, tx)
 }
 func (s *Store) FinishOffline(ctx context.Context, subject string, report offline.Report) (offline.Receipt, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -262,7 +262,7 @@ func (s *Store) FinishOffline(ctx context.Context, subject string, report offlin
 	if tag.RowsAffected() != 1 {
 		return empty, workerqueue.ErrLease
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return receipt, nil
@@ -288,7 +288,7 @@ func (s *Store) FailOffline(ctx context.Context, subject string, t offline.Token
 	if _, err = tx.Exec(ctx, `UPDATE worker_offline_executions SET state='UNKNOWN' WHERE execution_id=$1`, t.ID); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return commitAuthority(ctx, tx)
 }
 func (s *Store) GetOffline(ctx context.Context, runID string) (offline.Status, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

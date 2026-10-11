@@ -103,7 +103,7 @@ func (s *Store) relayRunStart(ctx context.Context, owner string) (bool, error) {
 	if _, err := appendAudit(ctx, tx, record, time.Now().UTC()); err != nil {
 		return false, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return false, err
 	}
 	return true, nil

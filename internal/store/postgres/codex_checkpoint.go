@@ -91,7 +91,7 @@ func (s *Store) SaveCodexCheckpoint(ctx context.Context, subject string, c codex
 	if err := workerAudit(ctx, tx, "worker.codex.source-checkpoint-retained", c.Binding.Token.RunID, c); err != nil {
 		return empty, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return c, nil

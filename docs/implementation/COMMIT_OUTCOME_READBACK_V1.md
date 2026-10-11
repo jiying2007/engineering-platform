@@ -39,3 +39,26 @@ automatic retry worker, schema migration or new authority. The tests exercise
 classification and HTTP mapping; a real post-COMMIT lost-ACK fault and selected
 host/provider long-run qualification are still tracked under P1 #229 and
 external #103/#105/#106 and must not be claimed from CI fixtures.
+
+## Worker and controlled maintenance transactions
+
+The same typed unknown-COMMIT classification covers the original audited
+transactions for Worker inbox claims/renewals/receipts, Offline and Codex
+execution permits/renewals/results, Codex control queue/delivery/settlement,
+Source Continuation, Checkpoint, Preparation, and execution reconciliation.
+The relevant Worker HTTP error writer returns the same fixed 503 with no SQL
+material. Callers must read back the *same* Run, execution/control token,
+generation, Recovery epoch, retained receipt and audit before resuming; a
+timeout must never mint a replacement permit or replay a model/Device/Git
+operation.
+
+Outbox retains its earlier separately specified
+`outbox.ErrOutcomeUnknown` authority and independent settlement policy;
+`schema_readiness`'s read-only transaction is not an effectful COMMIT.
+No new ledger, schema change, external publisher access or automatic retry
+is introduced.
+
+The isolated PostgreSQL regression simulates loss of a successful ACK
+*after* a real committed Recovery epoch/audit transaction, then demonstrates
+exact readback and stale-epoch denial. It is **not** an actual TCP cut between
+server COMMIT and client ACK and does not qualify production network behavior.

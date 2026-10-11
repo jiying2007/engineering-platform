@@ -97,7 +97,7 @@ func (s *Store) BindCodexControl(ctx context.Context, subject string, b codexexe
 	if err = workerAudit(ctx, tx, "worker.codex.control-bound", b.Token.RunID, b); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return commitAuthority(ctx, tx)
 }
 
 const controlColumns = `steering_command_id,run_id,execution_epoch,sequence,actor,content_digest,created_at,control_payload,delivery_state,dispatched_at,resolved_at`
@@ -200,7 +200,7 @@ func (s *Store) QueueCodexControl(ctx context.Context, runID, kind string, i cod
 	if err = workerAudit(ctx, tx, "steering.queued", runID, d); err != nil {
 		return empty, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return d, nil
@@ -244,7 +244,7 @@ func (s *Store) ClaimCodexControl(ctx context.Context, subject string, b codexex
 	if err = workerAudit(ctx, tx, "steering.dispatching", b.Token.RunID, d); err != nil {
 		return nil, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return nil, err
 	}
 	return &d, nil
@@ -290,7 +290,7 @@ func (s *Store) SettleCodexControl(ctx context.Context, subject string, r codexe
 	if err = workerAudit(ctx, tx, "steering.observed", r.Binding.Token.RunID, d); err != nil {
 		return empty, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return d, nil
@@ -355,7 +355,7 @@ func (s *Store) CloseCodexControl(ctx context.Context, subject string, c codexex
 	if err = workerAudit(ctx, tx, "worker.codex.controls-sealed", c.Binding.Token.RunID, t); err != nil {
 		return empty, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return t, nil

@@ -78,7 +78,7 @@ func (s *Store) ReconcileExecutionAbandoned(ctx context.Context, reconciler stri
 		if retained.RequestDigest != digest || retained.Reconciler != reconciler {
 			return zero, corestore.ErrConflict
 		}
-		return retained, tx.Commit(ctx)
+		return retained, commitAuthority(ctx, tx)
 	}
 	if receiptPresent || (state != "AUTHORIZED" && state != "UNKNOWN") {
 		return zero, corestore.ErrConflict
@@ -139,7 +139,7 @@ func (s *Store) ReconcileExecutionAbandoned(ctx context.Context, reconciler stri
 			return zero, corestore.ErrConflict
 		}
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return zero, err
 	}
 	return retained, nil

@@ -164,7 +164,7 @@ func (s *Store) claimInput(ctx context.Context, subject, profile string) (*worke
 		return nil, false, err
 	}
 	if busy {
-		return nil, false, tx.Commit(ctx)
+		return nil, false, commitAuthority(ctx, tx)
 	}
 	r, err := scanInbox(tx.QueryRow(ctx, `SELECT `+inboxColumns+` FROM worker_inbox i WHERE worker_profile=$1
  AND (state='PENDING' OR (state='LEASED' AND lease_until<=clock_timestamp()))
@@ -172,7 +172,7 @@ func (s *Store) claimInput(ctx context.Context, subject, profile string) (*worke
  AND (r.state='PAUSED' OR (r.state='RUNNING' AND s.paused)))
  ORDER BY inbox_id LIMIT 1 FOR UPDATE OF i SKIP LOCKED`, profile))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, false, tx.Commit(ctx)
+		return nil, false, commitAuthority(ctx, tx)
 	}
 	if err != nil {
 		return nil, false, err
@@ -192,7 +192,7 @@ func (s *Store) claimInput(ctx context.Context, subject, profile string) (*worke
 		if err := workerAudit(ctx, tx, "worker.input.revoked", r.runID, r.intent); err != nil {
 			return nil, false, err
 		}
-		return nil, true, tx.Commit(ctx)
+		return nil, true, commitAuthority(ctx, tx)
 	}
 	r.generation++
 	r.epoch = epoch
@@ -213,7 +213,7 @@ func (s *Store) claimInput(ctx context.Context, subject, profile string) (*worke
 	}{subject, a.Token}); err != nil {
 		return nil, false, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return nil, false, err
 	}
 	return &a, false, nil
@@ -287,7 +287,7 @@ func (s *Store) RenewInput(ctx context.Context, subject string, token workerqueu
 	if err != nil {
 		return time.Time{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return time.Time{}, err
 	}
 	return until, nil
@@ -347,7 +347,7 @@ func (s *Store) ReportInput(ctx context.Context, subject string, report workerqu
 	if tag.RowsAffected() != 1 {
 		return receipt, workerqueue.ErrLease
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return receipt, err
 	}
 	return receipt, nil

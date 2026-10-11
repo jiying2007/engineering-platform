@@ -203,7 +203,7 @@ func (s *Store) ContinueCodex(ctx context.Context, actor string, q codexexec.Con
 	if _, err = insertOutbox(ctx, tx, OutboxMessage{Key: "run:" + q.RunID + ":started", Topic: "run.started", AggregateType: "Run", AggregateID: q.RunID, Payload: workerqueue.Intent{RunID: q.RunID, TaskDigest: task, InputDigest: digest, ExecutionEpoch: 1}}); err != nil {
 		return empty, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return receipt, nil
