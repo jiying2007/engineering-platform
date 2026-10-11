@@ -110,3 +110,37 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 		t.Fatal(err)
 	}
 }
+
+func TestRecoveryProofBlocksLegacySafeToRetryWithoutQuiescence(t *testing.T) {
+	s := newIsolatedIntegrationStore(t)
+	runID := setupPostgresActionRun(t, s, "unsafe-retry")
+	now := time.Now().UTC()
+	req := action.Request{
+		ID: "unsafe-retry-op", RunID: runID, ExecutionEpoch: 1, RecoveryEpoch: 0,
+		Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci",
+		ParametersDigest: "sha256:" + strings.Repeat("a", 64), IdempotencyKey: "unsafe-retry-op",
+		RequestedBy: "runtime", RequestedAt: now,
+	}
+	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("b", 64), now)
+	if err := s.Create(*op); err != nil {
+		t.Fatal(err)
+	}
+	for i, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling, action.SafeToRetry} {
+		if err := op.Transition(state, now.Add(time.Duration(i+1)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Update(*op); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.BeginRecovery(0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
+		t.Fatalf("unqualified SAFE_TO_RETRY incorrectly cleared effectful Action: %v", err)
+	}
+	status, err := s.ReadOperationalStatus(context.Background())
+	if err != nil || status.AuthorityClear || status.Snapshot.SafeToRetryOperations != 1 {
+		t.Fatalf("unsafe retry reservation hidden from status: %+v err=%v", status, err)
+	}
+}
