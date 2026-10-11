@@ -171,6 +171,8 @@ func (s *Server) handleWorkerInbox(w http.ResponseWriter, r *http.Request) {
 }
 func writeWorkerError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, store.ErrCommitOutcomeUnknown):
+		writeCommitOutcomeUnknown(w)
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "worker intent not found")
 	case errors.Is(err, store.ErrConflict), errors.Is(err, store.ErrExists), errors.Is(err, workerqueue.ErrLease), errors.Is(err, workerqueue.ErrRecovery), errors.Is(err, workerqueue.ErrInactive), errors.Is(err, workerqueue.ErrPaused):
