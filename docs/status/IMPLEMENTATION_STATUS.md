@@ -40,6 +40,14 @@ context-free fallback. Both in-memory test/DEV ledgers explicitly implement
 this same single-ledger contract; fault-injection probes continue to
 intercept the exact scoped call phases. Original post-Provider settlement
 remains independently bounded and never replays a remote effect.
+The Gateway Authority also requires caller-bound Core
+`GetExecutionContext / GetTaskByDigestContext / GetRecoveryContext`
+at its constructor interface. Production Control Plane explicitly checks
+that its Core backend satisfies this scoped contract before admitting a
+Publisher Action Gateway. The optional unscoped Run/Task/Recovery
+fallback was removed; the same in-memory Core ledger now offers scoped
+reads and cancellation probes. This is a pre-dispatch Context fence,
+**not** proof that an original external Provider completed or quiesced.
 The Service rechecks caller cancellation after each pre-dispatch
 phase and the production PostgreSQL Action repository now propagates the exact
 request Context through idempotency reads, PLANNED/DISPATCHED transactions and

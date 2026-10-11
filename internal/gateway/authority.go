@@ -17,16 +17,10 @@ var (
 	ErrInvalidRiskClass = errors.New("invalid action risk class")
 )
 
+// State is the same Core authority, with mandatory caller-bound methods
+// for all three pre-dispatch reads. A context-free fallback could outlive
+// an authenticated HTTP cancellation before an Action reservation.
 type State interface {
-	GetExecution(string) (run.Run, session.Session, error)
-	GetTaskByDigest(string) (core.TaskContract, error)
-	GetRecovery() (recovery.Manager, error)
-}
-
-// Request-bound reads use the existing Core PostgreSQL authority; they do
-// not add a second admission gate. The final Action Store transaction still
-// fences the actual dispatch against the current Recovery/Run/Session epochs.
-type contextualState interface {
 	GetExecutionContext(context.Context, string) (run.Run, session.Session, error)
 	GetTaskByDigestContext(context.Context, string) (core.TaskContract, error)
 	GetRecoveryContext(context.Context) (recovery.Manager, error)
@@ -44,30 +38,21 @@ func (a *Authority) execution(ctx context.Context, id string) (run.Run, session.
 	if err := ctx.Err(); err != nil {
 		return run.Run{}, session.Session{}, err
 	}
-	if scoped, ok := a.state.(contextualState); ok {
-		return scoped.GetExecutionContext(ctx, id)
-	}
-	return a.state.GetExecution(id)
+	return a.state.GetExecutionContext(ctx, id)
 }
 
 func (a *Authority) frozenTask(ctx context.Context, digest string) (core.TaskContract, error) {
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
 	}
-	if scoped, ok := a.state.(contextualState); ok {
-		return scoped.GetTaskByDigestContext(ctx, digest)
-	}
-	return a.state.GetTaskByDigest(digest)
+	return a.state.GetTaskByDigestContext(ctx, digest)
 }
 
 func (a *Authority) recovery(ctx context.Context) (recovery.Manager, error) {
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
-	if scoped, ok := a.state.(contextualState); ok {
-		return scoped.GetRecoveryContext(ctx)
-	}
-	return a.state.GetRecovery()
+	return a.state.GetRecoveryContext(ctx)
 }
 
 func (a *Authority) Authorize(ctx context.Context, req action.Request) error {

@@ -148,18 +148,23 @@ func TestRecoveryEpochMustMatchEvenForObserve(t *testing.T) {
 	}
 }
 
+// A failing Core read must reach the required caller-scoped API. The test
+// fixture no longer relies on a legacy GetRecovery() fallback.
 type failingGatewayState struct {
-	State
+	*store.Memory
 	err error
 }
 
-func (s failingGatewayState) GetRecovery() (recovery.Manager, error) {
+func (s failingGatewayState) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	return recovery.Manager{}, s.err
 }
 
 func TestRecoveryReadFailureFailsClosed(t *testing.T) {
 	expected := errors.New("recovery state unavailable")
-	auth := NewAuthority(failingGatewayState{err: expected})
+	auth := NewAuthority(failingGatewayState{Memory: store.NewMemory(), err: expected})
 	if err := auth.CheckRecoveryEpoch(context.Background(), 0, action.Observe); !errors.Is(err, expected) {
 		t.Fatalf("expected recovery source error, got %v", err)
 	}

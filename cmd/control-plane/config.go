@@ -12,7 +12,13 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/gateway"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
+	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
 )
+
+// The production PostgreSQL backend must satisfy all three caller-bound
+// Gateway authority reads at compile time, in addition to the runtime
+// rejection of any unscoped backend configured for Publisher admission.
+var _ gateway.State = (*pgstore.Store)(nil)
 
 type configuration struct {
 	address               string
@@ -132,7 +138,11 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			if loadErr != nil {
 				return nil, loadErr
 			}
-			authority := gateway.NewAuthority(backend)
+			scopedCore, ok := backend.(gateway.State)
+			if !ok {
+				return nil, fmt.Errorf("Action Gateway requires caller-bound Core Run/Task/Recovery readback")
+			}
+			authority := gateway.NewAuthority(scopedCore)
 			actions = action.NewService(authority, authority, provider, repository)
 		}
 		handler, err = api.NewAuthenticatedHandler(backend, actions, c.policy, options)

@@ -13,6 +13,10 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/store"
 )
 
+// Compile-time acceptance: a Core state that provides only unscoped
+// GetExecution/GetTaskByDigest/GetRecovery cannot be injected into Gateway.
+var _ State = (*store.Memory)(nil)
+
 type contextAuthorityProbe struct {
 	*store.Memory
 	executionReads int
