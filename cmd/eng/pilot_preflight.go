@@ -499,10 +499,16 @@ func pilotGitCommit(repository, ref string) (string, error) {
 
 type pilotPublisherState struct{}
 
-func (pilotPublisherState) GetExecution(string) (run.Run, session.Session, error) {
+func (pilotPublisherState) GetExecutionContext(ctx context.Context, _ string) (run.Run, session.Session, error) {
+	if err := ctx.Err(); err != nil {
+		return run.Run{}, session.Session{}, err
+	}
 	return run.Run{}, session.Session{}, nil
 }
-func (pilotPublisherState) GetTaskByDigest(string) (core.TaskContract, error) {
+func (pilotPublisherState) GetTaskByDigestContext(ctx context.Context, _ string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
 	return core.TaskContract{}, nil
 }
 func (pilotPublisherState) GetCodex(context.Context, string) (codexexec.Status, error) {

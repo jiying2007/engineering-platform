@@ -30,14 +30,22 @@ type publisherState struct {
 	status codexexec.Status
 }
 
-func (s publisherState) GetExecution(id string) (run.Run, session.Session, error) {
+func (s publisherState) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
+	if err := ctx.Err(); err != nil {
+		return run.Run{}, session.Session{}, err
+	}
 	if id != s.run.ID {
 		return run.Run{}, session.Session{}, os.ErrNotExist
 	}
 	return s.run, *session.New(id, s.run.CurrentEpoch), nil
 }
 
-func (s publisherState) GetTaskByDigest(string) (core.TaskContract, error) { return s.task, nil }
+func (s publisherState) GetTaskByDigestContext(ctx context.Context, _ string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
+	return s.task, nil
+}
 
 func (s publisherState) GetCodex(context.Context, string) (codexexec.Status, error) {
 	return s.status, nil
