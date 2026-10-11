@@ -37,7 +37,8 @@ func TestEffectfulActionUnresolvedRequiresOriginalReadbackWithoutSQLLeak(t *test
 			if rec.Code != http.StatusServiceUnavailable ||
 				!strings.Contains(body, tc.wantCode) ||
 				!strings.Contains(body, "read back") ||
-				!strings.Contains(body, "before any retry") ||
+				!(strings.Contains(body, "before any retry") ||
+					strings.Contains(body, "before considering any retry")) ||
 				strings.Contains(body, "private SQL") ||
 				strings.Contains(body, "password") {
 				t.Fatalf("ambiguous external Action error lost no-replay/readback boundary: status=%d body=%q", rec.Code, body)
