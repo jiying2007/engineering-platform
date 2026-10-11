@@ -318,8 +318,20 @@ func (s *Service) GetContext(ctx context.Context, operationID string) (Operation
 }
 
 func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, error) {
+	if s == nil || s.repository == nil || s.provider == nil {
+		return Receipt{}, fmt.Errorf("action reconcile service is not fully configured")
+	}
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	op, err := s.getOperation(ctx, operationID)
 	if err != nil {
+		return Receipt{}, err
+	}
+	// A cancelled readback is not authority to advance UNKNOWN into a
+	// new external observation. In particular, legacy in-memory adapters
+	// must not accidentally turn a delayed read into a provider call.
+	if err := ctx.Err(); err != nil {
 		return Receipt{}, err
 	}
 	if op.State != Unknown {
@@ -328,10 +340,18 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	if err := op.Transition(Reconciling, s.now()); err != nil {
 		return Receipt{}, err
 	}
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	if err := s.updateOperation(ctx, op); err != nil {
 		return Receipt{}, err
 	}
-
+	// RECONCILING may now be durable even though the original caller was
+	// lost. Preserve it as unresolved for Recovery; never issue another
+	// provider observation after detecting cancellation, and never replay.
+	if err := ctx.Err(); err != nil {
+		return Receipt{}, err
+	}
 	result, err := s.provider.Reconcile(ctx, op)
 	if err != nil {
 		op.State = Manual

@@ -81,6 +81,20 @@ requires exact persisted ID/epoch/idempotency/audit readback and never treats
 a cancelled COMMIT as a known rollback; this is fail-closed error labeling,
 not proof that a specific production transaction committed or rolled back.
 See [COMMIT outcome/readback](../implementation/COMMIT_OUTCOME_READBACK_V1.md).
+The merged #246 additionally classifies 25 existing Worker/Offline/Codex/
+preparation/source-continuation mutating COMMIT sites and maps Worker HTTP
+unknown outcomes to fixed 503 exact-readback semantics. Its isolated-database
+lost-ACK regression is simulated *after* a real commit, not a live network cut.
+
+Action reconciliation now checks initiating Context before operation readback,
+after readback and after the original durable RECONCILING admission, before
+starting a new Provider observation. If the caller was lost immediately after
+admission, RECONCILING remains unresolved with no invented remote receipt or
+automatic retry. An observation that actually began still uses the existing
+independently bounded durable settlement even if the original caller then
+disconnects. This closes one request-cancellation path under P1 #229, **not**
+original-dispatcher quiescence or the provider-specific terminal Recovery
+Proof required by internal P0 #228.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
@@ -158,7 +172,7 @@ boundary. This deferral does not affect RC or production acceptance gates.
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
-| Operational status | v4 separates database authority from unobserved readiness; adds bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
+| Operational status | v5 separates database authority from unobserved readiness; reports PLANNED, DISPATCHED and unqualified historical SAFE_TO_RETRY external reservations as degraded, plus bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v3 with frozen single-canary, emergency-stop, no-provider-fallback and no-automatic-DB-downgrade gates, exact nonempty no-skip test inventory, and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Passing the frozen external canary/provider-revoke/Publisher-revoke/DB-restore gates, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |
