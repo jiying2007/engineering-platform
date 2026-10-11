@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,10 +85,16 @@ func TestRealTCPDropAfterServerCommitRequiresAuthoritativeRecoveryReadback(t *te
 	// connections and external Providers are never accessed here.
 	original := newIsolatedIntegrationStore(t)
 	config := original.pool.Config()
-	if config.ConnConfig.TLSConfig != nil || config.ConnConfig.Host == "" {
-		t.Skip("requires isolated local plaintext PostgreSQL test connection")
+	host := config.ConnConfig.Host
+	ip := net.ParseIP(host)
+	if config.ConnConfig.TLSConfig != nil ||
+		(host != "localhost" && (ip == nil || !ip.IsLoopback())) {
+		t.Skip("real TCP ACK cut is restricted to a local plaintext PostgreSQL test server")
 	}
-	backend := net.JoinHostPort(config.ConnConfig.Host, strconv.Itoa(int(config.ConnConfig.Port)))
+	if !strings.HasPrefix(config.ConnConfig.RuntimeParams["search_path"], "ep_test_") {
+		t.Fatal("refuse a lost-ACK fault outside a private PostgreSQL test schema")
+	}
+	backend := net.JoinHostPort(host, strconv.Itoa(int(config.ConnConfig.Port)))
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
