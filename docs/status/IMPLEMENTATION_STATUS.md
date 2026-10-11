@@ -28,6 +28,10 @@ The Action Gateway now binds frozen authorization, Run epoch and Recovery
 epoch prechecks to the initiating caller Context, rather than waiting in
 legacy background-context PostgreSQL reads. Action GET also propagates HTTP
 cancellation to the same existing ledger without observing/dispatching.
+The API ActionGateway now **requires** caller-bound `GetContext` at interface
+construction, not just an optional runtime type assertion. The legacy
+context-free `Get(string)` fallback was removed from HTTP Action GET;
+a new gateway cannot compile against this API without the scoped method.
 The Service rechecks caller cancellation after each pre-dispatch
 phase and the production PostgreSQL Action repository now propagates the exact
 request Context through idempotency reads, PLANNED/DISPATCHED transactions and
