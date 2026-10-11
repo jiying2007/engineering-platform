@@ -70,6 +70,22 @@ func TestRecoveryLifecycleContextCancelsPostgresLockWithoutStateLeak(t *testing.
 	if _, err := s.BeginRecoveryContext(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
+	// A cancelled proof must not leave a partly committed proof/audit
+	// or a transaction that outlives its original caller lock wait.
+	waitThenCancel("proof", func(c context.Context) error {
+		_, err := s.CreateRecoveryProof(c, 1, "urn:engineering-platform:operator:reconciler")
+		return err
+	})
+	var proofCount, proofAuditCount int
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM recovery_reconciliation_proofs WHERE recovery_epoch=1").Scan(&proofCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type='recovery.reconciliation_proved'").Scan(&proofAuditCount); err != nil {
+		t.Fatal(err)
+	}
+	if proofCount != 0 || proofAuditCount != 0 {
+		t.Fatalf("cancelled proof left durable record or audit: proof=%d audit=%d", proofCount, proofAuditCount)
+	}
 	proof, err := s.CreateRecoveryProof(ctx, 1, "urn:engineering-platform:operator:reconciler")
 	if err != nil {
 		t.Fatal(err)
