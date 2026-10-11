@@ -85,12 +85,7 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err := s.Update(*op); err != nil {
 		t.Fatal(err)
 	}
-	if err := op.Transition(action.SafeToRetry, now.Add(4*time.Second)); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.Update(*op); err != nil {
-		t.Fatal(err)
-	}
+	seedHistoricalSafeToRetry(t, s, op.ID)
 	status, err = s.ReadOperationalStatus(ctx)
 	if err != nil || status.Ready || status.AuthorityClear ||
 		status.Snapshot.SafeToRetryOperations != 1 || status.State != "DEGRADED" {
