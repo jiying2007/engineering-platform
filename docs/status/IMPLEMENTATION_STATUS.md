@@ -88,6 +88,18 @@ and in-memory DEV/test Core implement the same Recovery epoch authority, with
 cancelled Begin/Complete negative tests. Direct concrete-store maintenance
 methods remain independently inventoried under #229 and do not authorize any
 external Action replay or effectful terminal reconciliation.
+The remaining **24 HTTP Core contextual adapters** (Work/Task, Run/Session,
+Steering, Checkpoint/Delivery, Evidence/Verification and Review/Closure)
+now also require their original `*Context` method at the compile-time
+Core Store interface, rather than conditionally type-asserting an adapter
+and falling back to context-free record/transaction calls. Existing
+PostgreSQL methods are reused without changing atomic business/audit/Outbox
+authority or state schemas; the in-memory DEV/test Core delegates to the
+same single ledger after rejecting pre-cancelled requests. A source AST
+regression rejects reintroduced runtime-optional `s.store.(...Context...)`
+adapters in HTTP modules. This is request-to-Core caller cancellation
+hardening, not a selected-host worst-case lock latency measurement,
+an unattended credential qualification, or original external effect proof.
 The historical Steering record/read and the Attempt/Task-revision read paths
 now also offer caller-bound PostgreSQL variants; Steering HTTP readback uses the
 same request Context while live Codex steering retains its existing control
