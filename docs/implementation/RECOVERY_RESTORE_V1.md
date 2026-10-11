@@ -97,7 +97,11 @@ Publisher reconciliation returns `MANUAL / ABSENT_DISPATCH_NOT_QUIESCED`,
 not `SAFE_TO_RETRY`; it does not execute another Git mutation.
 
 Historical `SAFE_TO_RETRY` rows remain unresolved in Recovery Proof, and
-operational status v5 explicitly counts and degrades on those rows. All
+operational status v5 explicitly counts and degrades on those rows.
+The normal Action state machine and PostgreSQL ledger refuse new transitions
+into `SAFE_TO_RETRY` or from historical `SAFE_TO_RETRY` to `DISPATCHED`.
+Tests seed such a historical state only with isolated PostgreSQL fixture SQL;
+this is not production state-transition authority. All
 idempotency keys, original Action epochs and audit history are retained; there
 is no migration, fabricated confirmation, or auto-retry. Only a separately
 qualified provider-specific original-dispatcher quiescence and immutable
