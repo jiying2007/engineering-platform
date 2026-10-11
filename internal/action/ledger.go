@@ -74,9 +74,7 @@ func (o *Operation) Transition(to State, now time.Time) error {
 	case Unknown:
 		valid = to == Reconciling
 	case Reconciling:
-		valid = to == Confirmed || to == SafeToRetry || to == Manual
-	case SafeToRetry:
-		valid = to == Dispatched
+		valid = to == Confirmed || to == Manual
 	}
 	if !valid {
 		return ErrInvalidTransition

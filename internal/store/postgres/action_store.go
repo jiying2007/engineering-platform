@@ -237,14 +237,14 @@ WHERE operation_id=$5
 func previousStates(target action.State) ([]string, error) {
 	switch target {
 	case action.Dispatched:
-		return []string{string(action.Planned), string(action.SafeToRetry)}, nil
+		return []string{string(action.Planned)}, nil
 	case action.Confirmed:
 		return []string{string(action.Dispatched), string(action.Reconciling)}, nil
 	case action.Unknown:
 		return []string{string(action.Dispatched)}, nil
 	case action.Reconciling:
 		return []string{string(action.Unknown)}, nil
-	case action.SafeToRetry, action.Manual:
+	case action.Manual:
 		return []string{string(action.Reconciling)}, nil
 	default:
 		return nil, fmt.Errorf("%w: cannot persist transition to %s", action.ErrInvalidTransition, target)

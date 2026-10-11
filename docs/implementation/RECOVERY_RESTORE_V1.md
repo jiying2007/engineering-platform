@@ -20,7 +20,7 @@ caller. PostgreSQL computes them while the exact recovery epoch is locked.
 
 A proof is created only when all machine-observable ambiguity is clear:
 
-- no ExternalOperation outside CONFIRMED, SAFE_TO_RETRY or explicitly no-replay ABANDONED_RECONCILED;
+- no ExternalOperation outside CONFIRMED or explicitly no-replay ABANDONED_RECONCILED;
 - no live non-OBSERVE outbox lease;
 - no live Worker inbox lease;
 - no offline execution in AUTHORIZED or UNKNOWN.
@@ -87,6 +87,26 @@ authenticated principal and retained proof of the exact epoch. A successful
 local fixture/CI is not proof of production, publisher, provider or operator
 qualification. Existing installations require explicit quiescence and
 migration before running binaries that require schema v13.
+
+## P0 remote absence does not prove Publisher quiescence
+
+An instantaneous GitHub `ABSENT` ref/PR observation is not a retained proof
+that a timed-out original Publisher cannot finish its remote effect later.
+Even a byte-exact local Git bundle proves only source integrity. Accordingly,
+Publisher reconciliation returns `MANUAL / ABSENT_DISPATCH_NOT_QUIESCED`,
+not `SAFE_TO_RETRY`; it does not execute another Git mutation.
+
+Historical `SAFE_TO_RETRY` rows remain unresolved in Recovery Proof, and
+operational status v5 explicitly counts and degrades on those rows.
+The normal Action state machine and PostgreSQL ledger refuse new transitions
+into `SAFE_TO_RETRY` or from historical `SAFE_TO_RETRY` to `DISPATCHED`.
+Tests seed such a historical state only with isolated PostgreSQL fixture SQL;
+this is not production state-transition authority. All
+idempotency keys, original Action epochs and audit history are retained; there
+is no migration, fabricated confirmation, or auto-retry. Only a separately
+qualified provider-specific original-dispatcher quiescence and immutable
+external observation could support an eventual disposition. Such real
+effectful reconciliation is still P0 #228 and is not proven by these fixtures.
 
 ## Double check on completion
 

@@ -143,9 +143,9 @@ func TestEvaluateSnapshotValidatesWorkerPollFactsWithoutInferringReadiness(t *te
 	}
 }
 
-func TestOperationalStatusV4NeverHidesPreEffectOrInFlightActions(t *testing.T) {
-	if OperationalStatusVersion != 4 {
-		t.Fatal("PLANNED/DISPATCHED facts require a distinct v4 snapshot")
+func TestOperationalStatusV5NeverHidesUnqualifiedActionStates(t *testing.T) {
+	if OperationalStatusVersion != 5 {
+		t.Fatal("SAFE_TO_RETRY needs explicit v5 fail-closed accounting")
 	}
 	for _, tc := range []struct {
 		name   string
@@ -154,6 +154,7 @@ func TestOperationalStatusV4NeverHidesPreEffectOrInFlightActions(t *testing.T) {
 	}{
 		{"planned", func(s *Snapshot) { s.PlannedOperations = 1 }, "planned_external_actions"},
 		{"dispatched", func(s *Snapshot) { s.DispatchedOperations = 1 }, "dispatched_external_actions"},
+		{"unqualified-retry", func(s *Snapshot) { s.SafeToRetryOperations = 1 }, "unqualified_safe_to_retry_actions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := cleanSnapshot()
@@ -184,6 +185,7 @@ func TestOperationalStatusV4NeverHidesPreEffectOrInFlightActions(t *testing.T) {
 	for _, mutate := range []func(*Snapshot){
 		func(s *Snapshot) { s.PlannedOperations = -1 },
 		func(s *Snapshot) { s.DispatchedOperations = -1 },
+		func(s *Snapshot) { s.SafeToRetryOperations = -1 },
 	} {
 		s := cleanSnapshot()
 		mutate(&s)

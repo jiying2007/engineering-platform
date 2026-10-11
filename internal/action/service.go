@@ -184,6 +184,9 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		if existing.State == AbandonedReconciled {
 			return Receipt{}, fmt.Errorf("%w: abandoned external reservation has no replay authority", ErrDenied)
 		}
+		if existing.State == SafeToRetry {
+			return Receipt{}, fmt.Errorf("%w: SAFE_TO_RETRY has no independent dispatch-quiescence proof", ErrDenied)
+		}
 		return receiptFromOperation(req.ID, existing, s.now()), nil
 	} else if !errors.Is(getErr, ErrOperationAbsent) {
 		return Receipt{}, getErr
@@ -224,6 +227,9 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 			if getErr == nil && existing.RequestDigest == digest {
 				if existing.State == AbandonedReconciled {
 					return Receipt{}, fmt.Errorf("%w: abandoned external reservation has no replay authority", ErrDenied)
+				}
+				if existing.State == SafeToRetry {
+					return Receipt{}, fmt.Errorf("%w: SAFE_TO_RETRY has no independent dispatch-quiescence proof", ErrDenied)
 				}
 				return receiptFromOperation(req.ID, existing, s.now()), nil
 			}
@@ -343,7 +349,14 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	case ReconcileConfirmed:
 		err = op.Transition(Confirmed, s.now())
 	case ReconcileSafeToRetry:
-		err = op.Transition(SafeToRetry, s.now())
+		// The ReconcileResult contract has no independently retained proof
+		// that the original external dispatcher stopped. Any provider's
+		// unsupported retry verdict must fail closed to MANUAL, not grant a
+		// potentially duplicate model/Git/CI/device effect.
+		invalidReconcileOutcome = true
+		err = op.Transition(Manual, s.now())
+		result.ExternalRef = ""
+		result.ObservedState = "UNQUALIFIED_RETRY_VERDICT"
 	case ReconcileManual:
 		err = op.Transition(Manual, s.now())
 	default:

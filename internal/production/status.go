@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	OperationalStatusVersion = 4
+	OperationalStatusVersion = 5
 
 	OperationalObservationRequired = "OBSERVATION_REQUIRED"
 	OperationalAuthorityClear      = "CLEAR"
@@ -41,6 +41,7 @@ type Snapshot struct {
 	UnknownOperations      int64     `json:"unknown_operations"`
 	ReconcilingOperations  int64     `json:"reconciling_operations"`
 	ManualOperations       int64     `json:"manual_operations"`
+	SafeToRetryOperations  int64     `json:"safe_to_retry_operations"`
 	UnknownCodexExecutions int64     `json:"unknown_codex_executions"`
 	// Claim attempts update this existing database fact even when no work is
 	// available. It is poll history, not a freshness threshold or capacity claim.
@@ -76,7 +77,7 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 		snapshot.ExpiredWorkerLeases, snapshot.PendingOutbox, snapshot.LeasedOutbox,
 		snapshot.DeadLetterOutbox, snapshot.PlannedOperations, snapshot.DispatchedOperations,
 		snapshot.UnknownOperations, snapshot.ReconcilingOperations,
-		snapshot.ManualOperations, snapshot.UnknownCodexExecutions,
+		snapshot.ManualOperations, snapshot.SafeToRetryOperations, snapshot.UnknownCodexExecutions,
 	}
 	for _, count := range counts {
 		if count < 0 {
@@ -136,6 +137,7 @@ func EvaluateSnapshot(snapshot Snapshot) (OperationalStatus, error) {
 		{"unknown_external_actions", snapshot.UnknownOperations},
 		{"reconciling_actions", snapshot.ReconcilingOperations},
 		{"manual_actions", snapshot.ManualOperations},
+		{"unqualified_safe_to_retry_actions", snapshot.SafeToRetryOperations},
 		{"unknown_codex_executions", snapshot.UnknownCodexExecutions},
 	}
 	for _, check := range checks {
