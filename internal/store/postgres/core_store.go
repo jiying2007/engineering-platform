@@ -698,6 +698,12 @@ func (s *Store) RecordSteeringContext(
 	sess session.Session,
 	cmd session.SteeringCommand,
 ) error {
+	// The command, proposed Run and Session must refer to one immutable Run.
+	// A foreign cmd.RunID can otherwise insert a valid FK row for another Run
+	// while mutating this Run and producing a misleading audit aggregate.
+	if id == "" || value.ID != id || sess.RunID != id || cmd.RunID != id {
+		return corestore.ErrConflict
+	}
 	payload := struct {
 		Run      run.Run                 `json:"run"`
 		Session  session.Session         `json:"session"`
