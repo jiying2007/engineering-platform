@@ -57,9 +57,13 @@ Delivery/Verification/Work/Run readback and single audit-backed Review/Closure
 mutations. Recovery get/begin/complete HTTP operations now also carry caller Context
 through PostgreSQL readback and the existing audit/epoch/proof-bound
 transactions, with independently bounded cleanup after cancellation.
-Steering and some internal Core/CLI Store paths remain context-free.
-P1 #229 remains open for those separate migrations, ambiguous COMMIT readback
-and long-run qualification.
+The historical Steering record/read and the Attempt/Task-revision read paths
+now also offer caller-bound PostgreSQL variants; Steering HTTP readback uses the
+same request Context while live Codex steering retains its existing control
+protocol. Some controlled internal Core/CLI calls still use bounded server-side
+PostgreSQL deadlines rather than an initiating caller Context. P1 #229 stays
+open for remaining call-site inventory, ambiguous COMMIT readback, explicit
+maintenance lifecycles and real long-run qualification.
 
 The production PostgreSQL connection path additionally enforces bounded
 server-side query, lock and idle-transaction waits and retains stricter

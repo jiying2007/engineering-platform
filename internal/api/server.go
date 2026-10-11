@@ -557,7 +557,7 @@ func (s *Server) handleSteer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetSteering(w http.ResponseWriter, r *http.Request) {
-	cmd, err := s.store.GetSteering(r.PathValue("id"))
+	cmd, err := s.getSteeringForRequest(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeStoreError(w, err)
 		return

@@ -195,8 +195,21 @@ An ambiguous COMMIT cannot be classified as rollback or PASS: read back
 the exact Evidence ID, delivery subject digest, Verification report ID and
 its frozen plan/evidence identity. These changes do not grant Review/Closure
 permission, authorize any new Publisher/Device effect, or change the Recovery
-Proof requirements. Steering, Review/Closure and internal Core callers still
-require P1 #229 qualification.
+Proof requirements. The separate Review/Closure and Recovery caller-context
+slices are now merged; unresolved internal caller and COMMIT-ambiguity paths
+still require P1 #229 qualification.
+
+### Historical Steering and Core read caller-cancellation boundary
+
+The historical Steering Record/Get, Attempt and Task-revision PostgreSQL
+methods have caller-bound variants. Steering GET now inherits HTTP cancellation
+without altering the canonical Codex live-control delivery pipeline. Real
+PostgreSQL lock-wait tests must show no new Steering record or audit after
+cancellation, while original Run/Session/Task/Attempt identities survive.
+Controlled internal callers without a network request keep their original
+Store contract; server-side SQL and transaction ceilings remain active.
+A cancelled COMMIT is not evidence of rollback, and does not authorize a
+second live Codex tool/model turn or a replay of external publication.
 
 ### Review and Closure caller-cancellation boundary
 
