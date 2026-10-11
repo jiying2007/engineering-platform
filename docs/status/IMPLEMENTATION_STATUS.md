@@ -32,6 +32,14 @@ The API ActionGateway now **requires** caller-bound `GetContext` at interface
 construction, not just an optional runtime type assertion. The legacy
 context-free `Get(string)` fallback was removed from HTTP Action GET;
 a new gateway cannot compile against this API without the scoped method.
+The Action Service Repository now also **requires** caller-bound
+`CreateContext / GetContext / GetByIdempotencyKeyContext / UpdateContext`
+for all admission, idempotency, pre-dispatch and post-Provider settlement
+ledger calls: there is no optional legacy Repository type assertion or
+context-free fallback. Both in-memory test/DEV ledgers explicitly implement
+this same single-ledger contract; fault-injection probes continue to
+intercept the exact scoped call phases. Original post-Provider settlement
+remains independently bounded and never replays a remote effect.
 The Gateway Authority also requires caller-bound Core
 `GetExecutionContext / GetTaskByDigestContext / GetRecoveryContext`
 at its constructor interface. Production Control Plane explicitly checks

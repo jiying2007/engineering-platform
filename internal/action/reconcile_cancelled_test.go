@@ -32,6 +32,21 @@ func (r *reconcileCancellationRepository) Update(op Operation) error {
 	return err
 }
 
+// Preserve read/post-admission cancellation probes with the required scoped
+// repository calls, not the embedded MemoryRepository's default methods.
+func (r *reconcileCancellationRepository) GetContext(ctx context.Context, id string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
+	return r.Get(id)
+}
+func (r *reconcileCancellationRepository) UpdateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.Update(op)
+}
+
 type reconciliationProbeProvider struct {
 	cancel         context.CancelFunc
 	result         ReconcileResult

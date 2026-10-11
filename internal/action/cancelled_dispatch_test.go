@@ -36,6 +36,28 @@ func (r *cancelAtActionRepository) Update(op Operation) error {
 	return err
 }
 
+// Intercept the now-mandatory caller-bound repository operations at the
+// same phases as the original no-dispatch fault injection. Never bypass them
+// through promoted base-repository implementations.
+func (r *cancelAtActionRepository) GetByIdempotencyKeyContext(ctx context.Context, key string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
+	return r.GetByIdempotencyKey(key)
+}
+func (r *cancelAtActionRepository) CreateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.Create(op)
+}
+func (r *cancelAtActionRepository) UpdateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.Update(op)
+}
+
 type cancelAtAuthorization struct {
 	cancel context.CancelFunc
 }
