@@ -36,6 +36,8 @@ func (s *Server) handleExecutionAbandon(w http.ResponseWriter, r *http.Request) 
 	receipt, err := reconciler.ReconcileExecutionAbandoned(r.Context(), id.Subject(), request)
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrCommitOutcomeUnknown):
+			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "execution not found")
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch), errors.Is(err, recovery.ErrReconciliationRequired):
