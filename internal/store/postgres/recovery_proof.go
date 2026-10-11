@@ -54,7 +54,10 @@ func (s *Store) CreateRecoveryProof(ctx context.Context, epoch uint64, reconcile
 	if err != nil {
 		return proof, err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	// The caller may be cancelled while waiting on platform_state. Preserve
+	// independently bounded transaction cleanup rather than attempting
+	// rollback with that already-cancelled request Context.
+	defer rollbackOutbox(tx)
 	var currentEpoch uint64
 	var mode string
 	if err := tx.QueryRow(ctx, `SELECT recovery_epoch,recovery_mode FROM platform_state WHERE singleton_id=true FOR UPDATE`).Scan(&currentEpoch, &mode); err != nil {
