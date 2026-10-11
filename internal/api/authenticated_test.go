@@ -302,7 +302,10 @@ func (g *recordingGateway) Execute(ctx context.Context, req action.Request) (act
 	g.calls.Add(1)
 	return action.Receipt{ID: "test-receipt"}, nil
 }
-func (*recordingGateway) Get(string) (action.Operation, error) {
+func (*recordingGateway) GetContext(ctx context.Context, _ string) (action.Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
 	return action.Operation{}, errors.New("not used")
 }
 func (*recordingGateway) Reconcile(context.Context, string) (action.Receipt, error) {
