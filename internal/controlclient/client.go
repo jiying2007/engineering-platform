@@ -35,6 +35,11 @@ var ErrCommitOutcomeUnknown = errors.New("control COMMIT outcome unknown; exact 
 // Unlike ErrCommitOutcomeUnknown, the server may never have attempted COMMIT.
 var ErrPostOutcomeUnobserved = errors.New("control POST outcome unobserved; exact readback required")
 
+// ErrExternalEffectUnresolved means the Action Gateway has already called or
+// observed an external Provider, but its original settlement is unresolved.
+// This does not imply COMMIT failure or grant replay of the external effect.
+var ErrExternalEffectUnresolved = errors.New("control external Action effect unresolved; exact readback required")
+
 type postOutcomeUnobservedError struct{ cause error }
 
 func (e *postOutcomeUnobservedError) Error() string {
@@ -56,13 +61,17 @@ func classifyUnobservedPost(method string, err error) error {
 }
 
 type HTTPError struct {
-	Status               int
-	commitOutcomeUnknown bool
+	Status                   int
+	commitOutcomeUnknown     bool
+	externalEffectUnresolved bool
 }
 
 func (e *HTTPError) Error() string {
 	if e != nil && e.commitOutcomeUnknown {
 		return "control API returned HTTP 503 commit_outcome_unknown: read back exact resource identity, epoch and audit before any retry"
+	}
+	if e != nil && e.externalEffectUnresolved {
+		return "control API returned HTTP 503 external_effect_unresolved: read back original Action operation and external observation before any retry"
 	}
 	if e == nil {
 		return "nil control HTTP error"
@@ -73,7 +82,8 @@ func (e *HTTPError) Error() string {
 // Preserve errors.As(*HTTPError) and Status while providing a typed,
 // non-retrying signal. Upstream error text is never included in Error().
 func (e *HTTPError) Is(target error) bool {
-	return e != nil && e.commitOutcomeUnknown && target == ErrCommitOutcomeUnknown
+	return e != nil && ((e.commitOutcomeUnknown && target == ErrCommitOutcomeUnknown) ||
+		(e.externalEffectUnresolved && target == ErrExternalEffectUnresolved))
 }
 
 // Only the Control API's bounded JSON error code may be surfaced. In
@@ -97,9 +107,13 @@ func classifyControlHTTPError(response *http.Response) *HTTPError {
 	var payload struct {
 		Error string `json:"error"`
 	}
-	if json.Unmarshal(data, &payload) == nil &&
-		strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back") {
-		result.commitOutcomeUnknown = true
+	if json.Unmarshal(data, &payload) == nil {
+		switch {
+		case strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back"):
+			result.commitOutcomeUnknown = true
+		case strings.HasPrefix(payload.Error, "external_effect_unresolved: read back"):
+			result.externalEffectUnresolved = true
+		}
 	}
 	return result
 }

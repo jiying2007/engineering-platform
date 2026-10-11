@@ -2,6 +2,7 @@ package action
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -28,7 +29,7 @@ func TestInvalidProviderDispatchOutcomePersistsUnknownAndNeverReplays(t *testing
 		IdempotencyKey: "invalid-dispatch-once",
 	}
 	receipt, err := service.Execute(context.Background(), request)
-	if err == nil || !strings.Contains(err.Error(), "unsupported provider dispatch outcome") ||
+	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "unsupported provider dispatch outcome") ||
 		receipt.OperationID != "" || calls != 1 {
 		t.Fatalf("invalid dispatch was acknowledged: receipt=%#v err=%v calls=%d", receipt, err, calls)
 	}
@@ -64,7 +65,7 @@ func TestInvalidProviderReconcileOutcomePersistsManual(t *testing.T) {
 		repository,
 	)
 	receipt, err := service.Reconcile(context.Background(), "op-invalid-observe")
-	if err == nil || !strings.Contains(err.Error(), "unsupported provider reconcile outcome") ||
+	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "unsupported provider reconcile outcome") ||
 		receipt.OperationID != "" {
 		t.Fatalf("unrecognized reconciliation was acknowledged: receipt=%#v err=%v", receipt, err)
 	}
@@ -92,7 +93,7 @@ func TestInvalidProviderOutcomesCannotClaimUnpersistedSettlement(t *testing.T) {
 			ExecutionEpoch: 1, Action: "ci.dispatch",
 			Capability: "ci.dispatch", IdempotencyKey: "invalid-unpersisted-dispatch",
 		})
-		if err == nil || receipt.OperationID != "" {
+		if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" {
 			t.Fatalf("unpersisted UNKNOWN was acknowledged: receipt=%#v err=%v", receipt, err)
 		}
 		stored, err := repository.Get("op-invalid-unpersisted-dispatch")
@@ -116,7 +117,7 @@ func TestInvalidProviderOutcomesCannotClaimUnpersistedSettlement(t *testing.T) {
 			fakeProvider{reconcile: ReconcileResult{Outcome: "BAD"}}, repository,
 		)
 		receipt, err := service.Reconcile(context.Background(), "op-invalid-unpersisted-observe")
-		if err == nil || receipt.OperationID != "" {
+		if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" {
 			t.Fatalf("unpersisted MANUAL was acknowledged: receipt=%#v err=%v", receipt, err)
 		}
 		stored, err := repository.Get("op-invalid-unpersisted-observe")

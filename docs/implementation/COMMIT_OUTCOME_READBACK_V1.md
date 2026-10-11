@@ -99,6 +99,29 @@ Tests use a real local mTLS connection torn down after the server receives the
 POST, malformed success responses and single-call readback-negative probes.
 They do not qualify production outages or live provider behavior.
 
+## External Action after Provider activity
+
+The Action Gateway separately identifies `ErrExternalEffectUnresolved`
+when a Provider call or observation may have happened but its exact
+`CONFIRMED`/`UNKNOWN`/`MANUAL` settlement cannot be retained, or a
+malformed Provider verdict has been stored as non-success. The response is
+the fixed **503 `external_effect_unresolved`** directing exact original
+Operation ID, idempotency key, Run/execution/Recovery epoch, immutable
+receipt and audit readback; it is **not** an HTTP 422 validation failure
+or permission to generate a new idempotency key. The shared mTLS client
+recognizes the fixed bounded JSON response as the distinct typed
+`ErrExternalEffectUnresolved`, without echoing upstream SQL/Provider text,
+without automatic retry and without confusing it with a database
+`ErrCommitOutcomeUnknown` or a transport `ErrPostOutcomeUnobserved`.
+
+An attempted PostgreSQL COMMIT's unknown ACK remains the *more specific*
+classification; the API checks it before the generic post-Provider
+uncertainty label. Neither a local reservation nor a single external
+absence observation establishes original Publisher/Device dispatcher
+quiescence. P0 #228 retains the effectful-state Recovery blocker, and
+actual provider/host evidence and independent authorized reconciliation
+remain necessary. These negative tests never dispatch a second effect.
+
 ## Source-level regression boundary
 
 The PostgreSQL package's AST guard

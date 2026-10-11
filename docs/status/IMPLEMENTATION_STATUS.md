@@ -111,6 +111,14 @@ the more general transport condition does not assert that COMMIT happened.
 Regression tests terminate a real local mTLS POST connection after admission
 and inject malformed 2xx bodies without introducing a new HTTP attempt.
 Source/provider production quiescence remains P0 #228, not proven here.
+Action Service post-Provider settlement failures and invalid Provider
+verdicts also expose a separate typed `ErrExternalEffectUnresolved`
+rather than an ordinary HTTP 422 validation error. API maps it to a fixed
+non-leaking 503 directing original Operation/idempotency/Run/Recovery/audit
+readback, and the direct-mTLS Control client recognizes the same code
+without conflating it with server COMMIT-unknown or lost HTTP response.
+If a nested COMMIT result was unknown, that more precise classification
+still takes priority. No external Provider is retried or receipt invented.
 
 Action reconciliation now checks initiating Context before operation readback,
 after readback and after the original durable RECONCILING admission, before

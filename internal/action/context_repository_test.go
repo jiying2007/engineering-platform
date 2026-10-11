@@ -137,7 +137,7 @@ func TestActionContextRepositoryNeverFabricatesSettlementAfterAmbiguousCommit(t 
 		Capability: "ci.dispatch", IdempotencyKey: "commit-once",
 	}
 	receipt, err := service.Execute(ctx, req)
-	if err == nil || receipt.OperationID != "" || calls != 1 {
+	if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" || calls != 1 {
 		t.Fatalf("ambiguous COMMIT generated successful receipt: %#v err=%v calls=%d", receipt, err, calls)
 	}
 	stored, err := repo.Get(req.ID)

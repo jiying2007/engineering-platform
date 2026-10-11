@@ -816,6 +816,8 @@ func writeActionError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrCommitOutcomeUnknown):
 		writeCommitOutcomeUnknown(w)
+	case errors.Is(err, action.ErrExternalEffectUnresolved):
+		writeError(w, http.StatusServiceUnavailable, "external_effect_unresolved: read back the exact original Action operation ID, idempotency key, Run/Recovery epochs, receipt and audit before any retry")
 	case errors.Is(err, action.ErrDenied):
 		writePublicError(w, http.StatusForbidden)
 	case errors.Is(err, action.ErrIdempotencyConflict):
