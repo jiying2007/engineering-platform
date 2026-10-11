@@ -31,12 +31,12 @@ func TestGatewayRequestContextCancelsPostgresAuthorityLocks(t *testing.T) {
 		{
 			name:  "run-epoch",
 			table: "runs",
-			call: func(c context.Context) error { return auth.CheckRunEpoch(c, runID, 1) },
+			call:  func(c context.Context) error { return auth.CheckRunEpoch(c, runID, 1) },
 		},
 		{
 			name:  "recovery-epoch",
 			table: "platform_state",
-			call: func(c context.Context) error { return auth.CheckRecoveryEpoch(c, 0, action.ControlledMutation) },
+			call:  func(c context.Context) error { return auth.CheckRecoveryEpoch(c, 0, action.ControlledMutation) },
 		},
 	}
 	for _, tc := range tests {
