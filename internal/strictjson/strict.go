@@ -16,7 +16,7 @@ const MaxBytes = 1 << 20
 // at every depth and valid UTF-8. This prevents encoding/json's case-insensitive
 // struct matching or duplicate-key merging from changing authorization meaning.
 func ValidateObject(data []byte) error {
-	return validateObject(data, validKey)
+	return validateObject(data, validKey, MaxBytes)
 }
 
 // ValidateForeignObject validates a bounded external JSON object without
@@ -24,11 +24,18 @@ func ValidateObject(data []byte) error {
 // rejects duplicate members, invalid UTF-8, excessive nesting and trailing
 // data. Use this only for opaque JSON owned by an external protocol/schema.
 func ValidateForeignObject(data []byte) error {
-	return validateObject(data, validForeignKey)
+	return validateObject(data, validForeignKey, MaxBytes)
 }
 
-func validateObject(data []byte, keyOK func(string) bool) error {
-	if len(data) == 0 || len(data) > MaxBytes || !utf8.Valid(data) {
+// ValidateForeignObjectLimit reuses the exact same ambiguity/depth checks with
+// a caller's explicit byte budget. Request/configuration APIs retain MaxBytes;
+// the Control client alone uses its existing larger response budget.
+func ValidateForeignObjectLimit(data []byte, maxBytes int) error {
+	return validateObject(data, validForeignKey, maxBytes)
+}
+
+func validateObject(data []byte, keyOK func(string) bool, maxBytes int) error {
+	if maxBytes <= 0 || len(data) == 0 || len(data) > maxBytes || !utf8.Valid(data) {
 		return fmt.Errorf("invalid JSON size or encoding")
 	}
 	d := json.NewDecoder(bytes.NewReader(data))

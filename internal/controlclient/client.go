@@ -20,6 +20,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 const MaxRequest = 1 << 20
@@ -64,6 +66,7 @@ type HTTPError struct {
 	Status                   int
 	commitOutcomeUnknown     bool
 	externalEffectUnresolved bool
+	cause                    error
 }
 
 func (e *HTTPError) Error() string {
@@ -79,6 +82,8 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("control API returned HTTP %d", e.Status)
 }
 
+func (e *HTTPError) Unwrap() error { return e.cause }
+
 // Preserve errors.As(*HTTPError) and Status while providing a typed,
 // non-retrying signal. Upstream error text is never included in Error().
 func (e *HTTPError) Is(target error) bool {
@@ -91,31 +96,53 @@ func (e *HTTPError) Is(target error) bool {
 // into caller-visible diagnostics.
 func classifyControlHTTPError(response *http.Response) *HTTPError {
 	result := &HTTPError{Status: response.StatusCode}
-	if response.StatusCode != http.StatusServiceUnavailable ||
-		response.Header.Get("Content-Encoding") != "" {
+	if response.StatusCode < http.StatusInternalServerError {
+		return result
+	}
+	if response.Header.Get("Content-Encoding") != "" {
+		result.cause = errors.New("encoded control error response")
 		return result
 	}
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" {
+		result.cause = errors.New("invalid control error media type")
 		return result
 	}
 	const maxErrorBytes = 1024
 	data, err := io.ReadAll(io.LimitReader(response.Body, maxErrorBytes+1))
-	if err != nil || len(data) > maxErrorBytes {
+	if err != nil {
+		result.cause = err
+		return result
+	}
+	if len(data) > maxErrorBytes {
+		result.cause = errors.New("control error response exceeds limit")
 		return result
 	}
 	var payload struct {
 		Error string `json:"error"`
 	}
-	if json.Unmarshal(data, &payload) == nil {
-		switch {
-		case strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back"):
-			result.commitOutcomeUnknown = true
-		case strings.HasPrefix(payload.Error, "external_effect_unresolved: read back"):
-			result.externalEffectUnresolved = true
-		}
+	if strictjson.Decode(data, &payload) != nil || payload.Error == "" {
+		result.cause = errors.New("invalid control error object")
+		return result
+	}
+	switch {
+	case response.StatusCode == http.StatusServiceUnavailable && strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back"):
+		result.commitOutcomeUnknown = true
+	case response.StatusCode == http.StatusServiceUnavailable && strings.HasPrefix(payload.Error, "external_effect_unresolved: read back"):
+		result.externalEffectUnresolved = true
 	}
 	return result
+}
+
+// A server failure without an intact precise classification is not rollback
+// evidence. Retain the HTTP status and internal read cause, hide response text,
+// and require readback on POST without claiming COMMIT or a Provider effect.
+func classifyResponseHTTPError(method string, response *http.Response) error {
+	err := classifyControlHTTPError(response)
+	if err.cause != nil {
+		return classifyUnobservedPost(method, err)
+	}
+	return err
 }
 
 type Client struct {
@@ -245,7 +272,7 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, classifyControlHTTPError(response)
+		return nil, classifyResponseHTTPError(method, response)
 	}
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" || response.Header.Get("Content-Encoding") != "" {
@@ -258,12 +285,18 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	if len(data) > MaxResponse {
 		return nil, classifyUnobservedPost(method, fmt.Errorf("control response exceeds limit"))
 	}
-	if !json.Valid(data) {
-		return nil, classifyUnobservedPost(method, fmt.Errorf("invalid control JSON response"))
+	if strictjson.ValidateForeignObjectLimit(data, MaxResponse) != nil {
+		return nil, classifyUnobservedPost(method, fmt.Errorf("unambiguous control JSON object required"))
 	}
 	return data, nil
 }
 func (c *Client) Call(ctx context.Context, method, p string, in, out any) error {
+	// Reject programmer errors before admitting a potentially mutating request.
+	if out != nil {
+		if _, err := responseDestination(out); err != nil {
+			return err
+		}
+	}
 	var body []byte
 	var err error
 	if in != nil {
@@ -279,13 +312,8 @@ func (c *Client) Call(ctx context.Context, method, p string, in, out any) error 
 	if out == nil {
 		return nil
 	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(out); err != nil {
+	if err := decodeResponse(data, out); err != nil {
 		return classifyUnobservedPost(method, err)
-	}
-	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
-		return classifyUnobservedPost(method, fmt.Errorf("trailing control JSON"))
 	}
 	return nil
 }
