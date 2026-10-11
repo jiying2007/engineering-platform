@@ -85,6 +85,11 @@ The merged #246 additionally classifies 25 existing Worker/Offline/Codex/
 preparation/source-continuation mutating COMMIT sites and maps Worker HTTP
 unknown outcomes to fixed 503 exact-readback semantics. Its isolated-database
 lost-ACK regression is simulated *after* a real commit, not a live network cut.
+The independently authorized Execution Abandon HTTP route also preserves the
+same fixed, non-leaking `commit_outcome_unknown` 503 if its Recovery transaction
+COMMIT acknowledgement is lost: exact execution/Recovery epoch, receipt and
+immutable audit readback must precede any further operator decision. A generic
+503 is not rollback evidence and does not authorize a second abandonment.
 
 Action reconciliation now checks initiating Context before operation readback,
 after readback and after the original durable RECONCILING admission, before
