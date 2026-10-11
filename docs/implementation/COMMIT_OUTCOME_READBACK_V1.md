@@ -62,3 +62,19 @@ The isolated PostgreSQL regression simulates loss of a successful ACK
 *after* a real committed Recovery epoch/audit transaction, then demonstrates
 exact readback and stale-epoch denial. It is **not** an actual TCP cut between
 server COMMIT and client ACK and does not qualify production network behavior.
+
+## Source-level regression boundary
+
+The PostgreSQL package's AST guard
+`TestProductionCommitSitesHaveExplicitUnknownOutcomeAuthority` fails if
+a production source file adds any direct `.Commit(...)` outside the three
+deliberate call sites: `commitAuthority` (Core/Worker/Codex typed unknown),
+Outbox's pre-existing dedicated unknown-outcome policy and the read-only
+schema-readiness transaction. It also detects changed call counts inside
+those three files. An intentional new exception requires review of its
+persisted-effects/readback semantics and an explicit guard update.
+
+This source-level guard is a **regression check only**. It cannot prove
+that PostgreSQL or a proxy delivered a COMMIT acknowledgement, that a
+live TCP failure is recovered, or that long-running production workloads
+are safe; those remain independent evidence requirements under #229.
