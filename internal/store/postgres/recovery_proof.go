@@ -108,7 +108,7 @@ func (s *Store) CreateRecoveryProof(ctx context.Context, epoch uint64, reconcile
 	if _, err := appendAudit(ctx, tx, input, now); err != nil {
 		return recovery.Proof{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return recovery.Proof{}, err
 	}
 	return proof, nil

@@ -252,7 +252,11 @@ quiesced administrative operation, never an implicit production startup action.
 These are conservative *safety ceilings*, not calibrated performance targets,
 proof of a particular provider's behavior, or evidence of production
 availability. PostgreSQL cancellation, lock timeout, lost transport or a
-timeout during COMMIT does **not** prove that a write rolled back. Read back
+timeout during COMMIT does **not** prove that a write rolled back. The
+[COMMIT outcome/readback contract](COMMIT_OUTCOME_READBACK_V1.md) establishes
+the fixed `commit_outcome_unknown` response and exact immutable readback
+procedure for any lost commit acknowledgement. This is not an authorization
+to replay an external Provider effect. Read back
 the exact Action/idempotency/audit state before any external retry. Caller
 context propagation through legacy context-free Core/Action interfaces
 remains separate P1 #229 work.
