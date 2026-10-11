@@ -13,7 +13,7 @@ import (
 
 type publisherCancellationState struct {
 	publisherState
-	cancel context.CancelFunc
+	cancel      context.CancelFunc
 	frozenReads int
 }
 
