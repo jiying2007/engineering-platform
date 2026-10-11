@@ -33,7 +33,7 @@ func TestExecutionAbandonLostCommitMustDemandExactReadback(t *testing.T) {
 		Version: 1, ExecutionKind: recovery.ExecutionOffline, RunID: "run-recovery",
 		ExecutionID: strings.Repeat("a", 64), RecoveryEpoch: 1,
 		ObservationDigest: "sha256:" + strings.Repeat("b", 64),
-		Disposition: recovery.AbandonNoReplay,
+		Disposition:       recovery.AbandonNoReplay,
 	}
 	body := secureCall(t, pki.Client(t, reconcilerSubject),
 		server.URL+"/api/v1/recovery/executions/abandon",
