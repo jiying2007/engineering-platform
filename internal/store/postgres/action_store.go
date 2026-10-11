@@ -12,8 +12,8 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 )
 
+// Scoped Action ledger is mandatory for every Service injection.
 var _ action.Repository = (*Store)(nil)
-var _ action.ContextRepository = (*Store)(nil)
 
 func mapActionWriteError(err error) error {
 	if err == nil {
