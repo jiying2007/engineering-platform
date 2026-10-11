@@ -30,7 +30,7 @@ const MaxResponse = 4 << 20
 var ErrCommitOutcomeUnknown = errors.New("control COMMIT outcome unknown; exact readback required")
 
 type HTTPError struct {
-	Status int
+	Status               int
 	commitOutcomeUnknown bool
 }
 
@@ -68,7 +68,9 @@ func classifyControlHTTPError(response *http.Response) *HTTPError {
 	if err != nil || len(data) > maxErrorBytes {
 		return result
 	}
-	var payload struct { Error string `json:"error"` }
+	var payload struct {
+		Error string `json:"error"`
+	}
 	if json.Unmarshal(data, &payload) == nil &&
 		strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back") {
 		result.commitOutcomeUnknown = true
