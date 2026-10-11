@@ -37,6 +37,8 @@ func (s *Server) handleAbandonPlannedAction(w http.ResponseWriter, r *http.Reque
 	receipt, err := target.ReconcilePlannedActionAbandoned(r.Context(), id.Subject(), request)
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrCommitOutcomeUnknown):
+			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "Action reservation not found")
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch), errors.Is(err, recovery.ErrReconciliationRequired):

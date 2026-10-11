@@ -86,7 +86,7 @@ func (s *Store) ReconcilePlannedActionAbandoned(ctx context.Context, reconciler 
 		if retained.RequestDigest != requestDigest || retained.Reconciler != reconciler {
 			return zero, corestore.ErrConflict
 		}
-		if err := tx.Commit(ctx); err != nil {
+		if err := commitAuthority(ctx, tx); err != nil {
 			return zero, err
 		}
 		return retained, nil
@@ -131,7 +131,7 @@ func (s *Store) ReconcilePlannedActionAbandoned(ctx context.Context, reconciler 
 	if _, err := appendAudit(ctx, tx, auditInput, now); err != nil {
 		return zero, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return zero, err
 	}
 	return retained, nil
