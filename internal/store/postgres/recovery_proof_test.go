@@ -125,7 +125,7 @@ func TestRecoveryProofBlocksLegacySafeToRetryWithoutQuiescence(t *testing.T) {
 	if err := s.Create(*op); err != nil {
 		t.Fatal(err)
 	}
-	for i, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling, action.SafeToRetry} {
+	for i, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling} {
 		if err := op.Transition(state, now.Add(time.Duration(i+1)*time.Second)); err != nil {
 			t.Fatal(err)
 		}
@@ -133,6 +133,7 @@ func TestRecoveryProofBlocksLegacySafeToRetryWithoutQuiescence(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	seedHistoricalSafeToRetry(t, s, op.ID)
 	if _, err := s.BeginRecovery(0); err != nil {
 		t.Fatal(err)
 	}
