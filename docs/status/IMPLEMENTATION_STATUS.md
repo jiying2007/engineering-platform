@@ -103,6 +103,14 @@ not sent to callers. A source AST guard rejects new direct `Error()` reflection
 in `writeError`, and negative route tests cover backend error injection. The
 existing exact `commit_outcome_unknown` 503 readback path remains distinct.
 Redaction does not establish original operation outcome or grant replay.
+The direct-mTLS `controlclient` additionally distinguishes a server-classified
+`ErrCommitOutcomeUnknown` from `ErrPostOutcomeUnobserved`, the latter used
+when a mutating POST has no usable transport or successful response body.
+Both require original-ID/epoch/audit readback rather than an automatic retry;
+the more general transport condition does not assert that COMMIT happened.
+Regression tests terminate a real local mTLS POST connection after admission
+and inject malformed 2xx bodies without introducing a new HTTP attempt.
+Source/provider production quiescence remains P0 #228, not proven here.
 
 Action reconciliation now checks initiating Context before operation readback,
 after readback and after the original durable RECONCILING admission, before

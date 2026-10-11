@@ -29,6 +29,32 @@ const MaxResponse = 4 << 20
 // caller must perform exact immutable ID/epoch/idempotency/audit readback.
 var ErrCommitOutcomeUnknown = errors.New("control COMMIT outcome unknown; exact readback required")
 
+// ErrPostOutcomeUnobserved means a mutation request did not yield a usable
+// success/error response. Transport failure, partial success bytes or a
+// malformed success reply are not evidence that a POST was rolled back.
+// Unlike ErrCommitOutcomeUnknown, the server may never have attempted COMMIT.
+var ErrPostOutcomeUnobserved = errors.New("control POST outcome unobserved; exact readback required")
+
+type postOutcomeUnobservedError struct{ cause error }
+
+func (e *postOutcomeUnobservedError) Error() string {
+	return "control POST outcome unobserved: read back exact original resource, epoch and audit before any retry"
+}
+func (e *postOutcomeUnobservedError) Unwrap() error { return e.cause }
+func (e *postOutcomeUnobservedError) Is(target error) bool {
+	return target == ErrPostOutcomeUnobserved
+}
+
+// This wrapper intentionally hides original transport/decoder diagnostics from
+// Error(), while preserving errors.Is(context.Canceled/DeadlineExceeded) for
+// Worker cancellation and cleanup. It never attempts another HTTP request.
+func classifyUnobservedPost(method string, err error) error {
+	if err == nil || method != http.MethodPost {
+		return err
+	}
+	return &postOutcomeUnobservedError{cause: err}
+}
+
 type HTTPError struct {
 	Status               int
 	commitOutcomeUnknown bool
@@ -198,6 +224,9 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	}
 	response, err := c.http.Do(req)
 	if err != nil {
+		if method == http.MethodPost {
+			return nil, classifyUnobservedPost(method, err)
+		}
 		return nil, fmt.Errorf("control transport: %w", err)
 	}
 	defer response.Body.Close()
@@ -206,17 +235,17 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	}
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" || response.Header.Get("Content-Encoding") != "" {
-		return nil, fmt.Errorf("unencoded JSON response required")
+		return nil, classifyUnobservedPost(method, fmt.Errorf("unencoded JSON response required"))
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, MaxResponse+1))
 	if err != nil {
-		return nil, err
+		return nil, classifyUnobservedPost(method, err)
 	}
 	if len(data) > MaxResponse {
-		return nil, fmt.Errorf("control response exceeds limit")
+		return nil, classifyUnobservedPost(method, fmt.Errorf("control response exceeds limit"))
 	}
 	if !json.Valid(data) {
-		return nil, fmt.Errorf("invalid control JSON response")
+		return nil, classifyUnobservedPost(method, fmt.Errorf("invalid control JSON response"))
 	}
 	return data, nil
 }
@@ -239,10 +268,10 @@ func (c *Client) Call(ctx context.Context, method, p string, in, out any) error 
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(out); err != nil {
-		return err
+		return classifyUnobservedPost(method, err)
 	}
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
-		return fmt.Errorf("trailing control JSON")
+		return classifyUnobservedPost(method, fmt.Errorf("trailing control JSON"))
 	}
 	return nil
 }
