@@ -21,6 +21,15 @@ func (r *settlementUpdateRejector) Update(op Operation) error {
 	return r.MemoryRepository.Update(op)
 }
 
+func (r *settlementUpdateRejector) UpdateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// The injected post-Provider failure must still occur on the scoped
+	// settlement path after the original external call.
+	return r.Update(op)
+}
+
 func TestAmbiguousDispatchRequiresDurableUnknownBeforeReturningReceipt(t *testing.T) {
 	repository := &settlementUpdateRejector{MemoryRepository: NewMemoryRepository(), reject: Unknown}
 	calls := 0
