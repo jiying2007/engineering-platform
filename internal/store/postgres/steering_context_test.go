@@ -122,6 +122,35 @@ func TestSteeringAndCoreReadContextsCancelRealPostgresLockWithoutAuditResidue(t 
 	if revision, err := s.GetTaskRevisionContext(ctx, task.ID, task.Revision); err != nil || revision.ID != task.ID {
 		t.Fatalf("historical Task revision changed: revision=%+v err=%v", revision, err)
 	}
+	// Regression for a real cross-Run authority mismatch: a foreign target
+	// Run exists, so a database foreign key alone cannot reject this forgery.
+	foreignRunID := setupPostgresActionRun(t, s, "steering-cross-run")
+	foreignCmd := cmd
+	foreignCmd.ID = "foreign-steering"
+	foreignCmd.RunID = foreignRunID
+	if err := s.RecordSteeringContext(ctx, runID, value.Version, value, sess, foreignCmd); !errors.Is(err, corestore.ErrConflict) {
+		t.Fatalf("foreign Steering Run identity accepted: %v", err)
+	}
+	if _, err := s.GetSteeringContext(ctx, foreignCmd.ID); !errors.Is(err, corestore.ErrNotFound) {
+		t.Fatalf("foreign Steering left persistent record: %v", err)
+	}
+	wrongRun := value
+	wrongRun.ID = foreignRunID
+	if err := s.RecordSteeringContext(ctx, runID, value.Version, wrongRun, sess, cmd); !errors.Is(err, corestore.ErrConflict) {
+		t.Fatalf("mismatched Run aggregate identity accepted: %v", err)
+	}
+	wrongSession := sess
+	wrongSession.RunID = foreignRunID
+	if err := s.RecordSteeringContext(ctx, runID, value.Version, value, wrongSession, cmd); !errors.Is(err, corestore.ErrConflict) {
+		t.Fatalf("mismatched Session aggregate identity accepted: %v", err)
+	}
+	if current, _, err := s.GetExecutionContext(ctx, runID); err != nil || current.Version != value.Version {
+		t.Fatalf("invalid Steering advanced Run version: current=%+v err=%v", current, err)
+	}
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE event_type='steering.recorded' AND aggregate_id=$1", runID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("invalid Steering left audit: count=%d err=%v", count, err)
+	}
+
 	// A valid caller may still perform the original single-audit mutation
 	// after the cancelled transaction, with the same immutable record.
 	if err := s.RecordSteeringContext(ctx, runID, value.Version, value, sess, cmd); err != nil {
