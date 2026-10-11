@@ -25,9 +25,12 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/verification"
 )
 
+// Every network-visible Action operation must retain the initiating caller
+// Context. A legacy Get(string) implementation is not a valid Gateway:
+// it could continue a PostgreSQL read after mTLS client cancellation.
 type ActionGateway interface {
 	Execute(context.Context, action.Request) (action.Receipt, error)
-	Get(string) (action.Operation, error)
+	GetContext(context.Context, string) (action.Operation, error)
 	Reconcile(context.Context, string) (action.Receipt, error)
 }
 
