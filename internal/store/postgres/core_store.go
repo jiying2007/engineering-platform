@@ -22,10 +22,6 @@ import (
 
 var _ corestore.Store = (*Store)(nil)
 
-func bg() context.Context {
-	return context.Background()
-}
-
 func encodeJSON(value any) ([]byte, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -311,8 +307,12 @@ LIMIT 1`
 }
 
 func (s *Store) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
+	return s.GetTaskRevisionContext(context.Background(), id, revision)
+}
+
+func (s *Store) GetTaskRevisionContext(ctx context.Context, id string, revision uint64) (core.TaskContract, error) {
 	const q = "SELECT contract_json FROM task_contracts WHERE task_contract_id=$1 AND revision=$2"
-	return s.readTask(q, id, revision)
+	return s.readTaskContext(ctx, q, id, revision)
 }
 
 func (s *Store) GetTaskByDigest(digest string) (core.TaskContract, error) {
@@ -322,10 +322,6 @@ func (s *Store) GetTaskByDigest(digest string) (core.TaskContract, error) {
 func (s *Store) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
 	const q = "SELECT contract_json FROM task_contracts WHERE content_digest=$1"
 	return s.readTaskContext(ctx, q, digest)
-}
-
-func (s *Store) readTask(query string, args ...any) (core.TaskContract, error) {
-	return s.readTaskContext(context.Background(), query, args...)
 }
 
 func (s *Store) readTaskContext(ctx context.Context, query string, args ...any) (core.TaskContract, error) {
@@ -582,13 +578,17 @@ WHERE r.run_id=$1`
 }
 
 func (s *Store) GetAttempt(runID, attemptID string) (run.Attempt, error) {
+	return s.GetAttemptContext(context.Background(), runID, attemptID)
+}
+
+func (s *Store) GetAttemptContext(ctx context.Context, runID, attemptID string) (run.Attempt, error) {
 	const q = `
 SELECT attempt_id,execution_epoch,started_at,ended_at
 FROM run_attempts
 WHERE run_id=$1 AND attempt_id=$2`
 	var item run.Attempt
 	var endedAt pgtype.Timestamptz
-	if err := s.pool.QueryRow(bg(), q, runID, attemptID).Scan(
+	if err := s.pool.QueryRow(ctx, q, runID, attemptID).Scan(
 		&item.ID, &item.Epoch, &item.StartedAt, &endedAt,
 	); err != nil {
 		return run.Attempt{}, mapReadError(err)
@@ -684,6 +684,26 @@ func (s *Store) RecordSteering(
 	sess session.Session,
 	cmd session.SteeringCommand,
 ) error {
+	return s.RecordSteeringContext(context.Background(), id, expectedVersion, value, sess, cmd)
+}
+
+// RecordSteeringContext retains the historical single Core Run/Session audit
+// authority; the current live Codex steering path is a separate bounded
+// control-delivery protocol and is not replaced by this method.
+func (s *Store) RecordSteeringContext(
+	ctx context.Context,
+	id string,
+	expectedVersion uint64,
+	value run.Run,
+	sess session.Session,
+	cmd session.SteeringCommand,
+) error {
+	// The command, proposed Run and Session must refer to one immutable Run.
+	// A foreign cmd.RunID can otherwise insert a valid FK row for another Run
+	// while mutating this Run and producing a misleading audit aggregate.
+	if id == "" || value.ID != id || sess.RunID != id || cmd.RunID != id {
+		return corestore.ErrConflict
+	}
 	payload := struct {
 		Run      run.Run                 `json:"run"`
 		Session  session.Session         `json:"session"`
@@ -693,7 +713,7 @@ func (s *Store) RecordSteering(
 	if err != nil {
 		return err
 	}
-	_, err = s.Mutate(bg(), Mutation{
+	_, err = s.Mutate(ctx, Mutation{
 		Apply: func(ctx context.Context, tx pgx.Tx) error {
 			var currentEpoch uint64
 			var currentTask, currentInput string
@@ -755,12 +775,16 @@ WHERE run_id=$1 AND version=$2`
 }
 
 func (s *Store) GetSteering(id string) (session.SteeringCommand, error) {
+	return s.GetSteeringContext(context.Background(), id)
+}
+
+func (s *Store) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
 	const q = `
 SELECT steering_command_id,run_id,execution_epoch,sequence,actor,content_digest,created_at
 FROM steering_commands
 WHERE steering_command_id=$1`
 	var item session.SteeringCommand
-	if err := s.pool.QueryRow(bg(), q, id).Scan(
+	if err := s.pool.QueryRow(ctx, q, id).Scan(
 		&item.ID, &item.RunID, &item.ExecutionEpoch, &item.Sequence,
 		&item.Actor, &item.ContentDigest, &item.CreatedAt,
 	); err != nil {
