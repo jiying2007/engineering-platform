@@ -132,7 +132,11 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			if loadErr != nil {
 				return nil, loadErr
 			}
-			authority := gateway.NewAuthority(backend)
+			scopedCore, ok := backend.(gateway.State)
+			if !ok {
+				return nil, fmt.Errorf("Action Gateway requires caller-bound Core Run/Task/Recovery readback")
+			}
+			authority := gateway.NewAuthority(scopedCore)
 			actions = action.NewService(authority, authority, provider, repository)
 		}
 		handler, err = api.NewAuthenticatedHandler(backend, actions, c.policy, options)
