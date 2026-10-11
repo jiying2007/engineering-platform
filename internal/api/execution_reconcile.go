@@ -25,7 +25,7 @@ func (s *Server) handleExecutionAbandon(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := request.Validate(); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, http.StatusBadRequest, "invalid exact execution reconciliation request")
 		return
 	}
 	reconciler, ok := s.store.(executionReconciliationStore)
