@@ -69,6 +69,35 @@ type Store interface {
 
 	CreateClosureAndUpdateWork(core.ClosureReceipt, uint64, core.WorkItem) error
 	GetClosure(string) (core.ClosureReceipt, error)
+
+	// The original Core HTTP authority is always caller-scoped. Keep the
+	// same single ledger and audit; do not select legacy no-Context methods
+	// based on the runtime concrete Store type.
+	CreateWorkContext(context.Context, core.WorkItem) error
+	GetWorkContext(context.Context, string) (core.WorkItem, error)
+	UpdateWorkContext(context.Context, string, uint64, core.WorkItem) error
+	CreateTaskAndUpdateWorkContext(context.Context, core.TaskContract, verification.Plan, uint64, core.WorkItem) error
+	GetTaskContext(context.Context, string) (core.TaskContract, error)
+	GetTaskByDigestContext(context.Context, string) (core.TaskContract, error)
+	GetVerificationPlanByDigestContext(context.Context, string) (verification.Plan, error)
+	CreateExecutionAndUpdateWorkContext(context.Context, run.Run, run.Attempt, session.Session, core.RunInputManifest, uint64, core.WorkItem) error
+	GetExecutionContext(context.Context, string) (run.Run, session.Session, error)
+	GetRunInputByDigestContext(context.Context, string) (core.RunInputManifest, error)
+	UpdateExecutionContext(context.Context, string, uint64, run.Run, session.Session) error
+	UpdateExecutionAndWorkContext(context.Context, string, uint64, run.Run, session.Session, uint64, core.WorkItem) error
+	CreateCheckpointContext(context.Context, session.Checkpoint) (string, error)
+	GetCheckpointContext(context.Context, string) (session.Checkpoint, string, error)
+	CreateDeliveryContext(context.Context, core.DeliveryReceipt) error
+	GetDeliveryContext(context.Context, string) (core.DeliveryReceipt, error)
+	CreateEvidenceContext(context.Context, core.EvidenceRef) error
+	GetEvidenceContext(context.Context, string) (core.EvidenceRef, error)
+	CreateVerificationContext(context.Context, verification.Report) error
+	GetVerificationContext(context.Context, string) (verification.Report, error)
+	CreateReviewAndUpdateWorkContext(context.Context, review.Report, uint64, core.WorkItem) error
+	GetReviewContext(context.Context, string) (review.Report, error)
+	CreateClosureAndUpdateWorkContext(context.Context, core.ClosureReceipt, uint64, core.WorkItem) error
+	GetClosureContext(context.Context, string) (core.ClosureReceipt, error)
+	GetSteeringContext(context.Context, string) (session.SteeringCommand, error)
 }
 
 type Memory struct {
@@ -920,4 +949,146 @@ func (m *Memory) CompleteRecoveryContext(ctx context.Context, epoch uint64, reco
 		return recovery.Manager{}, err
 	}
 	return m.CompleteRecovery(epoch, reconciled)
+}
+
+// The HTTP Core Store contract is scoped even in the in-memory DEV/test
+// implementation. These methods delegate to the original single ledger;
+// they do not add a second set of records or independent mutation authority.
+func (m *Memory) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateWork(item)
+}
+func (m *Memory) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
+	if err := ctx.Err(); err != nil {
+		return core.WorkItem{}, err
+	}
+	return m.GetWork(id)
+}
+func (m *Memory) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.UpdateWork(id, expectedVersion, item)
+}
+func (m *Memory) CreateTaskAndUpdateWorkContext(ctx context.Context, task core.TaskContract, plan verification.Plan, version uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateTaskAndUpdateWork(task, plan, version, work)
+}
+func (m *Memory) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
+	return m.GetTask(id)
+}
+func (m *Memory) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
+	if err := ctx.Err(); err != nil {
+		return verification.Plan{}, err
+	}
+	return m.GetVerificationPlanByDigest(digest)
+}
+func (m *Memory) CreateExecutionAndUpdateWorkContext(ctx context.Context, value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, version uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateExecutionAndUpdateWork(value, attempt, sess, input, version, work)
+}
+func (m *Memory) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
+	if err := ctx.Err(); err != nil {
+		return core.RunInputManifest{}, err
+	}
+	return m.GetRunInputByDigest(digest)
+}
+func (m *Memory) UpdateExecutionContext(ctx context.Context, id string, version uint64, value run.Run, sess session.Session) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.UpdateExecution(id, version, value, sess)
+}
+func (m *Memory) UpdateExecutionAndWorkContext(ctx context.Context, id string, runVersion uint64, value run.Run, sess session.Session, workVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.UpdateExecutionAndWork(id, runVersion, value, sess, workVersion, work)
+}
+func (m *Memory) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	return m.CreateCheckpoint(item)
+}
+func (m *Memory) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
+	if err := ctx.Err(); err != nil {
+		return session.Checkpoint{}, "", err
+	}
+	return m.GetCheckpoint(id)
+}
+func (m *Memory) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateDelivery(item)
+}
+func (m *Memory) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return core.DeliveryReceipt{}, err
+	}
+	return m.GetDelivery(id)
+}
+func (m *Memory) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateEvidence(item)
+}
+func (m *Memory) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
+	if err := ctx.Err(); err != nil {
+		return core.EvidenceRef{}, err
+	}
+	return m.GetEvidence(id)
+}
+func (m *Memory) CreateVerificationContext(ctx context.Context, item verification.Report) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateVerification(item)
+}
+func (m *Memory) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
+	if err := ctx.Err(); err != nil {
+		return verification.Report{}, err
+	}
+	return m.GetVerification(id)
+}
+func (m *Memory) CreateReviewAndUpdateWorkContext(ctx context.Context, report review.Report, version uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateReviewAndUpdateWork(report, version, work)
+}
+func (m *Memory) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
+	if err := ctx.Err(); err != nil {
+		return review.Report{}, err
+	}
+	return m.GetReview(id)
+}
+func (m *Memory) CreateClosureAndUpdateWorkContext(ctx context.Context, item core.ClosureReceipt, version uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.CreateClosureAndUpdateWork(item, version, work)
+}
+func (m *Memory) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return core.ClosureReceipt{}, err
+	}
+	return m.GetClosure(id)
+}
+func (m *Memory) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
+	if err := ctx.Err(); err != nil {
+		return session.SteeringCommand{}, err
+	}
+	return m.GetSteering(id)
 }
