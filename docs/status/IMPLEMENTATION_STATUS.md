@@ -24,7 +24,11 @@ it does not prove or settle already-dispatched effects. The remaining
 DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
 Recovery Proof pending provider-specific, independently retained observations.
 
-The Action Gateway rechecks caller cancellation after each pre-dispatch
+The Action Gateway now binds frozen authorization, Run epoch and Recovery
+epoch prechecks to the initiating caller Context, rather than waiting in
+legacy background-context PostgreSQL reads. Action GET also propagates HTTP
+cancellation to the same existing ledger without observing/dispatching.
+The Service rechecks caller cancellation after each pre-dispatch
 phase and the production PostgreSQL Action repository now propagates the exact
 request Context through idempotency reads, PLANNED/DISPATCHED transactions and
 pre-observation reconciliation. A cancelled blocked SQL admission must stop
