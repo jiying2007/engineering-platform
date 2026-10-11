@@ -96,6 +96,13 @@ same fixed, non-leaking `commit_outcome_unknown` 503 if its Recovery transaction
 COMMIT acknowledgement is lost: exact execution/Recovery epoch, receipt and
 immutable audit readback must precede any further operator decision. A generic
 503 is not rollback evidence and does not authorize a second abandonment.
+Ordinary Control API Store/Action/Recovery errors are mapped to fixed
+non-leaking messages while preserving their original HTTP status categories;
+raw PostgreSQL/Provider diagnostics and malformed request parser fragments are
+not sent to callers. A source AST guard rejects new direct `Error()` reflection
+in `writeError`, and negative route tests cover backend error injection. The
+existing exact `commit_outcome_unknown` 503 readback path remains distinct.
+Redaction does not establish original operation outcome or grant replay.
 
 Action reconciliation now checks initiating Context before operation readback,
 after readback and after the original durable RECONCILING admission, before
