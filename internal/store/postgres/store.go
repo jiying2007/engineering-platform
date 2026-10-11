@@ -198,7 +198,7 @@ func (s *Store) CompleteRecoveryContext(ctx context.Context, epoch uint64, recon
 	if _, err := appendAudit(ctx, tx, input, time.Now().UTC()); err != nil {
 		return recovery.Manager{}, err
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return recovery.Manager{}, err
 	}
 	return result, nil

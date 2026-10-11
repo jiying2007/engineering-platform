@@ -62,8 +62,8 @@ func (s *Store) Mutate(ctx context.Context, mutation Mutation) (MutationResult, 
 		}
 		outboxIDs = append(outboxIDs, id)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return MutationResult{}, fmt.Errorf("commit authority transaction: %w", err)
+	if err := commitAuthority(ctx, tx); err != nil {
+		return MutationResult{}, err
 	}
 	return MutationResult{AuditEvent: event, OutboxIDs: outboxIDs}, nil
 }

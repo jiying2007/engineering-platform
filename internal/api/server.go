@@ -165,6 +165,8 @@ func (s *Server) handleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 	state, err := s.beginRecoveryForRequest(r.Context(), req.ExpectedRecoveryEpoch)
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrCommitOutcomeUnknown):
+			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrAlreadyRecovering):
 			writeError(w, http.StatusConflict, err.Error())
 		default:
@@ -191,6 +193,8 @@ func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) 
 	state, err := s.completeRecoveryForRequest(r.Context(), req.RecoveryEpoch, true)
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrCommitOutcomeUnknown):
+			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch):
 			writeError(w, http.StatusConflict, err.Error())
 		case errors.Is(err, recovery.ErrReconciliationRequired):
@@ -225,6 +229,8 @@ func (s *Server) handleCreateRecoveryProof(w http.ResponseWriter, r *http.Reques
 	proof, err := proofs.CreateRecoveryProof(r.Context(), req.RecoveryEpoch, req.Reconciler)
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrCommitOutcomeUnknown):
+			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict):
 			writeError(w, http.StatusConflict, err.Error())
 		default:
@@ -277,7 +283,7 @@ func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
@@ -394,7 +400,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -485,7 +491,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -654,7 +660,7 @@ func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -808,6 +814,8 @@ func (s *Server) handleReconcileAction(w http.ResponseWriter, r *http.Request) {
 
 func writeActionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, store.ErrCommitOutcomeUnknown):
+		writeCommitOutcomeUnknown(w)
 	case errors.Is(err, action.ErrDenied):
 		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, action.ErrIdempotencyConflict):
@@ -884,7 +892,7 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
@@ -953,7 +961,7 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, item)
@@ -1019,7 +1027,7 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeCommitAwareInternalError(w, err)
 		return
 	}
 	status := http.StatusCreated
@@ -1261,6 +1269,10 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 }
 
 func writeMutationError(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrCommitOutcomeUnknown) {
+		writeCommitOutcomeUnknown(w)
+		return
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -1273,6 +1285,10 @@ func writeMutationError(w http.ResponseWriter, err error) {
 }
 
 func writeStoreError(w http.ResponseWriter, err error) {
+	if errors.Is(err, store.ErrCommitOutcomeUnknown) {
+		writeCommitOutcomeUnknown(w)
+		return
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		writeError(w, http.StatusNotFound, err.Error())
 		return

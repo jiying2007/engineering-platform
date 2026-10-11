@@ -14,9 +14,12 @@ import (
 )
 
 var (
-	ErrExists   = errors.New("record already exists")
-	ErrNotFound = errors.New("record not found")
-	ErrConflict = errors.New("optimistic concurrency conflict")
+	ErrExists               = errors.New("record already exists")
+	ErrNotFound             = errors.New("record not found")
+	ErrConflict             = errors.New("optimistic concurrency conflict")
+	// A write COMMIT may have succeeded even if its acknowledgement was lost.
+	// Never translate this to a known rollback, approval or retry permission.
+	ErrCommitOutcomeUnknown = errors.New("authority commit outcome unknown; exact readback required")
 )
 
 type Store interface {
