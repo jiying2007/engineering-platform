@@ -138,7 +138,7 @@ func (s *Store) StartCodex(ctx context.Context, subject string, req codexexec.St
 	if err != nil {
 		return empty, mapWriteError(err)
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return codexexec.Permit{Token: token, Assignment: assignment, Preparation: prep, Profile: req.Profile, LeaseUntil: until}, nil
@@ -213,7 +213,7 @@ func (s *Store) RenewCodex(ctx context.Context, subject string, token codexexec.
 	if err != nil {
 		return until, err
 	}
-	return until, tx.Commit(ctx)
+	return until, commitAuthority(ctx, tx)
 }
 
 func (s *Store) FinishCodex(ctx context.Context, subject string, report codexexec.Report) (codexexec.Receipt, error) {
@@ -289,7 +289,7 @@ func (s *Store) FinishCodex(ctx context.Context, subject string, report codexexe
 	if tag.RowsAffected() != 1 {
 		return empty, workerqueue.ErrLease
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commitAuthority(ctx, tx); err != nil {
 		return empty, err
 	}
 	return receipt, nil
@@ -316,7 +316,7 @@ func (s *Store) FailCodex(ctx context.Context, subject string, token codexexec.T
 	if _, err = tx.Exec(ctx, `UPDATE worker_codex_executions SET state='UNKNOWN' WHERE execution_id=$1`, token.ID); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	return commitAuthority(ctx, tx)
 }
 
 func (s *Store) GetCodex(ctx context.Context, runID string) (codexexec.Status, error) {

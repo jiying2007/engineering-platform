@@ -94,7 +94,7 @@ func (s *Store) ReportPrepared(ctx context.Context, subject string, report prepa
 	if tag.RowsAffected() != 1 {
 		return preparation.Receipt{}, workerqueue.ErrLease
 	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := commitAuthority(ctx, tx); err != nil {
 		return preparation.Receipt{}, err
 	}
 	return receipt, nil
