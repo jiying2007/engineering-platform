@@ -32,6 +32,12 @@ type Store interface {
 	BeginRecovery(uint64) (recovery.Manager, error)
 	CompleteRecovery(uint64, bool) (recovery.Manager, error)
 
+	// Request-bound Recovery epoch/audit authority is mandatory at the
+	// Core Store interface, never a runtime-optional HTTP fallback.
+	GetRecoveryContext(context.Context) (recovery.Manager, error)
+	BeginRecoveryContext(context.Context, uint64) (recovery.Manager, error)
+	CompleteRecoveryContext(context.Context, uint64, bool) (recovery.Manager, error)
+
 	CreateTaskAndUpdateWork(core.TaskContract, verification.Plan, uint64, core.WorkItem) error
 	GetTask(string) (core.TaskContract, error)
 	GetTaskRevision(string, uint64) (core.TaskContract, error)
@@ -899,4 +905,19 @@ func (m *Memory) GetRecoveryContext(ctx context.Context) (recovery.Manager, erro
 		return recovery.Manager{}, err
 	}
 	return m.GetRecovery()
+}
+
+// DEV/test uses the same bounded caller admission fence as PostgreSQL
+// for Recovery Begin/Complete. No new Recovery ledger or replay mechanism.
+func (m *Memory) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
+	return m.BeginRecovery(expectedEpoch)
+}
+func (m *Memory) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
+	return m.CompleteRecovery(epoch, reconciled)
 }

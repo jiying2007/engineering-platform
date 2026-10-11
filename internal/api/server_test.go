@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -678,7 +679,10 @@ type failingRecoveryStore struct {
 	err error
 }
 
-func (s failingRecoveryStore) GetRecovery() (recovery.Manager, error) {
+func (s failingRecoveryStore) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	return recovery.Manager{}, s.err
 }
 
