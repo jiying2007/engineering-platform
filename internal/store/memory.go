@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -663,6 +664,33 @@ func (m *Memory) Update(op action.Operation) error {
 	}
 	m.operations[op.ID] = op
 	return nil
+}
+
+// Core's in-memory development lane implements the same caller-bound Action
+// Repository contract as production PostgreSQL. No second ledger or retry.
+func (m *Memory) CreateContext(ctx context.Context, op action.Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.Create(op)
+}
+func (m *Memory) GetContext(ctx context.Context, id string) (action.Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
+	return m.Get(id)
+}
+func (m *Memory) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
+	return m.GetByIdempotencyKey(key)
+}
+func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.Update(op)
 }
 
 func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
