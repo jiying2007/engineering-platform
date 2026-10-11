@@ -20,8 +20,8 @@ import (
 // adding another direct tx.Commit(...) call.
 func TestProductionCommitSitesHaveExplicitUnknownOutcomeAuthority(t *testing.T) {
 	allowed := map[string]int{
-		"commit_outcome.go":  1, // commitAuthority classifies typed Core/Worker unknown.
-		"outbox_store.go":   1, // Outbox has dedicated ErrOutcomeUnknown.
+		"commit_outcome.go":   1, // commitAuthority classifies typed Core/Worker unknown.
+		"outbox_store.go":     1, // Outbox has dedicated ErrOutcomeUnknown.
 		"schema_readiness.go": 1, // Read-only transaction has no durable side effect.
 	}
 	sources, err := filepath.Glob("*.go")
