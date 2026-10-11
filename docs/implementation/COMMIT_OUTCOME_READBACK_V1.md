@@ -35,10 +35,12 @@ caller receiving this status; the same readback policy applies.
 
 Existing caller-bound PostgreSQL timeouts and separately bounded rollback
 cleanup remain in place. The new error classification does not trigger any
-automatic retry worker, schema migration or new authority. The tests exercise
-classification and HTTP mapping; a real post-COMMIT lost-ACK fault and selected
-host/provider long-run qualification are still tracked under P1 #229 and
-external #103/#105/#106 and must not be claimed from CI fixtures.
+automatic retry worker, schema migration or new authority. #249 provides a
+real TCP acknowledgement-cut regression against a disposable, isolated local
+PostgreSQL server, beyond the earlier simulated lost-ACK test. It does not
+establish production-host/network behavior, external Publisher quiescence,
+provider qualification, SLOs or soak: #228/#229 and external
+#103/#105/#106 remain independent evidence gates.
 
 ## Worker and controlled maintenance transactions
 
@@ -58,10 +60,21 @@ Outbox retains its earlier separately specified
 No new ledger, schema change, external publisher access or automatic retry
 is introduced.
 
-The isolated PostgreSQL regression simulates loss of a successful ACK
-*after* a real committed Recovery epoch/audit transaction, then demonstrates
-exact readback and stale-epoch denial. It is **not** an actual TCP cut between
-server COMMIT and client ACK and does not qualify production network behavior.
+The earlier PostgreSQL regression simulated a lost acknowledgement
+after a real commit and proved exact epoch/audit readback. The independently
+qualified #249 test uses a strictly localhost-only, random private-schema
+PostgreSQL session and withholds the actual backend
+`CommandComplete("COMMIT")` response from pgx over TCP. The original Recovery
+epoch/audit is read back, and a stale retry conflicts. Neither test exercises
+a production link, distributed failure or external provider operation.
+
+The shared mTLS `controlclient` also recognizes only the fixed bounded JSON
+`commit_outcome_unknown` error on HTTP 503, exposing a typed
+`ErrCommitOutcomeUnknown` and fixed operator readback instruction while keeping
+the original `HTTPError.Status`. Arbitrary API bodies, SQL and credentials
+are never included in diagnostics; POST is not retried automatically. Even if
+a network error prevents the 503 reaching the client, the caller must perform
+original-ID readback before deciding any further step.
 
 ## Source-level regression boundary
 

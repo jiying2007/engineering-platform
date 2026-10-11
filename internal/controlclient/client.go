@@ -25,9 +25,58 @@ import (
 const MaxRequest = 1 << 20
 const MaxResponse = 4 << 20
 
-type HTTPError struct{ Status int }
+// ErrCommitOutcomeUnknown never authorizes automatic retries. A control
+// caller must perform exact immutable ID/epoch/idempotency/audit readback.
+var ErrCommitOutcomeUnknown = errors.New("control COMMIT outcome unknown; exact readback required")
 
-func (e *HTTPError) Error() string { return fmt.Sprintf("control API returned HTTP %d", e.Status) }
+type HTTPError struct {
+	Status               int
+	commitOutcomeUnknown bool
+}
+
+func (e *HTTPError) Error() string {
+	if e != nil && e.commitOutcomeUnknown {
+		return "control API returned HTTP 503 commit_outcome_unknown: read back exact resource identity, epoch and audit before any retry"
+	}
+	if e == nil {
+		return "nil control HTTP error"
+	}
+	return fmt.Sprintf("control API returned HTTP %d", e.Status)
+}
+
+// Preserve errors.As(*HTTPError) and Status while providing a typed,
+// non-retrying signal. Upstream error text is never included in Error().
+func (e *HTTPError) Is(target error) bool {
+	return e != nil && e.commitOutcomeUnknown && target == ErrCommitOutcomeUnknown
+}
+
+// Only the Control API's bounded JSON error code may be surfaced. In
+// particular, never copy SQL, tokens or attacker-controlled response bodies
+// into caller-visible diagnostics.
+func classifyControlHTTPError(response *http.Response) *HTTPError {
+	result := &HTTPError{Status: response.StatusCode}
+	if response.StatusCode != http.StatusServiceUnavailable ||
+		response.Header.Get("Content-Encoding") != "" {
+		return result
+	}
+	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil || contentType != "application/json" {
+		return result
+	}
+	const maxErrorBytes = 1024
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxErrorBytes+1))
+	if err != nil || len(data) > maxErrorBytes {
+		return result
+	}
+	var payload struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(data, &payload) == nil &&
+		strings.HasPrefix(payload.Error, "commit_outcome_unknown: read back") {
+		result.commitOutcomeUnknown = true
+	}
+	return result
+}
 
 type Client struct {
 	endpoint, subject string
@@ -153,7 +202,7 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, &HTTPError{Status: response.StatusCode}
+		return nil, classifyControlHTTPError(response)
 	}
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" || response.Header.Get("Content-Encoding") != "" {
