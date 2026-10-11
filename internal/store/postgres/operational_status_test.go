@@ -79,6 +79,23 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if status.Ready || status.State != "DEGRADED" || status.Snapshot.UnknownOperations != 1 {
 		t.Fatalf("UNKNOWN action did not degrade readiness: %#v", status)
 	}
+	if err := op.Transition(action.Reconciling, now.Add(3*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
+	if err := op.Transition(action.SafeToRetry, now.Add(4*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Update(*op); err != nil {
+		t.Fatal(err)
+	}
+	status, err = s.ReadOperationalStatus(ctx)
+	if err != nil || status.Ready || status.AuthorityClear ||
+		status.Snapshot.SafeToRetryOperations != 1 || status.State != "DEGRADED" {
+		t.Fatalf("unproven SAFE_TO_RETRY concealed from operational status: %#v err=%v", status, err)
+	}
 }
 
 func TestReadOperationalStatusExposesIdleWorkerPollFactsWithoutReadiness(t *testing.T) {
