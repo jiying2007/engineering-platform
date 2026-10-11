@@ -260,12 +260,25 @@ These are not inherited into Core automatically.
 
 ## Repository maturity
 
-**Trusted self-hosted M1 phase 1 is proven and the repository-side internal RC
-is a closed candidate; production/unattended qualification is not granted.**
-The Feature and Debug retained chains are historical proof, not pending WIF
-prerequisites and not a substitute for production acceptance. The only tracked
-open gates are #103 (WIF), #106 (optional relay/provider) and #105 (production
-acceptance).
+**Trusted self-hosted M1 phase 1 is historically proven, but the current
+repository is not an unqualified internally closed RC or production READY.**
+The retained Feature and Debug Closure chains establish the historical M1
+baseline; they do not qualify later Recovery/Action changes, live Provider
+effects, selected-host production performance or unattended credentials.
+The five separately tracked open gates are internal P0
+[#228](https://github.com/jiying2007/engineering-platform/issues/228)
+(effectful Action original-dispatcher quiescence and independent Recovery
+observation), internal P1
+[#229](https://github.com/jiying2007/engineering-platform/issues/229)
+(remaining Context/maintenance and selected-host long-run evidence), and
+external [#103](https://github.com/jiying2007/engineering-platform/issues/103)
+(managed WIF), [#106](https://github.com/jiying2007/engineering-platform/issues/106)
+(optional relay/provider), and
+[#105](https://github.com/jiying2007/engineering-platform/issues/105)
+(production/unattended acceptance). Do not treat healthy GitHub CI or an
+isolated PostgreSQL fault-injection test as evidence of a live remote Provider
+quiescence, production SLO or independent human approval. The single current
+maturity authority remains [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md).
 
 The current delivery contract includes all six executables, including
 `publisher-service`. After extracting an authenticated CI artifact and restoring
