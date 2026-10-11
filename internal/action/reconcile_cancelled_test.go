@@ -3,7 +3,6 @@ package action
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 )
 
@@ -155,8 +154,8 @@ func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *te
 			stored, err := repo.Get(id)
 			if err != nil || stored.State != tc.want ||
 				len(repo.settledStates) != 1 || repo.settledStates[0] != tc.want {
-				t.Fatal(fmt.Sprintf("missing bounded durable settlement: stored=%#v err=%v states=%v",
-					stored, err, repo.settledStates))
+				t.Fatalf("missing bounded durable settlement: stored=%#v err=%v states=%v",
+					stored, err, repo.settledStates)
 			}
 		})
 	}
