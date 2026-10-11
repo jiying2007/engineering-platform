@@ -78,7 +78,7 @@ func TestUnknownCommitRecoveryRoutesPreserveAmbiguityWithoutLeakingSQL(t *testin
 
 type ambiguousWorkStore struct{ *store.Memory }
 
-func (*ambiguousWorkStore) CreateWork(core.WorkItem) error {
+func (*ambiguousWorkStore) CreateWorkContext(context.Context, core.WorkItem) error {
 	return fmt.Errorf("private SQL/connection details: %w", store.ErrCommitOutcomeUnknown)
 }
 
