@@ -84,7 +84,18 @@ See [COMMIT outcome/readback](../implementation/COMMIT_OUTCOME_READBACK_V1.md).
 The merged #246 additionally classifies 25 existing Worker/Offline/Codex/
 preparation/source-continuation mutating COMMIT sites and maps Worker HTTP
 unknown outcomes to fixed 503 exact-readback semantics. Its isolated-database
-lost-ACK regression is simulated *after* a real commit, not a live network cut.
+lost-ACK regression simulates a real durable commit. The subsequently merged
+#249 adds a **real isolated localhost TCP cutoff after backend COMMIT** and
+verifies one retained Recovery epoch/audit plus stale-epoch denial. Exact PR-head
+[CI 38111732156](https://github.com/jiying2007/engineering-platform/actions/runs/38111732156)
+and fresh-main [38112232617](https://github.com/jiying2007/engineering-platform/actions/runs/38112232617)
+both passed 5/5; this still does not establish production networking,
+external provider-dispatcher quiescence or unattended operational readiness.
+The independently authorized Execution Abandon HTTP route also preserves the
+same fixed, non-leaking `commit_outcome_unknown` 503 if its Recovery transaction
+COMMIT acknowledgement is lost: exact execution/Recovery epoch, receipt and
+immutable audit readback must precede any further operator decision. A generic
+503 is not rollback evidence and does not authorize a second abandonment.
 
 Action reconciliation now checks initiating Context before operation readback,
 after readback and after the original durable RECONCILING admission, before
@@ -94,7 +105,14 @@ automatic retry. An observation that actually began still uses the existing
 independently bounded durable settlement even if the original caller then
 disconnects. This closes one request-cancellation path under P1 #229, **not**
 original-dispatcher quiescence or the provider-specific terminal Recovery
-Proof required by internal P0 #228.
+Proof required by internal P0 #228. The Recovery Proof's cancelled
+PostgreSQL lock-wait cleanup now reuses the existing independently bounded
+rollback helper, rather than attempting rollback with an already-cancelled
+request Context. An isolated lock-wait regression requires cancellation
+before release, no proof/audit residue and a subsequent successful authorized
+proof. The same source-level COMMIT guard also detects any new direct
+unqualified `Rollback(...)` outside the established bounded cleanup helper.
+This is transaction hygiene, not external-effect disposition.
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
