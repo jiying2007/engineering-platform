@@ -19,8 +19,8 @@ func TestEffectfulActionUnresolvedRequiresOriginalReadbackWithoutSQLLeak(t *test
 		wantCode string
 	}{
 		{
-			name: "provider-effect-with-failed-settlement",
-			err: fmt.Errorf("private SQL password: %w", action.ErrExternalEffectUnresolved),
+			name:     "provider-effect-with-failed-settlement",
+			err:      fmt.Errorf("private SQL password: %w", action.ErrExternalEffectUnresolved),
 			wantCode: "external_effect_unresolved",
 		},
 		{
