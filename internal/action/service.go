@@ -71,18 +71,12 @@ type Provider interface {
 	Reconcile(context.Context, Operation) (ReconcileResult, error)
 }
 
+// Repository is the single Action ledger authority. Caller Context is a
+// required contract, including idempotency lookup and pre-dispatch mutation:
+// a context-free adapter can no longer be injected into Action Service.
+// The independently bounded post-Provider settlement uses the same methods
+// under its own five-second Context, never a detached Provider execution.
 type Repository interface {
-	Create(Operation) error
-	Get(string) (Operation, error)
-	GetByIdempotencyKey(string) (Operation, error)
-	Update(Operation) error
-}
-
-// ContextRepository is a storage capability, not another Action authority.
-// Production PostgreSQL implements it so cancellation can interrupt a blocked
-// transaction; in-memory test doubles may still implement Repository directly.
-// All mutations keep the same single authoritative ledger and audit journal.
-type ContextRepository interface {
 	CreateContext(context.Context, Operation) error
 	GetContext(context.Context, string) (Operation, error)
 	GetByIdempotencyKeyContext(context.Context, string) (Operation, error)
@@ -107,33 +101,20 @@ func NewService(authorizer Authorizer, guard AuthorityGuard, provider Provider, 
 	}
 }
 
-// Prefer caller-bound database operations when supported. Plain Repository
-// remains the deliberately bounded test-double interface. Production Core
-// injects the PostgreSQL Store, whose contextual methods use the same
-// transaction/operation identifiers and cannot bypass authorization.
+// These calls cannot bypass caller Context. Legacy direct concrete-store
+// methods remain outside Action Service's repository interface and cannot
+// be accidentally selected as a fallback by a new Provider adapter.
 func (s *Service) createOperation(ctx context.Context, op Operation) error {
-	if store, ok := s.repository.(ContextRepository); ok {
-		return store.CreateContext(ctx, op)
-	}
-	return s.repository.Create(op)
+	return s.repository.CreateContext(ctx, op)
 }
 func (s *Service) getByKey(ctx context.Context, key string) (Operation, error) {
-	if store, ok := s.repository.(ContextRepository); ok {
-		return store.GetByIdempotencyKeyContext(ctx, key)
-	}
-	return s.repository.GetByIdempotencyKey(key)
+	return s.repository.GetByIdempotencyKeyContext(ctx, key)
 }
 func (s *Service) getOperation(ctx context.Context, id string) (Operation, error) {
-	if store, ok := s.repository.(ContextRepository); ok {
-		return store.GetContext(ctx, id)
-	}
-	return s.repository.Get(id)
+	return s.repository.GetContext(ctx, id)
 }
 func (s *Service) updateOperation(ctx context.Context, op Operation) error {
-	if store, ok := s.repository.(ContextRepository); ok {
-		return store.UpdateContext(ctx, op)
-	}
-	return s.repository.Update(op)
+	return s.repository.UpdateContext(ctx, op)
 }
 
 // Once a remote effect or a provider observation may have happened, the
