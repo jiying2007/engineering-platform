@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -849,4 +850,26 @@ func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
 		return core.ClosureReceipt{}, ErrNotFound
 	}
 	return item, nil
+}
+
+// These are caller-scoped views of the single existing in-memory Core ledger.
+// Gateway Authorization/Run/Recovery checks are now always bound to the
+// initiating request; only a separately authorized context may outlive it.
+func (m *Memory) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
+	if err := ctx.Err(); err != nil {
+		return run.Run{}, session.Session{}, err
+	}
+	return m.GetExecution(id)
+}
+func (m *Memory) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
+	return m.GetTaskByDigest(digest)
+}
+func (m *Memory) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
+	return m.GetRecovery()
 }
