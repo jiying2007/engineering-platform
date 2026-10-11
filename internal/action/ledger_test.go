@@ -21,10 +21,13 @@ func TestUnknownMustReconcileBeforeRetry(t *testing.T) {
 	if err := o.Transition(Reconciling, now); err != nil {
 		t.Fatal(err)
 	}
-	if err := o.Transition(SafeToRetry, now); err != nil {
-		t.Fatal(err)
+	if err := o.Transition(SafeToRetry, now); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("unproven SAFE_TO_RETRY transition must be forbidden, got %v", err)
 	}
-	if err := o.Transition(Dispatched, now); err != nil {
-		t.Fatalf("safe retry should dispatch: %v", err)
+	if err := o.Transition(Manual, now); err != nil {
+		t.Fatalf("unknown effect should remain MANUAL: %v", err)
+	}
+	if err := o.Transition(Dispatched, now); !errors.Is(err, ErrInvalidTransition) {
+		t.Fatalf("MANUAL cannot replay a potentially executed effect: %v", err)
 	}
 }

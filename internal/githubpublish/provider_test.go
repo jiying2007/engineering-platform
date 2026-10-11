@@ -135,7 +135,7 @@ func TestProviderReconciliationNeverReplaysPublication(t *testing.T) {
 		want action.ReconcileOutcome
 	}{
 		{"confirmed", ObservedConfirmed, action.ReconcileConfirmed},
-		{"absent", ObservedAbsent, action.ReconcileSafeToRetry},
+		{"absent", ObservedAbsent, action.ReconcileManual},
 		{"partial", ObservedPartial, action.ReconcileManual},
 		{"conflict", ObservedConflict, action.ReconcileManual},
 	} {
@@ -154,6 +154,9 @@ func TestProviderReconciliationNeverReplaysPublication(t *testing.T) {
 			}
 			if result.Outcome != tc.want || remote.observeCalls != 1 || remote.publishCalls != 0 {
 				t.Fatalf("reconcile=%#v observe=%d publish=%d", result, remote.observeCalls, remote.publishCalls)
+			}
+			if tc.seen == ObservedAbsent && result.ObservedState != "ABSENT_DISPATCH_NOT_QUIESCED" {
+				t.Fatalf("remote absence misclassified as quiescence: %+v", result)
 			}
 		})
 	}
@@ -190,8 +193,9 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 		})
 	}
 	// Read-only confirmation is allowed without local source bytes. In contrast,
-	// remote absence with missing bytes is MANUAL, not a grant to retry; and new
-	// Dispatch still rejects the missing source before Git mutation.
+	// remote absence is MANUAL regardless of local source bytes, since the
+	// original Publisher may still be in flight. Dispatch separately rejects
+	// missing source bytes before any Git mutation.
 	remote := &publisherRemote{}
 	provider, err := New(config, state, remote)
 	if err != nil {
