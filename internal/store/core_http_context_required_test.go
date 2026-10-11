@@ -30,15 +30,21 @@ func TestMemoryCoreHTTPContractAlwaysHonorsPreCancelledCaller(t *testing.T) {
 		{"CreateWork", func() error { return m.CreateWorkContext(ctx, core.WorkItem{ID: "cancelled-work"}) }},
 		{"GetWork", func() error { _, err := m.GetWorkContext(ctx, "cancelled-work"); return err }},
 		{"UpdateWork", func() error { return m.UpdateWorkContext(ctx, "cancelled-work", 0, core.WorkItem{}) }},
-		{"CreateTaskAndUpdateWork", func() error { return m.CreateTaskAndUpdateWorkContext(ctx, core.TaskContract{}, verification.Plan{}, 0, core.WorkItem{}) }},
+		{"CreateTaskAndUpdateWork", func() error {
+			return m.CreateTaskAndUpdateWorkContext(ctx, core.TaskContract{}, verification.Plan{}, 0, core.WorkItem{})
+		}},
 		{"GetTask", func() error { _, err := m.GetTaskContext(ctx, "missing-task"); return err }},
 		{"GetTaskByDigest", func() error { _, err := m.GetTaskByDigestContext(ctx, "missing-digest"); return err }},
 		{"GetVerificationPlanByDigest", func() error { _, err := m.GetVerificationPlanByDigestContext(ctx, "missing-plan"); return err }},
-		{"CreateExecutionAndUpdateWork", func() error { return m.CreateExecutionAndUpdateWorkContext(ctx, run.Run{}, run.Attempt{}, session.Session{}, core.RunInputManifest{}, 0, core.WorkItem{}) }},
+		{"CreateExecutionAndUpdateWork", func() error {
+			return m.CreateExecutionAndUpdateWorkContext(ctx, run.Run{}, run.Attempt{}, session.Session{}, core.RunInputManifest{}, 0, core.WorkItem{})
+		}},
 		{"GetExecution", func() error { _, _, err := m.GetExecutionContext(ctx, "missing-run"); return err }},
 		{"GetRunInputByDigest", func() error { _, err := m.GetRunInputByDigestContext(ctx, "missing-input"); return err }},
 		{"UpdateExecution", func() error { return m.UpdateExecutionContext(ctx, "missing-run", 0, run.Run{}, session.Session{}) }},
-		{"UpdateExecutionAndWork", func() error { return m.UpdateExecutionAndWorkContext(ctx, "missing-run", 0, run.Run{}, session.Session{}, 0, core.WorkItem{}) }},
+		{"UpdateExecutionAndWork", func() error {
+			return m.UpdateExecutionAndWorkContext(ctx, "missing-run", 0, run.Run{}, session.Session{}, 0, core.WorkItem{})
+		}},
 		{"CreateCheckpoint", func() error { _, err := m.CreateCheckpointContext(ctx, session.Checkpoint{}); return err }},
 		{"GetCheckpoint", func() error { _, _, err := m.GetCheckpointContext(ctx, "missing-checkpoint"); return err }},
 		{"CreateDelivery", func() error { return m.CreateDeliveryContext(ctx, core.DeliveryReceipt{}) }},
@@ -49,7 +55,9 @@ func TestMemoryCoreHTTPContractAlwaysHonorsPreCancelledCaller(t *testing.T) {
 		{"GetVerification", func() error { _, err := m.GetVerificationContext(ctx, "missing-verification"); return err }},
 		{"CreateReviewAndUpdateWork", func() error { return m.CreateReviewAndUpdateWorkContext(ctx, review.Report{}, 0, core.WorkItem{}) }},
 		{"GetReview", func() error { _, err := m.GetReviewContext(ctx, "missing-review"); return err }},
-		{"CreateClosureAndUpdateWork", func() error { return m.CreateClosureAndUpdateWorkContext(ctx, core.ClosureReceipt{}, 0, core.WorkItem{}) }},
+		{"CreateClosureAndUpdateWork", func() error {
+			return m.CreateClosureAndUpdateWorkContext(ctx, core.ClosureReceipt{}, 0, core.WorkItem{})
+		}},
 		{"GetClosure", func() error { _, err := m.GetClosureContext(ctx, "missing-closure"); return err }},
 		{"GetSteering", func() error { _, err := m.GetSteeringContext(ctx, "missing-steering"); return err }},
 	}
