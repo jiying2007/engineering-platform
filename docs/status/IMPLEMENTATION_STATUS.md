@@ -74,7 +74,13 @@ server-side query, lock and idle-transaction waits and retains stricter
 operator limits. This bounds waits but does not universally propagate HTTP/Worker
 caller cancellation through the remaining context-free Core methods or
 resolve COMMIT ambiguity;
-P1 #229 remains open pending that end-to-end qualification.
+P1 #229 remains open pending that end-to-end qualification. The
+Core, Recovery and pre-dispatch Action PLANNED mutation paths classify failed
+COMMIT acknowledgements explicitly as an unknown commit outcome. The API
+requires exact persisted ID/epoch/idempotency/audit readback and never treats
+a cancelled COMMIT as a known rollback; this is fail-closed error labeling,
+not proof that a specific production transaction committed or rolled back.
+See [COMMIT outcome/readback](../implementation/COMMIT_OUTCOME_READBACK_V1.md).
 
 The default internal lane remains trusted Ubuntu with a saved ChatGPT Codex
 session. This project is independent of digital-worker and inherits no old
