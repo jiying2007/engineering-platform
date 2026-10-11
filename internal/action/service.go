@@ -472,6 +472,34 @@ func (r *MemoryRepository) Update(op Operation) error {
 	return nil
 }
 
+// In-memory Action tests use the same required Context contract as
+// production PostgreSQL; a pre-cancelled caller has no admission authority.
+// These methods retain a single underlying map and do not add another ledger.
+func (r *MemoryRepository) CreateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.Create(op)
+}
+func (r *MemoryRepository) GetContext(ctx context.Context, id string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
+	return r.Get(id)
+}
+func (r *MemoryRepository) GetByIdempotencyKeyContext(ctx context.Context, key string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
+	return r.GetByIdempotencyKey(key)
+}
+func (r *MemoryRepository) UpdateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return r.Update(op)
+}
+
 type AllowCapabilities map[string]bool
 
 func (a AllowCapabilities) Authorize(_ context.Context, req Request) error {
