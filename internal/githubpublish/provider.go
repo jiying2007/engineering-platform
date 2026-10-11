@@ -24,9 +24,11 @@ const (
 	Capability = "github.publish-pr"
 )
 
+// State requires caller-bound Core reads. No detached background fallback is
+// allowed while reconstructing a frozen publication plan after cancellation.
 type State interface {
-	GetExecution(string) (run.Run, session.Session, error)
-	GetTaskByDigest(string) (core.TaskContract, error)
+	GetExecutionContext(context.Context, string) (run.Run, session.Session, error)
+	GetTaskByDigestContext(context.Context, string) (core.TaskContract, error)
 	GetCodex(context.Context, string) (codexexec.Status, error)
 }
 
@@ -86,14 +88,23 @@ type Provider struct {
 }
 
 func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.DispatchResult, error) {
+	if err := ctx.Err(); err != nil {
+		return action.DispatchResult{}, err
+	}
 	if req.Action != Action || req.Capability != Capability || req.RiskClass != action.ControlledMutation {
 		return action.DispatchResult{}, fmt.Errorf("GitHub publication requires exact controlled-mutation grant")
 	}
 	plan, bundle, err := p.derive(ctx, req.RunID, req.ExecutionEpoch, req.ParametersDigest, true)
 	if err != nil {
+		if ctx.Err() != nil {
+			return action.DispatchResult{}, ctx.Err()
+		}
 		return action.DispatchResult{
 			Outcome: action.DispatchUnknown, ObservedState: "PRECONDITION_FAILED",
 		}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return action.DispatchResult{}, err
 	}
 	receipt, err := p.remote.Publish(ctx, plan, bundle)
 	if err != nil {
@@ -117,6 +128,9 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 }
 
 func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.ReconcileResult, error) {
+	if err := ctx.Err(); err != nil {
+		return action.ReconcileResult{}, err
+	}
 	if op.ObservedState == "PRECONDITION_FAILED" {
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: op.ObservedState}, nil
 	}
@@ -125,7 +139,13 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 	}
 	plan, _, err := p.derive(ctx, op.RunID, op.ExecutionEpoch, "", false)
 	if err != nil {
+		if ctx.Err() != nil {
+			return action.ReconcileResult{}, ctx.Err()
+		}
 		return action.ReconcileResult{Outcome: action.ReconcileManual, ObservedState: "publication identity no longer reconciles"}, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return action.ReconcileResult{}, err
 	}
 	result, err := p.remote.Observe(ctx, plan)
 	if err != nil {
@@ -170,14 +190,17 @@ func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, param
 	if p == nil || p.state == nil || p.remote == nil || runID == "" || epoch == 0 {
 		return empty, "", fmt.Errorf("publisher is not fully configured")
 	}
-	value, _, err := p.state.GetExecution(runID)
+	if err := ctx.Err(); err != nil {
+		return empty, "", err
+	}
+	value, _, err := p.state.GetExecutionContext(ctx, runID)
 	if err != nil {
 		return empty, "", err
 	}
 	if err := value.CheckEpoch(epoch); err != nil {
 		return empty, "", err
 	}
-	task, err := p.state.GetTaskByDigest(value.TaskContractDigest)
+	task, err := p.state.GetTaskByDigestContext(ctx, value.TaskContractDigest)
 	if err != nil {
 		return empty, "", err
 	}
