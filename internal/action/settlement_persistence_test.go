@@ -36,7 +36,7 @@ func TestAmbiguousDispatchRequiresDurableUnknownBeforeReturningReceipt(t *testin
 		IdempotencyKey: "frozen-external-operation",
 	}
 	receipt, err := service.Execute(context.Background(), request)
-	if err == nil || !strings.Contains(err.Error(), "cannot persist UNKNOWN") || receipt.OperationID != "" {
+	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "cannot persist UNKNOWN") || receipt.OperationID != "" {
 		t.Fatalf("invented settled UNKNOWN despite rejected database write: receipt=%#v err=%v", receipt, err)
 	}
 	durable, err := repository.Get(request.ID)
@@ -66,7 +66,7 @@ func TestFailedReconciliationRequiresDurableManualBeforeReturningReceipt(t *test
 		repository,
 	)
 	receipt, err := service.Reconcile(context.Background(), "op-failed-manual")
-	if err == nil || !strings.Contains(err.Error(), "cannot persist MANUAL") || receipt.OperationID != "" {
+	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "cannot persist MANUAL") || receipt.OperationID != "" {
 		t.Fatalf("invented settled MANUAL despite rejected database write: receipt=%#v err=%v", receipt, err)
 	}
 	durable, err := repository.Get("op-failed-manual")
