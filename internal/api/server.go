@@ -147,7 +147,7 @@ func (s *Server) handleOperationalStatus(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleGetRecovery(w http.ResponseWriter, r *http.Request) {
 	state, err := s.getRecoveryForRequest(r.Context())
 	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, err.Error())
+		writePublicError(w, http.StatusServiceUnavailable)
 		return
 	}
 	writeJSON(w, http.StatusOK, state)
@@ -168,9 +168,9 @@ func (s *Server) handleBeginRecovery(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, store.ErrCommitOutcomeUnknown):
 			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrAlreadyRecovering):
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 		default:
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writePublicError(w, http.StatusInternalServerError)
 		}
 		return
 	}
@@ -196,11 +196,11 @@ func (s *Server) handleCompleteRecovery(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, store.ErrCommitOutcomeUnknown):
 			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict), errors.Is(err, recovery.ErrStaleEpoch):
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 		case errors.Is(err, recovery.ErrReconciliationRequired):
-			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			writePublicError(w, http.StatusUnprocessableEntity)
 		default:
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writePublicError(w, http.StatusInternalServerError)
 		}
 		return
 	}
@@ -232,9 +232,9 @@ func (s *Server) handleCreateRecoveryProof(w http.ResponseWriter, r *http.Reques
 		case errors.Is(err, store.ErrCommitOutcomeUnknown):
 			writeCommitOutcomeUnknown(w)
 		case errors.Is(err, store.ErrConflict):
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 		default:
-			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			writePublicError(w, http.StatusUnprocessableEntity)
 		}
 		return
 	}
@@ -280,7 +280,7 @@ func (s *Server) handleCreateWork(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.createWorkForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -340,7 +340,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	route, err := routing.ResolveForTarget(req.Contract.TaskType, req.Subsystem, req.TargetContext)
 	if err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writePublicError(w, http.StatusUnprocessableEntity)
 		return
 	}
 	req.Contract.CapabilityIDs = route.CapabilityIDs
@@ -373,7 +373,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	planDigest, err := req.VerificationPlan.Digest()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePublicError(w, http.StatusInternalServerError)
 		return
 	}
 	req.Contract.VerificationPlanID = req.VerificationPlan.ID
@@ -383,7 +383,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	digest, err := req.Contract.Digest()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePublicError(w, http.StatusInternalServerError)
 		return
 	}
 	expectedWorkVersion := work.Version
@@ -391,13 +391,13 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	work.ActiveRunID = ""
 	if work.State == core.WorkDraft {
 		if err := work.Transition(core.WorkReady); err != nil {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 	}
 	if err := s.freezeTaskForRequest(r.Context(), req.Contract, req.VerificationPlan, expectedWorkVersion, work); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -418,7 +418,7 @@ func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 	}
 	digest, err := task.Digest()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePublicError(w, http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"contract": task, "digest": digest})
@@ -452,7 +452,7 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	req.RunInput.TaskContractDigest = req.TaskContractDigest
 	inputDigest, err := req.RunInput.Digest()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePublicError(w, http.StatusInternalServerError)
 		return
 	}
 	task, err := s.getFrozenTaskForRequest(r.Context(), req.TaskContractDigest)
@@ -476,19 +476,19 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	value := run.New(req.RunID, req.TaskContractDigest, inputDigest)
 	attempt, err := value.StartAttempt(req.AttemptID, s.now())
 	if err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 		return
 	}
 	sess := session.New(req.RunID, attempt.Epoch)
 	expectedWorkVersion := work.Version
 	work.ActiveRunID = req.RunID
 	if err := work.Transition(core.WorkExecuting); err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 		return
 	}
 	if err := s.startRunForRequest(r.Context(), *value, attempt, *sess, req.RunInput, expectedWorkVersion, work); err != nil {
 		if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -657,7 +657,7 @@ func (s *Server) handleCreateCheckpoint(w http.ResponseWriter, r *http.Request) 
 	digest, err := s.createCheckpointForRequest(r.Context(), item)
 	if err != nil {
 		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -715,7 +715,7 @@ func (s *Server) handleCompleteRun(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedWorkVersion := work.Version
 	if err := work.Transition(core.WorkVerifying); err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 		return
 	}
 	if err := s.completeRunForRequest(r.Context(),
@@ -817,15 +817,15 @@ func writeActionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, store.ErrCommitOutcomeUnknown):
 		writeCommitOutcomeUnknown(w)
 	case errors.Is(err, action.ErrDenied):
-		writeError(w, http.StatusForbidden, err.Error())
+		writePublicError(w, http.StatusForbidden)
 	case errors.Is(err, action.ErrIdempotencyConflict):
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 	case errors.Is(err, action.ErrOperationAbsent), errors.Is(err, store.ErrNotFound):
-		writeError(w, http.StatusNotFound, err.Error())
+		writePublicError(w, http.StatusNotFound)
 	case errors.Is(err, run.ErrStaleEpoch), errors.Is(err, recovery.ErrStaleEpoch), errors.Is(err, recovery.ErrRecoveryMode):
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 	default:
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writePublicError(w, http.StatusUnprocessableEntity)
 	}
 }
 
@@ -884,12 +884,12 @@ func (s *Server) handleCreateDelivery(w http.ResponseWriter, r *http.Request) {
 	}
 	item.SubjectDigest, err = item.CalculateSubjectDigest()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writePublicError(w, http.StatusInternalServerError)
 		return
 	}
 	if err := s.createDeliveryForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -954,11 +954,11 @@ func (s *Server) handleCreateEvidence(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.registerEvidenceForRequest(r.Context(), item); err != nil {
 		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		if errors.Is(err, store.ErrConflict) {
-			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			writePublicError(w, http.StatusUnprocessableEntity)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -1024,7 +1024,7 @@ func (s *Server) handleCreateVerification(w http.ResponseWriter, r *http.Request
 	report.CreatedAt = s.now()
 	if err := s.createVerificationForRequest(r.Context(), report); err != nil {
 		if errors.Is(err, store.ErrExists) {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 		writeCommitAwareInternalError(w, err)
@@ -1109,14 +1109,14 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:            s.now(),
 	}
 	if err := report.Validate(); err != nil {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		writePublicError(w, http.StatusUnprocessableEntity)
 		return
 	}
 	expectedVersion := work.Version
 	nextWork := work
 	if report.Result == review.ResultPass {
 		if err := nextWork.Transition(core.WorkReviewing); err != nil {
-			writeError(w, http.StatusConflict, err.Error())
+			writePublicError(w, http.StatusConflict)
 			return
 		}
 	}
@@ -1199,7 +1199,7 @@ func (s *Server) handleCreateClosure(w http.ResponseWriter, r *http.Request) {
 	}
 	expectedVersion := work.Version
 	if err := work.Transition(core.WorkClosed); err != nil {
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 		return
 	}
 	closure := core.ClosureReceipt{
@@ -1262,7 +1262,7 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		writeError(w, http.StatusBadRequest, "invalid JSON object")
 		return false
 	}
 	return true
@@ -1274,14 +1274,14 @@ func writeMutationError(w http.ResponseWriter, err error) {
 		return
 	}
 	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, err.Error())
+		writePublicError(w, http.StatusNotFound)
 		return
 	}
 	if errors.Is(err, store.ErrExists) || errors.Is(err, store.ErrConflict) || errors.Is(err, run.ErrStaleEpoch) || errors.Is(err, session.ErrStaleEpoch) || errors.Is(err, session.ErrSequence) || errors.Is(err, session.ErrRuntimeNotOwner) {
-		writeError(w, http.StatusConflict, err.Error())
+		writePublicError(w, http.StatusConflict)
 		return
 	}
-	writeError(w, http.StatusUnprocessableEntity, err.Error())
+	writePublicError(w, http.StatusUnprocessableEntity)
 }
 
 func writeStoreError(w http.ResponseWriter, err error) {
@@ -1290,10 +1290,35 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		return
 	}
 	if errors.Is(err, store.ErrNotFound) {
-		writeError(w, http.StatusNotFound, err.Error())
+		writePublicError(w, http.StatusNotFound)
 		return
 	}
-	writeError(w, http.StatusInternalServerError, err.Error())
+	writePublicError(w, http.StatusInternalServerError)
+}
+
+// writePublicError preserves HTTP status without echoing arbitrary Store,
+// Provider, SQL or request-generated diagnostics. The fixed code is safe for
+// direct-mTLS Worker/CLI callers and never grants replay after a failure.
+// COMMIT uncertainty is classified before reaching this helper.
+func writePublicError(w http.ResponseWriter, status int) {
+	var message string
+	switch status {
+	case http.StatusBadRequest:
+		message = "invalid request"
+	case http.StatusForbidden:
+		message = "operation forbidden"
+	case http.StatusNotFound:
+		message = "resource not found"
+	case http.StatusConflict:
+		message = "conflict with current authority or version"
+	case http.StatusUnprocessableEntity:
+		message = "request rejected by current policy or contract"
+	case http.StatusServiceUnavailable:
+		message = "service temporarily unavailable"
+	default:
+		message = "internal operation failed"
+	}
+	writeError(w, status, message)
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
