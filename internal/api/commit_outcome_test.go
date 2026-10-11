@@ -15,7 +15,7 @@ import (
 
 func TestUnknownCommitOutcomeAPINeverClaimsRollbackOrExposesSQL(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name  string
 		reply func(http.ResponseWriter, error)
 	}{
 		{name: "action", reply: writeActionError},
