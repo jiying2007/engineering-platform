@@ -15,7 +15,20 @@ var (
 	ErrOperationExists     = errors.New("operation already exists")
 	ErrOperationAbsent     = errors.New("operation not found")
 	ErrIdempotencyConflict = errors.New("idempotency key reused for different request")
+	// A Provider call or observation may have happened, but its original
+	// immutable Action settlement cannot be established. Never translate
+	// this to a validation error or permission to dispatch again.
+	ErrExternalEffectUnresolved = errors.New("external Action effect unresolved; exact readback required")
 )
+
+// Tag post-Provider uncertainty without losing a more precise nested
+// ErrCommitOutcomeUnknown. The API tests that COMMIT classification first.
+func unresolvedExternalEffect(err error) error {
+	if err == nil {
+		return ErrExternalEffectUnresolved
+	}
+	return fmt.Errorf("%w: %w", ErrExternalEffectUnresolved, err)
+}
 
 type DispatchOutcome string
 
@@ -258,12 +271,12 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	result, err := s.provider.Dispatch(ctx, req)
 	if err != nil {
 		if transitionErr := op.Transition(Unknown, s.now()); transitionErr != nil {
-			return Receipt{}, transitionErr
+			return Receipt{}, unresolvedExternalEffect(transitionErr)
 		}
 		if updateErr := s.settleExternalEffect(ctx, *op); updateErr != nil {
 			// The external effect is ambiguous; an in-memory UNKNOWN
 			// receipt must not pretend the authoritative ledger settled.
-			return Receipt{}, fmt.Errorf("cannot persist UNKNOWN external operation: %w", updateErr)
+			return Receipt{}, unresolvedExternalEffect(fmt.Errorf("cannot persist UNKNOWN external operation: %w", updateErr))
 		}
 		return receiptFromOperation(req.ID, *op, s.now()), nil
 	}
@@ -272,11 +285,11 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	switch result.Outcome {
 	case DispatchConfirmed:
 		if err := op.Transition(Confirmed, s.now()); err != nil {
-			return Receipt{}, err
+			return Receipt{}, unresolvedExternalEffect(err)
 		}
 	case DispatchUnknown:
 		if err := op.Transition(Unknown, s.now()); err != nil {
-			return Receipt{}, err
+			return Receipt{}, unresolvedExternalEffect(err)
 		}
 	default:
 		// The Provider may have completed the external effect even when its
@@ -285,7 +298,7 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 		// an untrusted external reference from this response.
 		invalidDispatchOutcome = true
 		if err := op.Transition(Unknown, s.now()); err != nil {
-			return Receipt{}, err
+			return Receipt{}, unresolvedExternalEffect(err)
 		}
 		result.ExternalRef = ""
 		result.ObservedState = "INVALID_PROVIDER_DISPATCH_OUTCOME"
@@ -293,10 +306,10 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	op.ExternalRef = result.ExternalRef
 	op.ObservedState = result.ObservedState
 	if err := s.settleExternalEffect(ctx, *op); err != nil {
-		return Receipt{}, err
+		return Receipt{}, unresolvedExternalEffect(err)
 	}
 	if invalidDispatchOutcome {
-		return Receipt{}, fmt.Errorf("unsupported provider dispatch outcome; durable reconciliation required")
+		return Receipt{}, unresolvedExternalEffect(fmt.Errorf("unsupported provider dispatch outcome; durable reconciliation required"))
 	}
 	return receiptFromOperation(req.ID, *op, s.now()), nil
 }
@@ -359,7 +372,7 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 		if updateErr := s.settleExternalEffect(ctx, op); updateErr != nil {
 			// A reconciliation failure followed by a ledger write failure
 			// must not be reported as durable MANUAL settlement.
-			return Receipt{}, fmt.Errorf("cannot persist MANUAL external operation: %w", updateErr)
+			return Receipt{}, unresolvedExternalEffect(fmt.Errorf("cannot persist MANUAL external operation: %w", updateErr))
 		}
 		return receiptFromOperation("", op, s.now()), nil
 	}
@@ -389,15 +402,15 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 		result.ObservedState = "INVALID_PROVIDER_RECONCILE_OUTCOME"
 	}
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, unresolvedExternalEffect(err)
 	}
 	op.ExternalRef = result.ExternalRef
 	op.ObservedState = result.ObservedState
 	if err := s.settleExternalEffect(ctx, op); err != nil {
-		return Receipt{}, err
+		return Receipt{}, unresolvedExternalEffect(err)
 	}
 	if invalidReconcileOutcome {
-		return Receipt{}, fmt.Errorf("unsupported provider reconcile outcome; manual reconciliation required")
+		return Receipt{}, unresolvedExternalEffect(fmt.Errorf("unsupported provider reconcile outcome; manual reconciliation required"))
 	}
 	return receiptFromOperation("", op, s.now()), nil
 }
