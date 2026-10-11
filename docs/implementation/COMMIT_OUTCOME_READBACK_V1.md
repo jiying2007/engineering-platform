@@ -76,6 +76,29 @@ are never included in diagnostics; POST is not retried automatically. Even if
 a network error prevents the 503 reaching the client, the caller must perform
 original-ID readback before deciding any further step.
 
+## Mutating Control POST with no usable response
+
+The mTLS Control client distinguishes the server's **specific** typed 503
+`ErrCommitOutcomeUnknown` (COMMIT was attempted) from its own
+`ErrPostOutcomeUnobserved` (the client cannot establish what a POST did).
+The latter covers loss of the real HTTP transport after the request was
+submitted and unusable 2xx acknowledgements, including truncated/oversize,
+non-JSON or incompatible response data. The client performs **no POST retry**,
+provides a fixed, non-leaking operator message, and preserves cancellation
+causes for existing Worker shutdown logic. An early cancelled request may
+not have reached Core; this label is deliberately conservative rather than
+asserting that a mutation committed.
+
+The authorized operator must first inspect the original Run, operation,
+request digest, epoch, audit, immutable receipt and provider-specific external
+facts as applicable. Absence in one GET does not prove quiescence of an
+in-flight Publisher or permission to create a new idempotency key. A received
+non-2xx HTTP status retains its existing classification; a confirmed specific
+`commit_outcome_unknown` is not overwritten by generic transport ambiguity.
+Tests use a real local mTLS connection torn down after the server receives the
+POST, malformed success responses and single-call readback-negative probes.
+They do not qualify production outages or live provider behavior.
+
 ## Source-level regression boundary
 
 The PostgreSQL package's AST guard
