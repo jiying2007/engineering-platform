@@ -1,0 +1,38 @@
+name: Continuation source readback
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-readback:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/authority-context-readiness-20261012' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, current CI resolved revision
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Archive exact tracked public source only
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          mkdir "$RUNNER_TEMP/continuation-source"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/continuation-source/source.tar"
+          printf '%s\n' "$EXPECTED_SHA" > "$RUNNER_TEMP/continuation-source/SOURCE_SHA"
+          (cd "$RUNNER_TEMP/continuation-source" && sha256sum source.tar > SHA256SUMS)
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, current CI resolved revision
+        with:
+          name: continuation-source-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/continuation-source
+          if-no-files-found: error
+          retention-days: 1
+
+# This temporary source-only transport is removed before the final PR head is
+# qualified/merged. It never archives .git, environment, credentials, or host files.
