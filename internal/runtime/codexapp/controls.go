@@ -56,7 +56,7 @@ func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, tur
 		cancel()
 		result := <-observations
 		if err != nil {
-			return result.value, err
+			return result.value, errors.Join(err, result.err)
 		}
 		if result.err == nil && ctx.Err() != nil {
 			result.err = ctx.Err()
@@ -119,14 +119,11 @@ func pumpControls(ctx, inFlight context.Context, a *Adapter, threadID, turnID st
 				outcome = "NOT_APPLIED"
 			}
 		}
-		reporting, done := context.WithTimeout(context.Background(), 5*time.Second)
+		reporting, done := context.WithTimeout(context.WithoutCancel(inFlight), 5*time.Second)
 		err = c.Report(reporting, command.ID, outcome)
 		done()
-		if err != nil {
-			return err
-		}
-		if callErr != nil {
-			return callErr
+		if err != nil || callErr != nil {
+			return errors.Join(callErr, err)
 		}
 		if command.Kind == "INTERRUPT" {
 			// An empty interrupt response is only an ACK. The event reader must observe

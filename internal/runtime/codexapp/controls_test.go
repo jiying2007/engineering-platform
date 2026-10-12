@@ -16,6 +16,8 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
+var fixtureCloseFailure = errors.New("fixture Core seal unavailable")
+
 type fixtureController struct {
 	mu            sync.Mutex
 	command       *LiveControl
@@ -75,14 +77,14 @@ func (c *fixtureController) Close(_ context.Context, status string, proof proces
 	c.closed = status
 	c.exited = proof.Quiescent()
 	if c.closeFailure {
-		return errors.New("fixture Core seal unavailable")
+		return fixtureCloseFailure
 	}
 	return nil
 }
 
 func TestEngineeringActualProcessControls(t *testing.T) {
 	testsupport.RequireProcessNamespaces(t)
-	for _, mode := range []string{"steer", "interrupt", "lost-reply", "report-failure", "close-failure", "foreign-turn"} {
+	for _, mode := range []string{"steer", "interrupt", "lost-reply", "report-failure", "close-failure", "interrupt-and-close-failure", "foreign-turn"} {
 		t.Run(mode, func(t *testing.T) {
 			python, err := exec.LookPath("python3")
 			if err != nil {
@@ -106,8 +108,8 @@ func TestEngineeringActualProcessControls(t *testing.T) {
 			if err = os.WriteFile(login, []byte(`{"fixture_only":"never-an-account"}`), 0600); err != nil {
 				t.Fatal(err)
 			}
-			controller := &fixtureController{bound: make(chan struct{}), reported: make(chan struct{}), command: &LiveControl{ID: "c1", Kind: "STEER", Text: "只修复故障", ThreadID: "thread", TurnID: "turn"}, reportFailure: mode == "report-failure", closeFailure: mode == "close-failure"}
-			if mode == "interrupt" {
+			controller := &fixtureController{bound: make(chan struct{}), reported: make(chan struct{}), command: &LiveControl{ID: "c1", Kind: "STEER", Text: "只修复故障", ThreadID: "thread", TurnID: "turn"}, reportFailure: mode == "report-failure", closeFailure: mode == "close-failure" || mode == "interrupt-and-close-failure"}
+			if mode == "interrupt" || mode == "interrupt-and-close-failure" {
 				controller.command.Kind = "INTERRUPT"
 				controller.command.Text = ""
 			}
@@ -175,6 +177,9 @@ func TestEngineeringActualProcessControls(t *testing.T) {
 				}
 			} else if result.err == nil {
 				t.Fatal("non-deliverable outcome returned success")
+			}
+			if mode == "interrupt-and-close-failure" && (!errors.Is(result.err, ErrEngineeringInterrupted) || !errors.Is(result.err, fixtureCloseFailure) || !errors.Is(result.err, ErrEngineeringCloseUnobserved) || result.receipt.TurnID != "") {
+				t.Fatalf("interruption/close failure lost or deliverable invented: %+v", result)
 			}
 			controller.mu.Lock()
 			defer controller.mu.Unlock()
