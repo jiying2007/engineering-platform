@@ -151,15 +151,27 @@ func NewMemory() *Memory {
 	}
 }
 
-func (m *Memory) GetRecovery() (recovery.Manager, error) {
+func (m *Memory) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	return m.recoveryState, nil
 }
 
-func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
+func (m *Memory) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	if m.recoveryState.Epoch != expectedEpoch {
 		return recovery.Manager{}, ErrConflict
 	}
@@ -170,9 +182,15 @@ func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
 	return m.recoveryState, nil
 }
 
-func (m *Memory) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
+func (m *Memory) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return recovery.Manager{}, err
+	}
 	if m.recoveryState.Epoch != epoch {
 		return recovery.Manager{}, ErrConflict
 	}
@@ -182,9 +200,15 @@ func (m *Memory) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manag
 	return m.recoveryState, nil
 }
 
-func (m *Memory) CreateWork(item core.WorkItem) error {
+func (m *Memory) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.works[item.ID]; ok {
 		return ErrExists
 	}
@@ -195,9 +219,15 @@ func (m *Memory) CreateWork(item core.WorkItem) error {
 	return nil
 }
 
-func (m *Memory) GetWork(id string) (core.WorkItem, error) {
+func (m *Memory) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
+	if err := ctx.Err(); err != nil {
+		return core.WorkItem{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.WorkItem{}, err
+	}
 	item, ok := m.works[id]
 	if !ok {
 		return core.WorkItem{}, ErrNotFound
@@ -205,9 +235,15 @@ func (m *Memory) GetWork(id string) (core.WorkItem, error) {
 	return item, nil
 }
 
-func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
+func (m *Memory) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	current, ok := m.works[id]
 	if !ok {
 		return ErrNotFound
@@ -273,7 +309,10 @@ func (m *Memory) CreateTask(task core.TaskContract, plan verification.Plan) erro
 	return nil
 }
 
-func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
+func (m *Memory) CreateTaskAndUpdateWorkContext(ctx context.Context, task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if task.Revision == 0 || task.VerificationPlanDigest == "" || task.VerificationPlanID == "" {
 		return ErrConflict
 	}
@@ -294,6 +333,9 @@ func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verificati
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	currentWork, ok := m.works[work.ID]
 	if !ok {
@@ -344,9 +386,15 @@ func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verificati
 	return nil
 }
 
-func (m *Memory) GetTask(id string) (core.TaskContract, error) {
+func (m *Memory) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
 	latest, ok := m.latestTaskRev[id]
 	if !ok {
 		return core.TaskContract{}, ErrNotFound
@@ -368,9 +416,15 @@ func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract,
 	return task, nil
 }
 
-func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
+func (m *Memory) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
 	task, ok := m.tasksByDigest[digest]
 	if !ok {
 		return core.TaskContract{}, ErrNotFound
@@ -378,9 +432,15 @@ func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
 	return task, nil
 }
 
-func (m *Memory) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
+func (m *Memory) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
+	if err := ctx.Err(); err != nil {
+		return verification.Plan{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return verification.Plan{}, err
+	}
 	plan, ok := m.verificationPlans[digest]
 	if !ok {
 		return verification.Plan{}, ErrNotFound
@@ -417,7 +477,10 @@ func (m *Memory) CreateExecution(value run.Run, sess session.Session, input core
 	return nil
 }
 
-func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
+func (m *Memory) CreateExecutionAndUpdateWorkContext(ctx context.Context, value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if input.Continuation != nil {
 		return ErrConflict
 	}
@@ -442,6 +505,9 @@ func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	currentWork, ok := m.works[work.ID]
 	if !ok {
@@ -492,9 +558,15 @@ func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
 	return attempt, nil
 }
 
-func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
+func (m *Memory) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
+	if err := ctx.Err(); err != nil {
+		return run.Run{}, session.Session{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return run.Run{}, session.Session{}, err
+	}
 	value, ok := m.runs[id]
 	if !ok {
 		return run.Run{}, session.Session{}, ErrNotFound
@@ -506,9 +578,15 @@ func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
 	return value, sess, nil
 }
 
-func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
+func (m *Memory) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
+	if err := ctx.Err(); err != nil {
+		return core.RunInputManifest{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.RunInputManifest{}, err
+	}
 	input, ok := m.runInputs[digest]
 	if !ok {
 		return core.RunInputManifest{}, ErrNotFound
@@ -516,13 +594,19 @@ func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, erro
 	return input, nil
 }
 
-func (m *Memory) CreateCheckpoint(item session.Checkpoint) (string, error) {
+func (m *Memory) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	digest, err := item.Digest()
 	if err != nil {
 		return "", err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if _, ok := m.checkpoints[item.ID]; ok {
 		return "", ErrExists
 	}
@@ -534,9 +618,15 @@ func (m *Memory) CreateCheckpoint(item session.Checkpoint) (string, error) {
 	return digest, nil
 }
 
-func (m *Memory) GetCheckpoint(id string) (session.Checkpoint, string, error) {
+func (m *Memory) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
+	if err := ctx.Err(); err != nil {
+		return session.Checkpoint{}, "", err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return session.Checkpoint{}, "", err
+	}
 	item, ok := m.checkpoints[id]
 	if !ok {
 		return session.Checkpoint{}, "", ErrNotFound
@@ -548,9 +638,15 @@ func (m *Memory) GetCheckpoint(id string) (session.Checkpoint, string, error) {
 	return item, digest, nil
 }
 
-func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
+func (m *Memory) UpdateExecutionContext(ctx context.Context, id string, expectedVersion uint64, value run.Run, sess session.Session) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	current, ok := m.runs[id]
 	if !ok {
 		return ErrNotFound
@@ -606,9 +702,15 @@ func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run
 	return nil
 }
 
-func (m *Memory) GetSteering(id string) (session.SteeringCommand, error) {
+func (m *Memory) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
+	if err := ctx.Err(); err != nil {
+		return session.SteeringCommand{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return session.SteeringCommand{}, err
+	}
 	cmd, ok := m.steeringCommands[id]
 	if !ok {
 		return session.SteeringCommand{}, ErrNotFound
@@ -616,9 +718,15 @@ func (m *Memory) GetSteering(id string) (session.SteeringCommand, error) {
 	return cmd, nil
 }
 
-func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
+func (m *Memory) UpdateExecutionAndWorkContext(ctx context.Context, id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	currentRun, ok := m.runs[id]
 	if !ok {
@@ -653,9 +761,15 @@ func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, va
 	return nil
 }
 
-func (m *Memory) Create(op action.Operation) error {
+func (m *Memory) CreateContext(ctx context.Context, op action.Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.operations[op.ID]; ok {
 		return action.ErrOperationExists
 	}
@@ -667,9 +781,15 @@ func (m *Memory) Create(op action.Operation) error {
 	return nil
 }
 
-func (m *Memory) Get(id string) (action.Operation, error) {
+func (m *Memory) GetContext(ctx context.Context, id string) (action.Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
 	op, ok := m.operations[id]
 	if !ok {
 		return action.Operation{}, action.ErrOperationAbsent
@@ -677,9 +797,15 @@ func (m *Memory) Get(id string) (action.Operation, error) {
 	return op, nil
 }
 
-func (m *Memory) GetByIdempotencyKey(key string) (action.Operation, error) {
+func (m *Memory) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return action.Operation{}, err
+	}
 	id, ok := m.actionIdempotency[key]
 	if !ok {
 		return action.Operation{}, action.ErrOperationAbsent
@@ -691,9 +817,15 @@ func (m *Memory) GetByIdempotencyKey(key string) (action.Operation, error) {
 	return op, nil
 }
 
-func (m *Memory) Update(op action.Operation) error {
+func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.operations[op.ID]; !ok {
 		return action.ErrOperationAbsent
 	}
@@ -703,34 +835,24 @@ func (m *Memory) Update(op action.Operation) error {
 
 // Core's in-memory development lane implements the same caller-bound Action
 // Repository contract as production PostgreSQL. No second ledger or retry.
-func (m *Memory) CreateContext(ctx context.Context, op action.Operation) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.Create(op)
+func (m *Memory) Create(op action.Operation) error { return m.CreateContext(context.Background(), op) }
+func (m *Memory) Get(id string) (action.Operation, error) {
+	return m.GetContext(context.Background(), id)
 }
-func (m *Memory) GetContext(ctx context.Context, id string) (action.Operation, error) {
-	if err := ctx.Err(); err != nil {
-		return action.Operation{}, err
-	}
-	return m.Get(id)
+func (m *Memory) GetByIdempotencyKey(key string) (action.Operation, error) {
+	return m.GetByIdempotencyKeyContext(context.Background(), key)
 }
-func (m *Memory) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
-	if err := ctx.Err(); err != nil {
-		return action.Operation{}, err
-	}
-	return m.GetByIdempotencyKey(key)
-}
-func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.Update(op)
-}
+func (m *Memory) Update(op action.Operation) error { return m.UpdateContext(context.Background(), op) }
 
-func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
+func (m *Memory) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.deliveries[item.ID]; ok {
 		return ErrExists
 	}
@@ -738,9 +860,15 @@ func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
 	return nil
 }
 
-func (m *Memory) GetDelivery(id string) (core.DeliveryReceipt, error) {
+func (m *Memory) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return core.DeliveryReceipt{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.DeliveryReceipt{}, err
+	}
 	item, ok := m.deliveries[id]
 	if !ok {
 		return core.DeliveryReceipt{}, ErrNotFound
@@ -748,9 +876,15 @@ func (m *Memory) GetDelivery(id string) (core.DeliveryReceipt, error) {
 	return item, nil
 }
 
-func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
+func (m *Memory) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.evidence[item.ID]; ok {
 		return ErrExists
 	}
@@ -776,9 +910,15 @@ func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
 	return nil
 }
 
-func (m *Memory) GetEvidence(id string) (core.EvidenceRef, error) {
+func (m *Memory) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
+	if err := ctx.Err(); err != nil {
+		return core.EvidenceRef{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.EvidenceRef{}, err
+	}
 	item, ok := m.evidence[id]
 	if !ok {
 		return core.EvidenceRef{}, ErrNotFound
@@ -786,9 +926,15 @@ func (m *Memory) GetEvidence(id string) (core.EvidenceRef, error) {
 	return item, nil
 }
 
-func (m *Memory) CreateVerification(report verification.Report) error {
+func (m *Memory) CreateVerificationContext(ctx context.Context, report verification.Report) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.verificationReports[report.ID]; ok {
 		return ErrExists
 	}
@@ -796,9 +942,15 @@ func (m *Memory) CreateVerification(report verification.Report) error {
 	return nil
 }
 
-func (m *Memory) GetVerification(id string) (verification.Report, error) {
+func (m *Memory) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
+	if err := ctx.Err(); err != nil {
+		return verification.Report{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return verification.Report{}, err
+	}
 	report, ok := m.verificationReports[id]
 	if !ok {
 		return verification.Report{}, ErrNotFound
@@ -806,12 +958,18 @@ func (m *Memory) GetVerification(id string) (verification.Report, error) {
 	return report, nil
 }
 
-func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion uint64, work core.WorkItem) error {
+func (m *Memory) CreateReviewAndUpdateWorkContext(ctx context.Context, report review.Report, expectedVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := report.Validate(); err != nil {
 		return err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.reviewReports[report.ID]; ok {
 		return ErrExists
 	}
@@ -858,9 +1016,15 @@ func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion
 	return nil
 }
 
-func (m *Memory) GetReview(id string) (review.Report, error) {
+func (m *Memory) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
+	if err := ctx.Err(); err != nil {
+		return review.Report{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return review.Report{}, err
+	}
 	report, ok := m.reviewReports[id]
 	if !ok {
 		return review.Report{}, ErrNotFound
@@ -870,9 +1034,15 @@ func (m *Memory) GetReview(id string) (review.Report, error) {
 	return report, nil
 }
 
-func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
+func (m *Memory) CreateClosureAndUpdateWorkContext(ctx context.Context, item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := m.closures[item.ID]; ok {
 		return ErrExists
 	}
@@ -904,9 +1074,15 @@ func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVe
 	return nil
 }
 
-func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
+func (m *Memory) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
+	if err := ctx.Err(); err != nil {
+		return core.ClosureReceipt{}, err
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.ClosureReceipt{}, err
+	}
 	item, ok := m.closures[id]
 	if !ok {
 		return core.ClosureReceipt{}, ErrNotFound
@@ -917,178 +1093,94 @@ func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
 // These are caller-scoped views of the single existing in-memory Core ledger.
 // Gateway Authorization/Run/Recovery checks are now always bound to the
 // initiating request; only a separately authorized context may outlive it.
-func (m *Memory) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
-	if err := ctx.Err(); err != nil {
-		return run.Run{}, session.Session{}, err
-	}
-	return m.GetExecution(id)
+func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
+	return m.GetExecutionContext(context.Background(), id)
 }
-func (m *Memory) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
-	if err := ctx.Err(); err != nil {
-		return core.TaskContract{}, err
-	}
-	return m.GetTaskByDigest(digest)
+func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
+	return m.GetTaskByDigestContext(context.Background(), digest)
 }
-func (m *Memory) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
-	if err := ctx.Err(); err != nil {
-		return recovery.Manager{}, err
-	}
-	return m.GetRecovery()
+func (m *Memory) GetRecovery() (recovery.Manager, error) {
+	return m.GetRecoveryContext(context.Background())
 }
 
 // DEV/test uses the same bounded caller admission fence as PostgreSQL
 // for Recovery Begin/Complete. No new Recovery ledger or replay mechanism.
-func (m *Memory) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
-	if err := ctx.Err(); err != nil {
-		return recovery.Manager{}, err
-	}
-	return m.BeginRecovery(expectedEpoch)
+func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
+	return m.BeginRecoveryContext(context.Background(), expectedEpoch)
 }
-func (m *Memory) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
-	if err := ctx.Err(); err != nil {
-		return recovery.Manager{}, err
-	}
-	return m.CompleteRecovery(epoch, reconciled)
+func (m *Memory) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
+	return m.CompleteRecoveryContext(context.Background(), epoch, reconciled)
 }
 
 // The HTTP Core Store contract is scoped even in the in-memory DEV/test
 // implementation. These methods delegate to the original single ledger;
 // they do not add a second set of records or independent mutation authority.
-func (m *Memory) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateWork(item)
+func (m *Memory) CreateWork(item core.WorkItem) error {
+	return m.CreateWorkContext(context.Background(), item)
 }
-func (m *Memory) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
-	if err := ctx.Err(); err != nil {
-		return core.WorkItem{}, err
-	}
-	return m.GetWork(id)
+func (m *Memory) GetWork(id string) (core.WorkItem, error) {
+	return m.GetWorkContext(context.Background(), id)
 }
-func (m *Memory) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.UpdateWork(id, expectedVersion, item)
+func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
+	return m.UpdateWorkContext(context.Background(), id, expectedVersion, item)
 }
-func (m *Memory) CreateTaskAndUpdateWorkContext(ctx context.Context, task core.TaskContract, plan verification.Plan, version uint64, work core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateTaskAndUpdateWork(task, plan, version, work)
+func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
+	return m.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, expectedWorkVersion, work)
 }
-func (m *Memory) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
-	if err := ctx.Err(); err != nil {
-		return core.TaskContract{}, err
-	}
-	return m.GetTask(id)
+func (m *Memory) GetTask(id string) (core.TaskContract, error) {
+	return m.GetTaskContext(context.Background(), id)
 }
-func (m *Memory) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
-	if err := ctx.Err(); err != nil {
-		return verification.Plan{}, err
-	}
-	return m.GetVerificationPlanByDigest(digest)
+func (m *Memory) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
+	return m.GetVerificationPlanByDigestContext(context.Background(), digest)
 }
-func (m *Memory) CreateExecutionAndUpdateWorkContext(ctx context.Context, value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, version uint64, work core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateExecutionAndUpdateWork(value, attempt, sess, input, version, work)
+func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
+	return m.CreateExecutionAndUpdateWorkContext(context.Background(), value, attempt, sess, input, expectedWorkVersion, work)
 }
-func (m *Memory) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
-	if err := ctx.Err(); err != nil {
-		return core.RunInputManifest{}, err
-	}
-	return m.GetRunInputByDigest(digest)
+func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
+	return m.GetRunInputByDigestContext(context.Background(), digest)
 }
-func (m *Memory) UpdateExecutionContext(ctx context.Context, id string, version uint64, value run.Run, sess session.Session) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.UpdateExecution(id, version, value, sess)
+func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
+	return m.UpdateExecutionContext(context.Background(), id, expectedVersion, value, sess)
 }
-func (m *Memory) UpdateExecutionAndWorkContext(ctx context.Context, id string, runVersion uint64, value run.Run, sess session.Session, workVersion uint64, work core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.UpdateExecutionAndWork(id, runVersion, value, sess, workVersion, work)
+func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
+	return m.UpdateExecutionAndWorkContext(context.Background(), id, expectedRunVersion, value, sess, expectedWorkVersion, work)
 }
-func (m *Memory) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	return m.CreateCheckpoint(item)
+func (m *Memory) CreateCheckpoint(item session.Checkpoint) (string, error) {
+	return m.CreateCheckpointContext(context.Background(), item)
 }
-func (m *Memory) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
-	if err := ctx.Err(); err != nil {
-		return session.Checkpoint{}, "", err
-	}
-	return m.GetCheckpoint(id)
+func (m *Memory) GetCheckpoint(id string) (session.Checkpoint, string, error) {
+	return m.GetCheckpointContext(context.Background(), id)
 }
-func (m *Memory) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateDelivery(item)
+func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
+	return m.CreateDeliveryContext(context.Background(), item)
 }
-func (m *Memory) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
-	if err := ctx.Err(); err != nil {
-		return core.DeliveryReceipt{}, err
-	}
-	return m.GetDelivery(id)
+func (m *Memory) GetDelivery(id string) (core.DeliveryReceipt, error) {
+	return m.GetDeliveryContext(context.Background(), id)
 }
-func (m *Memory) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateEvidence(item)
+func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
+	return m.CreateEvidenceContext(context.Background(), item)
 }
-func (m *Memory) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
-	if err := ctx.Err(); err != nil {
-		return core.EvidenceRef{}, err
-	}
-	return m.GetEvidence(id)
+func (m *Memory) GetEvidence(id string) (core.EvidenceRef, error) {
+	return m.GetEvidenceContext(context.Background(), id)
 }
-func (m *Memory) CreateVerificationContext(ctx context.Context, item verification.Report) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateVerification(item)
+func (m *Memory) CreateVerification(report verification.Report) error {
+	return m.CreateVerificationContext(context.Background(), report)
 }
-func (m *Memory) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
-	if err := ctx.Err(); err != nil {
-		return verification.Report{}, err
-	}
-	return m.GetVerification(id)
+func (m *Memory) GetVerification(id string) (verification.Report, error) {
+	return m.GetVerificationContext(context.Background(), id)
 }
-func (m *Memory) CreateReviewAndUpdateWorkContext(ctx context.Context, report review.Report, version uint64, work core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateReviewAndUpdateWork(report, version, work)
+func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion uint64, work core.WorkItem) error {
+	return m.CreateReviewAndUpdateWorkContext(context.Background(), report, expectedVersion, work)
 }
-func (m *Memory) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
-	if err := ctx.Err(); err != nil {
-		return review.Report{}, err
-	}
-	return m.GetReview(id)
+func (m *Memory) GetReview(id string) (review.Report, error) {
+	return m.GetReviewContext(context.Background(), id)
 }
-func (m *Memory) CreateClosureAndUpdateWorkContext(ctx context.Context, item core.ClosureReceipt, version uint64, work core.WorkItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return m.CreateClosureAndUpdateWork(item, version, work)
+func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
+	return m.CreateClosureAndUpdateWorkContext(context.Background(), item, expectedVersion, work)
 }
-func (m *Memory) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
-	if err := ctx.Err(); err != nil {
-		return core.ClosureReceipt{}, err
-	}
-	return m.GetClosure(id)
+func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
+	return m.GetClosureContext(context.Background(), id)
 }
-func (m *Memory) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
-	if err := ctx.Err(); err != nil {
-		return session.SteeringCommand{}, err
-	}
-	return m.GetSteering(id)
+func (m *Memory) GetSteering(id string) (session.SteeringCommand, error) {
+	return m.GetSteeringContext(context.Background(), id)
 }

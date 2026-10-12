@@ -1,5 +1,23 @@
 # Implementation Status
 
+<!-- engineering-platform-readiness
+{
+  "version": 1,
+  "internal_readiness": "BLOCKED",
+  "internal_blockers": [
+    228,
+    229
+  ],
+  "external_qualification_gates": [
+    105
+  ],
+  "deferred_credential_gates": [
+    103,
+    106
+  ]
+}
+-->
+
 This is the single live implementation-status authority. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b98b`.
@@ -184,6 +202,42 @@ schema/runtime compatibility obligation.
 #54 and Debug #55 closure. It does not qualify later runtime changes. Do not rerun
 those subjects or rewrite their receipts to manufacture current production proof.
 
+## Response, Memory and readiness hardening
+
+The already-merged #262 Control client rejects a root null/non-object,
+validates explicitly tagged top-level required response members, and commits a
+fresh decoded output only after validation. Explicit nullable assignment is a
+valid empty claim; missing assignment is not. Complete allowlisted 503 codes
+keep their precise classification; unusable 5xx bodies preserve outcome-
+unobserved, HTTP status and internal cause. Intact ordinary errors are not
+reclassified as proof of COMMIT. No retry is added. The remaining hardening in
+this slice does not overwrite or reimplement #262. Nested domain checks remain
+the consumer's responsibility.
+
+Memory's existing scoped methods additionally recheck cancellation after the
+original RWMutex is acquired, before ledger access or mutation. Context-free
+concrete methods delegate to the same implementation; there is no second ledger.
+RWMutex waiting itself is not cancellable. This closes the post-wait access
+race, not all #229 lifecycle, pool-wait or production latency qualification.
+
+The unreferenced context-free `internal/authority` duplicate is retired; the
+single production Gateway retains its frozen-task authorization and now rejects
+cross-Run or stale Session identities in its epoch precheck. Existing PostgreSQL
+transactional admission remains authoritative. An isolated PostgreSQL regression
+holds the only pooled connection until seven caller-bound read/mutation/admission
+paths time out, then requires zero business/audit/Action residue, zero Provider
+calls and a usable pool. This is pool-wait cancellation evidence, not a production
+capacity measurement or permission to retry an uncertain operation.
+
+Delivery envelope v2 separates CI/source provenance from declared internal
+readiness, production acceptance and deferred credential alternatives. The one
+machine-readable block in this document is the declared readiness authority.
+Missing or inconsistent blocks fail closed; VerifyStatusBytes requires the exact
+original status bytes. The envelope is neither independent issue closure nor
+production qualification. #228 still needs an implemented and qualified
+provider-specific effectful terminal disposition; the state matrix is an
+acceptance contract and regression coverage, not that implementation.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**
@@ -355,9 +409,10 @@ and build directories. The existing [offline Runtime](../implementation/OFFLINE_
 also supports an explicitly frozen bounded build-output contract: the non-root
 PID1 guard collects exact files in private tmpfs after reaping children, and the
 existing Worker/Core/Evidence path binds their bytes. A real scratch-container C compiler, a freestanding host-ISA firmware-like
-ELF/map reference and private artifact restore are covered, but no target MCU
-cross-toolchain, boot/timing/hardware behavior or larger production firmware
-capacity is qualified. A same-Run compiled Worker/mTLS/PostgreSQL/native
+ELF/map reference and private artifact restore are covered. The separate
+no-network Cortex-M0 cross-toolchain reference is a controlled fixture, not
+qualification of target-board boot/timing/hardware behavior or larger
+production firmware capacity. A same-Run compiled Worker/mTLS/PostgreSQL/native
 C build additionally captures and restores its original records and raw outputs
 after deleting source/Git/preparation roots, without creating Evidence or new
 execution. Producer-derived capture tests remove the entire prepared root
@@ -448,11 +503,11 @@ cannot promote them into account/provider/device qualification.
 
 ## Internal RC boundary and external qualification gates
 
-W01-W10 remain the approved scope, but the repository-side implementation for
-the current small-team RC is closed. Remaining work is deliberately separated
-into **external qualification/deployment gates** and **explicit non-goals**; it
-is not an invitation to add parallel authorities, compatibility shims or
-speculative services.
+W01-W10 remain historical accepted repository slices, not current internal
+closure. Internal P0 #228 and P1 #229 remain open independently of external
+qualification/deployment gates and explicit non-goals. No green CI, binary
+provenance envelope or historical milestone can erase these internal blockers.
+Do not add parallel authorities, compatibility shims or speculative services.
 
 - **W01 — repository-side complete; production measurement external.** Bounded
   queue-progress windows, canonical Worker poll observations, authenticated
