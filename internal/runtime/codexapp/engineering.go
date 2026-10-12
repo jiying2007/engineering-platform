@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -186,13 +187,13 @@ func ObserveEngineeringTurn(ctx context.Context, adapter *Adapter, threadID, tur
 	}
 }
 
-func retainEngineeringHistory(controller EngineeringController, history EngineeringHistory) (string, int, error) {
+func retainEngineeringHistory(parent context.Context, controller EngineeringController, history EngineeringHistory) (string, int, error) {
 	digest, err := history.Digest()
 	if err != nil {
 		return "", 0, err
 	}
 	if controller != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 		defer cancel()
 		if err := controller.RetainHistory(ctx, history); err != nil {
 			return "", 0, err
@@ -271,28 +272,9 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !proof.Quiescent() {
-			stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-			var stopErr error
-			proof, stopErr = scope.Stop(stopCtx)
-			stop()
-			if !proof.Quiescent() {
-				receipt = EngineeringReceipt{}
-				runErr = fmt.Errorf("runtime process-tree termination unconfirmed: %v", stopErr)
-			}
-		}
-		if controller != nil && controlStarted {
-			terminal := observation.Status
-			if terminal == "" {
-				terminal = "unknown"
-			}
-			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
-			closeErr := controller.Close(reportCtx, terminal, proof)
-			reportCancel()
-			if closeErr != nil && runErr == nil {
-				receipt = EngineeringReceipt{}
-				runErr = closeErr
-			}
+		proof, runErr = settleEngineeringExit(ctx, scope.Stop, proof, controller, controlStarted, observation.Status, runErr)
+		if runErr != nil {
+			receipt = EngineeringReceipt{}
 		}
 	}()
 	adapter, err := NewAdapter(client, work)
@@ -321,10 +303,10 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	}
 	controlStarted = true
 	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
-	historyDigest, historyCount, historyErr := retainEngineeringHistory(controller, observation.History)
+	historyDigest, historyCount, historyErr := retainEngineeringHistory(ctx, controller, observation.History)
 	if err != nil {
 		if historyErr != nil && len(observation.History.Completion) != 0 {
-			return receipt, fmt.Errorf("%w; private item history retention failed: %v", err, historyErr)
+			return receipt, errors.Join(err, fmt.Errorf("private item history retention failed: %w", historyErr))
 		}
 		return receipt, err
 	}
@@ -336,7 +318,7 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	proof, err = scope.Wait(joinCtx)
 	joinCancel()
 	if err != nil || !proof.Quiescent() {
-		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
+		return receipt, errors.Join(ErrEngineeringStopUnconfirmed, err)
 	}
 	receipt = EngineeringReceipt{
 		SchemaVersion: 5, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,
@@ -404,28 +386,9 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !proof.Quiescent() {
-			stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-			var stopErr error
-			proof, stopErr = scope.Stop(stopCtx)
-			stop()
-			if !proof.Quiescent() {
-				receipt = EngineeringReceipt{}
-				runErr = fmt.Errorf("runtime process-tree termination unconfirmed: %v", stopErr)
-			}
-		}
-		if controller != nil && controlStarted {
-			terminal := observation.Status
-			if terminal == "" {
-				terminal = "unknown"
-			}
-			reportCtx, reportCancel := context.WithTimeout(context.Background(), 6*time.Second)
-			closeErr := controller.Close(reportCtx, terminal, proof)
-			reportCancel()
-			if closeErr != nil && runErr == nil {
-				receipt = EngineeringReceipt{}
-				runErr = closeErr
-			}
+		proof, runErr = settleEngineeringExit(ctx, scope.Stop, proof, controller, controlStarted, observation.Status, runErr)
+		if runErr != nil {
+			receipt = EngineeringReceipt{}
 		}
 	}()
 	adapter, err := NewAdapter(client, work)
@@ -455,10 +418,10 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	}
 	controlStarted = true
 	observation, err = observeControlledEngineering(runCtx, adapter, threadID, turnID, controller)
-	historyDigest, historyCount, historyErr := retainEngineeringHistory(controller, observation.History)
+	historyDigest, historyCount, historyErr := retainEngineeringHistory(ctx, controller, observation.History)
 	if err != nil {
 		if historyErr != nil && len(observation.History.Completion) != 0 {
-			return receipt, fmt.Errorf("%w; private item history retention failed: %v", err, historyErr)
+			return receipt, errors.Join(err, fmt.Errorf("private item history retention failed: %w", historyErr))
 		}
 		return receipt, err
 	}
@@ -470,7 +433,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	proof, err = scope.Wait(joinCtx)
 	joinCancel()
 	if err != nil || !proof.Quiescent() {
-		return receipt, fmt.Errorf("app-server namespace did not terminate cleanly: %v", err)
+		return receipt, errors.Join(ErrEngineeringStopUnconfirmed, err)
 	}
 	receipt = EngineeringReceipt{
 		SchemaVersion: 5, ProcessScope: proof, CLI: "codex-cli", Version: qualifiedVersion,

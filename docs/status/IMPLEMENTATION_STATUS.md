@@ -204,6 +204,22 @@ those subjects or rewrite their receipts to manufacture current production proof
 
 ## Response, Memory and readiness hardening
 
+The merged readback hardening rejects null open-PR observations before any
+later publication decision, and joins one-attempt Codex/offline failure-report
+uncertainty with the original execution error. The non-test Core selector guard
+complements the scoped Store interface; no empty response authorizes replay.
+
+Both engineering credential lanes now share their existing bounded process/control
+settlement: original turn errors, failed namespace stop and failed Core close
+acknowledgements remain independently discoverable. History-retention and control
+RPC/report errors are joined rather than masking one another. Stop, history,
+report and close retain original request values under cancellation-independent
+bounded Contexts; each original operation is attempted once. Any settlement
+failure clears the successful engineering receipt. Kernel-controlled tests include
+an interrupted real fixture process with a simultaneous Core-close failure;
+unit-only synthetic proofs are never represented as production evidence. These
+changes do not supply original Publisher dispatcher quiescence or close #228/#229.
+
 The service-facing Core Store contract now contains only caller-Context methods;
 31 unscoped interface entries were removed. Historical Attempt/Task-revision/
 Steering methods use the same required Context contract and Memory post-lock
