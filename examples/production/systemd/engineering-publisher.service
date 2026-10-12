@@ -36,6 +36,9 @@ ProtectHostname=true
 RestrictSUIDSGID=true
 LockPersonality=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StateDirectory=engineering-platform/publisher-witness
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/engineering-platform/publisher-witness
 ReadOnlyPaths=/var/lib/engineering-platform/preparation/artifacts
 SystemCallArchitectures=native
 

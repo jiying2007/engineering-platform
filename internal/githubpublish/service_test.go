@@ -24,7 +24,7 @@ type serviceRemote struct {
 	onPublish    func(string) error
 }
 
-func (r *serviceRemote) Publish(_ context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {
+func (r *serviceRemote) Publish(_ context.Context, plan Plan, bundlePath string, _ DispatchIdentity) (PublicationReceipt, error) {
 	r.publishCalls++
 	if r.onPublish != nil {
 		if err := r.onPublish(bundlePath); err != nil {
@@ -59,8 +59,16 @@ func publisherServiceFixture(t *testing.T) (*RemoteService, Plan) {
 		t.Fatal(err)
 	}
 	remote := &serviceRemote{}
+	witness := t.TempDir()
+	if err := os.Chmod(witness, 0700); err != nil {
+		t.Fatal(err)
+	}
+	journal, err := newDispatchJournal(witness)
+	if err != nil {
+		t.Fatal(err)
+	}
 	service := &RemoteService{
-		remote: remote, artifactRoot: root, artifactIdentity: info,
+		journal: journal, remote: remote, artifactRoot: root, artifactIdentity: info,
 		targets: map[string]TargetPolicy{
 			"jiying2007/engineering-platform": {
 				Repository: "jiying2007/engineering-platform", BaseRef: "main",
@@ -100,7 +108,7 @@ func authorizedPublisherRequest(t *testing.T, method, path string, body []byte) 
 
 func TestRemoteServicePublishesOnlyVerifiedBundleAndControlIdentity(t *testing.T) {
 	service, plan := publisherServiceFixture(t)
-	body, err := json.Marshal(publishRequest{Plan: plan})
+	body, err := json.Marshal(publishRequest{Plan: plan, Identity: testDispatchIdentity(plan)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +136,7 @@ func TestRemoteServiceRejectsBundleDriftBeforeGitHub(t *testing.T) {
 	if err := os.WriteFile(path, []byte("different"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	body, _ := json.Marshal(publishRequest{Plan: plan})
+	body, _ := json.Marshal(publishRequest{Plan: plan, Identity: testDispatchIdentity(plan)})
 	rec := httptest.NewRecorder()
 	service.Handler().ServeHTTP(rec, authorizedPublisherRequest(t, http.MethodPost, "/v1/publish", body))
 	if rec.Code != http.StatusUnprocessableEntity {
@@ -166,7 +174,7 @@ func TestRemoteServicePublishesVerifiedPrivateSnapshotAfterSourceSwap(t *testing
 		}
 		return nil
 	}
-	body, err := json.Marshal(publishRequest{Plan: plan})
+	body, err := json.Marshal(publishRequest{Plan: plan, Identity: testDispatchIdentity(plan)})
 	if err != nil {
 		t.Fatal(err)
 	}

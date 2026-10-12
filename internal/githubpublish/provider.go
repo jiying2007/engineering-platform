@@ -75,7 +75,7 @@ type ObserveResult struct {
 }
 
 type Remote interface {
-	Publish(context.Context, Plan, string) (PublicationReceipt, error)
+	Publish(context.Context, Plan, string, DispatchIdentity) (PublicationReceipt, error)
 	Observe(context.Context, Plan) (ObserveResult, error)
 }
 
@@ -106,7 +106,12 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 	if err := ctx.Err(); err != nil {
 		return action.DispatchResult{}, err
 	}
-	receipt, err := p.remote.Publish(ctx, plan, bundle)
+	digest, err := action.RequestDigest(req)
+	if err != nil {
+		return action.DispatchResult{}, err
+	}
+	identity := DispatchIdentity{req.ID, req.RunID, req.ExecutionEpoch, req.RecoveryEpoch, req.IdempotencyKey, digest}
+	receipt, err := p.remote.Publish(ctx, plan, bundle, identity)
 	if err != nil {
 		return action.DispatchResult{}, err
 	}

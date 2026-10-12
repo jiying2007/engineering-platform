@@ -517,7 +517,7 @@ func (pilotPublisherState) GetCodex(context.Context, string) (codexexec.Status, 
 
 type pilotPublisherRemote struct{}
 
-func (pilotPublisherRemote) Publish(context.Context, githubpublish.Plan, string) (githubpublish.PublicationReceipt, error) {
+func (pilotPublisherRemote) Publish(context.Context, githubpublish.Plan, string, githubpublish.DispatchIdentity) (githubpublish.PublicationReceipt, error) {
 	return githubpublish.PublicationReceipt{}, nil
 }
 func (pilotPublisherRemote) Observe(context.Context, githubpublish.Plan) (githubpublish.ObserveResult, error) {

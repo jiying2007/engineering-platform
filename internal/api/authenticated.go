@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/core"
+	"github.com/jiying2007/engineering-platform/internal/githubpublish"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
@@ -22,7 +23,10 @@ type RecoveryCompletionGate interface {
 	AuthorizeCompletion(context.Context, string, uint64) error
 }
 
-type AuthenticatedOptions struct{ RecoveryCompletion RecoveryCompletionGate }
+type AuthenticatedOptions struct {
+	RecoveryCompletion  RecoveryCompletionGate
+	PublicationRecovery githubpublish.PublicationRecoveryObserver
+}
 type identityKey struct{}
 
 func AuthenticatedIdentity(ctx context.Context) (access.Identity, bool) {
@@ -33,6 +37,8 @@ func AuthenticatedIdentity(ctx context.Context) (access.Identity, bool) {
 // Every admitted route has an explicit capability. New routes default to denial;
 // method/path prefixes, proxy headers and an unknown capability never grant access.
 var routeCapabilities = map[string]string{
+	"POST /api/v1/recovery/actions/confirm-publication": access.RecoveryReconcile,
+	"GET /api/v1/recovery/actions/{id}/publication":     access.Read,
 	"GET /api/v1/capabilities":                          access.Read,
 	"GET /api/v1/recovery":                              access.Read,
 	"GET /api/v1/operations/status":                     access.Read,
@@ -81,6 +87,7 @@ func NewAuthenticatedHandler(backend store.Store, actions ActionGateway, policy 
 		return nil, fmt.Errorf("store and access policy are required")
 	}
 	s := NewServerWithActionGateway(backend, actions)
+	s.publicationRecovery = options.PublicationRecovery
 	s.workerRoutes()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := s.mux.Handler(r)
@@ -190,6 +197,11 @@ func authorizeBody(ctx context.Context, pattern string, id access.Identity, data
 		}
 		if body.Reviewer != id.Subject() {
 			return http.StatusForbidden
+		}
+	case "POST /api/v1/recovery/actions/confirm-publication":
+		var body githubpublish.PublicationRecoveryRequest
+		if strictjson.Decode(data, &body) != nil || body.Validate() != nil {
+			return http.StatusBadRequest
 		}
 	case "POST /api/v1/recovery/actions/abandon-planned":
 		var body recovery.ActionPlannedAbandonRequest

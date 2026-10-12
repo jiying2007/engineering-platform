@@ -204,6 +204,31 @@ those subjects or rewrite their receipts to manufacture current production proof
 
 ## Response, Memory and readiness hardening
 
+A positive-only publication recovery path now requires original independent
+Publisher completion witnesses plus fresh exact positive PR readback. Core
+collects evidence itself over mTLS and records a serializable original-Action
+settlement, full evidence, audit and exact readback; no user-uploaded stop flag,
+negative observation or new publish call authorizes it. Publisher-service config
+v2 requires a separate private witness root and never reuses occupied slots.
+Historical/missing-completion and interrupted in-flight publication still remain
+unresolved. This repository implementation is not selected-host/provider or
+production qualification; internal [228,229] remains BLOCKED. See
+[publication recovery witness](../implementation/PUBLICATION_RECOVERY_WITNESS_V1.md).
+
+Publication readback, exact-repeat settlement and aggregate Recovery facts now
+share row/observation/time/original-audit-payload validation. Corrupt or missing
+receipts/events/operations cannot clear a new proof or complete an older proof.
+Database regressions include real post-COMMIT TCP acknowledgement loss, concurrent
+settlement, cancellation while waiting on three authority locks, failed audit
+rollback, mTLS Core roles, and native dump/restore into a new isolated database.
+The upstream observation in these transaction fixtures is synthetic. The
+transient systemd fixture also uses Publisher v2 and a random private witness
+StateDirectory, preserving the canonical security properties and read-only
+artifacts. It never maps test cleanup to production state. Canonical
+CI still requires PostgreSQL 17 and its five original jobs; supplementary native
+same-major tests are not a substitute. No production/host closure is asserted.
+
+
 Normal Action updates now compare all immutable original reservation fields in
 the same PostgreSQL UPDATE predicate; a different authorized Run cannot lend
 its admission to the original operation ID. Both existing memory ledgers enforce

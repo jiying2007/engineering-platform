@@ -65,6 +65,19 @@ def parse_unit(raw):
     return result
 
 
+def publisher_witness_path(root):
+    require(root.is_absolute() and root.parent == Path("/run") and PREFIX.fullmatch(root.name), "random ephemeral Publisher root required")
+    return Path("/var/lib") / (root.name + "-publisher-witness")
+
+
+def publisher_fixture_configuration(root):
+    return {"version": 2, "artifact_root": str(root / "artifacts"),
+            "witness_root": str(publisher_witness_path(root)),
+            "git_executable": str(Path(shutil.which("git")).resolve()),
+            "token_file": str(root / "inert-token"),
+            "targets": [{"repository": "example/systemd-fixture", "base_ref": "main", "branch_prefix": "test/"}]}
+
+
 def publisher_properties(raw, root, uid, gid):
     p = parse_unit(raw)
     require(p["Unit"]["Description"] == "Engineering Platform GitHub Publisher", "wrong service role")
@@ -72,14 +85,18 @@ def publisher_properties(raw, root, uid, gid):
     require(p["Service"]["User"] == "engineering-publisher" and p["Service"]["Group"] == "engineering-platform", "publisher identity contract drift")
     require(p["Service"]["EnvironmentFile"] == "/etc/engineering-platform/publisher.env", "publisher environment drift")
     require(p["Service"]["ReadOnlyPaths"] == "/var/lib/engineering-platform/preparation/artifacts", "publisher artifact boundary drift")
+    require(p["Service"].get("StateDirectory") == "engineering-platform/publisher-witness", "Publisher witness namespace drift")
+    require(p["Service"].get("StateDirectoryMode") == "0700", "Publisher witness permissions drift")
+    require(p["Service"].get("ReadWritePaths") == "/var/lib/engineering-platform/publisher-witness", "Publisher witness writable boundary drift")
+    witness = publisher_witness_path(root)
     # Unit graph intentionally not instantiated: no production-named unit is
     # loaded, started, stopped, enabled or reconfigured by this test.
     require(set(p["Unit"]) == {"Description", "Wants", "After", *RATE_POLICY}, "unreviewed unit graph/property")
-    allowed = {"Type", "NotifyAccess", "User", "Group", "EnvironmentFile", "ExecStart", "Restart", "RestartSec", "TimeoutStartSec", "TimeoutStopSec", "UMask", "NoNewPrivileges", "PrivateTmp", "PrivateDevices", "ProtectSystem", "ProtectHome", "ProtectKernelTunables", "ProtectKernelModules", "ProtectKernelLogs", "ProtectControlGroups", "ProtectClock", "ProtectHostname", "RestrictSUIDSGID", "LockPersonality", "RestrictAddressFamilies", "ReadOnlyPaths", "SystemCallArchitectures", *STOP_POLICY}
+    allowed = {"Type", "NotifyAccess", "User", "Group", "EnvironmentFile", "ExecStart", "Restart", "RestartSec", "TimeoutStartSec", "TimeoutStopSec", "UMask", "NoNewPrivileges", "PrivateTmp", "PrivateDevices", "ProtectSystem", "ProtectHome", "ProtectKernelTunables", "ProtectKernelModules", "ProtectKernelLogs", "ProtectControlGroups", "ProtectClock", "ProtectHostname", "RestrictSUIDSGID", "LockPersonality", "RestrictAddressFamilies", "ReadOnlyPaths", "SystemCallArchitectures", "StateDirectory", "StateDirectoryMode", "ReadWritePaths", *STOP_POLICY}
     require(set(p["Service"]) == allowed, "unreviewed service property")
     properties = {**RATE_POLICY, **p["Service"]}
     del properties["ExecStart"]
-    properties.update(User=str(uid), Group=str(gid), EnvironmentFile=str(root / "publisher.env"), ReadOnlyPaths=str(root / "artifacts"))
+    properties.update(User=str(uid), Group=str(gid), EnvironmentFile=str(root / "publisher.env"), ReadOnlyPaths=str(root / "artifacts"), StateDirectory=witness.name, ReadWritePaths=str(witness))
     return ["--property=" + key + "=" + value for key, value in sorted(properties.items())]
 
 
@@ -95,7 +112,7 @@ def fixture(root):
         ext.write_text("basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=" + usage + "\nsubjectAltName=" + san + "\nauthorityKeyIdentifier=keyid:always\nsubjectKeyIdentifier=hash\n")
         openssl("x509", "-req", "-in", str(root / (name + ".csr")), "-CA", str(ca), "-CAkey", str(cakey), "-set_serial", "11" if name == "server" else "12", "-days", "1", "-extfile", str(ext), "-out", str(root / (name + ".crt")))
     (root / "inert-token").write_text("TEST_ONLY_NOT_AN_UPSTREAM_CREDENTIAL")
-    (root / "publisher.json").write_text(json.dumps({"version": 1, "artifact_root": str(root / "artifacts"), "git_executable": str(Path(shutil.which("git")).resolve()), "token_file": str(root / "inert-token"), "targets": [{"repository": "example/systemd-fixture", "base_ref": "main", "branch_prefix": "test/"}]}))
+    (root / "publisher.json").write_text(json.dumps(publisher_fixture_configuration(root)))
     env = {"PUBLISHER_CONFIG_FILE": root / "publisher.json", "PUBLISHER_TLS_CERT_FILE": root / "server.crt", "PUBLISHER_TLS_KEY_FILE": root / "server.key", "PUBLISHER_CLIENT_CA_FILE": ca, "PUBLISHER_CONTROL_SUBJECT": "urn:engineering-platform:control:systemd-test", "LISTEN_HOST": "127.0.0.1", "PORT": "0"}
     (root / "publisher.env").write_text("".join(str(k) + "=" + str(v) + "\n" for k, v in env.items()))
     tls = ssl.create_default_context(cafile=str(ca))
@@ -362,6 +379,8 @@ def run_suite(distribution, expected, root, prefix):
         parse_unit((assets / ("engineering-" + role + ".service")).read_text())
     raw = (assets / "engineering-publisher.service").read_text()
     props = publisher_properties(raw, root, os.getuid(), os.getgid())
+    witness = publisher_witness_path(root)
+    require(not witness.exists() and not witness.is_symlink(), "refuse pre-existing test witness state")
     opener = fixture(root)
     publisher = str(installed / "bin/publisher-service")
     units = []
@@ -508,6 +527,11 @@ def run_suite(distribution, expected, root, prefix):
                 u.cleanup()
             except Exception as exc:
                 cleanup_errors.append(type(exc).__name__)
+        if not cleanup_errors:
+            # This fixed random namespace was absent before our transient units.
+            # Never clean the canonical production witness or artifact roots.
+            command(["sudo", "-n", "rm", "-rf", "--", str(witness)])
+            require(not witness.exists() and not witness.is_symlink(), "test witness cleanup incomplete")
         if cleanup_errors:
             raise ValueError("test units require cleanup reconciliation: " + ",".join(cleanup_errors))
 
