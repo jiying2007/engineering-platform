@@ -33,9 +33,7 @@ func ExecuteOffline(ctx context.Context, c Transport, p *preparation.Preparer, e
 	finished := false
 	defer func() {
 		if !finished {
-			cleanup, stop := context.WithTimeout(context.Background(), 6*time.Second)
-			defer stop()
-			_ = c.Call(cleanup, http.MethodPost, "/api/v1/worker/offline/fail", permit.Token, nil)
+			err = errors.Join(err, settleExecutionFailure(ctx, c, "/api/v1/worker/offline/fail", permit.Token))
 		}
 	}()
 	running, cancel := context.WithTimeout(ctx, 90*time.Second)
