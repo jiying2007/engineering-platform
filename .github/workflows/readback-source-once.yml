@@ -1,4 +1,4 @@
-name: Read exact post-264 source once
+name: Materialize exact integrated readback source once
 on:
   push:
     branches: [fix/publication-failure-readback-20261012]
@@ -6,28 +6,25 @@ permissions:
   contents: read
 jobs:
   source:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/fix/publication-failure-readback-20261012' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: write # Creates only immutable blob objects; never commits or refs.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 01026af19fb2a62d74e65019c6bb2bea8e15b12f
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Archive tracked source only
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 01026af19fb2a62d74e65019c6bb2bea8e15b12f
-          mkdir "$RUNNER_TEMP/readback-source"
-          git archive --format=tar HEAD > "$RUNNER_TEMP/readback-source/source.tar"
-          git rev-parse HEAD > "$RUNNER_TEMP/readback-source/SOURCE_SHA"
-          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/readback-source/SOURCE_TREE"
-          (cd "$RUNNER_TEMP/readback-source" && sha256sum source.tar > SHA256SUMS)
+      - name: Verify exact original inputs and transfer tested source blobs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .ep-transfer/export.py
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: post-264-source-${{ github.sha }}
-          path: ${{ runner.temp }}/readback-source
+          name: integrated-readback-objects-${{ github.sha }}
+          path: ${{ runner.temp }}/readback-objects
           if-no-files-found: error
           retention-days: 1
-# Temporary branch-only source readback. Removed before final PR qualification.
-# No .git, environment, host data, model, credentials or candidate execution.
+# Temporary source transfer, absent from final PR head. No candidate code,
+# credentials, environment archive, provider/model, commits, refs or deployment.
