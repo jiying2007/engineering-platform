@@ -7,32 +7,61 @@ permissions:
   contents: read
 
 jobs:
-  source-readback:
+  materialize-and-test:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/authority-context-readiness-20261012' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 12
+    permissions:
+      contents: write # Only the final step creates immutable Git blobs; no ref writes.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7, current CI resolved revision
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Archive exact tracked public source only
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Materialize exact original bodies and honest readiness
         shell: bash
-        env:
-          EXPECTED_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
-          mkdir "$RUNNER_TEMP/continuation-source"
-          git archive --format=tar HEAD > "$RUNNER_TEMP/continuation-source/source.tar"
-          printf '%s\n' "$EXPECTED_SHA" > "$RUNNER_TEMP/continuation-source/SOURCE_SHA"
-          (cd "$RUNNER_TEMP/continuation-source" && sha256sum source.tar > SHA256SUMS)
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6, current CI resolved revision
+          go version
+          go mod download
+          python3 -B .ci-continuation/transform.py
+          gofmt -w internal/store/memory.go internal/store/memory_cancel_during_wait_test.go internal/store/postgres/pool_context_test.go internal/gateway/authority.go internal/gateway/session_epoch_test.go internal/rcdelivery/*.go internal/action/recovery_state_matrix_test.go
+          git diff --check
+      - name: Run actual package regressions, not a partial harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -race -count=10 -timeout 3m ./internal/store ./internal/gateway ./internal/rcdelivery ./internal/action
+          go test -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestPostgresCallerContextBoundsPoolWait$'
+          go vet ./internal/store ./internal/gateway ./internal/rcdelivery ./internal/action ./internal/store/postgres
+          python3 -B scripts/test_authority_context_inventory.py
+      - name: Retain reviewed candidate bytes as immutable Git objects only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .ci-continuation/export_objects.py
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          name: continuation-source-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/continuation-source
+          name: continuation-candidate-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/continuation-candidate
           if-no-files-found: error
           retention-days: 1
 
-# This temporary source-only transport is removed before the final PR head is
-# qualified/merged. It never archives .git, environment, credentials, or host files.
+# Temporary branch-only generator/transport, removed before final head CI/merge.
+# No model, account credentials, commits, refs, deployment or recovery disposition.
