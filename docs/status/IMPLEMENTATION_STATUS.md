@@ -204,6 +204,15 @@ those subjects or rewrite their receipts to manufacture current production proof
 
 ## Response, Memory and readiness hardening
 
+Normal Action updates now compare all immutable original reservation fields in
+the same PostgreSQL UPDATE predicate; a different authorized Run cannot lend
+its admission to the original operation ID. Both existing memory ledgers enforce
+the same identity fence. The standalone Action MemoryRepository also checks
+cancellation immediately after acquiring its original lock. Real PostgreSQL
+regressions reject eight identity substitutions without row/audit changes and
+preserve exact original post-Provider settlement after Recovery Begin. This is
+not a new terminal disposition, a retry grant or closure of #228/#229.
+
 The merged readback hardening rejects null open-PR observations before any
 later publication decision, and joins one-attempt Codex/offline failure-report
 uncertainty with the original execution error. The non-test Core selector guard
