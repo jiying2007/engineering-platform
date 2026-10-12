@@ -16,6 +16,9 @@ test "$source" = "$EXPECTED_SOURCE"
 prefix="ep-sysd-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
 root="/run/$prefix-$(python3 -c 'import secrets; print(secrets.token_hex(6))')"
 dist="$RUNNER_TEMP/$(basename "$root")-dist"
+witness="/var/lib/$(basename "$root")-publisher-witness"
+# systemd creates only this random test StateDirectory. Refuse existing state.
+test ! -e "$witness" && test ! -L "$witness"
 # Only the generated current-run names are eligible for this cleanup. No
 # boot-time units/accounts/configuration are written, enabled or modified.
 cleanup() {
@@ -31,7 +34,7 @@ cleanup() {
     sudo -n systemctl reset-failed "$unit" >/dev/null 2>&1 || true
   done <<< "$inventory"
   if [ "$failed" -eq 0 ]; then
-    sudo -n rm -rf -- "$root" || failed=1
+    sudo -n rm -rf -- "$root" "$witness" || failed=1
     rm -rf -- "$dist" || failed=1
   fi
   if [ "$failed" -ne 0 ]; then echo 'test service cleanup requires reconciliation' >&2; exit 1; fi

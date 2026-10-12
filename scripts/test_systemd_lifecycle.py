@@ -39,16 +39,19 @@ class LifecycleContracts(unittest.TestCase):
             lifecycle.parse_unit(self.raw.replace('StartLimitBurst=3\n', ''))
 
     def test_mapping_retains_all_original_service_properties(self):
-        root = Path('/run/ep-sysd-1-1-1234')
+        root = Path('/run/ep-sysd-1-1-012345abcdef')
         original = lifecycle.parse_unit(self.raw)['Service']
         props = dict(s[len('--property='):].split('=', 1) for s in lifecycle.publisher_properties(self.raw, root, 1000, 1001))
         for key in original:
-            if key not in {'ExecStart', 'User', 'Group', 'EnvironmentFile', 'ReadOnlyPaths'}:
+            if key not in {'ExecStart', 'User', 'Group', 'EnvironmentFile', 'ReadOnlyPaths', 'ReadWritePaths', 'StateDirectory'}:
                 self.assertEqual(props[key], original[key])
         self.assertEqual(props['User'], '1000')
         self.assertEqual(props['Group'], '1001')
         self.assertEqual(props['EnvironmentFile'], str(root/'publisher.env'))
         self.assertEqual(props['ReadOnlyPaths'], str(root/'artifacts'))
+        self.assertEqual(props['ReadWritePaths'], str(lifecycle.publisher_witness_path(root)))
+        self.assertEqual(props['StateDirectory'], root.name+'-publisher-witness')
+        self.assertEqual(props['StateDirectoryMode'], '0700')
         self.assertNotIn('ExecStart', props)
         self.assertNotIn('Wants', props)
         self.assertNotIn('After', props)
@@ -62,6 +65,21 @@ class LifecycleContracts(unittest.TestCase):
         for changed in (self.raw.replace('Restart=on-failure', 'Restart=on-failure\nRestart=always'), self.raw + '\n[Other]\nKey=value\n', self.raw.replace('[Service]', '[Service]\nPrivateTmp=true')):
             with self.assertRaises((ValueError, configparser.Error)):
                 lifecycle.parse_unit(changed)
+
+    def test_witness_namespace_and_mode_cannot_be_weakened(self):
+        root=Path('/run/ep-sysd-1-1-012345abcdef')
+        for old,new in [('StateDirectoryMode=0700','StateDirectoryMode=0777'),
+                        ('StateDirectory=engineering-platform/publisher-witness','StateDirectory=shared'),
+                        ('ReadWritePaths=/var/lib/engineering-platform/publisher-witness','ReadWritePaths=/var/lib')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                lifecycle.publisher_properties(self.raw.replace(old,new),root,1000,1000)
+        for bad in (Path('/var/lib/engineering-platform'),Path('/run/test'),Path('/run/ep-sysd-1-1-012345abcdef/child')):
+            with self.assertRaises(ValueError):lifecycle.publisher_witness_path(bad)
+        config=lifecycle.publisher_fixture_configuration(root)
+        self.assertEqual(config['version'],2)
+        self.assertEqual(config['witness_root'],str(lifecycle.publisher_witness_path(root)))
+        self.assertNotEqual(config['artifact_root'],config['witness_root'])
+        self.assertEqual(config['targets'][0]['repository'],'example/systemd-fixture')
 
     def test_no_implicit_systemd_or_privileged_operation(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {}, clear=True), mock.patch.object(lifecycle, 'command') as cmd:

@@ -144,6 +144,9 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			}
 			authority := gateway.NewAuthority(scopedCore)
 			actions = action.NewService(authority, authority, provider, repository)
+			if c.publisherRemoteConfig != "" {
+				options.PublicationRecovery = provider
+			}
 		}
 		handler, err = api.NewAuthenticatedHandler(backend, actions, c.policy, options)
 		if err != nil {

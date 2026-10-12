@@ -60,7 +60,7 @@ type publisherRemote struct {
 	err          error
 }
 
-func (r *publisherRemote) Publish(_ context.Context, plan Plan, _ string) (PublicationReceipt, error) {
+func (r *publisherRemote) Publish(_ context.Context, plan Plan, _ string, _ DispatchIdentity) (PublicationReceipt, error) {
 	r.publishCalls++
 	r.plan = plan
 	if r.err != nil {

@@ -185,12 +185,12 @@ func (c *remoteClient) health(ctx context.Context, configurationDigest string) (
 	}, nil
 }
 
-func (c *remoteClient) Publish(ctx context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {
+func (c *remoteClient) Publish(ctx context.Context, plan Plan, bundlePath string, identity DispatchIdentity) (PublicationReceipt, error) {
 	var receipt PublicationReceipt
-	if c == nil || c.client == nil || plan.Validate() != nil || bundlePath == "" {
+	if c == nil || c.client == nil || plan.Validate() != nil || bundlePath == "" || identity.Validate() != nil || identity.RunID != plan.RunID {
 		return receipt, fmt.Errorf("valid publisher remote client request required")
 	}
-	if err := c.call(ctx, "/v1/publish", publishRequest{Plan: plan}, &receipt); err != nil {
+	if err := c.call(ctx, "/v1/publish", publishRequest{Plan: plan, Identity: identity}, &receipt); err != nil {
 		return receipt, err
 	}
 	if err := receipt.Validate(plan); err != nil {

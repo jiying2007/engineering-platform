@@ -172,3 +172,14 @@ func canonicalSecret(path string) (string, error) {
 	}
 	return clean, nil
 }
+
+// ServiceConfiguration v2 requires a separate Publisher-owned witness root.
+// There is no default, automatic directory creation, or v1 service fallback.
+type ServiceConfiguration struct {
+	Version       int            `json:"version"`
+	ArtifactRoot  string         `json:"artifact_root"`
+	WitnessRoot   string         `json:"witness_root"`
+	GitExecutable string         `json:"git_executable"`
+	TokenFile     string         `json:"token_file"`
+	Targets       []TargetPolicy `json:"targets"`
+}

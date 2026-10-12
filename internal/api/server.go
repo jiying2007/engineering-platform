@@ -14,6 +14,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/embedded"
+	"github.com/jiying2007/engineering-platform/internal/githubpublish"
 	"github.com/jiying2007/engineering-platform/internal/material"
 	"github.com/jiying2007/engineering-platform/internal/production"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
@@ -40,10 +41,11 @@ type RecoveryProofStore interface {
 }
 
 type Server struct {
-	store   store.Store
-	actions ActionGateway
-	mux     *http.ServeMux
-	now     func() time.Time
+	publicationRecovery githubpublish.PublicationRecoveryObserver
+	store               store.Store
+	actions             ActionGateway
+	mux                 *http.ServeMux
+	now                 func() time.Time
 }
 
 func NewServer(s store.Store) *Server {
@@ -83,6 +85,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/recovery/proofs/{epoch}", s.handleGetRecoveryProof)
 	s.mux.HandleFunc("POST /api/v1/recovery/executions/abandon", s.handleExecutionAbandon)
 	s.mux.HandleFunc("POST /api/v1/recovery/actions/abandon-planned", s.handleAbandonPlannedAction)
+	s.mux.HandleFunc("POST /api/v1/recovery/actions/confirm-publication", s.handleConfirmRecoveredPublication)
+	s.mux.HandleFunc("GET /api/v1/recovery/actions/{id}/publication", s.handleGetRecoveredPublication)
 	s.mux.HandleFunc("GET /api/v1/recovery/actions/{id}/abandon-planned", s.handleGetAbandonedPlannedAction)
 	s.mux.HandleFunc("POST /api/v1/work-items", s.handleCreateWork)
 	s.mux.HandleFunc("GET /api/v1/work-items/{id}", s.handleGetWork)

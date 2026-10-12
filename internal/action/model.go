@@ -33,3 +33,7 @@ type Receipt struct {
 	ObservedState string    `json:"observed_state,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 }
+
+// RequestDigest binds publication witnesses to the exact existing Core identity.
+// IdempotencyKey is separately preserved; RequestedAt is not identity.
+func RequestDigest(req Request) (string, error) { return requestDigest(req) }

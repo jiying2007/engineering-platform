@@ -246,7 +246,7 @@ func TestOfflineCommandInstalledServicesLifecycle(t *testing.T) {
 	git, err = filepath.EvalSymlinks(git)
 	commandOK(t, err)
 	targets := []githubpublish.TargetPolicy{{Repository: "example/lifecycle-fixture", BaseRef: "main", BranchPrefix: "test/"}}
-	publisherConfig := serviceJSON(t, config, "publisher.json", githubpublish.Configuration{Version: 1, ArtifactRoot: artifactRoot, GitExecutable: git, TokenFile: serviceWrite(t, config, "inert-token", []byte("TEST_ONLY_NOT_A_REAL_CREDENTIAL")), Targets: targets})
+	publisherConfig := serviceJSON(t, config, "publisher.json", githubpublish.ServiceConfiguration{Version: 2, WitnessRoot: servicePrivateWitnessRoot(t), ArtifactRoot: artifactRoot, GitExecutable: git, TokenFile: serviceWrite(t, config, "inert-token", []byte("TEST_ONLY_NOT_A_REAL_CREDENTIAL")), Targets: targets})
 	publisherEnv := []string{"PUBLISHER_CONFIG_FILE=" + publisherConfig, "PUBLISHER_TLS_CERT_FILE=" + cert, "PUBLISHER_TLS_KEY_FILE=" + key, "PUBLISHER_CLIENT_CA_FILE=" + ca, "PUBLISHER_CONTROL_SUBJECT=" + controller, "LISTEN_HOST=127.0.0.1", "PORT=0"}
 	publisher := startInstalledProcess(t, ctx, filepath.Join(bin, "publisher-service"), nil, publisherEnv)
 	publisherEndpoint := publisher.endpoint(t, ctx)
@@ -510,4 +510,13 @@ func TestOfflineCommandInstalledServicesLifecycle(t *testing.T) {
 	}
 	publisher.stop(t, syscall.SIGTERM)
 	assertServiceClosed(t, publisherEndpoint)
+}
+
+func servicePrivateWitnessRoot(t *testing.T) string {
+	t.Helper()
+	p := t.TempDir()
+	if err := os.Chmod(p, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }

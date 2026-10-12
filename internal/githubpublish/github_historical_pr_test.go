@@ -149,7 +149,7 @@ func TestGitHubPublishNeverReopensClosedDeterministicBranch(t *testing.T) {
 			}
 			g.git = gitPath
 			bundle := filepath.Join(config.ArtifactRoot, plan.ExecutionID+".bundle")
-			_, err = g.Publish(context.Background(), plan, bundle)
+			_, err = g.Publish(context.Background(), plan, bundle, testDispatchIdentity(plan))
 			if err == nil || !strings.Contains(err.Error(), "prior pull request history") {
 				t.Fatalf("historically closed PR did not block fresh publication: %v", err)
 			}

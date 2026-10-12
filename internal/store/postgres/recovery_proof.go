@@ -17,6 +17,9 @@ var ErrRecoveryFactsUnresolved = errors.New("recovery reconciliation facts are n
 
 func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 	var facts recovery.Facts
+	if err := validateRecoveredPublications(ctx, tx); err != nil {
+		return facts, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
+	}
 	queries := []struct {
 		dst *uint64
 		q   string
@@ -147,6 +150,18 @@ func (s *Store) AuthorizeCompletion(ctx context.Context, subject string, epoch u
 	}
 	if subject == "" || proof.Reconciler == subject {
 		return fmt.Errorf("recovery completion requires a different authenticated principal from reconciler")
+	}
+	// The principal that settled an original publication may not complete the
+	// same Recovery epoch by asking another principal to issue the aggregate proof.
+	var participated bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM external_operations
+  WHERE receipt_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1'
+    AND receipt_json->'request'->>'recovery_epoch'=$1
+    AND receipt_json->>'reconciler'=$2)`, fmt.Sprint(epoch), subject).Scan(&participated); err != nil {
+		return err
+	}
+	if participated {
+		return fmt.Errorf("publication reconciler cannot complete the same Recovery epoch")
 	}
 	return nil
 }

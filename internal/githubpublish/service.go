@@ -2,22 +2,27 @@ package githubpublish
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 type RemoteService struct {
+	journal          *dispatchJournal
 	remote           Remote
 	artifactRoot     string
 	artifactIdentity os.FileInfo
@@ -26,7 +31,8 @@ type RemoteService struct {
 }
 
 type publishRequest struct {
-	Plan Plan `json:"plan"`
+	Plan     Plan             `json:"plan"`
+	Identity DispatchIdentity `json:"identity"`
 }
 
 type observeRequest struct {
@@ -41,7 +47,7 @@ func LoadRemoteService(configPath, controlSubject string) (*RemoteService, error
 	if err != nil {
 		return nil, err
 	}
-	var config Configuration
+	var config ServiceConfiguration
 	if err := strictjson.Decode(data, &config); err != nil {
 		return nil, err
 	}
@@ -53,12 +59,25 @@ func LoadRemoteService(configPath, controlSubject string) (*RemoteService, error
 	if err != nil {
 		return nil, err
 	}
-	targets, err := targetMap(config.Version, config.Targets)
+	if config.Version != 2 {
+		return nil, fmt.Errorf("publisher service configuration v2 with witness root required")
+	}
+	journal, err := newDispatchJournal(config.WitnessRoot)
+	if err != nil {
+		return nil, err
+	}
+	// Worker-visible artifacts can never share/contain the publisher-private witness root.
+	relA, eA := filepath.Rel(artifactRoot, journal.path)
+	relB, eB := filepath.Rel(journal.path, artifactRoot)
+	if eA != nil || eB != nil || (relA != ".." && !strings.HasPrefix(relA, ".."+string(os.PathSeparator))) || (relB != ".." && !strings.HasPrefix(relB, ".."+string(os.PathSeparator))) {
+		return nil, fmt.Errorf("publisher witness and artifact roots must be disjoint")
+	}
+	targets, err := targetMap(1, config.Targets)
 	if err != nil {
 		return nil, err
 	}
 	return &RemoteService{
-		remote: remote, artifactRoot: artifactRoot, artifactIdentity: info,
+		journal: journal, remote: remote, artifactRoot: artifactRoot, artifactIdentity: info,
 		targets: targets, controlSubject: controlSubject,
 	}, nil
 }
@@ -68,6 +87,7 @@ func (s *RemoteService) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("POST /v1/publish", s.handlePublish)
 	mux.HandleFunc("POST /v1/observe", s.handleObserve)
+	mux.HandleFunc("POST /v1/dispatch-evidence", s.handleDispatchEvidence)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s == nil || !s.authorized(r) {
 			writePublisherError(w, http.StatusUnauthorized, "verified control-plane identity required")
@@ -105,6 +125,10 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	if !decodePublisherRequest(w, r, &req) {
 		return
 	}
+	if req.Identity.Validate() != nil || req.Identity.RunID != req.Plan.RunID {
+		writePublisherError(w, http.StatusForbidden, "original Action reservation required")
+		return
+	}
 	if err := s.authorizePlan(req.Plan); err != nil {
 		writePublisherError(w, http.StatusForbidden, err.Error())
 		return
@@ -118,13 +142,41 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	// The original Worker artifact may change after verification; never pass
 	// its mutable path to Git or GitHub transport.
 	defer cleanup()
-	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle)
+	slot, start, err := s.journal.begin(r.Context(), req.Identity, req.Plan)
+	if err != nil {
+		writePublisherError(w, http.StatusConflict, "original publication slot occupied or unavailable; no replay")
+		return
+	}
+	defer slot.Close()
+	if err := r.Context().Err(); err != nil {
+		writePublisherError(w, http.StatusServiceUnavailable, "publication cancelled before remote invocation")
+		return
+	}
+	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle, req.Identity)
 	if err != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication failed")
 		return
 	}
 	if err := receipt.Validate(req.Plan); err != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication receipt invalid")
+		return
+	}
+	// The original invocation returned successfully and validated before this
+	// append-only completion marker can be written. On any failure keep STARTED.
+	digest, err := canonical.Digest(start)
+	if err != nil {
+		writePublisherError(w, http.StatusServiceUnavailable, "publication witness unavailable")
+		return
+	}
+	completion := DispatchCompletion{Version: 1, StartDigest: digest, Receipt: receipt, ReturnedAt: time.Now().UTC()}
+	settle, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+	defer cancel()
+	if err := errors.Join(settle.Err(), completion.Validate(start)); err != nil {
+		writePublisherError(w, http.StatusServiceUnavailable, "publication witness unavailable")
+		return
+	}
+	if err := writeWitness(slot, "completed.json", completion); err != nil {
+		writePublisherError(w, http.StatusServiceUnavailable, "publication completion not retained; exact readback required")
 		return
 	}
 	writePublisherJSON(w, http.StatusOK, receipt)
@@ -275,4 +327,37 @@ func writePublisherJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+// This route never calls Publish, never synthesizes a completion from absence,
+// and accepts no caller-supplied observation/stop flag. Current positive readback
+// must match the exact PR in the independently retained original completion.
+func (s *RemoteService) handleDispatchEvidence(w http.ResponseWriter, r *http.Request) {
+	var req publishRequest
+	if !decodePublisherRequest(w, r, &req) {
+		return
+	}
+	if s.authorizePlan(req.Plan) != nil || req.Identity.Validate() != nil || req.Plan.RunID != req.Identity.RunID {
+		writePublisherError(w, http.StatusForbidden, "invalid exact publication identity")
+		return
+	}
+	start, completed, err := s.journal.completed(r.Context(), req.Identity, req.Plan)
+	if err != nil {
+		writePublisherError(w, http.StatusConflict, "original completion is unavailable; operation remains unresolved")
+		return
+	}
+	observed, err := s.remote.Observe(r.Context(), req.Plan)
+	if err != nil {
+		writePublisherError(w, http.StatusBadGateway, "independent publication observation unavailable")
+		return
+	}
+	evidence := PublicationEvidence{Version: 1, Start: start, Completion: completed, Observation: observed, ObservedAt: time.Now().UTC()}
+	if evidence.Validate() != nil {
+		writePublisherError(w, http.StatusConflict, "current publication does not match original positive completion")
+		return
+	}
+	if r.Context().Err() != nil {
+		return
+	}
+	writePublisherJSON(w, http.StatusOK, evidence)
 }

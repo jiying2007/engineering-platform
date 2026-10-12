@@ -89,9 +89,9 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 	}, nil
 }
 
-func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string) (PublicationReceipt, error) {
+func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string, identity DispatchIdentity) (PublicationReceipt, error) {
 	var empty PublicationReceipt
-	if g == nil || plan.Validate() != nil || bundlePath == "" {
+	if g == nil || plan.Validate() != nil || bundlePath == "" || identity.Validate() != nil || identity.RunID != plan.RunID {
 		return empty, fmt.Errorf("valid GitHub publication plan and bundle are required")
 	}
 	token, err := g.loadToken()

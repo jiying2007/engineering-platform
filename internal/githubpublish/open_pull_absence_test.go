@@ -56,7 +56,7 @@ func TestGitHubNullOpenPullReadbackNeverAuthorizesCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.git = gitPath
-	if _, err := g.Publish(context.Background(), plan, filepath.Join(config.ArtifactRoot, plan.ExecutionID+".bundle")); err == nil {
+	if _, err := g.Publish(context.Background(), plan, filepath.Join(config.ArtifactRoot, plan.ExecutionID+".bundle"), testDispatchIdentity(plan)); err == nil {
 		t.Fatal("unobserved open-PR query was accepted")
 	}
 	if mutations.Load() != 0 || historyQueries.Load() != 0 {
