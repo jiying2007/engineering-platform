@@ -709,7 +709,7 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 		},
 	}, http.StatusCreated)
 
-	value, sess, err := s.store.GetExecution("run-steer-id")
+	value, sess, err := s.store.GetExecutionContext(context.Background(), "run-steer-id")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,10 +717,10 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 	if err = sess.ApplySteering(first); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.store.RecordSteering(value.ID, value.Version, value, sess, first); err != nil {
+	if err = s.store.RecordSteeringContext(context.Background(), value.ID, value.Version, value, sess, first); err != nil {
 		t.Fatal(err)
 	}
-	value, sess, err = s.store.GetExecution(value.ID)
+	value, sess, err = s.store.GetExecutionContext(context.Background(), value.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +730,7 @@ func TestDuplicateSteeringIDCannotOverwriteHistory(t *testing.T) {
 	if err = sess.ApplySteering(second); err != nil {
 		t.Fatal(err)
 	}
-	if err = s.store.RecordSteering(value.ID, value.Version, value, sess, second); err == nil {
+	if err = s.store.RecordSteeringContext(context.Background(), value.ID, value.Version, value, sess, second); err == nil {
 		t.Fatal("historical metadata overwritten")
 	}
 

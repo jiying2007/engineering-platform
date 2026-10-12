@@ -168,7 +168,7 @@ func (m *Manager) Create(ctx context.Context, spec Spec) (result Workspace, err 
 	complete := false
 	defer func() {
 		if !complete {
-			err = errors.Join(err, root.RemoveAll(spec.ID))
+			err = errors.Join(err, cleanupIncompleteCreate(ctx, root, spec.ID))
 		}
 	}()
 	for _, dir := range []string{"source", "home", "git-home", "template"} {
@@ -251,12 +251,7 @@ func (m *Manager) validateManaged(w Workspace) (*os.Root, error) {
 	if err != nil || !info.IsDir() {
 		return fail()
 	}
-	f, err := root.Open(w.ID + "/owner.json")
-	if err != nil {
-		return fail()
-	}
-	data, readErr := io.ReadAll(io.LimitReader(f, 16<<10))
-	_ = f.Close()
+	data, readErr := boundedRootFile(root, w.ID+"/owner.json", 16<<10)
 	var stored Workspace
 	if readErr != nil || json.Unmarshal(data, &stored) != nil || stored != w {
 		return fail()
@@ -267,15 +262,7 @@ func (m *Manager) validateManaged(w Workspace) (*os.Root, error) {
 // Cleanup only removes the exclusively created anchored slot after checking its
 // random ownership record. It never executes Git in a caller-provided repository.
 func (m *Manager) Cleanup(ctx context.Context, w Workspace) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	root, err := m.validateManaged(w)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-	return root.RemoveAll(w.ID)
+	return m.cleanupManaged(ctx, w)
 }
 func (m *Manager) Head(ctx context.Context, w Workspace) (string, error) {
 	if err := ctx.Err(); err != nil {

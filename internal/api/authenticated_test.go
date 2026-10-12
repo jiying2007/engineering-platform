@@ -180,7 +180,7 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	secureCall(t, ci, base+"/evidence", payload, http.StatusForbidden)
 	evidence["issuer"], evidence["procedure"] = "test-ci", "release.sign"
 	secureCall(t, ci, base+"/evidence", payload, http.StatusForbidden)
-	if _, err := backend.GetEvidence("evidence-auth"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := backend.GetEvidenceContext(context.Background(), "evidence-auth"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("denied evidence persisted: %v", err)
 	}
 	evidence["procedure"] = "ci.test"
@@ -202,7 +202,7 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 	secureCall(t, engineer, base+"/reviews", review, http.StatusForbidden)
 	secureCall(t, verifier, base+"/reviews", review, http.StatusForbidden)
 	secureCall(t, reviewer, base+"/reviews", review, http.StatusCreated)
-	persistedReview, err := backend.GetReview("review-auth")
+	persistedReview, err := backend.GetReviewContext(context.Background(), "review-auth")
 	if err != nil || persistedReview.Reviewer != reviewerSubject || persistedReview.Result != "PASS" {
 		t.Fatalf("authenticated review not persisted exactly: %#v %v", persistedReview, err)
 	}
@@ -213,7 +213,7 @@ func authenticatedLifecycle(t *testing.T, backend store.Store) {
 		"verification_report_id": "verification-auth",
 		"review_report_id":       "review-auth",
 	}, http.StatusCreated)
-	final, err := backend.GetWork("work-auth")
+	final, err := backend.GetWorkContext(context.Background(), "work-auth")
 	if err != nil || final.State != core.WorkClosed {
 		t.Fatalf("authenticated lifecycle did not close: %v %v", final, err)
 	}
@@ -256,7 +256,7 @@ func TestTLSAndWireAuthorityCannotBeSpoofed(t *testing.T) {
 		secureRaw(t, engineer, http.MethodPost, server.URL+"/api/v1/work-items", []byte(body), http.StatusBadRequest)
 	}
 	secureCall(t, engineer, server.URL+"/api/v1/work-items", map[string]any{"work_item_id": "spoof", "title": "test", "human_owner": "fake"}, http.StatusForbidden)
-	if _, err := backend.GetWork("spoof"); !errors.Is(err, store.ErrNotFound) {
+	if _, err := backend.GetWorkContext(context.Background(), "spoof"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatal("spoofed work persisted")
 	}
 	secureCall(t, engineer, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusForbidden)
