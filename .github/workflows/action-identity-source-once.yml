@@ -1,0 +1,32 @@
+name: Action identity source readback
+on:
+  push:
+    branches: [fix/action-original-identity-20261012]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 200227b5b29b4f7a8db4897d2afff851b4f2ce0e
+          persist-credentials: false
+      - name: Retain tracked source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 200227b5b29b4f7a8db4897d2afff851b4f2ce0e
+          mkdir "$RUNNER_TEMP/source-readback"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/source-readback/source.tar"
+          git rev-parse HEAD > "$RUNNER_TEMP/source-readback/SOURCE_SHA"
+          (cd "$RUNNER_TEMP/source-readback" && sha256sum source.tar > SHA256SUMS)
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: action-identity-source-200227b5
+          path: ${{ runner.temp }}/source-readback
+          if-no-files-found: error
+          retention-days: 1
+# Temporary branch-only public tracked-source readback. Removed before PR CI.
+# No environment, .git, credentials, ref mutation or live Provider operation.
