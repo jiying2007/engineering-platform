@@ -42,3 +42,14 @@ PostgreSQL+mTLS/audit/restore readback. Keep ambiguous cases blocked.
 Unit transition-matrix tests cover all state pairs and preserve existing
 no-retry/no-generic-abandonment rules. They are regression coverage, not proof
 that #228 is closed or that a selected host/provider has quiesced.
+
+## Original reservation identity
+
+Every normal ledger update binds the exact stored operation ID, Run, execution
+and original Recovery epochs, Action/risk/capability, idempotency key and request
+digest. Even a different currently authorized Run cannot admit the original
+reservation into DISPATCHED. Mismatched settlement leaves the original row/key
+and audit unchanged. Original post-Provider settlement remains allowed after a
+new Recovery epoch begins; it must carry the old immutable identity, never be
+rebased onto current authority. This closes an identity-substitution gap, not
+original-dispatcher quiescence or effectful terminal Recovery.

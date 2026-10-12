@@ -184,6 +184,10 @@ func (s *Store) Update(op action.Operation) error {
 // UpdateContext binds the caller deadline to pre-effect DISPATCHED authority
 // and exact ledger updates. Post-provider settlements use a separate bounded
 // context at the Action Service level and never re-dispatch the remote effect.
+// Match every frozen field inside this same atomic UPDATE, not only operation ID
+// and state. A caller cannot borrow another Run's admission or change the original
+// idempotency/audit subject. Do not compare settlement to the *current* Recovery
+// epoch: an original Provider result must survive a later Recovery Begin.
 func (s *Store) UpdateContext(ctx context.Context, op action.Operation) error {
 	allowedPrevious, err := previousStates(op.State)
 	if err != nil {
@@ -204,11 +208,16 @@ func (s *Store) UpdateContext(ctx context.Context, op action.Operation) error {
 UPDATE external_operations
 SET state=$1,external_ref=$2,observed_state=$3,updated_at=$4
 WHERE operation_id=$5
-  AND state = ANY($6::text[])`
+  AND state = ANY($6::text[])
+  AND run_id=$7 AND execution_epoch=$8 AND recovery_epoch=$9
+  AND action=$10 AND risk_class=$11 AND capability=$12
+  AND idempotency_key=$13 AND request_digest=$14`
 			tag, err := tx.Exec(
 				ctx, q,
 				string(op.State), nullIfEmpty(op.ExternalRef), nullIfEmpty(op.ObservedState),
 				op.UpdatedAt, op.ID, allowedPrevious,
+				op.RunID, op.ExecutionEpoch, op.RecoveryEpoch,
+				op.Action, string(op.RiskClass), op.Capability, op.IdempotencyKey, op.RequestDigest,
 			)
 			if err != nil {
 				return mapActionWriteError(err)

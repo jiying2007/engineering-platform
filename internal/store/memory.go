@@ -827,8 +827,12 @@ func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if _, ok := m.operations[op.ID]; !ok {
+	original, ok := m.operations[op.ID]
+	if !ok {
 		return action.ErrOperationAbsent
+	}
+	if !original.SameReservation(op) {
+		return action.ErrInvalidTransition
 	}
 	m.operations[op.ID] = op
 	return nil

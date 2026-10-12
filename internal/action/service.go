@@ -424,9 +424,30 @@ func NewMemoryRepository() *MemoryRepository {
 	}
 }
 
+// Concrete convenience methods share the exact same ledger and cancellation
+// contract. No goroutine is detached; RWMutex acquisition is not cancellable.
 func (r *MemoryRepository) Create(op Operation) error {
+	return r.CreateContext(context.Background(), op)
+}
+func (r *MemoryRepository) Get(id string) (Operation, error) {
+	return r.GetContext(context.Background(), id)
+}
+func (r *MemoryRepository) GetByIdempotencyKey(key string) (Operation, error) {
+	return r.GetByIdempotencyKeyContext(context.Background(), key)
+}
+func (r *MemoryRepository) Update(op Operation) error {
+	return r.UpdateContext(context.Background(), op)
+}
+
+func (r *MemoryRepository) CreateContext(ctx context.Context, op Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if _, ok := r.items[op.ID]; ok {
 		return ErrOperationExists
 	}
@@ -437,20 +458,30 @@ func (r *MemoryRepository) Create(op Operation) error {
 	r.idempotency[op.IdempotencyKey] = op.ID
 	return nil
 }
-
-func (r *MemoryRepository) Get(id string) (Operation, error) {
+func (r *MemoryRepository) GetContext(ctx context.Context, id string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
 	op, ok := r.items[id]
 	if !ok {
 		return Operation{}, ErrOperationAbsent
 	}
 	return op, nil
 }
-
-func (r *MemoryRepository) GetByIdempotencyKey(key string) (Operation, error) {
+func (r *MemoryRepository) GetByIdempotencyKeyContext(ctx context.Context, key string) (Operation, error) {
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return Operation{}, err
+	}
 	id, ok := r.idempotency[key]
 	if !ok {
 		return Operation{}, ErrOperationAbsent
@@ -461,43 +492,24 @@ func (r *MemoryRepository) GetByIdempotencyKey(key string) (Operation, error) {
 	}
 	return op, nil
 }
-
-func (r *MemoryRepository) Update(op Operation) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.items[op.ID]; !ok {
-		return ErrOperationAbsent
-	}
-	r.items[op.ID] = op
-	return nil
-}
-
-// In-memory Action tests use the same required Context contract as
-// production PostgreSQL; a pre-cancelled caller has no admission authority.
-// These methods retain a single underlying map and do not add another ledger.
-func (r *MemoryRepository) CreateContext(ctx context.Context, op Operation) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return r.Create(op)
-}
-func (r *MemoryRepository) GetContext(ctx context.Context, id string) (Operation, error) {
-	if err := ctx.Err(); err != nil {
-		return Operation{}, err
-	}
-	return r.Get(id)
-}
-func (r *MemoryRepository) GetByIdempotencyKeyContext(ctx context.Context, key string) (Operation, error) {
-	if err := ctx.Err(); err != nil {
-		return Operation{}, err
-	}
-	return r.GetByIdempotencyKey(key)
-}
 func (r *MemoryRepository) UpdateContext(ctx context.Context, op Operation) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return r.Update(op)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	original, ok := r.items[op.ID]
+	if !ok {
+		return ErrOperationAbsent
+	}
+	if !original.SameReservation(op) {
+		return ErrInvalidTransition
+	}
+	r.items[op.ID] = op
+	return nil
 }
 
 type AllowCapabilities map[string]bool

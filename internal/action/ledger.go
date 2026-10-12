@@ -83,3 +83,14 @@ func (o *Operation) Transition(to State, now time.Time) error {
 	o.UpdatedAt = now
 	return nil
 }
+
+// SameReservation compares only the immutable original Action identity. A later
+// Run/Recovery epoch must never be substituted while settling an earlier effect.
+// Result state, timestamp and Provider observation are deliberately not identity.
+func (o Operation) SameReservation(other Operation) bool {
+	return o.ID == other.ID && o.RunID == other.RunID &&
+		o.ExecutionEpoch == other.ExecutionEpoch && o.RecoveryEpoch == other.RecoveryEpoch &&
+		o.Action == other.Action && o.RiskClass == other.RiskClass &&
+		o.Capability == other.Capability && o.IdempotencyKey == other.IdempotencyKey &&
+		o.RequestDigest == other.RequestDigest
+}
