@@ -1,0 +1,110 @@
+name: Verify exact publication recovery candidate
+on:
+  push:
+    branches: [feat/publication-recovery-verified-20261012]
+permissions:
+  contents: read
+jobs:
+  verify-and-export:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/feat/publication-recovery-verified-20261012' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write # Only immutable source blob/tree export; no ref mutations.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Materialize only hash-pinned reviewed candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,bz2,hashlib,subprocess
+          from pathlib import Path
+          data=b''.join(Path(f'.ci-recovery/patch.{i}.b64').read_bytes() for i in range(4))
+          assert len(data)==43960
+          compressed=base64.b64decode(data,validate=True)
+          assert hashlib.sha256(compressed).hexdigest()=='457a43565f0a08c12445e2e68bc25a5dd0ca7e06c51be411aee9074eb1cec771'
+          patch=bz2.decompress(compressed)
+          assert len(patch)==160850
+          assert hashlib.sha256(patch).hexdigest()=='b5e5a5fd3714cc55f8247442f6653f2189a4cb01a96eecc76bf14edfa346b9a1'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.github/workflows/recovery-source-once.yml',*[f'.ci-recovery/patch.{i}.b64' for i in range(4)]],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='7e1a5a09033eaaaf6489d3377275a633a1370487'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Execute actual PostgreSQL 17 recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/recovery-evidence"
+          go version | tee "$RUNNER_TEMP/recovery-evidence/go-version.txt"
+          go mod download
+          python3 -B scripts/test_verify_publication_recovery_log.py
+          go test -json -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestPublicationRecoveryDatabase' | tee "$RUNNER_TEMP/recovery-evidence/pg17-recovery.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/recovery-evidence/pg17-recovery.jsonl"
+          go vet ./internal/store/postgres ./internal/githubpublish ./internal/api
+      - name: Export exact immutable source objects without commits or refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          base='a9a73d36ff04811d26e0960f02058a4189c63b85'
+          target='7e1a5a09033eaaaf6489d3377275a633a1370487'
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(paths)==37 and all(not p.startswith('.ci-') and not p.endswith('source-once.yml') for p in paths)
+          entries=[];records=[]
+          for p in paths:
+              f=Path(p);assert f.is_file() and not f.is_symlink()
+              data=f.read_bytes();assert len(data)<100000
+              sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              payload=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode()
+              observed=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+              assert observed['sha']==sha
+              mode=subprocess.check_output(['git','ls-files','-s','--',p],text=True).split()[0]
+              entries.append({'path':p,'mode':mode,'type':'blob','sha':sha})
+              records.append({'path':p,'mode':mode,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+          payload=json.dumps({'base_tree':'615693bdcff7a42309100f747575cb9b8d81aee3','tree':entries}).encode()
+          observed=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/trees','--input','-'],input=payload))
+          assert observed['sha']==target
+          result={'version':1,'repository':repo,'base':base,'tree':target,'files':records,'ref_writes':False,'provider_executed':False,'production_qualified':False}
+          out=Path(os.environ['RUNNER_TEMP'])/'recovery-evidence'
+          (out/'source-objects.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: publication-recovery-pg17-${{ github.sha }}
+          path: ${{ runner.temp }}/recovery-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Branch-only exact-source transport: final target tree has none of these files.
+# No push, merge, deployment, user credentials, actual Provider, or replay.
