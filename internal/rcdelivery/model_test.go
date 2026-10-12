@@ -40,7 +40,7 @@ func fixture(t *testing.T) cievidence.Envelope {
 
 func TestBuildBindsInternalRCWithoutPromotingExternalGates(t *testing.T) {
 	ci := fixture(t)
-	e, err := Build(ci, strings.Repeat("b", 40), []byte("# Implementation Status\ncurrent\n"), []byte("{}\n"), []byte("{}\n"))
+	e, err := Build(ci, strings.Repeat("b", 40), readinessTestStatus(), []byte("{}\n"), []byte("{}\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestBuildRejectsPRDriftAndArbitraryGovernanceBytes(t *testing.T) {
 	for i, mutate := range tests {
 		ci := fixture(t)
 		tree := strings.Repeat("b", 40)
-		status := []byte("# Implementation Status\ncurrent\n")
+		status := readinessTestStatus()
 		mutate(&ci, &tree, &status)
 		if _, err := Build(ci, tree, status, []byte("{}\n"), []byte("{}\n")); err == nil {
 			t.Fatal("invalid RC input accepted", i)
@@ -82,7 +82,7 @@ func TestBuildRejectsPRDriftAndArbitraryGovernanceBytes(t *testing.T) {
 
 func TestEnvelopeMutationIsRejected(t *testing.T) {
 	ci := fixture(t)
-	e, err := Build(ci, strings.Repeat("b", 40), []byte("# Implementation Status\ncurrent\n"), []byte("{}\n"), []byte("{}\n"))
+	e, err := Build(ci, strings.Repeat("b", 40), readinessTestStatus(), []byte("{}\n"), []byte("{}\n"))
 	if err != nil {
 		t.Fatal(err)
 	}

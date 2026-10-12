@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	Version = 1
-	Status  = "INTERNAL_RC_DELIVERY_BOUND_EXTERNAL_GATES_OPEN"
+	Version = 2
+	Status  = "CI_DELIVERY_PROVENANCE_BOUND"
 )
 
 var sha40 = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -23,6 +23,7 @@ var sha40 = regexp.MustCompile(`^[0-9a-f]{40}$`)
 type Delivery struct {
 	Version                         int                 `json:"version"`
 	Status                          string              `json:"status"`
+	Readiness                       ReadinessSnapshot   `json:"readiness"`
 	Repository                      string              `json:"repository"`
 	SourceSHA                       string              `json:"source_sha"`
 	SourceTree                      string              `json:"source_tree"`
@@ -86,6 +87,10 @@ func Build(ci cievidence.Envelope, sourceTree string, implementationStatus, reta
 		len(retainedPrototypes) == 0 || len(retainedPrototypes) > 1<<20 {
 		return zero, fmt.Errorf("bounded repository governance bytes required")
 	}
+	readiness, err := ReadinessFromStatus(implementationStatus)
+	if err != nil {
+		return zero, err
+	}
 	binaries, codex, err := selectArtifacts(receipt)
 	if err != nil {
 		return zero, err
@@ -96,6 +101,7 @@ func Build(ci cievidence.Envelope, sourceTree string, implementationStatus, reta
 	}
 	delivery := Delivery{
 		Version: Version, Status: Status, Repository: receipt.Repository,
+		Readiness: readiness,
 		SourceSHA: receipt.SourceSHA, SourceTree: sourceTree,
 		CIRunID: receipt.RunID, CIRunAttempt: receipt.RunAttempt,
 		CIEvidenceDigest: ci.ReceiptDigest,
@@ -111,7 +117,7 @@ func Build(ci cievidence.Envelope, sourceTree string, implementationStatus, reta
 		return zero, err
 	}
 	envelope := Envelope{Delivery: delivery, DeliveryDigest: digest}
-	if err := envelope.Verify(); err != nil {
+	if err := envelope.VerifyStatusBytes(implementationStatus); err != nil {
 		return zero, err
 	}
 	return envelope, nil
@@ -119,6 +125,9 @@ func Build(ci cievidence.Envelope, sourceTree string, implementationStatus, reta
 
 func (e Envelope) Verify() error {
 	d := e.Delivery
+	if err := d.Readiness.Validate(); err != nil {
+		return err
+	}
 	if d.Version != Version || d.Status != Status || d.Repository != cievidence.TrustedRepository ||
 		!sha40.MatchString(d.SourceSHA) || !sha40.MatchString(d.SourceTree) ||
 		d.CIRunID <= 0 || d.CIRunAttempt <= 0 || !canonical.ValidDigest(d.CIEvidenceDigest) ||
@@ -149,6 +158,30 @@ func (e Envelope) Verify() error {
 	digest, err := canonical.Digest(d)
 	if err != nil || digest != e.DeliveryDigest {
 		return fmt.Errorf("RC delivery digest mismatch")
+	}
+	return nil
+}
+
+// VerifyStatusBytes additionally checks the exact authoritative status bytes.
+// Verify alone is structural integrity, not authentication of supplied hashes.
+func (e Envelope) VerifyStatusBytes(status []byte) error {
+	if err := e.Verify(); err != nil {
+		return err
+	}
+	if canonical.BytesDigest(status) != e.Delivery.ImplementationStatusDigest {
+		return fmt.Errorf("implementation status byte digest mismatch")
+	}
+	observed, err := ReadinessFromStatus(status)
+	if err != nil {
+		return err
+	}
+	observedDigest, err := canonical.Digest(observed)
+	if err != nil {
+		return err
+	}
+	expectedDigest, err := canonical.Digest(e.Delivery.Readiness)
+	if err != nil || observedDigest != expectedDigest {
+		return fmt.Errorf("declared readiness differs from original status bytes")
 	}
 	return nil
 }

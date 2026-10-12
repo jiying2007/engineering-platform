@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrActionNotAllowed = errors.New("action is not allowed by frozen task contract")
-	ErrInvalidRiskClass = errors.New("invalid action risk class")
+	ErrActionNotAllowed        = errors.New("action is not allowed by frozen task contract")
+	ErrInvalidRiskClass        = errors.New("invalid action risk class")
+	ErrRunSessionEpochMismatch = errors.New("run/session execution identity mismatch")
 )
 
 // State is the same Core authority, with mandatory caller-bound methods
@@ -25,36 +26,27 @@ type State interface {
 	GetTaskByDigestContext(context.Context, string) (core.TaskContract, error)
 	GetRecoveryContext(context.Context) (recovery.Manager, error)
 }
+type Authority struct{ state State }
 
-type Authority struct {
-	state State
-}
-
-func NewAuthority(state State) *Authority {
-	return &Authority{state: state}
-}
-
+func NewAuthority(state State) *Authority { return &Authority{state: state} }
 func (a *Authority) execution(ctx context.Context, id string) (run.Run, session.Session, error) {
 	if err := ctx.Err(); err != nil {
 		return run.Run{}, session.Session{}, err
 	}
 	return a.state.GetExecutionContext(ctx, id)
 }
-
 func (a *Authority) frozenTask(ctx context.Context, digest string) (core.TaskContract, error) {
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
 	}
 	return a.state.GetTaskByDigestContext(ctx, digest)
 }
-
 func (a *Authority) recovery(ctx context.Context) (recovery.Manager, error) {
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
 	return a.state.GetRecoveryContext(ctx)
 }
-
 func (a *Authority) Authorize(ctx context.Context, req action.Request) error {
 	if a == nil || a.state == nil {
 		return fmt.Errorf("gateway authority state is not configured")
@@ -88,21 +80,25 @@ func (a *Authority) Authorize(ctx context.Context, req action.Request) error {
 	}
 	return fmt.Errorf("%w: %s", ErrActionNotAllowed, req.Action)
 }
-
 func (a *Authority) CheckRunEpoch(ctx context.Context, runID string, epoch uint64) error {
 	if a == nil || a.state == nil {
 		return fmt.Errorf("gateway authority state is not configured")
 	}
-	value, _, err := a.execution(ctx, runID)
+	value, sess, err := a.execution(ctx, runID)
 	if err != nil {
 		return err
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return value.CheckEpoch(epoch)
+	if err := value.CheckEpoch(epoch); err != nil {
+		return err
+	}
+	if value.ID != runID || sess.RunID != runID || sess.ExecutionEpoch != epoch {
+		return ErrRunSessionEpochMismatch
+	}
+	return nil
 }
-
 func (a *Authority) CheckRecoveryEpoch(ctx context.Context, epoch uint64, risk action.RiskClass) error {
 	if a == nil || a.state == nil {
 		return fmt.Errorf("gateway authority state is not configured")
