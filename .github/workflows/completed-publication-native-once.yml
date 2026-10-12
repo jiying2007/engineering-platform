@@ -1,0 +1,146 @@
+name: Completed publication native validation
+on:
+  push:
+    branches: [feat/completed-publication-recovery-20261012]
+permissions:
+  contents: read
+jobs:
+  native-validation:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # Final immutable blob export only; no commit/ref writes.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Materialize exact reviewed source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/publication-evidence"
+          python3 - <<'PY'
+          import base64,gzip,hashlib,subprocess
+          from pathlib import Path
+          expected=['3ba027f9780ab8c663cf5525e01bcbcb11aa8db0','18f1872d3e9c055e5afbb4fd52db1543a51d323f','24675e3f2fdc72989525175eec7e277e8cb52a89','05c0d67153edb24845db221c8faacd6582f0a595','17525d55fdddcda21417735309a50788942106d1']
+          chunks=[]
+          for i,sha in enumerate(expected):
+              data=Path(f'.ci-publication/patch.{i}.b64').read_bytes()
+              if i==1:
+                  # Repair only the identified text transport typo; the canonical
+                  # per-chunk, compressed, patch and final-tree hashes all follow.
+                  assert data.count(b'Hz8dn5zs+t3Ysg')==1
+                  data=data.replace(b'Hz8dn5zs+t3Ysg',b'Hz8dn5zs3YMg')
+              assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha, i
+              chunks.append(data)
+          compressed=base64.b64decode(b''.join(chunks),validate=True)
+          assert hashlib.sha256(compressed).hexdigest()=='ddb53e1f4dff3803f7f6687d61b56565530b0c65ac33707c7e882cd60d1a7abd'
+          patch=gzip.decompress(compressed)
+          assert hashlib.sha256(patch).hexdigest()=='d6e343cecd3d2a2d1c18cf3e67c962974a77345a15e1f8ac270801747d1592c4'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          paths=[f'.ci-publication/patch.{i}.b64' for i in range(5)]+['.github/workflows/completed-publication-native-once.yml']
+          subprocess.run(['git','rm','--cached',*paths],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='57280fa5aee0710eb28b013f0b6ebed3ce678592'
+          for p in paths: Path(p).unlink()
+          PY
+          go version
+          go mod download
+          git diff --cached --check
+          test -z "$(gofmt -l .)"
+      - name: Require real namespace tests without host-wide policy changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$RUNNER_TEMP/ep-namespace-go-tmp"
+          mkdir "$tmp"
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            command -v apparmor_parser >/dev/null
+            printf 'abi <abi/4.0>,\nprofile ep-publication-native-tests %s/go-build*/b*/*.test flags=(unconfined) {\n  userns,\n}\n' "$tmp" > "$RUNNER_TEMP/ep-publication.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/ep-publication.apparmor"
+          fi
+          echo "TMPDIR=$tmp" >> "$GITHUB_ENV"
+          echo "EP_REQUIRE_PID_NAMESPACE_TESTS=1" >> "$GITHUB_ENV"
+      - name: Real PostgreSQL positive recovery, migration, mTLS and lost ACK
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -race -v -count=3 -timeout 3m ./internal/store/postgres -run '^TestPostgresCompletedPublication' | tee "$RUNNER_TEMP/publication-evidence/postgres.log"
+          ! grep -q -- '--- SKIP:' "$RUNNER_TEMP/publication-evidence/postgres.log"
+      - name: Publisher journal and actual process-tree regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -race -v -count=3 -timeout 3m ./internal/githubpublish ./internal/api ./db | tee "$RUNNER_TEMP/publication-evidence/protocol-kernel.log"
+          ! grep -q -- '--- SKIP: TestPublisherGitNamespace' "$RUNNER_TEMP/publication-evidence/protocol-kernel.log"
+          go test -race -count=1 -timeout 3m ./internal/production ./cmd/control-plane
+          go vet ./...
+      - name: Original PostgreSQL native backup/restore includes new receipt
+        shell: bash
+        env:
+          EP_RESTORE_DRILL: '1'
+        run: |
+          set -euo pipefail
+          test -S /var/run/docker.sock
+          docker image inspect postgres:17-alpine >/dev/null
+          go test -race -v -count=1 -timeout 8m ./internal/store/postgres -run '^TestPostgresAuthorityRestoreDrill$' | tee "$RUNNER_TEMP/publication-evidence/restore.log"
+          ! grep -q -- '--- SKIP:' "$RUNNER_TEMP/publication-evidence/restore.log"
+      - name: Export exact validated blobs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          assert os.environ['GITHUB_REPOSITORY']=='jiying2007/engineering-platform'
+          out=Path(os.environ['RUNNER_TEMP'])/'publication-evidence'
+          base='a9a73d36ff04811d26e0960f02058a4189c63b85'
+          tree=subprocess.check_output(['git','write-tree'],text=True).strip()
+          assert tree=='57280fa5aee0710eb28b013f0b6ebed3ce678592'
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(paths)==38 and not any(p.startswith('.ci-publication/') or p.endswith('native-once.yml') for p in paths)
+          records=[]
+          for path in paths:
+              p=Path(path);assert p.is_file() and not p.is_symlink()
+              data=p.read_bytes();assert len(data)<200000
+              sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              request=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode()
+              response=json.loads(subprocess.check_output(['gh','api','--method','POST','repos/jiying2007/engineering-platform/git/blobs','--input','-'],input=request))
+              assert response['sha']==sha
+              records.append({'path':path,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+              dest=out/'files'/path;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+          (out/'objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False},indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: completed-publication-native-${{ github.sha }}
+          path: ${{ runner.temp }}/publication-evidence
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+# Branch-only exact-source qualification. No live GitHub publication, model,
+# account credential or production operation. No commits or refs from this job.
+# The final product tree excludes this workflow and all transport capsules.
