@@ -23,52 +23,14 @@ var (
 	ErrCommitOutcomeUnknown = errors.New("authority commit outcome unknown; exact readback required")
 )
 
+// Store is caller-scoped only. Concrete convenience methods are not a network
+// or service contract and cannot be selected through this authority interface.
 type Store interface {
-	CreateWork(core.WorkItem) error
-	GetWork(string) (core.WorkItem, error)
-	UpdateWork(string, uint64, core.WorkItem) error
-
-	GetRecovery() (recovery.Manager, error)
-	BeginRecovery(uint64) (recovery.Manager, error)
-	CompleteRecovery(uint64, bool) (recovery.Manager, error)
-
 	// Request-bound Recovery epoch/audit authority is mandatory at the
 	// Core Store interface, never a runtime-optional HTTP fallback.
 	GetRecoveryContext(context.Context) (recovery.Manager, error)
 	BeginRecoveryContext(context.Context, uint64) (recovery.Manager, error)
 	CompleteRecoveryContext(context.Context, uint64, bool) (recovery.Manager, error)
-
-	CreateTaskAndUpdateWork(core.TaskContract, verification.Plan, uint64, core.WorkItem) error
-	GetTask(string) (core.TaskContract, error)
-	GetTaskRevision(string, uint64) (core.TaskContract, error)
-	GetTaskByDigest(string) (core.TaskContract, error)
-	GetVerificationPlanByDigest(string) (verification.Plan, error)
-
-	CreateExecutionAndUpdateWork(run.Run, run.Attempt, session.Session, core.RunInputManifest, uint64, core.WorkItem) error
-	GetExecution(string) (run.Run, session.Session, error)
-	GetAttempt(string, string) (run.Attempt, error)
-	GetRunInputByDigest(string) (core.RunInputManifest, error)
-	UpdateExecution(string, uint64, run.Run, session.Session) error
-	RecordSteering(string, uint64, run.Run, session.Session, session.SteeringCommand) error
-	GetSteering(string) (session.SteeringCommand, error)
-	UpdateExecutionAndWork(string, uint64, run.Run, session.Session, uint64, core.WorkItem) error
-	CreateCheckpoint(session.Checkpoint) (string, error)
-	GetCheckpoint(string) (session.Checkpoint, string, error)
-
-	CreateDelivery(core.DeliveryReceipt) error
-	GetDelivery(string) (core.DeliveryReceipt, error)
-
-	CreateEvidence(core.EvidenceRef) error
-	GetEvidence(string) (core.EvidenceRef, error)
-
-	CreateVerification(verification.Report) error
-	GetVerification(string) (verification.Report, error)
-
-	CreateReviewAndUpdateWork(review.Report, uint64, core.WorkItem) error
-	GetReview(string) (review.Report, error)
-
-	CreateClosureAndUpdateWork(core.ClosureReceipt, uint64, core.WorkItem) error
-	GetClosure(string) (core.ClosureReceipt, error)
 
 	// The original Core HTTP authority is always caller-scoped. Keep the
 	// same single ledger and audit; do not select legacy no-Context methods
@@ -98,6 +60,9 @@ type Store interface {
 	CreateClosureAndUpdateWorkContext(context.Context, core.ClosureReceipt, uint64, core.WorkItem) error
 	GetClosureContext(context.Context, string) (core.ClosureReceipt, error)
 	GetSteeringContext(context.Context, string) (session.SteeringCommand, error)
+	GetTaskRevisionContext(context.Context, string, uint64) (core.TaskContract, error)
+	GetAttemptContext(context.Context, string, string) (run.Attempt, error)
+	RecordSteeringContext(context.Context, string, uint64, run.Run, session.Session, session.SteeringCommand) error
 }
 
 type Memory struct {
@@ -402,9 +367,17 @@ func (m *Memory) GetTaskContext(ctx context.Context, id string) (core.TaskContra
 	return m.tasks[id][latest], nil
 }
 
-func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
+func (m *Memory) GetTaskRevisionContext(ctx context.Context, id string, revision uint64) (core.TaskContract, error) {
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return core.TaskContract{}, err
+	}
+
 	versions, ok := m.tasks[id]
 	if !ok {
 		return core.TaskContract{}, ErrNotFound
@@ -414,6 +387,10 @@ func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract,
 		return core.TaskContract{}, ErrNotFound
 	}
 	return task, nil
+}
+
+func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
+	return m.GetTaskRevisionContext(context.Background(), id, revision)
 }
 
 func (m *Memory) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
@@ -544,9 +521,17 @@ func (m *Memory) CreateExecutionAndUpdateWorkContext(ctx context.Context, value 
 	return nil
 }
 
-func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
+func (m *Memory) GetAttemptContext(ctx context.Context, runID, attemptID string) (run.Attempt, error) {
+	if err := ctx.Err(); err != nil {
+		return run.Attempt{}, err
+	}
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return run.Attempt{}, err
+	}
+
 	items, ok := m.attempts[runID]
 	if !ok {
 		return run.Attempt{}, ErrNotFound
@@ -556,6 +541,10 @@ func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
 		return run.Attempt{}, ErrNotFound
 	}
 	return attempt, nil
+}
+
+func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
+	return m.GetAttemptContext(context.Background(), runID, attemptID)
 }
 
 func (m *Memory) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
@@ -667,9 +656,16 @@ func (m *Memory) UpdateExecutionContext(ctx context.Context, id string, expected
 	return nil
 }
 
-func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run, sess session.Session, cmd session.SteeringCommand) error {
+func (m *Memory) RecordSteeringContext(ctx context.Context, id string, expectedVersion uint64, value run.Run, sess session.Session, cmd session.SteeringCommand) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	current, ok := m.runs[id]
 	if !ok {
@@ -684,6 +680,7 @@ func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run
 	}
 	if current.TaskContractDigest != value.TaskContractDigest ||
 		current.RunInputManifestDigest != value.RunInputManifestDigest ||
+		value.ID != id || sess.RunID != id ||
 		cmd.RunID != id ||
 		cmd.ExecutionEpoch != current.CurrentEpoch ||
 		sess.ExecutionEpoch != current.CurrentEpoch ||
@@ -700,6 +697,10 @@ func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run
 	m.sessions[id] = sess
 	m.steeringCommands[cmd.ID] = cmd
 	return nil
+}
+
+func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run, sess session.Session, cmd session.SteeringCommand) error {
+	return m.RecordSteeringContext(context.Background(), id, expectedVersion, value, sess, cmd)
 }
 
 func (m *Memory) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {

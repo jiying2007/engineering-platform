@@ -82,17 +82,15 @@ func PrepareOnce(ctx context.Context, c Transport, profile string, p *preparatio
 	leaseErr := <-done
 	if prepareErr != nil || leaseErr != nil {
 		if prepareErr == nil {
-			_ = p.Cleanup(context.Background(), result)
+			prepareErr = p.CleanupAfterFailure(ctx, result)
 		}
 		return nil, errors.Join(prepareErr, leaseErr)
 	}
 	if err := renew(opctx); err != nil {
-		_ = p.Cleanup(context.Background(), result)
-		return nil, err
+		return nil, errors.Join(err, p.CleanupAfterFailure(ctx, result))
 	}
 	if err := p.Recheck(opctx, a, result); err != nil {
-		_ = p.Cleanup(context.Background(), result)
-		return nil, err
+		return nil, errors.Join(err, p.CleanupAfterFailure(ctx, result))
 	}
 	report := preparation.Report{Input: input, Facts: result.Facts}
 	var receipt preparation.Receipt

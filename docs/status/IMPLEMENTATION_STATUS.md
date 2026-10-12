@@ -204,6 +204,23 @@ those subjects or rewrite their receipts to manufacture current production proof
 
 ## Response, Memory and readiness hardening
 
+The service-facing Core Store contract now contains only caller-Context methods;
+31 unscoped interface entries were removed. Historical Attempt/Task-revision/
+Steering methods use the same required Context contract and Memory post-lock
+cancellation checks. Concrete convenience wrappers remain for direct fixtures,
+not a network fallback. Memory historical Steering also matches PostgreSQL's
+Run/Session identity rejection.
+
+Preparation cleanup now preserves primary and cleanup errors together. Managed
+and incomplete-create slot deletion use anchored, batched, cooperative traversal
+with a five-second deadline, 100,000-entry and 128-level budgets. Managed owner
+bytes survive cancellation/budget failure, and normal completion removes only the
+empty owned slot. Cleanup never follows symlinks, opens special-file contents,
+detaches deletion, replays execution or removes retained artifact roots. Blocking
+kernel filesystem calls are not made interruptible by a Context; pathological
+storage/real-host stop latency remains explicitly unqualified under #229. See
+[workspace cleanup lifecycle](../implementation/WORKSPACE_CLEANUP_LIFECYCLE_V1.md).
+
 The already-merged #262 Control client rejects a root null/non-object,
 validates explicitly tagged top-level required response members, and commits a
 fresh decoded output only after validation. Explicit nullable assignment is a

@@ -174,7 +174,7 @@ func (p *Preparer) PrepareWithSource(ctx context.Context, subject string, a work
 	ready := false
 	defer func() {
 		if !ready {
-			err = errors.Join(err, p.manager.Cleanup(context.Background(), w))
+			err = errors.Join(err, p.manager.CleanupAfterFailure(ctx, w))
 		}
 	}()
 	seedCheckpoint := ""
@@ -263,4 +263,13 @@ func (p *Preparer) Cleanup(ctx context.Context, result Result) error {
 		return fmt.Errorf("preparer required")
 	}
 	return p.manager.Cleanup(ctx, result.Workspace)
+}
+
+// CleanupAfterFailure preserves cleanup errors for the caller. Only pre-Runtime
+// slots may use it; a reporting ambiguity retains the slot without cleanup.
+func (p *Preparer) CleanupAfterFailure(ctx context.Context, result Result) error {
+	if p == nil {
+		return fmt.Errorf("preparer required")
+	}
+	return p.manager.CleanupAfterFailure(ctx, result.Workspace)
 }
