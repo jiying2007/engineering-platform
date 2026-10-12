@@ -309,6 +309,12 @@ func (g *githubRemote) findOpenPull(ctx context.Context, token string, plan Plan
 	if err != nil {
 		return pullRecord{}, false, err
 	}
+	// A 200/null is a missing observation, not the explicit empty array that
+	// permits later absence checks and PR creation. Keep Publish and Observe on
+	// the same fail-closed readback contract as historical PR lookup.
+	if pulls == nil {
+		return pullRecord{}, false, fmt.Errorf("GitHub open PR response must be an array")
+	}
 	if len(pulls) == 0 {
 		return pullRecord{}, false, nil
 	}

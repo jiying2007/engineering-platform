@@ -51,9 +51,7 @@ func ExecuteCodex(ctx context.Context, c Transport, p *preparation.Preparer, req
 	finished := false
 	defer func() {
 		if !finished {
-			cleanup, stop := context.WithTimeout(context.Background(), 6*time.Second)
-			defer stop()
-			_ = c.Call(cleanup, http.MethodPost, "/api/v1/worker/codex/fail", permit.Token, nil)
+			err = errors.Join(err, settleExecutionFailure(ctx, c, "/api/v1/worker/codex/fail", permit.Token))
 		}
 	}()
 
