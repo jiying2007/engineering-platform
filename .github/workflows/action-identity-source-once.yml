@@ -5,28 +5,114 @@ on:
 permissions:
   contents: read
 jobs:
-  source:
+  materialize-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 12
+    permissions:
+      contents: write # Immutable blob export only; no commits/refs/merges.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 200227b5b29b4f7a8db4897d2afff851b4f2ce0e
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Retain tracked source only
+          fetch-depth: 3
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Apply exact reviewed patch and prove complete target tree
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 200227b5b29b4f7a8db4897d2afff851b4f2ce0e
-          mkdir "$RUNNER_TEMP/source-readback"
-          git archive --format=tar HEAD > "$RUNNER_TEMP/source-readback/source.tar"
-          git rev-parse HEAD > "$RUNNER_TEMP/source-readback/SOURCE_SHA"
-          (cd "$RUNNER_TEMP/source-readback" && sha256sum source.tar > SHA256SUMS)
+          python3 - <<'PY'
+          import base64, gzip, hashlib, subprocess
+          from pathlib import Path
+          encoded=b''.join(Path(f'.ci-action/patch.{i}.b64').read_bytes() for i in range(2))
+          compressed=base64.b64decode(encoded,validate=True)
+          assert hashlib.sha256(compressed).hexdigest()=='64c00dc45fd043e49e50bee9e6fcc7079f34f830cb5fedd0d0f4cf21b99c82b4'
+          patch=gzip.decompress(compressed)
+          assert hashlib.sha256(patch).hexdigest()=='3929c98da1e60c80548ca30f79590ba1a39e98ecb1ec54c5d32c9c74d645f6a0'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.github/workflows/action-identity-source-once.yml','.ci-action/patch.0.b64','.ci-action/patch.1.b64'],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='615693bdcff7a42309100f747575cb9b8d81aee3'
+          PY
+          go version
+          go mod download
+          git diff --cached --check
+      - name: Prove original SQL fails new real-database regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/identity-evidence"
+          git show 200227b5b29b4f7a8db4897d2afff851b4f2ce0e:internal/store/postgres/action_store.go > "$RUNNER_TEMP/identity-evidence/original-action-store.go"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'identity-evidence'
+          (out/'overlay.json').write_text(json.dumps({'Replace':{str(Path('internal/store/postgres/action_store.go').resolve()):str(out/'original-action-store.go')}}))
+          PY
+          set +e
+          go test -overlay "$RUNNER_TEMP/identity-evidence/overlay.json" -race -v -count=1 -timeout 2m ./internal/store/postgres -run '^TestPostgresAction(RejectsBorrowedRunAuthority|SettlementBindsEveryOriginalIdentityField)$' > "$RUNNER_TEMP/identity-evidence/sql-before.log" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          grep -F 'borrowed Run authorized original dispatch: <nil>' "$RUNNER_TEMP/identity-evidence/sql-before.log"
+          grep -F 'altered settlement accepted: <nil>' "$RUNNER_TEMP/identity-evidence/sql-before.log"
+          ! grep -q '^--- SKIP:' "$RUNNER_TEMP/identity-evidence/sql-before.log"
+      - name: Verify fixed SQL and both memory ledgers
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -race -v -count=3 -timeout 2m ./internal/store/postgres -run '^TestPostgresAction(RejectsBorrowedRunAuthority|SettlementBindsEveryOriginalIdentityField)$' | tee "$RUNNER_TEMP/identity-evidence/sql-after.log"
+          ! grep -q '^--- SKIP:' "$RUNNER_TEMP/identity-evidence/sql-after.log"
+          go test -race -count=10 -timeout 2m ./internal/action ./internal/store ./internal/gateway | tee "$RUNNER_TEMP/identity-evidence/memory-after.log"
+          go vet ./internal/action ./internal/store ./internal/gateway ./internal/store/postgres
+      - name: Export exact validated source blobs, no ref writes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          assert os.environ['GITHUB_REPOSITORY']=='jiying2007/engineering-platform'
+          out=Path(os.environ['RUNNER_TEMP'])/'identity-evidence'
+          paths=subprocess.check_output(['git','diff','--cached','--name-only','200227b5b29b4f7a8db4897d2afff851b4f2ce0e'],text=True).splitlines()
+          assert len(paths)==10 and not any(p.startswith('.ci-') or p.endswith('source-once.yml') for p in paths)
+          records=[]
+          for p in paths:
+              data=Path(p).read_bytes();assert len(data)<100000
+              sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              request=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode()
+              response=json.loads(subprocess.check_output(['gh','api','--method','POST','repos/jiying2007/engineering-platform/git/blobs','--input','-'],input=request))
+              assert response['sha']==sha
+              records.append({'path':p,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+              dest=out/'files'/p;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
+          result={'version':1,'base':'200227b5b29b4f7a8db4897d2afff851b4f2ce0e','tree':'615693bdcff7a42309100f747575cb9b8d81aee3','files':records,'ref_writes':False}
+          (out/'objects.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
         with:
-          name: action-identity-source-200227b5
-          path: ${{ runner.temp }}/source-readback
+          name: action-identity-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/identity-evidence
           if-no-files-found: error
-          retention-days: 1
-# Temporary branch-only public tracked-source readback. Removed before PR CI.
-# No environment, .git, credentials, ref mutation or live Provider operation.
+          retention-days: 30
+# Temporary branch-only validation and immutable blob export. All transport files
+# are absent from the exact final target tree; no model/Provider/credential change.
