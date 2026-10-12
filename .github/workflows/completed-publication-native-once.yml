@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: write # Final immutable blob export only; no commit/ref writes.
+      contents: write # Final immutable blob export only; no remote commit/ref writes.
     services:
       postgres:
         image: postgres:17-alpine
@@ -29,7 +29,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version-file: go.mod
@@ -47,8 +47,6 @@ jobs:
           for i,sha in enumerate(expected):
               data=Path(f'.ci-publication/patch.{i}.b64').read_bytes()
               if i==1:
-                  # Repair only the identified text transport typo; the canonical
-                  # per-chunk, compressed, patch and final-tree hashes all follow.
                   assert data.count(b'Hz8dn5zs+t3Ysg')==1
                   data=data.replace(b'Hz8dn5zs+t3Ysg',b'Hz8dn5zs3YMg')
               assert hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()==sha, i
@@ -64,6 +62,14 @@ jobs:
           assert subprocess.check_output(['git','write-tree'],text=True).strip()=='57280fa5aee0710eb28b013f0b6ebed3ce678592'
           for p in paths: Path(p).unlink()
           PY
+          # Installed distribution tests correctly require a clean source commit.
+          # This detached LOCAL object binds the exact candidate tree; it is not
+          # pushed, exported as a release, or confused with the later PR head.
+          tree="$(git write-tree)"
+          local_commit="$(printf '%s\n' 'LOCAL TEST ONLY: exact positive recovery candidate' | git -c user.name='Native source qualification' -c user.email='native-tests@example.invalid' commit-tree "$tree" -p "$GITHUB_SHA")"
+          git checkout --detach "$local_commit"
+          test -z "$(git status --porcelain)"
+          printf 'remote_transport_head=%s\nlocal_test_commit=%s\nsource_tree=%s\n' "$GITHUB_SHA" "$local_commit" "$tree" > "$RUNNER_TEMP/publication-evidence/source-projection.txt"
           go version
           go mod download
           git diff --cached --check
@@ -93,7 +99,7 @@ jobs:
           set -euo pipefail
           go test -race -v -count=3 -timeout 3m ./internal/githubpublish ./internal/api ./db | tee "$RUNNER_TEMP/publication-evidence/protocol-kernel.log"
           ! grep -q -- '--- SKIP: TestPublisherGitNamespace' "$RUNNER_TEMP/publication-evidence/protocol-kernel.log"
-          go test -race -count=1 -timeout 3m ./internal/production ./cmd/control-plane
+          go test -race -count=1 -timeout 3m ./internal/production ./cmd/control-plane | tee "$RUNNER_TEMP/publication-evidence/installed-tests.log"
           go vet ./...
       - name: Original PostgreSQL native backup/restore includes new receipt
         shell: bash
@@ -119,6 +125,7 @@ jobs:
           base='a9a73d36ff04811d26e0960f02058a4189c63b85'
           tree=subprocess.check_output(['git','write-tree'],text=True).strip()
           assert tree=='57280fa5aee0710eb28b013f0b6ebed3ce678592'
+          assert not subprocess.check_output(['git','status','--porcelain'])
           paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
           assert len(paths)==38 and not any(p.startswith('.ci-publication/') or p.endswith('native-once.yml') for p in paths)
           records=[]
@@ -131,7 +138,7 @@ jobs:
               assert response['sha']==sha
               records.append({'path':path,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
               dest=out/'files'/path;dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(data)
-          (out/'objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False},indent=2)+'\n')
+          (out/'objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'remote_ref_writes':False,'local_test_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()},indent=2)+'\n')
           PY
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         if: ${{ always() }}
@@ -142,5 +149,5 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 # Branch-only exact-source qualification. No live GitHub publication, model,
-# account credential or production operation. No commits or refs from this job.
+# account credential or production operation. No remote commits or refs by job.
 # The final product tree excludes this workflow and all transport capsules.
