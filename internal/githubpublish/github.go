@@ -264,7 +264,7 @@ func (g *githubRemote) getRef(ctx context.Context, token, repository, ref string
 	var record refRecord
 	status, err := g.request(ctx, token, http.MethodGet,
 		"/repos/"+repository+"/git/ref/"+escapeRef(ref), nil, nil, &record)
-	if status == http.StatusNotFound {
+	if githubRefAbsent(status, err) {
 		return "", false, nil
 	}
 	if err != nil {
@@ -378,6 +378,9 @@ func publicationText(plan Plan) (string, string) {
 }
 
 func (g *githubRemote) request(ctx context.Context, token, method, endpoint string, query url.Values, input, output any) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	var body io.Reader
 	if input != nil {
 		data, err := json.Marshal(input)
@@ -401,24 +404,14 @@ func (g *githubRemote) request(ctx context.Context, token, method, endpoint stri
 	if input != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	response, err := g.client.Do(request)
 	if err != nil {
 		return 0, err
 	}
-	defer response.Body.Close()
-	data, readErr := io.ReadAll(io.LimitReader(response.Body, (2<<20)+1))
-	if readErr != nil || len(data) > 2<<20 {
-		return response.StatusCode, fmt.Errorf("GitHub API response outside size limit")
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return response.StatusCode, fmt.Errorf("GitHub API returned status %d", response.StatusCode)
-	}
-	if output != nil {
-		if len(data) == 0 || json.Unmarshal(data, output) != nil {
-			return response.StatusCode, fmt.Errorf("GitHub API returned invalid JSON")
-		}
-	}
-	return response.StatusCode, nil
+	return finishGitHubResponse(ctx, response, output)
 }
 
 func (g *githubRemote) stageBundle(ctx context.Context, token string, plan Plan, bundlePath string) (string, func(), error) {
