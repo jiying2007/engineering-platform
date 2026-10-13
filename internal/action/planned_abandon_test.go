@@ -22,7 +22,7 @@ func TestIdempotentAbandonedActionCannotReplayOrClaimConfirmed(t *testing.T) {
 	}
 	op := NewWithRequestDigest(req, digest, time.Now().UTC())
 	op.State = AbandonedReconciled // fixture simulates Recovery-only durable readback
-	if err := repo.Create(*op); err != nil {
+	if err := repo.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	calls := 0

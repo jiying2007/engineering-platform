@@ -30,7 +30,7 @@ func TestRequiredMemoryActionContextRejectsPreCancelledAdmission(t *testing.T) {
 	if err := repo.UpdateContext(ctx, op); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled Action update bypassed Context: %v", err)
 	}
-	if _, err := repo.Get(op.ID); !errors.Is(err, ErrOperationAbsent) {
+	if _, err := repo.GetContext(context.Background(), op.ID); !errors.Is(err, ErrOperationAbsent) {
 		t.Fatalf("cancelled Action Create left a reservation: %v", err)
 	}
 	if err := repo.CreateContext(context.Background(), op); err != nil {

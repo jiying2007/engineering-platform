@@ -9,7 +9,7 @@ from authority_context_inventory import inventory
 CATEGORIES = {
     "Explicitly timed command root", "Signal-owned command/service root",
     "Command with downstream budget", "Independent bounded cleanup/settlement",
-    "Concrete convenience wrapper", "Test support helper",
+    "Test support helper",
 }
 ROW = re.compile(r"^\| `([^`]+):(\d+)` \| `(Background|TODO|WithoutCancel)` \| ([^|]+) \|$", re.M)
 

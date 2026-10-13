@@ -68,10 +68,10 @@ func TestMemoryCoreHTTPContractAlwaysHonorsPreCancelledCaller(t *testing.T) {
 			}
 		})
 	}
-	if _, err := m.GetWork("cancelled-work"); !errors.Is(err, ErrNotFound) {
+	if _, err := m.GetWorkContext(context.Background(), "cancelled-work"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cancelled HTTP mutation left Core Work residue: %v", err)
 	}
-	state, err := m.GetRecovery()
+	state, err := m.GetRecoveryContext(context.Background())
 	if err != nil || state.Epoch != 0 || state.Mode != recovery.Normal {
 		t.Fatalf("cancelled HTTP operations changed Recovery authority: %+v %v", state, err)
 	}

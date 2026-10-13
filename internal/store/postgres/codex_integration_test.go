@@ -41,7 +41,7 @@ func codexFixture(t *testing.T, s *Store, profiles ...codexexec.Profile) codexex
 	pd, err := profile.Digest()
 	workerOK(t, err)
 	work := core.WorkItem{ID: "codex-work", Title: "codex fixture", HumanOwner: "fixture", State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC()}
-	workerOK(t, s.CreateWork(work))
+	workerOK(t, s.CreateWorkContext(context.Background(), work))
 	plan := verification.Plan{ID: "codex-plan", Criteria: []verification.Criterion{{ID: "ac", Statement: "change", Requirements: []verification.EvidenceRequirement{{ID: "req", Procedure: "test"}}}}}
 	planDigest, err := plan.Digest()
 	workerOK(t, err)
@@ -55,7 +55,7 @@ func codexFixture(t *testing.T, s *Store, profiles ...codexexec.Profile) codexex
 	workerOK(t, err)
 	work.State = core.WorkReady
 	work.ActiveTaskContractDigest = taskDigest
-	workerOK(t, s.CreateTaskAndUpdateWork(task, plan, 1, work))
+	workerOK(t, s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, work))
 	input := core.RunInputManifest{
 		RunID: "codex-run", TaskContractDigest: taskDigest, RuntimeProfile: "codex/runtime",
 		ToolProfile: "codex/" + pd, WorkerProfile: "worker/codex", PolicyProfile: "policy",
@@ -66,12 +66,12 @@ func codexFixture(t *testing.T, s *Store, profiles ...codexexec.Profile) codexex
 	attempt, err := value.StartAttempt("attempt", time.Now().UTC())
 	workerOK(t, err)
 	sess := session.New(value.ID, attempt.Epoch)
-	work, err = s.GetWork(work.ID)
+	work, err = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, err)
 	version := work.Version
 	work.State = core.WorkExecuting
 	work.ActiveRunID = value.ID
-	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, version, work))
+	workerOK(t, s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, version, work))
 	relayWorkerFixture(t, s)
 	claimed, err := s.ClaimInput(ctx, codexTestWorker, "worker/codex")
 	workerOK(t, err)
@@ -142,7 +142,7 @@ func TestCodexStoreFreshGrantReplayAndMigration(t *testing.T) {
 	first, err := s.FinishCodex(ctx, codexTestWorker, report)
 	workerOK(t, err)
 	workerOK(t, first.Verify(codexTestWorker, permit, result))
-	_, err = s.BeginRecovery(permit.Token.RecoveryEpoch)
+	_, err = s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 	workerOK(t, err)
 	second, err := s.FinishCodex(ctx, codexTestWorker, report)
 	workerOK(t, err)
@@ -179,7 +179,7 @@ func TestCodexStoreUnknownBlocksRecoveryAndReplay(t *testing.T) {
 	if _, err := s.StartCodex(ctx, codexTestWorker, req); err == nil {
 		t.Fatal("UNKNOWN Codex execution was replayed")
 	}
-	recoveryState, err := s.BeginRecovery(permit.Token.RecoveryEpoch)
+	recoveryState, err := s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 	workerOK(t, err)
 	if _, err := s.CreateRecoveryProof(ctx, recoveryState.Epoch, "reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
 		t.Fatalf("UNKNOWN Codex execution did not block recovery proof: %v", err)
@@ -202,7 +202,7 @@ func TestCodexStoreLeaseAndIdentityFailClosed(t *testing.T) {
 			case "profile":
 				token.ProfileDigest = canonical.BytesDigest([]byte("other"))
 			case "recovery":
-				_, err = s.BeginRecovery(token.RecoveryEpoch)
+				_, err = s.BeginRecoveryContext(context.Background(), token.RecoveryEpoch)
 				workerOK(t, err)
 			case "pause":
 				workerSQL(t, s, "UPDATE sessions SET paused=true")

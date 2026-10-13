@@ -13,7 +13,7 @@ type cancelAtActionRepository struct {
 }
 
 func (r *cancelAtActionRepository) GetByIdempotencyKey(key string) (Operation, error) {
-	result, err := r.MemoryRepository.GetByIdempotencyKey(key)
+	result, err := r.MemoryRepository.GetByIdempotencyKeyContext(context.Background(), key)
 	if r.phase == "lookup" {
 		r.cancel()
 	}
@@ -21,7 +21,7 @@ func (r *cancelAtActionRepository) GetByIdempotencyKey(key string) (Operation, e
 }
 
 func (r *cancelAtActionRepository) Create(op Operation) error {
-	err := r.MemoryRepository.Create(op)
+	err := r.MemoryRepository.CreateContext(context.Background(), op)
 	if err == nil && r.phase == "created" {
 		r.cancel()
 	}
@@ -29,7 +29,7 @@ func (r *cancelAtActionRepository) Create(op Operation) error {
 }
 
 func (r *cancelAtActionRepository) Update(op Operation) error {
-	err := r.MemoryRepository.Update(op)
+	err := r.MemoryRepository.UpdateContext(context.Background(), op)
 	if err == nil && r.phase == "dispatched" && op.State == Dispatched {
 		r.cancel()
 	}
@@ -122,7 +122,7 @@ func TestActionCancelledBeforeExternalDispatchPreservesDurableNoReplayBoundary(t
 				receipt.OperationID != "" || receipt.Result != "" {
 				t.Fatalf("cancellation admitted a provider effect: receipt=%#v err=%v calls=%d", receipt, err, dispatchCalls)
 			}
-			stored, readErr := repo.Get(req.ID)
+			stored, readErr := repo.GetContext(context.Background(), req.ID)
 			switch phase {
 			case "created":
 				if readErr != nil || stored.State != Planned {

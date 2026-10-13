@@ -40,7 +40,7 @@ func TestPreparationStoreAtomicReceiptReplayAndMigration(t *testing.T) {
 	workerOK(t, err)
 	workerOK(t, preparation.Verify(a, first, report.Facts, "prepare-worker"))
 	// Readback is history even during recovery; no new action is admitted.
-	_, err = s.BeginRecovery(a.Token.RecoveryEpoch)
+	_, err = s.BeginRecoveryContext(context.Background(), a.Token.RecoveryEpoch)
 	workerOK(t, err)
 	replay, err := s.ReportPrepared(ctx, "prepare-worker", report)
 	workerOK(t, err)
@@ -105,7 +105,7 @@ func TestPreparationStoreRejectsStaleForeignAndInflatedReports(t *testing.T) {
 			case "generation":
 				report.Input.Token.Generation++
 			case "recovery":
-				_, err := s.BeginRecovery(a.Token.RecoveryEpoch)
+				_, err := s.BeginRecoveryContext(context.Background(), a.Token.RecoveryEpoch)
 				workerOK(t, err)
 			case "paused":
 				workerSQL(t, s, "UPDATE sessions SET paused=true")

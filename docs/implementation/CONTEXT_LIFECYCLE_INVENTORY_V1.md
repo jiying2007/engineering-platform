@@ -1,13 +1,14 @@
 # Caller and maintenance Context inventory — current source slice
 
-Base: `c449d7c3f1bfaab3f9f07b61d1992d7248c6d285`, plus the scoped Publisher
-Git and v2 host-admission corrections in this change. This closes the *enumeration* of the current
+Base: `2772d0d9c1122d004c7854993bae88ac53d3a138`, followed by removal of
+75 unreferenced context-free concrete wrappers. There are now 58 direct origins,
+down from 133; no new lifetime is introduced. This closes the *enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:495c9052ca4c5037c00a78cd5f3dcba578414ede3b66c2693c485376bf092089`
+`sha256:82683ee82edd8616ea1b18265562ee52a7557ec6d43a983e1036e6f5e837c443`
 
 ## Reviewed categories
 
@@ -17,7 +18,6 @@ Production `cmd` / `internal` Go source digest from the existing scanner:
 | Signal-owned command/service root | 10 |
 | Command with downstream budget | 2 |
 | Independent bounded cleanup/settlement | 16 |
-| Concrete convenience wrapper | 75 |
 | Test support helper | 3 |
 
 Command roots either own a signal lifetime or have explicit operation budgets.
@@ -26,10 +26,13 @@ probe/cleanup) and `controlclient.Raw` (its existing independent HTTP/dial/TLS
 budgets). Daemon signal lifetime is intentionally not a guessed short request
 timeout. A local process signal still must not be interpreted as remote rollback.
 
-Concrete conveniences delegate to the same Context implementations; mandatory
-Core/Action/Gateway/Publisher interfaces do not offer a network fallback to them.
-The existing all-production Core selector/method-value regression is retained.
-This source inventory is not an alias-sensitive or interprocedural call graph.
+Concrete Core and Action types now expose only the required Context variants
+for these 75 operations, matching the mandatory interfaces. All 329 former test
+call sites supply their Context explicitly; the existing production selector guard
+and a new concrete-method-set regression reject reintroduction. There is no
+fixture-only wrapper or compatibility shim. The retired wrapper category is no
+longer accepted by the inventory verifier. This source inventory is not an
+alias-sensitive or interprocedural call graph.
 
 Independent cleanup/settlement includes original Action DB settlement (5 s),
 PostgreSQL rollback (5 s), owned workspace cleanup (5 s plus traversal budgets),
@@ -96,11 +99,6 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/sandbox-guard/main.go:33` | `Background` | Explicitly timed command root |
 | `cmd/worker/main.go:85` | `Background` | Signal-owned command/service root |
 | `internal/action/service.go:126` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/action/service.go:299` | `Background` | Concrete convenience wrapper |
-| `internal/action/service.go:430` | `Background` | Concrete convenience wrapper |
-| `internal/action/service.go:433` | `Background` | Concrete convenience wrapper |
-| `internal/action/service.go:436` | `Background` | Concrete convenience wrapper |
-| `internal/action/service.go:439` | `Background` | Concrete convenience wrapper |
 | `internal/githubpublish/armed_cancellation.go:31` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/service.go:187` | `WithoutCancel` | Independent bounded cleanup/settlement |
@@ -113,77 +111,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |
 | `internal/sandbox/testutil/image.go:82` | `Background` | Test support helper |
-| `internal/store/memory.go:393` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:547` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:703` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:843` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:845` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:848` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:850` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1102` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1105` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1108` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1114` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1117` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1124` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1127` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1130` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1133` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1136` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1139` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1142` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1145` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1148` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1151` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1154` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1157` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1160` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1163` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1166` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1169` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1172` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1175` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1178` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1181` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1184` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1187` | `Background` | Concrete convenience wrapper |
-| `internal/store/memory.go:1190` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/action_store.go:102` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/action_store.go:141` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/action_store.go:149` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/action_store.go:181` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:70` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:105` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:130` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:175` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:296` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:310` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:319` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:340` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:367` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:551` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:581` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:603` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:623` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:687` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:778` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:804` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:887` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:929` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:950` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:985` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1005` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1057` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1077` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1112` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1136` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1242` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1262` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/core_store.go:1342` | `Background` | Concrete convenience wrapper |
 | `internal/store/postgres/outbox_store.go:182` | `Background` | Independent bounded cleanup/settlement |
-| `internal/store/postgres/store.go:68` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/store.go:90` | `Background` | Concrete convenience wrapper |
-| `internal/store/postgres/store.go:137` | `Background` | Concrete convenience wrapper |
 | `internal/testsupport/processscope.go:39` | `Background` | Test support helper |
 | `internal/workeragent/codex_checkpoint.go:37` | `Background` | Independent bounded cleanup/settlement |
 | `internal/workeragent/failure_settlement.go:27` | `WithoutCancel` | Independent bounded cleanup/settlement |

@@ -416,7 +416,7 @@ func offlineCommandCapture(t *testing.T, mode string) {
 	if _, err = command(); err == nil {
 		t.Fatal("actual execution ran twice")
 	}
-	value, _, err := store.GetExecution(input.RunID)
+	value, _, err := store.GetExecutionContext(context.Background(), input.RunID)
 	commandOK(t, err)
 	if value.State != "RUNNING" {
 		t.Fatal("offline check completed engineering Run")
@@ -629,7 +629,7 @@ func offlineCrashAfterPermit(t *testing.T, ctx context.Context, store *pgstore.S
 		t.Fatal("replay created another offline execution", executions)
 	}
 
-	recoveryState, err := store.BeginRecovery(status.Token.RecoveryEpoch)
+	recoveryState, err := store.BeginRecoveryContext(context.Background(), status.Token.RecoveryEpoch)
 	commandOK(t, err)
 	if _, err := store.CreateRecoveryProof(ctx, recoveryState.Epoch, "urn:engineering-platform:operator:crash-reconciler"); !errors.Is(err, pgstore.ErrRecoveryFactsUnresolved) {
 		t.Fatalf("unresolved crashed execution did not block recovery proof: %v", err)

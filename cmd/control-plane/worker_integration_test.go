@@ -194,7 +194,7 @@ func TestWorkerCommandMTLSRelayAdmissionAndShutdown(t *testing.T) {
 	if status.State != workerqueue.Validated || string(got) != string(want) {
 		t.Fatal("CLI did not return the exact durable receipt")
 	}
-	value, _, err := store.GetExecution("cmd-run")
+	value, _, err := store.GetExecutionContext(context.Background(), "cmd-run")
 	commandOK(t, err)
 	if value.State != run.Running {
 		t.Fatal("input admission completed a Run")

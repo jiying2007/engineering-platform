@@ -21,11 +21,11 @@ func continuationFixture(t *testing.T, s *Store) (codexexec.ContinueRequest, cod
 	t.Helper()
 	ctx := context.Background()
 	p, b, i := liveControlFixture(t, s)
-	work, e := s.GetWork(p.Assignment.Task.WorkItemID)
+	work, e := s.GetWorkContext(context.Background(), p.Assignment.Task.WorkItemID)
 	workerOK(t, e)
 	version := work.Version
 	work.HumanOwner = continuationOwner
-	workerOK(t, s.UpdateWork(work.ID, version, work))
+	workerOK(t, s.UpdateWorkContext(context.Background(), work.ID, version, work))
 	i.Text = ""
 	i.Actor = continuationOwner
 	_, e = s.QueueCodexControl(ctx, p.Token.RunID, codexexec.ControlInterrupt, i)
@@ -42,9 +42,9 @@ func continuationFixture(t *testing.T, s *Store) (codexexec.ContinueRequest, cod
 	_, e = s.SaveCodexCheckpoint(ctx, codexTestWorker, cp)
 	workerOK(t, e)
 	workerOK(t, s.FailCodex(ctx, codexTestWorker, p.Token))
-	r, _, e := s.GetExecution(p.Token.RunID)
+	r, _, e := s.GetExecutionContext(context.Background(), p.Token.RunID)
 	workerOK(t, e)
-	work, e = s.GetWork(work.ID)
+	work, e = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, e)
 	cd, e := cp.Digest()
 	workerOK(t, e)
@@ -67,7 +67,7 @@ func TestCodexContinuationAtomicAndIdempotent(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("retry mutated receipt")
 	}
-	old, _, e := s.GetExecution(q.SourceRunID)
+	old, _, e := s.GetExecutionContext(context.Background(), q.SourceRunID)
 	workerOK(t, e)
 	if old.State != run.Aborted || old.CurrentEpoch != q.ExecutionEpoch+1 {
 		t.Fatal("old Run not fenced")
@@ -85,7 +85,7 @@ func TestCodexContinuationAtomicAndIdempotent(t *testing.T) {
 	if _, e = s.RenewCodex(ctx, codexTestWorker, p.Token); e == nil {
 		t.Fatal("old renewal allowed")
 	}
-	work, e := s.GetWork(p.Assignment.Task.WorkItemID)
+	work, e := s.GetWorkContext(context.Background(), p.Assignment.Task.WorkItemID)
 	workerOK(t, e)
 	if work.ActiveRunID != q.RunID || work.ActiveTaskContractDigest != p.Assignment.Intent.TaskDigest || work.Version != q.ExpectedWorkVersion+1 {
 		t.Fatal("wrong Work transition")
@@ -204,7 +204,7 @@ func TestCodexContinuationAndLateActionCannotBothCommit(t *testing.T) {
 			op := action.NewWithRequestDigest(action.Request{ID: "racing-action", RunID: q.SourceRunID, ExecutionEpoch: q.ExecutionEpoch, RecoveryEpoch: q.RecoveryEpoch, Action: "test", RiskClass: action.ControlledMutation, Capability: "test", IdempotencyKey: "racing-action"}, canonical.BytesDigest([]byte("test")), time.Now().UTC())
 			results := make(chan error, 2)
 			start := make(chan struct{})
-			go func() { <-start; results <- s.Create(*op) }()
+			go func() { <-start; results <- s.CreateContext(context.Background(), *op) }()
 			go func() { <-start; _, err := s.ContinueCodex(context.Background(), continuationOwner, q); results <- err }()
 			close(start)
 			one, two := <-results, <-results
@@ -220,11 +220,11 @@ func TestCodexContinuationRejectsActionAuthorizedBeforeFence(t *testing.T) {
 	op := action.NewWithRequestDigest(action.Request{ID: "late-action", RunID: q.SourceRunID, ExecutionEpoch: q.ExecutionEpoch, RecoveryEpoch: q.RecoveryEpoch, Action: "test", RiskClass: action.ControlledMutation, Capability: "test", IdempotencyKey: "late-action"}, canonical.BytesDigest([]byte("test")), time.Now().UTC())
 	_, err := s.ContinueCodex(context.Background(), continuationOwner, q)
 	workerOK(t, err)
-	if s.Create(*op) == nil {
+	if s.CreateContext(context.Background(), *op) == nil {
 		t.Fatal("previous authorization crossed continuation fence")
 	}
 	op.ExecutionEpoch++
-	if s.Create(*op) == nil {
+	if s.CreateContext(context.Background(), *op) == nil {
 		t.Fatal("new epoch reopened retired source actions")
 	}
 	assertCount(t, s, "SELECT count(*) FROM external_operations", 0)

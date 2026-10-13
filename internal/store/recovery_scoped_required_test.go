@@ -22,7 +22,7 @@ func TestMemoryRecoveryLifecycleRequiredContextRejectsCancelledMutations(t *test
 	if _, err := core.BeginRecoveryContext(ctx, 0); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled Recovery Begin escaped caller context: %v", err)
 	}
-	state, err := core.GetRecovery()
+	state, err := core.GetRecoveryContext(context.Background())
 	if err != nil || state.Epoch != 0 || state.Mode != recovery.Normal {
 		t.Fatalf("cancelled begin mutated durable epoch: state=%+v err=%v", state, err)
 	}
@@ -34,7 +34,7 @@ func TestMemoryRecoveryLifecycleRequiredContextRejectsCancelledMutations(t *test
 	if _, err := core.CompleteRecoveryContext(ctx, 1, true); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled Recovery Complete escaped caller context: %v", err)
 	}
-	state, err = core.GetRecovery()
+	state, err = core.GetRecoveryContext(context.Background())
 	if err != nil || state.Epoch != 1 || state.Mode != recovery.RecoveryReconciliation {
 		t.Fatalf("cancelled complete advanced authority: state=%+v err=%v", state, err)
 	}

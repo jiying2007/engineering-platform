@@ -106,7 +106,7 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	pd, e := profile.Digest()
 	workerOK(t, e)
 	work := core.WorkItem{ID: "continue-work", Title: "source continuation test", HumanOwner: continuationOwner, State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC()}
-	workerOK(t, s.CreateWork(work))
+	workerOK(t, s.CreateWorkContext(context.Background(), work))
 	plan := verification.Plan{ID: "continue-plan", Criteria: []verification.Criterion{{ID: "all-source", Statement: "verify full diff from original base", Requirements: []verification.EvidenceRequirement{{ID: "test", Procedure: "test"}}}}}
 	planDigest, e := plan.Digest()
 	workerOK(t, e)
@@ -115,7 +115,7 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	workerOK(t, e)
 	work.ActiveTaskContractDigest = taskDigest
 	work.State = core.WorkReady
-	workerOK(t, s.CreateTaskAndUpdateWork(task, plan, 1, work))
+	workerOK(t, s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, work))
 	input := core.RunInputManifest{RunID: "source-run", TaskContractDigest: taskDigest, RuntimeProfile: "codex/runtime", ToolProfile: "codex/" + pd, WorkerProfile: "worker/codex", PolicyProfile: "policy"}
 	inputDigest, e := input.Digest()
 	workerOK(t, e)
@@ -123,12 +123,12 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	attempt, e := value.StartAttempt("first", time.Now().UTC())
 	workerOK(t, e)
 	sess := session.New(input.RunID, 1)
-	work, e = s.GetWork(work.ID)
+	work, e = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, e)
 	wv := work.Version
 	work.State = core.WorkExecuting
 	work.ActiveRunID = value.ID
-	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, wv, work))
+	workerOK(t, s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, wv, work))
 	relayWorkerFixture(t, s)
 	policy, e := access.New(continuationPolicy(pd))
 	workerOK(t, e)
@@ -186,9 +186,9 @@ func TestCodexContinuationMTLSTwoActualWorkerExecutions(t *testing.T) {
 	oldBytes, _ := json.Marshal(old.Runtime)
 	cd, e := retained.Artifact.Facts.Digest()
 	workerOK(t, e)
-	current, _, e := s.GetExecution(input.RunID)
+	current, _, e := s.GetExecutionContext(context.Background(), input.RunID)
 	workerOK(t, e)
-	work, e = s.GetWork(work.ID)
+	work, e = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, e)
 	q := codexexec.ContinueRequest{SourceRunID: input.RunID, RunID: "next-run", AttemptID: "next-attempt", CheckpointDigest: cd, ExpectedRunVersion: current.Version, ExpectedWorkVersion: work.Version, ExecutionEpoch: current.CurrentEpoch, RecoveryEpoch: old.Token.RecoveryEpoch, Reason: "Explicitly continue these reviewed source bytes in a new Run"}
 	for _, who := range []string{"urn:engineering-platform:engineer:start-only", "urn:engineering-platform:engineer:control-only"} {

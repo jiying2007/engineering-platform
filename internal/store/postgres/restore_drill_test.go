@@ -106,12 +106,12 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 		source.Close()
 		t.Fatal(err)
 	}
-	value, _, err := source.GetExecution("restore-run")
+	value, _, err := source.GetExecutionContext(context.Background(), "restore-run")
 	if err != nil {
 		source.Close()
 		t.Fatal(err)
 	}
-	task, err := source.GetTaskByDigest(value.TaskContractDigest)
+	task, err := source.GetTaskByDigestContext(context.Background(), value.TaskContractDigest)
 	if err != nil {
 		source.Close()
 		t.Fatal(err)
@@ -229,7 +229,7 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 	if err := restored.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:completer", 1); err != nil {
 		t.Fatal(err)
 	}
-	state, err := restored.CompleteRecovery(1, true)
+	state, err := restored.CompleteRecoveryContext(context.Background(), 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	t.Helper()
 	now := time.Unix(100, 0).UTC()
 	work := core.WorkItem{ID: "restore-work", Title: "restore drill", HumanOwner: "owner", State: core.WorkDraft, Version: 1, CreatedAt: now}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 	plan := verification.Plan{ID: "restore-plan", Criteria: []verification.Criterion{{ID: "criterion", Statement: "CI passes", Requirements: []verification.EvidenceRequirement{{ID: "ci", Procedure: "ci.test", Issuer: "ci"}}}}}
@@ -260,10 +260,10 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	if err := ready.Transition(core.WorkReady); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateTaskAndUpdateWork(task, plan, work.Version, ready); err != nil {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, work.Version, ready); err != nil {
 		t.Fatal(err)
 	}
-	ready, _ = s.GetWork(work.ID)
+	ready, _ = s.GetWorkContext(context.Background(), work.ID)
 	input := core.RunInputManifest{RunID: "restore-run", TaskContractDigest: taskDigest, RuntimeProfile: "runtime", ToolProfile: "tool", WorkerProfile: "worker/restore", PolicyProfile: "policy"}
 	inputDigest, err := input.Digest()
 	if err != nil {
@@ -280,7 +280,7 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	if err := executing.Transition(core.WorkExecuting); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, ready.Version, executing); err != nil {
+	if err := s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, ready.Version, executing); err != nil {
 		t.Fatal(err)
 	}
 	// The Action is admitted and CONFIRMED while the Run is still active.
@@ -288,23 +288,23 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	// historical operation; none may fabricate a new action after Run Complete.
 	req := action.Request{ID: "restore-operation", RunID: value.ID, ExecutionEpoch: 1, RecoveryEpoch: 0, Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci", ParametersDigest: "sha256:" + strings.Repeat("c", 64), IdempotencyKey: "restore-operation", RequestedBy: "runtime", RequestedAt: now.Add(6 * time.Second)}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("d", 64), now.Add(6*time.Second))
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	if err := op.Transition(action.Dispatched, now.Add(7*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	if err := op.Transition(action.Confirmed, now.Add(8*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	currentRun, currentSession, _ := s.GetExecution(value.ID)
-	currentWork, _ := s.GetWork(work.ID)
+	currentRun, currentSession, _ := s.GetExecutionContext(context.Background(), value.ID)
+	currentWork, _ := s.GetWorkContext(context.Background(), work.ID)
 	if err := currentRun.Complete(currentRun.CurrentEpoch); err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,7 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	if err := verifying.Transition(core.WorkVerifying); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateExecutionAndWork(value.ID, currentRun.Version, currentRun, currentSession, currentWork.Version, verifying); err != nil {
+	if err := s.UpdateExecutionAndWorkContext(context.Background(), value.ID, currentRun.Version, currentRun, currentSession, currentWork.Version, verifying); err != nil {
 		t.Fatal(err)
 	}
 	delivery := core.DeliveryReceipt{ID: "restore-delivery", WorkItemID: work.ID, TaskContractDigest: taskDigest, RunID: value.ID, BaseCommit: task.BaseCommit, ResultCommit: strings.Repeat("b", 40), CreatedAt: now.Add(2 * time.Second)}
@@ -320,11 +320,11 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateDelivery(delivery); err != nil {
+	if err := s.CreateDeliveryContext(context.Background(), delivery); err != nil {
 		t.Fatal(err)
 	}
 	evidence := core.EvidenceRef{ID: "restore-evidence", DeliveryReceiptID: delivery.ID, RequirementID: "ci", SubjectDigest: delivery.SubjectDigest, Issuer: "ci", Procedure: "ci.test", Result: "PASS", Applicable: true}
-	if err := s.CreateEvidence(evidence); err != nil {
+	if err := s.CreateEvidenceContext(context.Background(), evidence); err != nil {
 		t.Fatal(err)
 	}
 	verificationReport := verification.Evaluate(plan, delivery.SubjectDigest, []core.EvidenceRef{evidence})
@@ -333,28 +333,28 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 	verificationReport.VerificationPlanDigest = planDigest
 	verificationReport.Verifier = "verifier"
 	verificationReport.CreatedAt = now.Add(3 * time.Second)
-	if err := s.CreateVerification(verificationReport); err != nil {
+	if err := s.CreateVerificationContext(context.Background(), verificationReport); err != nil {
 		t.Fatal(err)
 	}
-	verifying, _ = s.GetWork(work.ID)
+	verifying, _ = s.GetWorkContext(context.Background(), work.ID)
 	reviewReport := review.Report{ID: "restore-review", DeliveryReceiptID: delivery.ID, VerificationReportID: verificationReport.ID, TaskContractDigest: taskDigest, SubjectDigest: delivery.SubjectDigest, Reviewer: "reviewer", Result: review.ResultPass, CreatedAt: now.Add(4 * time.Second)}
 	reviewing := verifying
 	if err := reviewing.Transition(core.WorkReviewing); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateReviewAndUpdateWork(reviewReport, verifying.Version, reviewing); err != nil {
+	if err := s.CreateReviewAndUpdateWorkContext(context.Background(), reviewReport, verifying.Version, reviewing); err != nil {
 		t.Fatal(err)
 	}
-	reviewing, _ = s.GetWork(work.ID)
+	reviewing, _ = s.GetWorkContext(context.Background(), work.ID)
 	closure := core.ClosureReceipt{ID: "restore-closure", WorkItemID: work.ID, TaskContractDigest: taskDigest, RunID: value.ID, DeliveryReceiptID: delivery.ID, VerificationReportID: verificationReport.ID, ReviewReportID: reviewReport.ID, SubjectDigest: delivery.SubjectDigest, Result: "CLOSED", CreatedAt: now.Add(5 * time.Second)}
 	closed := reviewing
 	if err := closed.Transition(core.WorkClosed); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateClosureAndUpdateWork(closure, reviewing.Version, closed); err != nil {
+	if err := s.CreateClosureAndUpdateWorkContext(context.Background(), closure, reviewing.Version, closed); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); err != nil {
@@ -365,40 +365,40 @@ func seedRestoreAuthority(t *testing.T, s *Store) {
 func authoritySnapshot(ctx context.Context, s *Store) (restoreSnapshot, error) {
 	var snapshot restoreSnapshot
 	var err error
-	if snapshot.Recovery, err = s.GetRecovery(); err != nil {
+	if snapshot.Recovery, err = s.GetRecoveryContext(context.Background()); err != nil {
 		return snapshot, err
 	}
-	work, err := s.GetWork("restore-work")
+	work, err := s.GetWorkContext(context.Background(), "restore-work")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.WorkDigest, _ = canonical.Digest(work)
-	delivery, err := s.GetDelivery("restore-delivery")
+	delivery, err := s.GetDeliveryContext(context.Background(), "restore-delivery")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.DeliveryDigest, _ = canonical.Digest(delivery)
-	evidence, err := s.GetEvidence("restore-evidence")
+	evidence, err := s.GetEvidenceContext(context.Background(), "restore-evidence")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.EvidenceDigest, _ = canonical.Digest(evidence)
-	verificationReport, err := s.GetVerification("restore-verification")
+	verificationReport, err := s.GetVerificationContext(context.Background(), "restore-verification")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.VerificationDigest, _ = canonical.Digest(verificationReport)
-	reviewReport, err := s.GetReview("restore-review")
+	reviewReport, err := s.GetReviewContext(context.Background(), "restore-review")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.ReviewDigest, _ = reviewReport.Digest()
-	closure, err := s.GetClosure("restore-closure")
+	closure, err := s.GetClosureContext(context.Background(), "restore-closure")
 	if err != nil {
 		return snapshot, err
 	}
 	snapshot.ClosureDigest, _ = canonical.Digest(closure)
-	op, err := s.Get("restore-operation")
+	op, err := s.GetContext(context.Background(), "restore-operation")
 	if err != nil {
 		return snapshot, err
 	}

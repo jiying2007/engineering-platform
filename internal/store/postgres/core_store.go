@@ -66,10 +66,6 @@ func auditInput(eventType, aggregateType, aggregateID string, payload any) (audi
 	}, nil
 }
 
-func (s *Store) CreateWork(item core.WorkItem) error {
-	return s.CreateWorkContext(context.Background(), item)
-}
-
 // CreateWorkContext uses the request context for Work/audit transactions.
 // A cancelled COMMIT does not establish rollback: use exact Work readback.
 func (s *Store) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
@@ -101,10 +97,6 @@ INSERT INTO work_items (
 	return err
 }
 
-func (s *Store) GetWork(id string) (core.WorkItem, error) {
-	return s.GetWorkContext(context.Background(), id)
-}
-
 func (s *Store) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
 	const q = `
 SELECT work_item_id,COALESCE(source_ref,''),title,human_owner,COALESCE(target_id,''),
@@ -124,10 +116,6 @@ WHERE work_item_id=$1`
 	}
 	item.State = core.WorkState(state)
 	return item, nil
-}
-
-func (s *Store) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
-	return s.UpdateWorkContext(context.Background(), id, expectedVersion, item)
 }
 
 func (s *Store) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
@@ -164,15 +152,6 @@ WHERE work_item_id=$9 AND version=$10`
 		Audit: input,
 	})
 	return err
-}
-
-func (s *Store) CreateTaskAndUpdateWork(
-	task core.TaskContract,
-	plan verification.Plan,
-	expectedWorkVersion uint64,
-	work core.WorkItem,
-) error {
-	return s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, expectedWorkVersion, work)
 }
 
 // The frozen Task/Plan/Work commit and its audit must share caller cancellation.
@@ -292,10 +271,6 @@ WHERE work_item_id=$4 AND version=$5`
 	return err
 }
 
-func (s *Store) GetTask(id string) (core.TaskContract, error) {
-	return s.GetTaskContext(context.Background(), id)
-}
-
 func (s *Store) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
 	const q = `
 SELECT contract_json
@@ -306,17 +281,9 @@ LIMIT 1`
 	return s.readTaskContext(ctx, q, id)
 }
 
-func (s *Store) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
-	return s.GetTaskRevisionContext(context.Background(), id, revision)
-}
-
 func (s *Store) GetTaskRevisionContext(ctx context.Context, id string, revision uint64) (core.TaskContract, error) {
 	const q = "SELECT contract_json FROM task_contracts WHERE task_contract_id=$1 AND revision=$2"
 	return s.readTaskContext(ctx, q, id, revision)
-}
-
-func (s *Store) GetTaskByDigest(digest string) (core.TaskContract, error) {
-	return s.GetTaskByDigestContext(context.Background(), digest)
 }
 
 func (s *Store) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
@@ -336,10 +303,6 @@ func (s *Store) readTaskContext(ctx context.Context, query string, args ...any) 
 	return task, nil
 }
 
-func (s *Store) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
-	return s.GetVerificationPlanByDigestContext(context.Background(), digest)
-}
-
 func (s *Store) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
@@ -354,17 +317,6 @@ func (s *Store) GetVerificationPlanByDigestContext(ctx context.Context, digest s
 		return verification.Plan{}, fmt.Errorf("decode verification plan: %w", err)
 	}
 	return plan, nil
-}
-
-func (s *Store) CreateExecutionAndUpdateWork(
-	value run.Run,
-	attempt run.Attempt,
-	sess session.Session,
-	inputManifest core.RunInputManifest,
-	expectedWorkVersion uint64,
-	work core.WorkItem,
-) error {
-	return s.CreateExecutionAndUpdateWorkContext(context.Background(), value, attempt, sess, inputManifest, expectedWorkVersion, work)
 }
 
 // CreateExecutionAndUpdateWorkContext preserves Run/Attempt/Session/Work,
@@ -547,10 +499,6 @@ VALUES ($1,$2,$3,$4,$5)`
 	return nil
 }
 
-func (s *Store) GetExecution(id string) (run.Run, session.Session, error) {
-	return s.GetExecutionContext(context.Background(), id)
-}
-
 func (s *Store) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
 	const q = `
 SELECT r.run_id,r.task_contract_digest,r.run_input_manifest_digest,r.state,r.version,
@@ -577,10 +525,6 @@ WHERE r.run_id=$1`
 	return value, sess, nil
 }
 
-func (s *Store) GetAttempt(runID, attemptID string) (run.Attempt, error) {
-	return s.GetAttemptContext(context.Background(), runID, attemptID)
-}
-
 func (s *Store) GetAttemptContext(ctx context.Context, runID, attemptID string) (run.Attempt, error) {
 	const q = `
 SELECT attempt_id,execution_epoch,started_at,ended_at
@@ -599,10 +543,6 @@ WHERE run_id=$1 AND attempt_id=$2`
 	return item, nil
 }
 
-func (s *Store) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
-	return s.GetRunInputByDigestContext(context.Background(), digest)
-}
-
 func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
@@ -617,10 +557,6 @@ func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (
 		return core.RunInputManifest{}, fmt.Errorf("decode run input manifest: %w", err)
 	}
 	return item, nil
-}
-
-func (s *Store) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
-	return s.UpdateExecutionContext(context.Background(), id, expectedVersion, value, sess)
 }
 
 // UpdateExecutionContext atomically persists Run/Session ownership and audit,
@@ -675,16 +611,6 @@ WHERE run_id=$5`
 		Audit: input,
 	})
 	return err
-}
-
-func (s *Store) RecordSteering(
-	id string,
-	expectedVersion uint64,
-	value run.Run,
-	sess session.Session,
-	cmd session.SteeringCommand,
-) error {
-	return s.RecordSteeringContext(context.Background(), id, expectedVersion, value, sess, cmd)
 }
 
 // RecordSteeringContext retains the historical single Core Run/Session audit
@@ -774,10 +700,6 @@ WHERE run_id=$1 AND version=$2`
 	return err
 }
 
-func (s *Store) GetSteering(id string) (session.SteeringCommand, error) {
-	return s.GetSteeringContext(context.Background(), id)
-}
-
 func (s *Store) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
 	const q = `
 SELECT steering_command_id,run_id,execution_epoch,sequence,actor,content_digest,created_at
@@ -791,17 +713,6 @@ WHERE steering_command_id=$1`
 		return session.SteeringCommand{}, mapReadError(err)
 	}
 	return item, nil
-}
-
-func (s *Store) UpdateExecutionAndWork(
-	id string,
-	expectedRunVersion uint64,
-	value run.Run,
-	sess session.Session,
-	expectedWorkVersion uint64,
-	work core.WorkItem,
-) error {
-	return s.UpdateExecutionAndWorkContext(context.Background(), id, expectedRunVersion, value, sess, expectedWorkVersion, work)
 }
 
 // UpdateExecutionAndWorkContext preserves completed Run/Session and Work
@@ -883,10 +794,6 @@ WHERE work_item_id=$4 AND version=$5`
 	return err
 }
 
-func (s *Store) CreateCheckpoint(item session.Checkpoint) (string, error) {
-	return s.CreateCheckpointContext(context.Background(), item)
-}
-
 // CreateCheckpointContext retains the original checkpoint/audit transaction,
 // while honoring the HTTP/Worker caller's cancellation during lock waits.
 func (s *Store) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
@@ -925,10 +832,6 @@ INSERT INTO checkpoints (
 	return digest, nil
 }
 
-func (s *Store) GetCheckpoint(id string) (session.Checkpoint, string, error) {
-	return s.GetCheckpointContext(context.Background(), id)
-}
-
 func (s *Store) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
 	var raw []byte
 	var digest string
@@ -944,10 +847,6 @@ func (s *Store) GetCheckpointContext(ctx context.Context, id string) (session.Ch
 		return session.Checkpoint{}, "", fmt.Errorf("decode checkpoint: %w", err)
 	}
 	return item, digest, nil
-}
-
-func (s *Store) CreateDelivery(item core.DeliveryReceipt) error {
-	return s.CreateDeliveryContext(context.Background(), item)
 }
 
 // Delivery creation and its existing audit are one caller-bound transaction.
@@ -981,10 +880,6 @@ INSERT INTO delivery_receipts (
 	return err
 }
 
-func (s *Store) GetDelivery(id string) (core.DeliveryReceipt, error) {
-	return s.GetDeliveryContext(context.Background(), id)
-}
-
 func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
@@ -999,10 +894,6 @@ func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.Deliver
 		return core.DeliveryReceipt{}, fmt.Errorf("decode delivery receipt: %w", err)
 	}
 	return item, nil
-}
-
-func (s *Store) CreateEvidence(item core.EvidenceRef) error {
-	return s.CreateEvidenceContext(context.Background(), item)
 }
 
 // Evidence verification and its immutable audit share the same PostgreSQL
@@ -1053,10 +944,6 @@ INSERT INTO evidence (
 	return err
 }
 
-func (s *Store) GetEvidence(id string) (core.EvidenceRef, error) {
-	return s.GetEvidenceContext(context.Background(), id)
-}
-
 func (s *Store) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
@@ -1071,10 +958,6 @@ func (s *Store) GetEvidenceContext(ctx context.Context, id string) (core.Evidenc
 		return core.EvidenceRef{}, fmt.Errorf("decode evidence: %w", err)
 	}
 	return item, nil
-}
-
-func (s *Store) CreateVerification(report verification.Report) error {
-	return s.CreateVerificationContext(context.Background(), report)
 }
 
 // Verification report and audit retain their original single transaction;
@@ -1108,10 +991,6 @@ INSERT INTO verification_reports (
 	return err
 }
 
-func (s *Store) GetVerification(id string) (verification.Report, error) {
-	return s.GetVerificationContext(context.Background(), id)
-}
-
 func (s *Store) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(
@@ -1126,14 +1005,6 @@ func (s *Store) GetVerificationContext(ctx context.Context, id string) (verifica
 		return verification.Report{}, fmt.Errorf("decode verification report: %w", err)
 	}
 	return report, nil
-}
-
-func (s *Store) CreateReviewAndUpdateWork(
-	report review.Report,
-	expectedVersion uint64,
-	work core.WorkItem,
-) error {
-	return s.CreateReviewAndUpdateWorkContext(context.Background(), report, expectedVersion, work)
 }
 
 func (s *Store) CreateReviewAndUpdateWorkContext(
@@ -1238,10 +1109,6 @@ WHERE work_item_id=$2 AND version=$3 AND state=$4
 	return err
 }
 
-func (s *Store) GetReview(id string) (review.Report, error) {
-	return s.GetReviewContext(context.Background(), id)
-}
-
 func (s *Store) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
 	var raw []byte
 	if err := s.pool.QueryRow(ctx, "SELECT report_json FROM review_reports WHERE review_report_id=$1", id).Scan(&raw); err != nil {
@@ -1252,14 +1119,6 @@ func (s *Store) GetReviewContext(ctx context.Context, id string) (review.Report,
 		return review.Report{}, fmt.Errorf("decode review report: %w", err)
 	}
 	return report, nil
-}
-
-func (s *Store) CreateClosureAndUpdateWork(
-	item core.ClosureReceipt,
-	expectedVersion uint64,
-	work core.WorkItem,
-) error {
-	return s.CreateClosureAndUpdateWorkContext(context.Background(), item, expectedVersion, work)
 }
 
 func (s *Store) CreateClosureAndUpdateWorkContext(
@@ -1336,10 +1195,6 @@ WHERE work_item_id=$4 AND version=$5 AND state=$6
 		Audit: input,
 	})
 	return err
-}
-
-func (s *Store) GetClosure(id string) (core.ClosureReceipt, error) {
-	return s.GetClosureContext(context.Background(), id)
 }
 
 func (s *Store) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {

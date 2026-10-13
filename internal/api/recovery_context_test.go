@@ -24,7 +24,7 @@ func (p *recoveryContextProbe) GetRecoveryContext(ctx context.Context) (recovery
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
-	return p.Memory.GetRecovery()
+	return p.Memory.GetRecoveryContext(context.Background())
 }
 
 func (p *recoveryContextProbe) BeginRecoveryContext(ctx context.Context, epoch uint64) (recovery.Manager, error) {
@@ -32,7 +32,7 @@ func (p *recoveryContextProbe) BeginRecoveryContext(ctx context.Context, epoch u
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
-	return p.Memory.BeginRecovery(epoch)
+	return p.Memory.BeginRecoveryContext(context.Background(), epoch)
 }
 
 func (p *recoveryContextProbe) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
@@ -40,7 +40,7 @@ func (p *recoveryContextProbe) CompleteRecoveryContext(ctx context.Context, epoc
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
-	return p.Memory.CompleteRecovery(epoch, reconciled)
+	return p.Memory.CompleteRecoveryContext(context.Background(), epoch, reconciled)
 }
 
 func TestRecoveryLifecycleHTTPUsesCallerBoundCoreAuthority(t *testing.T) {
@@ -72,7 +72,7 @@ func TestRecoveryLifecycleHTTPUsesCallerBoundCoreAuthority(t *testing.T) {
 	if probe.completes != 0 {
 		t.Fatal("canceled Recovery Complete reached mutable Core authority")
 	}
-	state, err := probe.Memory.GetRecovery()
+	state, err := probe.Memory.GetRecoveryContext(context.Background())
 	if err != nil || state.Epoch != 1 || state.Mode != recovery.RecoveryReconciliation {
 		t.Fatalf("cancelled completion changed recovery mode: state=%+v err=%v", state, err)
 	}

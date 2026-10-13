@@ -29,7 +29,7 @@ func TestReconcileExpiredOfflineExecutionAbandonsWithoutReplay(t *testing.T) {
 	permit, err := s.StartOffline(ctx, "offline-worker", start)
 	workerOK(t, err)
 	workerSQL(t, s, "UPDATE worker_offline_executions SET lease_until=clock_timestamp()-interval '1 second'")
-	state, err := s.BeginRecovery(permit.Token.RecoveryEpoch)
+	state, err := s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 	workerOK(t, err)
 	request := reconcileRequest(recovery.ExecutionOffline, start.RunID, permit.Token.ID, state.Epoch)
 	receipt, err := s.ReconcileExecutionAbandoned(ctx, "reconciler", request)
@@ -60,7 +60,7 @@ func TestReconcileExpiredOfflineExecutionAbandonsWithoutReplay(t *testing.T) {
 	if !proof.Facts.Clear() {
 		t.Fatal("abandoned execution still blocks proof", proof.Facts)
 	}
-	_, err = s.CompleteRecovery(state.Epoch, true)
+	_, err = s.CompleteRecoveryContext(context.Background(), state.Epoch, true)
 	workerOK(t, err)
 	if _, err = s.StartOffline(ctx, "offline-worker", start); err == nil {
 		t.Fatal("abandoned execution was replayed")
@@ -75,7 +75,7 @@ func TestReconcileUnknownCodexWaitsForLeaseAndClearsRecovery(t *testing.T) {
 	permit, err := s.StartCodex(ctx, codexTestWorker, start)
 	workerOK(t, err)
 	workerOK(t, s.FailCodex(ctx, codexTestWorker, permit.Token))
-	state, err := s.BeginRecovery(permit.Token.RecoveryEpoch)
+	state, err := s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 	workerOK(t, err)
 	request := reconcileRequest(recovery.ExecutionCodex, start.RunID, permit.Token.ID, state.Epoch)
 	if _, err = s.ReconcileExecutionAbandoned(ctx, "reconciler", request); !errors.Is(err, corestore.ErrConflict) {
@@ -110,7 +110,7 @@ func TestExecutionReconciliationRejectsNormalModeFinishedAndWrongIdentity(t *tes
 		t.Fatalf("normal-mode reconciliation accepted: %v", err)
 	}
 	workerSQL(t, s, "UPDATE worker_offline_executions SET lease_until=clock_timestamp()-interval '1 second'")
-	state, err := s.BeginRecovery(permit.Token.RecoveryEpoch)
+	state, err := s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 	workerOK(t, err)
 	request.RecoveryEpoch = state.Epoch
 	request.ExecutionID = strings.Repeat("f", 64)

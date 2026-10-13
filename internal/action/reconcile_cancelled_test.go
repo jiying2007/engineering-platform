@@ -16,7 +16,7 @@ type reconcileCancellationRepository struct {
 
 func (r *reconcileCancellationRepository) Get(id string) (Operation, error) {
 	r.gets++
-	value, err := r.MemoryRepository.Get(id)
+	value, err := r.MemoryRepository.GetContext(context.Background(), id)
 	if r.phase == "after-read" {
 		r.cancel()
 	}
@@ -25,7 +25,7 @@ func (r *reconcileCancellationRepository) Get(id string) (Operation, error) {
 
 func (r *reconcileCancellationRepository) Update(op Operation) error {
 	r.updates++
-	err := r.MemoryRepository.Update(op)
+	err := r.MemoryRepository.UpdateContext(context.Background(), op)
 	if err == nil && r.phase == "after-reconciling" && op.State == Reconciling {
 		r.cancel()
 	}
@@ -75,7 +75,7 @@ func TestCancelledReconciliationCannotStartProviderObservation(t *testing.T) {
 				MemoryRepository: NewMemoryRepository(), phase: phase, cancel: cancel,
 			}
 			id := "cancel-reconcile-" + phase
-			if err := repo.Create(Operation{
+			if err := repo.CreateContext(context.Background(), Operation{
 				ID: id, RunID: "run-1", State: Unknown,
 				IdempotencyKey: "no-replay-" + phase,
 			}); err != nil {
@@ -94,7 +94,7 @@ func TestCancelledReconciliationCannotStartProviderObservation(t *testing.T) {
 				t.Fatalf("cancelled reconciliation started external observation: receipt=%#v err=%v calls=%d",
 					receipt, err, provider.reconcileCalls)
 			}
-			got, err := repo.MemoryRepository.Get(id)
+			got, err := repo.MemoryRepository.GetContext(context.Background(), id)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -150,7 +150,7 @@ func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *te
 			defer cancel()
 			id := "observed-reconcile-" + tc.name
 			repo := &trackingActionContextStore{MemoryRepository: NewMemoryRepository()}
-			if err := repo.Create(Operation{
+			if err := repo.CreateContext(context.Background(), Operation{
 				ID: id, RunID: "run-1", State: Unknown,
 				IdempotencyKey: "reconcile-once-" + tc.name,
 			}); err != nil {
@@ -166,7 +166,7 @@ func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *te
 				t.Fatalf("observed effect lost independent settlement: receipt=%#v err=%v calls=%d",
 					receipt, err, provider.reconcileCalls)
 			}
-			stored, err := repo.Get(id)
+			stored, err := repo.GetContext(context.Background(), id)
 			if err != nil || stored.State != tc.want ||
 				len(repo.settledStates) != 1 || repo.settledStates[0] != tc.want {
 				t.Fatalf("missing bounded durable settlement: stored=%#v err=%v states=%v",

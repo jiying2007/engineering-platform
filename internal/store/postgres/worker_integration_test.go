@@ -31,7 +31,7 @@ func workerSQL(t *testing.T, s *Store, query string, args ...any) {
 func startWorkerFixture(t *testing.T, s *Store, suffix string) core.RunInputManifest {
 	t.Helper()
 	work := core.WorkItem{ID: "worker-work-" + suffix, Title: "worker admission fixture", HumanOwner: "fixture", State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC()}
-	workerOK(t, s.CreateWork(work))
+	workerOK(t, s.CreateWorkContext(context.Background(), work))
 	plan := verification.Plan{ID: "worker-plan-" + suffix, Criteria: []verification.Criterion{{ID: "ac", Statement: "test", Requirements: []verification.EvidenceRequirement{{ID: "req", Procedure: "test"}}}}}
 	pd, err := plan.Digest()
 	workerOK(t, err)
@@ -40,7 +40,7 @@ func startWorkerFixture(t *testing.T, s *Store, suffix string) core.RunInputMani
 	workerOK(t, err)
 	work.State = core.WorkReady
 	work.ActiveTaskContractDigest = td
-	workerOK(t, s.CreateTaskAndUpdateWork(task, plan, 1, work))
+	workerOK(t, s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, work))
 	input := core.RunInputManifest{RunID: "worker-run-" + suffix, TaskContractDigest: td, RuntimeProfile: "codex", ToolProfile: "tools", WorkerProfile: "worker/ubuntu", PolicyProfile: "policy"}
 	digest, err := input.Digest()
 	workerOK(t, err)
@@ -48,12 +48,12 @@ func startWorkerFixture(t *testing.T, s *Store, suffix string) core.RunInputMani
 	attempt, err := value.StartAttempt("attempt", time.Now().UTC())
 	workerOK(t, err)
 	sess := session.New(value.ID, attempt.Epoch)
-	work, err = s.GetWork(work.ID)
+	work, err = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, err)
 	version := work.Version
 	work.State = core.WorkExecuting
 	work.ActiveRunID = value.ID
-	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, version, work))
+	workerOK(t, s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, version, work))
 	return input
 }
 func claimWorkerFixture(t *testing.T, s *Store, subject string) *workerqueue.Assignment {
@@ -188,7 +188,7 @@ func TestWorkerInboxLeaseFencingAndRetainedReceipt(t *testing.T) {
 	if receipt.Kind != workerqueue.Validated || receipt.Validation.ExecutionStarted || receipt.Validation.ContextBytesVerified {
 		t.Fatal("receipt claims execution")
 	}
-	current, _, err := s.GetExecution(input.RunID)
+	current, _, err := s.GetExecutionContext(context.Background(), input.RunID)
 	workerOK(t, err)
 	if current.State != run.Running {
 		t.Fatal("admission completed Run")
@@ -215,7 +215,7 @@ func TestWorkerInboxRecoveryAndTakeoverFenceActiveLease(t *testing.T) {
 			workerOK(t, err)
 			switch mode {
 			case "recovery":
-				_, err := s.BeginRecovery(0)
+				_, err := s.BeginRecoveryContext(context.Background(), 0)
 				workerOK(t, err)
 			case "takeover":
 				workerSQL(t, s, `UPDATE runs SET current_epoch=current_epoch+1,state='HUMAN_CONTROLLED',control_owner='HUMAN' WHERE run_id=$1`, input.RunID)
@@ -240,7 +240,7 @@ func TestWorkerInboxCompletedRecoveryDoesNotReviveOldLease(t *testing.T) {
 	a := claimWorkerFixture(t, s, "worker")
 	report, err := workerqueue.NewReport(*a)
 	workerOK(t, err)
-	active, err := s.BeginRecovery(0)
+	active, err := s.BeginRecoveryContext(context.Background(), 0)
 	workerOK(t, err)
 	if _, err := s.CreateRecoveryProof(ctx, active.Epoch, "test-reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
 		t.Fatalf("live Worker lease did not block recovery proof: %v", err)
@@ -248,7 +248,7 @@ func TestWorkerInboxCompletedRecoveryDoesNotReviveOldLease(t *testing.T) {
 	workerSQL(t, s, `UPDATE worker_inbox SET lease_until=clock_timestamp()-interval '1 second' WHERE inbox_id=$1`, a.Token.InboxID)
 	_, err = s.CreateRecoveryProof(ctx, active.Epoch, "test-reconciler")
 	workerOK(t, err)
-	_, err = s.CompleteRecovery(active.Epoch, true)
+	_, err = s.CompleteRecoveryContext(context.Background(), active.Epoch, true)
 	workerOK(t, err)
 	if _, err := s.ReportInput(ctx, "worker", report); !errors.Is(err, workerqueue.ErrRecovery) {
 		t.Fatalf("old epoch revived: %v", err)

@@ -18,7 +18,7 @@ func (r *settlementUpdateRejector) Update(op Operation) error {
 	if op.State == r.reject {
 		return errors.New("injected durable ledger write failure")
 	}
-	return r.MemoryRepository.Update(op)
+	return r.MemoryRepository.UpdateContext(context.Background(), op)
 }
 
 func (r *settlementUpdateRejector) UpdateContext(ctx context.Context, op Operation) error {
@@ -48,7 +48,7 @@ func TestAmbiguousDispatchRequiresDurableUnknownBeforeReturningReceipt(t *testin
 	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "cannot persist UNKNOWN") || receipt.OperationID != "" {
 		t.Fatalf("invented settled UNKNOWN despite rejected database write: receipt=%#v err=%v", receipt, err)
 	}
-	durable, err := repository.Get(request.ID)
+	durable, err := repository.GetContext(context.Background(), request.ID)
 	if err != nil || durable.State != Dispatched {
 		t.Fatalf("external operation ledger state not preserved: state=%#v err=%v", durable, err)
 	}
@@ -62,7 +62,7 @@ func TestAmbiguousDispatchRequiresDurableUnknownBeforeReturningReceipt(t *testin
 
 func TestFailedReconciliationRequiresDurableManualBeforeReturningReceipt(t *testing.T) {
 	repository := &settlementUpdateRejector{MemoryRepository: NewMemoryRepository(), reject: Manual}
-	if err := repository.Create(Operation{
+	if err := repository.CreateContext(context.Background(), Operation{
 		ID: "op-failed-manual", RunID: "run-1", State: Unknown,
 		Action: "ci.dispatch", Capability: "ci.dispatch",
 	}); err != nil {
@@ -78,7 +78,7 @@ func TestFailedReconciliationRequiresDurableManualBeforeReturningReceipt(t *test
 	if !errors.Is(err, ErrExternalEffectUnresolved) || !strings.Contains(err.Error(), "cannot persist MANUAL") || receipt.OperationID != "" {
 		t.Fatalf("invented settled MANUAL despite rejected database write: receipt=%#v err=%v", receipt, err)
 	}
-	durable, err := repository.Get("op-failed-manual")
+	durable, err := repository.GetContext(context.Background(), "op-failed-manual")
 	if err != nil || durable.State != Reconciling {
 		t.Fatalf("reconciliation state not preserved for independent recovery: state=%#v err=%v", durable, err)
 	}

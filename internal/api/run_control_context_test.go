@@ -25,7 +25,7 @@ func (p *runControlContextProbe) UpdateExecutionContext(ctx context.Context, id 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.UpdateExecution(id, version, value, sess)
+	return p.Memory.UpdateExecutionContext(context.Background(), id, version, value, sess)
 }
 
 func (p *runControlContextProbe) UpdateExecutionAndWorkContext(ctx context.Context, id string, runVersion uint64, value run.Run, sess session.Session, workVersion uint64, work core.WorkItem) error {
@@ -33,7 +33,7 @@ func (p *runControlContextProbe) UpdateExecutionAndWorkContext(ctx context.Conte
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.UpdateExecutionAndWork(id, runVersion, value, sess, workVersion, work)
+	return p.Memory.UpdateExecutionAndWorkContext(context.Background(), id, runVersion, value, sess, workVersion, work)
 }
 
 func TestRunControlHTTPRoutesUseRequestBoundCoreAuthority(t *testing.T) {
@@ -62,7 +62,7 @@ func TestRunControlHTTPRoutesUseRequestBoundCoreAuthority(t *testing.T) {
 	if p.completeWrites != 1 {
 		t.Fatalf("Run completion bypassed atomic request-bound Run/Work authority: %d", p.completeWrites)
 	}
-	work, err := p.Memory.GetWork("work-run-complete")
+	work, err := p.Memory.GetWorkContext(context.Background(), "work-run-complete")
 	if err != nil || work.State != core.WorkVerifying {
 		t.Fatalf("Run completion failed to advance Work atomically: %#v err=%v", work, err)
 	}
@@ -92,7 +92,7 @@ func TestCancelledRunControlHTTPRequestCannotMutateRunOrSession(t *testing.T) {
 		t.Fatalf("cancelled Run control crossed Core authority: status=%d writes=%d",
 			response.Code, p.controlWrites)
 	}
-	value, sess, err := p.Memory.GetExecution("run-cancel-control")
+	value, sess, err := p.Memory.GetExecutionContext(context.Background(), "run-cancel-control")
 	if err != nil || value.State != run.Running || sess.Paused {
 		t.Fatalf("cancelled control changed Run/Session state: %#v %#v err=%v",
 			value, sess, err)

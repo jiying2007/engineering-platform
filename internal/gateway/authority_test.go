@@ -26,7 +26,7 @@ func setupAuthority(t *testing.T, allowed []string) (*Authority, *store.Memory, 
 		Version:    1,
 		CreatedAt:  time.Unix(1, 0),
 	}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 	plan := verification.Plan{
@@ -120,7 +120,7 @@ func TestRunEpochGuardRejectsStaleRuntime(t *testing.T) {
 
 func TestRecoveryModeAllowsObserveButBlocksMutations(t *testing.T) {
 	auth, state, _ := setupAuthority(t, []string{"device.read", "device.flash"})
-	active, err := state.BeginRecovery(0)
+	active, err := state.BeginRecoveryContext(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestRecoveryModeAllowsObserveButBlocksMutations(t *testing.T) {
 
 func TestRecoveryEpochMustMatchEvenForObserve(t *testing.T) {
 	auth, state, _ := setupAuthority(t, []string{"device.read"})
-	active, err := state.BeginRecovery(0)
+	active, err := state.BeginRecoveryContext(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		Version:    1,
 		CreatedAt:  time.Now().UTC(),
 	}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 
@@ -91,18 +91,18 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err := readyWork.Transition(core.WorkReady); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateTaskAndUpdateWork(task, plan, work.Version, readyWork); err != nil {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, work.Version, readyWork); err != nil {
 		t.Fatal(err)
 	}
 
-	persistedTask, err := s.GetTaskByDigest(taskDigest)
+	persistedTask, err := s.GetTaskByDigestContext(context.Background(), taskDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if persistedTask.VerificationPlanDigest != planDigest {
 		t.Fatalf("task/plan binding mismatch: %#v", persistedTask)
 	}
-	persistedPlan, err := s.GetVerificationPlanByDigest(planDigest)
+	persistedPlan, err := s.GetVerificationPlanByDigestContext(context.Background(), planDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("unexpected persisted plan: %#v", persistedPlan)
 	}
 
-	readyWork, err = s.GetWork(workID)
+	readyWork, err = s.GetWorkContext(context.Background(), workID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err := executingWork.Transition(core.WorkExecuting); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateExecutionAndUpdateWork(
+	if err := s.CreateExecutionAndUpdateWorkContext(context.Background(),
 		*value,
 		attempt,
 		*sess,
@@ -150,14 +150,14 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	persistedAttempt, err := s.GetAttempt(runID, attempt.ID)
+	persistedAttempt, err := s.GetAttemptContext(context.Background(), runID, attempt.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if persistedAttempt.Epoch != attempt.Epoch || !persistedAttempt.EndedAt.IsZero() {
 		t.Fatalf("unexpected persisted attempt: %#v", persistedAttempt)
 	}
-	persistedInput, err := s.GetRunInputByDigest(inputDigest)
+	persistedInput, err := s.GetRunInputByDigestContext(context.Background(), inputDigest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("structured context identity changed in PostgreSQL: %#v digest=%s err=%v", persistedInput, persistedInputDigest, err)
 	}
 
-	currentRun, currentSession, err := s.GetExecution(runID)
+	currentRun, currentSession, err := s.GetExecutionContext(context.Background(), runID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err := currentSession.ApplySteering(cmd); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RecordSteering(
+	if err := s.RecordSteeringContext(context.Background(),
 		runID,
 		currentRun.Version,
 		currentRun,
@@ -194,7 +194,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	storedSteer, err := s.GetSteering(cmd.ID)
+	storedSteer, err := s.GetSteeringContext(context.Background(), cmd.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("unexpected persisted steering: %#v", storedSteer)
 	}
 
-	currentRun, currentSession, err = s.GetExecution(runID)
+	currentRun, currentSession, err = s.GetExecutionContext(context.Background(), runID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,11 +220,11 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		LastEventSequence:      1,
 		CreatedAt:              time.Now().UTC(),
 	}
-	checkpointDigest, err := s.CreateCheckpoint(checkpoint)
+	checkpointDigest, err := s.CreateCheckpointContext(context.Background(), checkpoint)
 	if err != nil {
 		t.Fatal(err)
 	}
-	storedCheckpoint, storedCheckpointDigest, err := s.GetCheckpoint(checkpoint.ID)
+	storedCheckpoint, storedCheckpointDigest, err := s.GetCheckpointContext(context.Background(), checkpoint.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("unexpected checkpoint: %#v digest=%s", storedCheckpoint, storedCheckpointDigest)
 	}
 
-	currentWork, err := s.GetWork(workID)
+	currentWork, err := s.GetWorkContext(context.Background(), workID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err := verifyingWork.Transition(core.WorkVerifying); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateExecutionAndWork(
+	if err := s.UpdateExecutionAndWorkContext(context.Background(),
 		runID,
 		currentRun.Version,
 		completedRun,
@@ -275,10 +275,10 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateDelivery(delivery); err != nil {
+	if err := s.CreateDeliveryContext(context.Background(), delivery); err != nil {
 		t.Fatal(err)
 	}
-	storedDelivery, err := s.GetDelivery(delivery.ID)
+	storedDelivery, err := s.GetDeliveryContext(context.Background(), delivery.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,22 +297,22 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		ArtifactRefs:      []string{delivery.Artifacts[0].ID},
 		Applicable:        true,
 	}
-	if err := s.CreateEvidence(evidence); err != nil {
+	if err := s.CreateEvidenceContext(context.Background(), evidence); err != nil {
 		t.Fatal(err)
 	}
 	wrongRequirement := evidence
 	wrongRequirement.ID += "-wrong-requirement"
 	wrongRequirement.RequirementID = "req-other"
-	if err := s.CreateEvidence(wrongRequirement); err == nil {
+	if err := s.CreateEvidenceContext(context.Background(), wrongRequirement); err == nil {
 		t.Fatal("PostgreSQL store accepted evidence for a different frozen requirement")
 	}
 	wrongSubject := evidence
 	wrongSubject.ID += "-wrong-subject"
 	wrongSubject.SubjectDigest = "sha256:other"
-	if err := s.CreateEvidence(wrongSubject); err == nil {
+	if err := s.CreateEvidenceContext(context.Background(), wrongSubject); err == nil {
 		t.Fatal("PostgreSQL store accepted evidence for a different delivery subject")
 	}
-	storedEvidence, err := s.GetEvidence(evidence.ID)
+	storedEvidence, err := s.GetEvidenceContext(context.Background(), evidence.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,10 +329,10 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if report.Result != "PASS" {
 		t.Fatalf("expected PASS verification, got %#v", report)
 	}
-	if err := s.CreateVerification(report); err != nil {
+	if err := s.CreateVerificationContext(context.Background(), report); err != nil {
 		t.Fatal(err)
 	}
-	storedReport, err := s.GetVerification(report.ID)
+	storedReport, err := s.GetVerificationContext(context.Background(), report.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("unexpected verification report: %#v", storedReport)
 	}
 
-	verifyingWork, err = s.GetWork(workID)
+	verifyingWork, err = s.GetWorkContext(context.Background(), workID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,10 +359,10 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 	if err := reviewingWork.Transition(core.WorkReviewing); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateReviewAndUpdateWork(reviewReport, verifyingWork.Version, reviewingWork); err != nil {
+	if err := s.CreateReviewAndUpdateWorkContext(context.Background(), reviewReport, verifyingWork.Version, reviewingWork); err != nil {
 		t.Fatal(err)
 	}
-	storedReview, err := s.GetReview(reviewReport.ID)
+	storedReview, err := s.GetReviewContext(context.Background(), reviewReport.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +372,7 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		t.Fatalf("unexpected review report: %#v", storedReview)
 	}
 
-	reviewingWork, err = s.GetWork(workID)
+	reviewingWork, err = s.GetWorkContext(context.Background(), workID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -392,21 +392,21 @@ func TestPostgresCoreLifecycleVerticalSlice(t *testing.T) {
 		Result:               "CLOSED",
 		CreatedAt:            time.Now().UTC(),
 	}
-	if err := s.CreateClosureAndUpdateWork(
+	if err := s.CreateClosureAndUpdateWorkContext(context.Background(),
 		closure,
 		reviewingWork.Version,
 		closedWork,
 	); err != nil {
 		t.Fatal(err)
 	}
-	storedClosure, err := s.GetClosure(closure.ID)
+	storedClosure, err := s.GetClosureContext(context.Background(), closure.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if storedClosure.SubjectDigest != delivery.SubjectDigest {
 		t.Fatalf("unexpected closure: %#v", storedClosure)
 	}
-	finalWork, err := s.GetWork(workID)
+	finalWork, err := s.GetWorkContext(context.Background(), workID)
 	if err != nil {
 		t.Fatal(err)
 	}

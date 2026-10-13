@@ -21,7 +21,7 @@ func (p *steeringContextProbe) GetSteeringContext(ctx context.Context, id string
 	if err := ctx.Err(); err != nil {
 		return session.SteeringCommand{}, err
 	}
-	return p.Memory.GetSteering(id)
+	return p.Memory.GetSteeringContext(context.Background(), id)
 }
 
 func TestSteeringReadHTTPUsesCallerContextWithoutChangingRecordedProvenance(t *testing.T) {
@@ -39,7 +39,7 @@ func TestSteeringReadHTTPUsesCallerContextWithoutChangingRecordedProvenance(t *t
 			"policy_profile":  "policy/m1",
 		},
 	}, http.StatusCreated)
-	value, sess, err := probe.Memory.GetExecution("run-steer-context")
+	value, sess, err := probe.Memory.GetExecutionContext(context.Background(), "run-steer-context")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestSteeringReadHTTPUsesCallerContextWithoutChangingRecordedProvenance(t *t
 	if err := sess.ApplySteering(cmd); err != nil {
 		t.Fatal(err)
 	}
-	if err := probe.Memory.RecordSteering(value.ID, value.Version, value, sess, cmd); err != nil {
+	if err := probe.Memory.RecordSteeringContext(context.Background(), value.ID, value.Version, value, sess, cmd); err != nil {
 		t.Fatal(err)
 	}
 	mustRequest(t, handler, http.MethodGet, "/api/v1/steering/"+cmd.ID, nil, http.StatusOK)

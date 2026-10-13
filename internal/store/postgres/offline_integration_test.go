@@ -33,7 +33,7 @@ func offlineFixtureProfile(t *testing.T, s *Store, p sandbox.Profile) offline.St
 	pd, err := p.Digest()
 	workerOK(t, err)
 	work := core.WorkItem{ID: "offline-work", Title: "offline fixture", HumanOwner: "fixture", State: core.WorkDraft, Version: 1, CreatedAt: time.Now().UTC()}
-	workerOK(t, s.CreateWork(work))
+	workerOK(t, s.CreateWorkContext(context.Background(), work))
 	plan := verification.Plan{ID: "offline-plan", Criteria: []verification.Criterion{{ID: "ac", Statement: "test", Requirements: []verification.EvidenceRequirement{{ID: "req", Procedure: "test"}}}}}
 	planDigest, err := plan.Digest()
 	workerOK(t, err)
@@ -42,7 +42,7 @@ func offlineFixtureProfile(t *testing.T, s *Store, p sandbox.Profile) offline.St
 	workerOK(t, err)
 	work.State = core.WorkReady
 	work.ActiveTaskContractDigest = td
-	workerOK(t, s.CreateTaskAndUpdateWork(task, plan, 1, work))
+	workerOK(t, s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, work))
 	input := core.RunInputManifest{RunID: "offline-run", TaskContractDigest: td, RuntimeProfile: "offline-check", ToolProfile: "offline/" + pd, WorkerProfile: "worker/ubuntu", PolicyProfile: "policy"}
 	id, err := input.Digest()
 	workerOK(t, err)
@@ -50,12 +50,12 @@ func offlineFixtureProfile(t *testing.T, s *Store, p sandbox.Profile) offline.St
 	attempt, err := value.StartAttempt("attempt", time.Now().UTC())
 	workerOK(t, err)
 	sess := session.New(value.ID, attempt.Epoch)
-	work, err = s.GetWork(work.ID)
+	work, err = s.GetWorkContext(context.Background(), work.ID)
 	workerOK(t, err)
 	version := work.Version
 	work.State = core.WorkExecuting
 	work.ActiveRunID = value.ID
-	workerOK(t, s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, version, work))
+	workerOK(t, s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, version, work))
 	relayWorkerFixture(t, s)
 	a := *claimWorkerFixture(t, s, "offline-worker")
 	ir, err := workerqueue.NewReport(a)
@@ -84,7 +84,7 @@ func TestOfflineStoreFreshGrantReplayAndMigration(t *testing.T) {
 	first, err := s.FinishOffline(ctx, "offline-worker", report)
 	workerOK(t, err)
 	workerOK(t, first.Verify("offline-worker", p, report.Result))
-	_, err = s.BeginRecovery(p.Token.RecoveryEpoch)
+	_, err = s.BeginRecoveryContext(context.Background(), p.Token.RecoveryEpoch)
 	workerOK(t, err)
 	second, err := s.FinishOffline(ctx, "offline-worker", report)
 	workerOK(t, err)
@@ -147,7 +147,7 @@ func TestOfflineStoreRevocationExpiryAndIdentity(t *testing.T) {
 			case "profile":
 				token.ProfileDigest = sandbox.Hash([]byte("other"))
 			case "recovery":
-				_, err = s.BeginRecovery(token.RecoveryEpoch)
+				_, err = s.BeginRecoveryContext(context.Background(), token.RecoveryEpoch)
 				workerOK(t, err)
 			case "pause":
 				workerSQL(t, s, "UPDATE sessions SET paused=true")

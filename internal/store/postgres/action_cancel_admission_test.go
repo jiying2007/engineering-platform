@@ -88,10 +88,10 @@ func TestPostgresActionCancellationInterruptsLockedAdmissionWithoutDispatch(t *t
 	if err := blocker.Rollback(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if stored, err := s.Get(request.ID); !errors.Is(err, action.ErrOperationAbsent) {
+	if stored, err := s.GetContext(context.Background(), request.ID); !errors.Is(err, action.ErrOperationAbsent) {
 		t.Fatalf("cancelled SQL created a false reservation: %#v err=%v", stored, err)
 	}
-	if stored, err := s.GetByIdempotencyKey(request.IdempotencyKey); !errors.Is(err, action.ErrOperationAbsent) {
+	if stored, err := s.GetByIdempotencyKeyContext(context.Background(), request.IdempotencyKey); !errors.Is(err, action.ErrOperationAbsent) {
 		t.Fatalf("cancelled SQL retained an unexpected idempotency key: %#v err=%v", stored, err)
 	}
 }

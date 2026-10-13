@@ -35,7 +35,7 @@ func TestMemoryCancellationWhileWaitingCannotReadOrMutate(t *testing.T) {
 		{"work-create", func(ctx context.Context, m *Memory) error {
 			return m.CreateWorkContext(ctx, core.WorkItem{ID: "cancelled"})
 		}, func(t *testing.T, m *Memory) {
-			if _, err := m.GetWork("cancelled"); !errors.Is(err, ErrNotFound) {
+			if _, err := m.GetWorkContext(context.Background(), "cancelled"); !errors.Is(err, ErrNotFound) {
 				t.Fatalf("cancelled write persisted: %v", err)
 			}
 		}},
@@ -44,7 +44,7 @@ func TestMemoryCancellationWhileWaitingCannotReadOrMutate(t *testing.T) {
 		{"action-create", func(ctx context.Context, m *Memory) error {
 			return m.CreateContext(ctx, action.Operation{ID: "cancelled", IdempotencyKey: "cancelled"})
 		}, func(t *testing.T, m *Memory) {
-			if _, err := m.Get("cancelled"); !errors.Is(err, action.ErrOperationAbsent) {
+			if _, err := m.GetContext(context.Background(), "cancelled"); !errors.Is(err, action.ErrOperationAbsent) {
 				t.Fatalf("cancelled Action persisted: %v", err)
 			}
 		}},
@@ -52,7 +52,7 @@ func TestMemoryCancellationWhileWaitingCannotReadOrMutate(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := NewMemory()
-			if err := m.CreateWork(core.WorkItem{ID: "existing"}); err != nil {
+			if err := m.CreateWorkContext(context.Background(), core.WorkItem{ID: "existing"}); err != nil {
 				t.Fatal(err)
 			}
 			parent, cancel := context.WithCancel(context.Background())

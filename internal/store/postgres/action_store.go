@@ -98,10 +98,6 @@ func checkActionAdmission(ctx context.Context, tx pgx.Tx, op action.Operation) e
 	return nil
 }
 
-func (s *Store) Create(op action.Operation) error {
-	return s.CreateContext(context.Background(), op)
-}
-
 // CreateContext propagates the exact request cancellation into the same
 // authoritative PostgreSQL admission transaction. If COMMIT becomes
 // ambiguous, callers must read back the idempotency key rather than retry.
@@ -137,16 +133,8 @@ INSERT INTO external_operations (
 	return err
 }
 
-func (s *Store) Get(id string) (action.Operation, error) {
-	return s.GetContext(context.Background(), id)
-}
-
 func (s *Store) GetContext(ctx context.Context, id string) (action.Operation, error) {
 	return s.readOperation(ctx, "WHERE operation_id=$1", id)
-}
-
-func (s *Store) GetByIdempotencyKey(key string) (action.Operation, error) {
-	return s.GetByIdempotencyKeyContext(context.Background(), key)
 }
 
 func (s *Store) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
@@ -175,10 +163,6 @@ FROM external_operations `
 	op.RiskClass = action.RiskClass(riskClass)
 	op.State = action.State(state)
 	return op, nil
-}
-
-func (s *Store) Update(op action.Operation) error {
-	return s.UpdateContext(context.Background(), op)
 }
 
 // UpdateContext binds the caller deadline to pre-effect DISPATCHED authority

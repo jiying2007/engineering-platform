@@ -263,7 +263,7 @@ func TestTLSAndWireAuthorityCannotBeSpoofed(t *testing.T) {
 	operator := pki.Client(t, recoverySubject)
 	secureCall(t, operator, server.URL+"/api/v1/recovery/begin", map[string]any{"expected_recovery_epoch": 0}, http.StatusOK)
 	secureCall(t, operator, server.URL+"/api/v1/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusServiceUnavailable)
-	state, err := backend.GetRecovery()
+	state, err := backend.GetRecoveryContext(context.Background())
 	if err != nil || string(state.Mode) != "RECOVERY_RECONCILIATION" {
 		t.Fatal("completion bypassed reconciliation authority")
 	}
@@ -281,7 +281,7 @@ func (g *rejectingRecoveryGate) AuthorizeCompletion(_ context.Context, subject s
 }
 func TestRecoveryRequiresIndependentEpochGate(t *testing.T) {
 	backend := store.NewMemory()
-	if _, err := backend.BeginRecovery(0); err != nil {
+	if _, err := backend.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	gate := &rejectingRecoveryGate{}
@@ -425,7 +425,7 @@ func TestPostgresRecoveryProofRequiresSeparateIdentities(t *testing.T) {
 	secureCall(t, reconciler, base+"/recovery/proofs", proofBody, http.StatusCreated)
 	secureCall(t, reconciler, base+"/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusForbidden)
 	secureCall(t, operator, base+"/recovery/complete", map[string]any{"recovery_epoch": 1}, http.StatusOK)
-	state, err := backend.GetRecovery()
+	state, err := backend.GetRecoveryContext(context.Background())
 	if err != nil || state.Mode != recovery.Normal || state.Epoch != 1 {
 		t.Fatalf("recovery did not complete through independent proof: %#v %v", state, err)
 	}

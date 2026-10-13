@@ -32,7 +32,7 @@ func TestMemoryRepositoryRejectsReservationIdentityDrift(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewMemoryRepository()
 			original := identityFixture()
-			if err := r.Create(original); err != nil {
+			if err := r.CreateContext(context.Background(), original); err != nil {
 				t.Fatal(err)
 			}
 			changed := original
@@ -41,18 +41,18 @@ func TestMemoryRepositoryRejectsReservationIdentityDrift(t *testing.T) {
 			if err := r.UpdateContext(context.Background(), changed); !errors.Is(err, ErrInvalidTransition) {
 				t.Fatalf("identity drift accepted: %v", err)
 			}
-			stored, err := r.Get(original.ID)
+			stored, err := r.GetContext(context.Background(), original.ID)
 			if err != nil || stored != original {
 				t.Fatalf("original reservation changed: %+v %v", stored, err)
 			}
-			byKey, err := r.GetByIdempotencyKey(original.IdempotencyKey)
+			byKey, err := r.GetByIdempotencyKeyContext(context.Background(), original.IdempotencyKey)
 			if err != nil || byKey != original {
 				t.Fatal("original idempotency binding changed")
 			}
 			original.State = Confirmed
 			original.ExternalRef = "provider:original"
 			original.ObservedState = "observed"
-			if err := r.Update(original); err != nil {
+			if err := r.UpdateContext(context.Background(), original); err != nil {
 				t.Fatalf("original settlement refused: %v", err)
 			}
 		})
@@ -76,7 +76,7 @@ func TestMemoryRepositoryCancelledWaiterCannotAccessLedger(t *testing.T) {
 		t.Run(operation, func(t *testing.T) {
 			r := NewMemoryRepository()
 			original := identityFixture()
-			if err := r.Create(original); err != nil {
+			if err := r.CreateContext(context.Background(), original); err != nil {
 				t.Fatal(err)
 			}
 			parent, cancel := context.WithCancel(context.Background())
@@ -125,11 +125,11 @@ func TestMemoryRepositoryCancelledWaiterCannotAccessLedger(t *testing.T) {
 			case <-time.After(2 * time.Second):
 				t.Fatal("waiter did not return after lock release")
 			}
-			stored, err := r.Get(original.ID)
+			stored, err := r.GetContext(context.Background(), original.ID)
 			if err != nil || stored != original {
 				t.Fatal("cancelled update changed ledger")
 			}
-			if _, err := r.Get("new"); !errors.Is(err, ErrOperationAbsent) {
+			if _, err := r.GetContext(context.Background(), "new"); !errors.Is(err, ErrOperationAbsent) {
 				t.Fatal("cancelled creation persisted")
 			}
 		})

@@ -258,7 +258,7 @@ func TestPreparationCommandRealBytesLeaseAndDurableReadback(t *testing.T) {
 	if string(got) != "exact source\n" {
 		t.Fatal("workspace not exact base")
 	}
-	value, _, err := store.GetExecution(input.RunID)
+	value, _, err := store.GetExecutionContext(context.Background(), input.RunID)
 	commandOK(t, err)
 	if value.State != run.Running {
 		t.Fatal("preparation completed Run")
