@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject skipped/missing targeted PostgreSQL recovery tests in canonical CI."""
+"""Reject skipped/missing targeted publication recovery and kernel tests."""
 import json
 import sys
 from collections import Counter
@@ -20,7 +20,20 @@ REQUIRED = {
 
 RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill"}
 
-def verify(path: Path, repeats: int = 3, required=REQUIRED) -> None:
+PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"
+PUBLISHER_REQUIRED = {
+    "TestPublisherGitNamespaceReapsFastCommands",
+    "TestPublisherGitNamespaceKillsDetachedHelper",
+    "TestPublisherGitNamespaceCancellationReapsTree",
+    "TestPublisherGitNamespacePrecancelledStartsNothing",
+    "TestPublisherGitUnconfirmedReapQuarantinesVerifiedSource",
+    "TestPublisherGitOutputReapsDetachedDescendant",
+    "TestPublisherGitCredentialNeverFollowsRemoteRedirect",
+    "TestGitHubPublishNeverReopensClosedDeterministicBranch",
+    "TestGitHubNullOpenPullReadbackNeverAuthorizesCreate",
+}
+
+def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> None:
     if repeats < 1 or repeats > 20:
         raise ValueError("invalid repetition count")
     passed = Counter()
@@ -30,26 +43,28 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED) -> None:
         if not isinstance(event, dict):
             raise ValueError("invalid test event")
         if event.get("Action") in ("skip", "fail"):
-            raise ValueError("database test was skipped or failed")
+            raise ValueError("required test was skipped or failed")
         if event.get("Action") == "pass":
             name = event.get("Test")
             if name in required:
-                if event.get("Package") != PACKAGE:
+                if event.get("Package") != package:
                     raise ValueError("targeted test belongs to a different package")
                 passed[name] += 1
-            elif not name and event.get("Package") == PACKAGE:
+            elif not name and event.get("Package") == package:
                 package_passed = True
     if not package_passed or any(passed[name] != repeats for name in required):
-        raise ValueError("missing exact targeted database success events")
+        raise ValueError("missing exact targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2]!="--restore"):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel]")
     try:
-        if len(sys.argv)==3:
+        if len(sys.argv)==3 and sys.argv[2]=="--publisher-kernel":
+            verify(Path(sys.argv[1]), required=PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)
+        elif len(sys.argv)==3:
             verify(Path(sys.argv[1]), repeats=1, required=RESTORE_REQUIRED)
         else:
             verify(Path(sys.argv[1]))
     except (OSError, ValueError) as exc:
-        raise SystemExit(f"database recovery gate rejected: {exc}")
-    print("Publication recovery PostgreSQL tests: explicit required repetitions, zero skips")
+        raise SystemExit(f"publication recovery gate rejected: {exc}")
+    print("Publication recovery required tests: explicit required repetitions, zero skips")

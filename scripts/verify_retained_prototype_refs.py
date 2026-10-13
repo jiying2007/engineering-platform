@@ -17,6 +17,7 @@ NAMES = (
     "feat/independent-publisher-service",
     "feat/independent-review-authority",
     "feat/relay-codex-config-renderer",
+    "feat/completed-publication-recovery-20261012",
 )
 
 def require(value, message):

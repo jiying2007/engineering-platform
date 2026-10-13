@@ -134,17 +134,12 @@ func Check(c Config) (Result, error) {
 	if err := readHostJSON(control["GITHUB_PUBLISHER_PLAN_FILE"], &plan); err != nil {
 		return result, err
 	}
-	var pub githubpublish.Configuration
+	var pub githubpublish.ServiceConfiguration
 	if err := readHostJSON(publisher["PUBLISHER_CONFIG_FILE"], &pub); err != nil {
 		return result, err
 	}
-	if plan.Version != 1 || pub.Version != 1 || len(plan.Targets) == 0 || len(plan.Targets) != len(pub.Targets) || plan.ArtifactRoot != pub.ArtifactRoot {
-		return result, fmt.Errorf("publisher plan/service policy mismatch")
-	}
-	for i, target := range plan.Targets {
-		if target != pub.Targets[i] {
-			return result, fmt.Errorf("publisher target policy mismatch")
-		}
+	if err := checkPublisherPolicyAndWitness(plan, pub, uids[3], groups[3]); err != nil {
+		return result, err
 	}
 	if err := safeDirectory(pub.ArtifactRoot); err != nil {
 		return result, err

@@ -31,6 +31,11 @@
       "branch": "feat/relay-codex-config-renderer",
       "expected_head": "e4e88385dcb01d3da54a7334eb64f14e472e0aec",
       "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
+    },
+    {
+      "branch": "feat/completed-publication-recovery-20261012",
+      "expected_head": "f9860c2271e2119279daf5a31549ff9ca7fedba7",
+      "disposition": "RETAINED_SUPERSEDED_PROTOTYPE"
     }
   ]
 }
