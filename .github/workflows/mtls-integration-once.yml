@@ -1,0 +1,96 @@
+name: Verify integrated Publisher mTLS response candidate
+on:
+  push:
+    branches: [fix/publisher-mtls-complete-response-20261014]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write # Immutable blob export only; no commit/ref/issue mutation.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Materialize exact integrated source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/mtls-evidence"
+          python3 -B - <<'PY'
+          import gzip,hashlib,subprocess
+          from pathlib import Path
+          raw=Path('.ci-mtls/patch.gz').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='f39ff1454470f673d939b2e6d979f8b61ad57cc7a8318bc271152d932583a610'
+          patch=gzip.decompress(raw)
+          assert len(patch)==28244 and hashlib.sha256(patch).hexdigest()=='7e683568d702524fc046ed85e9c4dd0de690c7b887b7a08b3efb131be94c27b7'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.ci-mtls/patch.gz','.github/workflows/mtls-integration-once.yml'],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='b9a8d00c5cd47a9cd1a7117ef2f560312a6bca56'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run original-module mTLS and script regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mtls-evidence"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          go test -json -race -count=3 -timeout 3m ./internal/githubpublish -run '^Test(PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation)' | tee "$out/mtls-integrated-3.jsonl"
+          python3 -B - <<'PY'
+          import os,re,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import verify_publication_recovery_log as gate
+          names=set(re.findall(r'^func (TestPublisherRemote\w+)\(',Path('internal/githubpublish/remote_response_test.go').read_text(),re.M))
+          assert len(names)==7
+          gate.verify(Path(os.environ['RUNNER_TEMP'])/'mtls-evidence/mtls-integrated-3.jsonl',repeats=3,required=names,package=gate.PUBLISHER_PACKAGE)
+          PY
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-binding.json"
+          go vet ./internal/githubpublish
+      - name: Export only the verified immutable source blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='474d6a8b0e406a7730cc5edc561923ce40921a75';tree='b9a8d00c5cd47a9cd1a7117ef2f560312a6bca56'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          expected={'.github/workflows/ci.yml':'b1d673987209181a0f1b354b1392da42b133c00c','docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md':'abb496724a86458a4fba842266efbd0ffcd03a61','docs/status/IMPLEMENTATION_STATUS.md':'5a3001045a24ab5b1bf611647e90c6178c6cfe0d','internal/githubpublish/github_response.go':'b346117ee9e064ccd56c2fe17aed140bee9f67f9','internal/githubpublish/remote_client.go':'4e0052888f36b141a310a9b8b43eb7a23f03815b','internal/githubpublish/remote_response_test.go':'9a08009351df2aef49b46df311815051c0d5aae3','internal/githubpublish/response_body.go':'87bb80fe16505d21213561ee337a9d2cde183316','scripts/test_verify_publication_recovery_log.py':'4eaf7bfc518155ccb4125de4a73894ec51cc6f04','scripts/verify_publication_recovery_log.py':'71b90420abf644c43cdc99b95a6b07e38c6b83c6'}
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert set(paths)==set(expected)
+          records=[]
+          for name in paths:
+            raw=Path(name).read_bytes();assert len(raw)<100000
+            sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest();assert sha==expected[name]
+            payload=json.dumps({'encoding':'base64','content':base64.b64encode(raw).decode()}).encode()
+            obj=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+            assert obj['sha']==sha
+            records.append({'path':name,'sha':sha,'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)})
+          out=Path(os.environ['RUNNER_TEMP'])/'mtls-evidence'
+          (out/'source-objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False,'live_provider_executed':False,'production_qualified':False},indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          (out/'integrated.patch').write_bytes(subprocess.check_output(['git','diff','--cached',base]))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: integrated-mtls-response-${{ github.sha }}
+          path: ${{ runner.temp }}/mtls-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Branch-only exact-byte source transport; absent from the final target tree.
+# PR278 cleanup is preserved. Internal blockers [228,229] remain OPEN/BLOCKED.
