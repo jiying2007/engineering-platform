@@ -207,6 +207,20 @@ imposed on the independent Worker artifact. Existing digest and private snapshot
 checks remain authoritative. This does not forcibly interrupt a blocked regular-
 file syscall/fsync or qualify selected-host latency, storage or #229 overall.
 
+## Import-bound origin references
+
+The existing scanner now parses the exact source bytes it hashes with the Go AST
+frontend in `scripts/context_inventory_ast.go`, rather than searching source text.
+Explicit context import aliases, multiline selectors and constructor function values
+remain reviewable at their origin. Local alias shadowing and source strings/comments
+are not mistaken for Context constructors. Physical file/line positions ignore
+Go `//line` remapping. Dot imports of context fail the inventory rather than being
+guessed across package files. All existing direct entries and category counts remain
+unchanged; no new background lifecycle is authorized by this scanner change.
+
+Origin enumeration is still not dynamic function-value points-to analysis, a complete
+interprocedural request-flow proof or selected-host kernel/storage qualification.
+
 ## Original armed-cancellation certificate
 
 The original Publisher uses one five-second cancellation-independent context to
