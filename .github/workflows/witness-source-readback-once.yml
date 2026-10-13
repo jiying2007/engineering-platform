@@ -29,7 +29,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 3
+          fetch-depth: 4
       - name: Materialize hash-bound reviewed source only
         shell: bash
         run: |
@@ -47,6 +47,14 @@ jobs:
           subprocess.run(['git','apply','--index','-'],input=patch,check=True)
           subprocess.run(['git','rm','--cached','.github/workflows/witness-source-readback-once.yml',*[f'.ci-witness/patch.{i}.b64' for i in range(3)]],check=True)
           assert subprocess.check_output(['git','write-tree'],text=True).strip()=='d28dbf473c2f6d7809ebc1d5ac03766e173232ed'
+          # The prior run correctly rejected one trailing blank line. Apply only
+          # that exact reviewed byte correction; retain all tests/guardrails.
+          p=Path('scripts/test_verify_publication_recovery_log.py');raw=p.read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='2ce926867cb4a297d386d58222da9c18cf81bdc863f9fd9a9b5c53707a770322' and raw.endswith(b'\n\n')
+          p.write_bytes(raw[:-1])
+          assert hashlib.sha256(p.read_bytes()).hexdigest()=='5b71041835c7302cde9e57ee64cebbce4ceed2dd71203a9b6ed492e11b2f13c4'
+          subprocess.run(['git','add',str(p)],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='17daa2b61f9565744277fde231316cb2065ce7b2'
           PY
           git diff --cached --check
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
@@ -79,7 +87,7 @@ jobs:
           python3 -B - <<'PY'
           import base64,hashlib,json,os,subprocess
           from pathlib import Path
-          repo='jiying2007/engineering-platform';base='2e44ef83804992cbbbd713b7a7af7c556f07f19b';tree='d28dbf473c2f6d7809ebc1d5ac03766e173232ed'
+          repo='jiying2007/engineering-platform';base='2e44ef83804992cbbbd713b7a7af7c556f07f19b';tree='17daa2b61f9565744277fde231316cb2065ce7b2'
           assert os.environ['GITHUB_REPOSITORY']==repo
           paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
           assert len(paths)==24 and not any(p.startswith('.ci-') or '__pycache__' in p or p.endswith('once.yml') for p in paths)
