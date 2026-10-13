@@ -15,10 +15,13 @@ import (
 )
 
 func TestNoInvocationRestoreDrill(t *testing.T) {
+	forNoInvocationVersions(t, testNoInvocationRestoreDrill)
+}
+func testNoInvocationRestoreDrill(t *testing.T, version int) {
 	if os.Getenv("EP_RESTORE_DRILL") != "1" {
 		t.Skip("EP_RESTORE_DRILL is not set")
 	}
-	s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	saved, err := s.AbandonUninvokedPublication(ctx, plannedReconciler, req, e)

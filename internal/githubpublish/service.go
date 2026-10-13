@@ -159,7 +159,7 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	}
 	// A durable intent precedes every possible remote invocation. A crashed
 	// STARTED-v2 with no intent is recoverable only while owning this same lock.
-	if err := slot.arm(r.Context(), start); err != nil {
+	if err := slot.prepareInvocation(r.Context(), start); err != nil {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication invocation barrier unavailable; no replay")
 		return
 	}

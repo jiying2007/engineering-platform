@@ -19,9 +19,12 @@ import (
 )
 
 func TestNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T) {
+	forNoInvocationVersions(t, testNoInvocationDatabaseCorruptionBlocksProofAndReadback)
+}
+func testNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T, version int) {
 	for _, mode := range []string{"external-ref", "observation", "missing-receipt", "self-consistent-receipt", "missing-operation", "missing-audit", "changed-time", "unknown-field"} {
 		t.Run(mode, func(t *testing.T) {
-			s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+			s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 			ctx := context.Background()
 			saved, err := s.AbandonUninvokedPublication(ctx, plannedReconciler, req, e)
 			if err != nil {
@@ -69,9 +72,12 @@ func TestNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T) {
 }
 
 func TestNoInvocationDatabaseWaitCancellationIsAtomic(t *testing.T) {
+	forNoInvocationVersions(t, testNoInvocationDatabaseWaitCancellationIsAtomic)
+}
+func testNoInvocationDatabaseWaitCancellationIsAtomic(t *testing.T, version int) {
 	for _, table := range []string{"platform_state", "external_operations", "audit_journal_state"} {
 		t.Run(table, func(t *testing.T) {
-			s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+			s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 			ctx := context.Background()
 			before := actionIdentityAuditCount(t, s, req.Identity.OperationID)
 			held, err := s.pool.Begin(ctx)
@@ -103,7 +109,10 @@ func TestNoInvocationDatabaseWaitCancellationIsAtomic(t *testing.T) {
 }
 
 func TestNoInvocationDatabaseAuditFailureRollsBack(t *testing.T) {
-	s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	forNoInvocationVersions(t, testNoInvocationDatabaseAuditFailureRollsBack)
+}
+func testNoInvocationDatabaseAuditFailureRollsBack(t *testing.T, version int) {
+	s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	ctx := context.Background()
 	if _, err := s.pool.Exec(ctx, "DELETE FROM audit_journal_state"); err != nil {
 		t.Fatal(err)
@@ -121,7 +130,10 @@ func TestNoInvocationDatabaseAuditFailureRollsBack(t *testing.T) {
 }
 
 func TestNoInvocationDatabaseConcurrentSettlementIsSingle(t *testing.T) {
-	s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	forNoInvocationVersions(t, testNoInvocationDatabaseConcurrentSettlementIsSingle)
+}
+func testNoInvocationDatabaseConcurrentSettlementIsSingle(t *testing.T, version int) {
+	s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	ctx := context.Background()
 	start := make(chan struct{})
 	errs := make(chan error, 2)
@@ -169,7 +181,10 @@ func TestNoInvocationDatabaseConcurrentSettlementIsSingle(t *testing.T) {
 }
 
 func TestNoInvocationDatabaseRealCommitAckLoss(t *testing.T) {
-	original, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	forNoInvocationVersions(t, testNoInvocationDatabaseRealCommitAckLoss)
+}
+func testNoInvocationDatabaseRealCommitAckLoss(t *testing.T, version int) {
+	original, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	cfg := original.pool.Config()
 	host := cfg.ConnConfig.Host
 	ip := net.ParseIP(host)
@@ -229,7 +244,10 @@ func TestNoInvocationDatabaseRealCommitAckLoss(t *testing.T) {
 }
 
 func TestNoInvocationDatabaseCompletionRechecksEvidence(t *testing.T) {
-	s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	forNoInvocationVersions(t, testNoInvocationDatabaseCompletionRechecksEvidence)
+}
+func testNoInvocationDatabaseCompletionRechecksEvidence(t *testing.T, version int) {
+	s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	ctx := context.Background()
 	if _, err := s.AbandonUninvokedPublication(ctx, plannedReconciler, req, e); err != nil {
 		t.Fatal(err)

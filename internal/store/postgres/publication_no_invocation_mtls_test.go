@@ -39,7 +39,10 @@ func (o *databaseNonInvocationObserver) FenceUninvokedPublication(ctx context.Co
 }
 
 func TestNoInvocationDatabaseMTLSIndependentCompletion(t *testing.T) {
-	s, req, e := noInvocationDatabaseFixture(t, action.Manual)
+	forNoInvocationVersions(t, testNoInvocationDatabaseMTLSIndependentCompletion)
+}
+func testNoInvocationDatabaseMTLSIndependentCompletion(t *testing.T, version int) {
+	s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 	observer := &databaseNonInvocationObserver{evidence: e}
 	const reader = "urn:engineering-platform:operator:readonly"
 	const proof = "urn:engineering-platform:operator:proof"
