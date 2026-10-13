@@ -1,0 +1,34 @@
+name: Witness integrity exact source
+on:
+  push:
+    branches: [fix/witness-proof-integrity-20261013]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ec012c01b5c0e66efffd14300248293d0d59b251
+          persist-credentials: false
+      - name: Archive tracked source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = ec012c01b5c0e66efffd14300248293d0d59b251
+          out="$RUNNER_TEMP/witness-integrity-source"
+          mkdir "$out"
+          git archive --format=tar HEAD > "$out/source.tar"
+          git rev-parse HEAD > "$out/SOURCE_SHA"
+          git rev-parse HEAD^{tree} > "$out/SOURCE_TREE"
+          (cd "$out" && sha256sum source.tar > SHA256SUMS)
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: witness-integrity-source-ec012c01
+          path: ${{ runner.temp }}/witness-integrity-source
+          if-no-files-found: error
+          retention-days: 1
+# Read-only branch-local transport; no environment/credentials/host files.
+# Removed from the product tree before exact-head qualification.
