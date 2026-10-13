@@ -133,7 +133,7 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusForbidden, err.Error())
 		return
 	}
-	bundle, cleanup, err := s.verifyBundle(req.Plan)
+	bundle, cleanup, err := s.verifyBundle(r.Context(), req.Plan)
 	if err != nil {
 		writePublisherError(w, http.StatusUnprocessableEntity, err.Error())
 		return
@@ -235,15 +235,14 @@ func (s *RemoteService) authorizePlan(plan Plan) error {
 	return nil
 }
 
-func (s *RemoteService) verifyBundle(plan Plan) (string, func(), error) {
+func (s *RemoteService) verifyBundle(ctx context.Context, plan Plan) (string, func(), error) {
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
 	if s == nil || plan.Validate() != nil {
 		return "", nil, fmt.Errorf("valid publication plan required")
 	}
-	current, err := os.Lstat(s.artifactRoot)
-	if err != nil || !current.IsDir() || !os.SameFile(current, s.artifactIdentity) {
-		return "", nil, fmt.Errorf("publisher artifact root changed")
-	}
-	root, err := os.OpenRoot(s.artifactRoot)
+	root, err := openBundleRoot(s.artifactRoot, s.artifactIdentity)
 	if err != nil {
 		return "", nil, err
 	}
@@ -253,14 +252,9 @@ func (s *RemoteService) verifyBundle(plan Plan) (string, func(), error) {
 	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm()&0o022 != 0 || before.Size() != plan.BundleSize {
 		return "", nil, fmt.Errorf("retained result bundle is not the expected regular file")
 	}
-	source, err := root.Open(name)
+	source, err := openBundleRead(root, name, before, plan.BundleSize)
 	if err != nil {
 		return "", nil, err
-	}
-	opened, err := source.Stat()
-	if err != nil || !os.SameFile(before, opened) {
-		_ = source.Close()
-		return "", nil, fmt.Errorf("retained result bundle changed before read")
 	}
 
 	// Stage a private copy under the publisher's UID. Verifying a hash and
@@ -280,16 +274,16 @@ func (s *RemoteService) verifyBundle(plan Plan) (string, func(), error) {
 		return "", nil, err
 	}
 	hash := sha256.New()
-	n, copyErr := io.Copy(io.MultiWriter(copyFile, hash), io.LimitReader(source, plan.BundleSize+1))
+	n, copyErr := copyBundle(ctx, io.MultiWriter(copyFile, hash), source, plan.BundleSize)
 	closeSourceErr := source.Close()
 	syncErr := copyFile.Sync()
 	closeCopyErr := copyFile.Close()
 	after, afterErr := root.Lstat(name)
 	if copyErr != nil || closeSourceErr != nil || syncErr != nil || closeCopyErr != nil ||
 		afterErr != nil || !os.SameFile(before, after) || after.Size() != before.Size() ||
-		n != plan.BundleSize {
+		n != plan.BundleSize || ctx.Err() != nil {
 		cleanup()
-		return "", nil, fmt.Errorf("retained result bundle changed or private snapshot failed")
+		return "", nil, errors.Join(ctx.Err(), fmt.Errorf("retained result bundle changed or private snapshot failed"))
 	}
 	if "sha256:"+hex.EncodeToString(hash.Sum(nil)) != plan.BundleDigest {
 		cleanup()

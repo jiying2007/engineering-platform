@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -261,7 +261,7 @@ func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, param
 	if !requireBundle {
 		return plan, "", nil
 	}
-	bundle, err := p.verifyBundle(status.Token.ID, change.BundleDigest, change.BundleSize)
+	bundle, err := p.verifyBundle(ctx, status.Token.ID, change.BundleDigest, change.BundleSize)
 	if err != nil {
 		return empty, "", err
 	}
@@ -306,15 +306,14 @@ func encodeReceipt(receipt PublicationReceipt) (string, error) {
 	return string(data), nil
 }
 
-func (p *Provider) verifyBundle(id, wantDigest string, wantSize int64) (string, error) {
+func (p *Provider) verifyBundle(ctx context.Context, id, wantDigest string, wantSize int64) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if !executionID.MatchString(id) || !digestPattern.MatchString(wantDigest) || wantSize <= 0 || wantSize > 1<<30 {
 		return "", fmt.Errorf("invalid retained bundle identity")
 	}
-	current, err := os.Lstat(p.artifactRoot)
-	if err != nil || !current.IsDir() || !os.SameFile(current, p.artifactIdentity) {
-		return "", fmt.Errorf("publisher artifact root changed")
-	}
-	root, err := os.OpenRoot(p.artifactRoot)
+	root, err := openBundleRoot(p.artifactRoot, p.artifactIdentity)
 	if err != nil {
 		return "", err
 	}
@@ -325,22 +324,17 @@ func (p *Provider) verifyBundle(id, wantDigest string, wantSize int64) (string, 
 		before.Size() != wantSize {
 		return "", fmt.Errorf("retained result bundle is not the expected regular file")
 	}
-	file, err := root.Open(name)
+	file, err := openBundleRead(root, name, before, wantSize)
 	if err != nil {
 		return "", err
 	}
-	opened, err := file.Stat()
-	if err != nil || !os.SameFile(before, opened) {
-		_ = file.Close()
-		return "", fmt.Errorf("retained result bundle changed before read")
-	}
 	hash := sha256.New()
-	n, copyErr := io.Copy(hash, io.LimitReader(file, (1<<30)+1))
+	n, copyErr := copyBundle(ctx, hash, file, wantSize)
 	closeErr := file.Close()
 	after, afterErr := root.Lstat(name)
 	if copyErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(before, after) ||
-		n != wantSize || n > 1<<30 {
-		return "", fmt.Errorf("retained result bundle changed during read")
+		n != wantSize || n > 1<<30 || ctx.Err() != nil {
+		return "", errors.Join(ctx.Err(), fmt.Errorf("retained result bundle changed during read"))
 	}
 	actual := "sha256:" + hex.EncodeToString(hash.Sum(nil))
 	if actual != wantDigest {
