@@ -16,7 +16,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 3
       - name: Materialize exact approved patch on current base
         shell: bash
         run: |
@@ -27,21 +27,38 @@ jobs:
           from pathlib import Path
           out=Path(os.environ['RUNNER_TEMP'])/'context-evidence'
           parts=[Path(f'.ci-context/patch.{i}.b64').read_text() for i in range(3)]
-          # Transport transcription repairs only; each repaired part MUST match
-          # its previously computed original Git blob. Never repair source code.
+          # Restore only known transport transcription differences; original
+          # immutable part hashes must match before any source is applied.
           parts[0]=parts[0].replace('R2tobup','R2t5tdobup').replace('GI3Hen74','GI3HN74').replace('Njsdba8vb','Njsdb8vb')
           parts[1]=parts[1].replace('EtrsiirsQttd','EtrsiirsrQttd')
           expected=['c1cc6b712ba3387b9d35ac58acc0893bfffd86aa','454e5926a4e2a5f8812ba351678978ec464dada5','034bdfa1d859be750dd4a1cc21a52aa23e95e6b0']
+          def blob(data): return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
           actual=[]
           for i,p in enumerate(parts):
               data=p.encode();(out/f'transport.{i}.b64').write_bytes(data)
-              actual.append(hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest())
+              actual.append(blob(data))
           (out/'transport-hashes.json').write_text(json.dumps({'expected':expected,'actual':actual},indent=2)+'\n')
           assert actual==expected,'source transport mismatch: no source applied'
           patch=gzip.decompress(base64.b64decode(''.join(parts),validate=True))
           assert hashlib.sha256(patch).hexdigest()=='294e21053fdcc27638105294d8b0f6d230148e772ae009bacc51f7f296e054af'
-          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
-          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          # PR274 appended a new section at the former EOF. Preserve its exact
+          # current bytes; transplant only the old candidate's added paragraph.
+          path='docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md'
+          sections=patch.decode().split('diff --git ')
+          assert sections[0]==''
+          doc=[s for s in sections[1:] if s.startswith('a/'+path+' ')];assert len(doc)==1
+          added='\n'.join(line[1:] for line in doc[0].splitlines() if line.startswith('+') and not line.startswith('+++'))+'\n'
+          before=Path(path).read_bytes()
+          assert blob(before)=='59e3da82859629f32f7ded1e7ec8c671c49fc67e'
+          marker='\n## Original armed-cancellation certificate\n'
+          text=before.decode();assert text.count(marker)==1
+          revised=text.replace(marker,added+marker,1).encode()
+          assert blob(revised)=='610bd8eaace3c877a3e1d07665028048d9520fa7'
+          remaining=''.join('diff --git '+s for s in sections[1:] if s!=doc[0]).encode()
+          subprocess.run(['git','apply','--index','--check','-'],input=remaining,check=True)
+          subprocess.run(['git','apply','--index','-'],input=remaining,check=True)
+          Path(path).write_bytes(revised)
+          subprocess.run(['git','add','--',path],check=True)
           subprocess.run(['git','rm','--cached','.github/workflows/context-candidate-once.yml',*[f'.ci-context/patch.{i}.b64' for i in range(3)]],check=True)
           tree=subprocess.check_output(['git','write-tree'],text=True).strip()
           assert tree=='07c40f550dc408adfd76c65ba54ddd212b589be4',tree
