@@ -70,7 +70,10 @@ class GateTests(unittest.TestCase):
         events = [event("start")]
         for _ in range(3):
             events += [event("run", "TestCase"), event("run", "TestCase/child"),
-                       event("pause", "TestCase/child"), event("run", "TestCase/sibling"),
+                       event("pause", "TestCase/child"),
+                       event("run", "TestCase/Europe/Paris"), event("pass", "TestCase/Europe/Paris"),
+                       event("run", "TestCase/child/slash-name"), event("pass", "TestCase/child/slash-name"),
+                       event("run", "TestCase/sibling"),
                        event("pass", "TestCase/sibling"), event("cont", "TestCase/child"),
                        event("output", "TestCase/child", Output="=== CONT child\n"),
                        event("pass", "TestCase/child"), event("pass", "TestCase")]

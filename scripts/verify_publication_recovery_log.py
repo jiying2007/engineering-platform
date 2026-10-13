@@ -157,14 +157,18 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         if action == "run":
             if name is None or name in active:
                 raise ValueError("test started twice or without identity")
-            if "/" in name and name.rsplit("/", 1)[0] not in active:
-                raise ValueError("subtest has no active parent")
+            root = name.split("/", 1)[0]
+            # A slash in t.Run names does not imply an intermediate run event.
+            # test2json exposes full names, not parent IDs; bind to the known
+            # top-level invocation instead of inventing nested parent events.
+            if "/" in name and root not in active:
+                raise ValueError("subtest has no active top-level test")
             seen.add(name)
             if len(seen) > MAX_TESTS:
                 raise ValueError("test identity budget exceeded")
             active[name] = "running"
             if "/" in name:
-                children[name.rsplit("/", 1)[0]] += 1
+                children[root] += 1
         elif action in ("pause", "cont"):
             expected = "running" if action == "pause" else "paused"
             if name is None or active.get(name) != expected:
@@ -178,12 +182,12 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
             else:
                 if active.get(name) != "running":
                     raise ValueError("test passed without a running invocation")
-                if children[name]:
+                if "/" not in name and children[name]:
                     raise ValueError("test passed with unfinished subtests")
                 del active[name]
                 del children[name]
                 if "/" in name:
-                    children[name.rsplit("/", 1)[0]] -= 1
+                    children[name.split("/", 1)[0]] -= 1
                 if name in required:
                     passed[name] += 1
                     if passed[name] > repeats:
