@@ -1,0 +1,117 @@
+name: Verify complete Publisher HTTP observation
+on:
+  push:
+    branches: [fix/publisher-response-observation-20261013]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write # Immutable source blobs only; no commits/refs/issue changes.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Prepare exact source and private kernel test scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/response-evidence" "$RUNNER_TEMP/response-go-tmp"
+          go version | tee "$RUNNER_TEMP/response-evidence/go-version.txt"
+          go mod download
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            command -v apparmor_parser >/dev/null
+            printf 'abi <abi/4.0>,\nprofile ep-response-tests %s/go-build*/b*/*.test flags=(unconfined) {\n  userns,\n}\n' "$RUNNER_TEMP/response-go-tmp" > "$RUNNER_TEMP/response.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/response.apparmor"
+          fi
+          echo "TMPDIR=$RUNNER_TEMP/response-go-tmp" >> "$GITHUB_ENV"
+          echo "EP_REQUIRE_PID_NAMESPACE_TESTS=1" >> "$GITHUB_ENV"
+          python3 -B .ci-response/transform.py
+          git diff --check
+      - name: Reproduce original failures and require fixed complete regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/response-evidence"
+          git show 91ba1c958c15c85c75f71ef931b9f4fbdca0f365:internal/githubpublish/github.go > "$out/original-github.go"
+          python3 -B - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'response-evidence'
+          (out/'overlay.json').write_text(json.dumps({'Replace':{str(Path('internal/githubpublish/github.go').resolve()):str(out/'original-github.go')}}))
+          PY
+          set +e
+          go test -overlay "$out/overlay.json" -json -race -count=1 -timeout 2m ./internal/githubpublish -run '^TestPublisherGitHubResponse' > "$out/original-response.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          grep -F 'incomplete 404 became absence' "$out/original-response.jsonl"
+          grep -F 'truncated 404 created an observation' "$out/original-response.jsonl"
+          grep -F 'incomplete ref query reached publication' "$out/original-response.jsonl"
+          grep -F 'failed response mutated accepted output' "$out/original-response.jsonl"
+          ! grep -Fq '"Action":"skip"' "$out/original-response.jsonl"
+          go test -json -race -count=20 -timeout 3m ./internal/githubpublish -run '^TestPublisherGitHubResponse' | tee "$out/response-fixed-20.jsonl"
+          go test -json -race -count=3 -timeout 3m ./internal/githubpublish | tee "$out/publisher-all-3.jsonl"
+          python3 -B - <<'PY'
+          import os,re,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import verify_publication_recovery_log as gate
+          out=Path(os.environ['RUNNER_TEMP'])/'response-evidence'
+          names=set(re.findall(r'^func (TestPublisherGitHubResponse\w+)\(',Path('internal/githubpublish/github_response_test.go').read_text(),re.M))
+          assert len(names)==6
+          gate.verify(out/'response-fixed-20.jsonl',repeats=20,required=names,package=gate.PUBLISHER_PACKAGE)
+          gate.verify(out/'publisher-all-3.jsonl',repeats=3,required=gate.PUBLISHER_REQUIRED,package=gate.PUBLISHER_PACKAGE)
+          PY
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-inventory.json"
+          go vet ./internal/githubpublish
+      - name: Export only the tested six-file source change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='91ba1c958c15c85c75f71ef931b9f4fbdca0f365'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          paths=['internal/githubpublish/github.go','internal/githubpublish/github_response.go','internal/githubpublish/github_response_test.go','docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md','docs/status/IMPLEMENTATION_STATUS.md','scripts/verify_publication_recovery_log.py']
+          subprocess.run(['git','add','--',*paths],check=True)
+          subprocess.run(['git','rm','--cached','.ci-response/transform.py','.github/workflows/response-observation-once.yml'],check=True)
+          observed=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert sorted(observed)==sorted(paths)
+          tree=subprocess.check_output(['git','write-tree'],text=True).strip()
+          records=[]
+          for name in paths:
+              raw=Path(name).read_bytes();assert len(raw)<100000
+              sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+              payload=json.dumps({'encoding':'base64','content':base64.b64encode(raw).decode()}).encode()
+              obj=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+              assert obj['sha']==sha
+              records.append({'path':name,'sha':sha,'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)})
+          result={'version':1,'base':base,'tree':tree,'files':records,'ref_writes':False,'live_provider_executed':False,'production_qualified':False}
+          out=Path(os.environ['RUNNER_TEMP'])/'response-evidence'
+          (out/'source-objects.json').write_text(json.dumps(result,indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          (out/'candidate.diff').write_bytes(subprocess.check_output(['git','diff','--cached',base]))
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: publisher-response-observation-${{ github.sha }}
+          path: ${{ runner.temp }}/response-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Temporary exact-source preparation, removed before final PR qualification.
+# Internal blockers [228,229] remain OPEN; no automatic retries or live publishing.
