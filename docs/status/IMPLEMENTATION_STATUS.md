@@ -377,6 +377,13 @@ lost on late cancellation. No witness format, retry authority, or terminal
 recovery transition is added. These cooperative checkpoints do not qualify
 blocked kernel I/O or selected-host lifecycle/storage behavior.
 
+Publisher REST now distinguishes complete HTTP status observations from failed
+body/close/cancellation readback. An incomplete 404 cannot become ref absence or
+permit a later publication attempt. Failed or cancelled response decoding cannot
+partially replace accepted output. Loopback HTTP truncation and local-only Git
+attempt probes test this boundary; no live Provider or post-entry recovery
+qualification is implied, and no absence-to-retry authority is added.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**

@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:6d82aacb91feef00839249e4407711ebb9b46d4a1fa1ec24830a06dd3c2d12ae`
+`sha256:495c9052ca4c5037c00a78cd5f3dcba578414ede3b66c2693c485376bf092089`
 
 ## Reviewed categories
 
@@ -249,3 +249,13 @@ The original completion path passes its existing five-second settlement Context;
 client cancellation does not erase a genuinely completed publication. These are
 cooperative I/O checkpoints, not forced interruption of kernel reads/fsync or
 selected-host latency qualification. Internal blockers [228,229] remain OPEN.
+
+## Complete HTTP observations before absence classification
+
+Publisher REST exchange retains the initiating Context before transport and while
+reading its bounded response. A complete status verdict is distinct from body,
+close, limit or cancellation failure; a failed response carrying HTTP 404 cannot
+become a ref-absence fact. Successful decoding uses a fresh target committed only
+after read/close/decode/cancellation checks. No independent lifecycle or automatic
+retry is introduced. A complete negative observation still does not prove original
+dispatcher quiescence or authorize replay; internal blockers [228,229] remain OPEN.
