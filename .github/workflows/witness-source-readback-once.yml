@@ -1,0 +1,33 @@
+name: Witness source readback
+on:
+  push:
+    branches: [fix/publisher-witness-hardening-20261013]
+permissions:
+  contents: read
+jobs:
+  source:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 2e44ef83804992cbbbd713b7a7af7c556f07f19b
+          persist-credentials: false
+      - name: Archive only exact git-tracked public source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 2e44ef83804992cbbbd713b7a7af7c556f07f19b
+          mkdir "$RUNNER_TEMP/witness-source"
+          git archive HEAD > "$RUNNER_TEMP/witness-source/source.tar"
+          git rev-parse HEAD > "$RUNNER_TEMP/witness-source/SOURCE_SHA"
+          (cd "$RUNNER_TEMP/witness-source" && sha256sum source.tar > SHA256SUMS)
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: witness-source-2e44ef8
+          path: ${{ runner.temp }}/witness-source
+          if-no-files-found: error
+          retention-days: 1
+# Branch-only transport; removed before final PR head. No host files, credentials,
+# provider calls, state changes, ref writes or repository permission changes.
