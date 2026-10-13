@@ -328,6 +328,28 @@ production qualification. #228 still needs an implemented and qualified
 provider-specific effectful terminal disposition; the state matrix is an
 acceptance contract and regression coverage, not that implementation.
 
+## Pre-invocation publication recovery
+
+The Publisher now writes STARTED-v2 while holding the original slot inode lock,
+then durably arms invoked.json before Remote.Publish. A new explicit recovery
+path can seal and abandon only a same-boot/original-inode STARTED-v2 with no
+invocation/completion record. This is independent proof of **not calling the
+Publisher remote**, not a remote-absence inference. It creates a typed
+non-success reconciliation receipt in the existing Action row, preserves the
+original idempotency reservation and diagnostic, and never creates a PR/success
+receipt or grants replay. Core obtains the proof through its configured mTLS
+Publisher; request JSON cannot substitute evidence. Active holders, old v1 starts,
+restored/copied directories, foreign boot/slot identities and any partial/complete
+intent stay blocked. The positive #268 path and #269 processscope remain intact.
+
+The direct Context inventory remains source-bound. Database/mTLS/concurrency/
+COMMIT-loss/corruption/restore checks extend existing canonical gates. The exact
+scope and local-filesystem assumptions are recorded in
+`docs/implementation/PUBLICATION_NO_INVOCATION_RECOVERY_V1.md`.
+**#228 and #229 remain internal blockers**: historical missing witnesses,
+post-intent/original-error/ambiguous external results and selected-host lifecycle/
+backup/long-run acceptance are not promoted by this pre-effect path.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**

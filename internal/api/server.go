@@ -86,6 +86,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/recovery/executions/abandon", s.handleExecutionAbandon)
 	s.mux.HandleFunc("POST /api/v1/recovery/actions/abandon-planned", s.handleAbandonPlannedAction)
 	s.mux.HandleFunc("POST /api/v1/recovery/actions/confirm-publication", s.handleConfirmRecoveredPublication)
+	s.mux.HandleFunc("POST /api/v1/recovery/actions/abandon-uninvoked", s.handleAbandonUninvokedPublication)
+	s.mux.HandleFunc("GET /api/v1/recovery/actions/{id}/uninvoked", s.handleGetUninvokedPublication)
 	s.mux.HandleFunc("GET /api/v1/recovery/actions/{id}/publication", s.handleGetRecoveredPublication)
 	s.mux.HandleFunc("GET /api/v1/recovery/actions/{id}/abandon-planned", s.handleGetAbandonedPlannedAction)
 	s.mux.HandleFunc("POST /api/v1/work-items", s.handleCreateWork)

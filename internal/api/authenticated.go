@@ -37,6 +37,8 @@ func AuthenticatedIdentity(ctx context.Context) (access.Identity, bool) {
 // Every admitted route has an explicit capability. New routes default to denial;
 // method/path prefixes, proxy headers and an unknown capability never grant access.
 var routeCapabilities = map[string]string{
+	"POST /api/v1/recovery/actions/abandon-uninvoked":   access.RecoveryReconcile,
+	"GET /api/v1/recovery/actions/{id}/uninvoked":       access.Read,
 	"POST /api/v1/recovery/actions/confirm-publication": access.RecoveryReconcile,
 	"GET /api/v1/recovery/actions/{id}/publication":     access.Read,
 	"GET /api/v1/capabilities":                          access.Read,

@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from verify_publication_recovery_log import REQUIRED, RESTORE_REQUIRED, PUBLISHER_REQUIRED, PUBLISHER_PACKAGE, verify
+from verify_publication_recovery_log import REQUIRED, RESTORE_REQUIRED, PUBLISHER_REQUIRED, PUBLISHER_PACKAGE, PACKAGE, NO_INVOCATION_REQUIRED, NO_INVOCATION_PUBLISHER_REQUIRED, verify
 
 class GateTests(unittest.TestCase):
     def test_success_and_negative_events(self):
@@ -16,7 +16,7 @@ class GateTests(unittest.TestCase):
                 if valid: verify(path)
                 else:
                     with self.assertRaises(ValueError): verify(path)
-    def test_restore_requires_both_drills_without_subtest_skips(self):
+    def test_restore_requires_all_three_drills_without_subtest_skips(self):
         package="github.com/jiying2007/engineering-platform/internal/store/postgres"
         good=[{"Action":"pass","Test":name,"Package":package} for name in sorted(RESTORE_REQUIRED)]
         good.append({"Action":"pass","Package":package})
@@ -37,4 +37,15 @@ class GateTests(unittest.TestCase):
             for bad in (good[1:],good+[{"Action":"skip","Test":"TestPublisherGitNamespaceKillsDetachedHelper/namespace"}]):
                 path.write_text("\n".join(json.dumps(e) for e in bad))
                 with self.assertRaises(ValueError):verify(path,required=PUBLISHER_REQUIRED,package=PUBLISHER_PACKAGE)
+    def test_no_invocation_gates_require_exact_cases_and_package(self):
+        for required, package in ((NO_INVOCATION_REQUIRED, PACKAGE), (NO_INVOCATION_PUBLISHER_REQUIRED, PUBLISHER_PACKAGE)):
+            good=[{"Action":"pass","Test":n,"Package":package} for n in sorted(required) for _ in range(3)]
+            good.append({"Action":"pass","Package":package})
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/"no-invocation.jsonl"
+                path.write_text("\n".join(json.dumps(e) for e in good))
+                verify(path,required=required,package=package)
+                for bad in (good[1:],good[:-1],good+[good[0]],good+[{"Action":"skip","Test":"required/nested"}],good+[{"Action":"fail"}], [dict(e,Package="wrong/package") for e in good]):
+                    path.write_text("\n".join(json.dumps(e) for e in bad))
+                    with self.assertRaises(ValueError):verify(path,required=required,package=package)
 if __name__=="__main__":unittest.main()

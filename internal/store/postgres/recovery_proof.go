@@ -20,6 +20,9 @@ func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 	if err := validateRecoveredPublications(ctx, tx); err != nil {
 		return facts, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
 	}
+	if err := validateUninvokedPublications(ctx, tx); err != nil {
+		return facts, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
+	}
 	queries := []struct {
 		dst *uint64
 		q   string
@@ -157,7 +160,10 @@ func (s *Store) AuthorizeCompletion(ctx context.Context, subject string, epoch u
 	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM external_operations
   WHERE receipt_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1'
     AND receipt_json->'request'->>'recovery_epoch'=$1
-    AND receipt_json->>'reconciler'=$2)`, fmt.Sprint(epoch), subject).Scan(&participated); err != nil {
+    AND receipt_json->>'reconciler'=$2 OR
+    reconciliation_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_NOT_INVOKED_V1'
+    AND reconciliation_json->'request'->>'recovery_epoch'=$1
+    AND reconciliation_json->>'reconciler'=$2)`, fmt.Sprint(epoch), subject).Scan(&participated); err != nil {
 		return err
 	}
 	if participated {

@@ -18,7 +18,7 @@ REQUIRED = {
     "TestPublicationRecoveryDatabaseMTLSIndependentCompletion",
 }
 
-RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill"}
+RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill", "TestNoInvocationRestoreDrill"}
 
 PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"
 PUBLISHER_REQUIRED = {
@@ -31,6 +31,18 @@ PUBLISHER_REQUIRED = {
     "TestPublisherGitCredentialNeverFollowsRemoteRedirect",
     "TestGitHubPublishNeverReopensClosedDeterministicBranch",
     "TestGitHubNullOpenPullReadbackNeverAuthorizesCreate",
+}
+
+NO_INVOCATION_REQUIRED = {name.replace("TestPublicationRecoveryDatabase", "TestNoInvocationDatabase") for name in REQUIRED}
+NO_INVOCATION_PUBLISHER_REQUIRED = {
+ "TestPublisherNoInvocationFenceRejectsActiveAndReplays",
+ "TestPublisherNoInvocationFenceRejectsHistoricalAndArmed",
+ "TestPublisherInvocationBarrierPrecedesRemote",
+ "TestPublisherUninvokedLeaseRejectsCancelledArming",
+ "TestPublisherNoInvocationFenceAfterRealProcessExit",
+ "TestPublisherNoInvocationRejectsRestoredStartSnapshot",
+ "TestPublisherNoInvocationRejectsOtherBootIdentity",
+ "TestPublisherNoInvocationEvidenceRealMTLS",
 }
 
 def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> None:
@@ -56,10 +68,14 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         raise ValueError("missing exact targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel")):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher]")
     try:
-        if len(sys.argv)==3 and sys.argv[2]=="--publisher-kernel":
+        if len(sys.argv)==3 and sys.argv[2]=="--no-invocation-db":
+            verify(Path(sys.argv[1]), required=NO_INVOCATION_REQUIRED)
+        elif len(sys.argv)==3 and sys.argv[2]=="--no-invocation-publisher":
+            verify(Path(sys.argv[1]), required=NO_INVOCATION_PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)
+        elif len(sys.argv)==3 and sys.argv[2]=="--publisher-kernel":
             verify(Path(sys.argv[1]), required=PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)
         elif len(sys.argv)==3:
             verify(Path(sys.argv[1]), repeats=1, required=RESTORE_REQUIRED)

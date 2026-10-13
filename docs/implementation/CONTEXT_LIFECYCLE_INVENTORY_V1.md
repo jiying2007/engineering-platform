@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:bf6fd91bed628e4acd04a45ec66a8fb051e6223116118e683e56af3aa31ddae3`
+`sha256:8923a9f32a8eabd1a4516f34605ac47932347081b510b23322ce9fae67c649ae`
 
 ## Reviewed categories
 
@@ -102,7 +102,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/action/service.go:436` | `Background` | Concrete convenience wrapper |
 | `internal/action/service.go:439` | `Background` | Concrete convenience wrapper |
 | `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/githubpublish/service.go:180` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/githubpublish/service.go:187` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/controls.go:122` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |

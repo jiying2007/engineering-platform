@@ -121,13 +121,13 @@ func readWitness(r *os.Root, name string, dst any) error {
 	}
 	return syncRoot(r)
 }
-func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, plan Plan) (*os.Root, DispatchStart, error) {
+func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, plan Plan) (*dispatchLease, DispatchStart, error) {
 	var zero DispatchStart
 	if err := ctx.Err(); err != nil {
 		return nil, zero, err
 	}
-	start := DispatchStart{Version: 1, Identity: identity, Plan: plan, StartedAt: time.Now().UTC()}
-	if start.Validate() != nil {
+	start := DispatchStart{Version: 2, Identity: identity, Plan: plan, StartedAt: time.Now().UTC()}
+	if identity.Validate() != nil || plan.Validate() != nil || identity.RunID != plan.RunID {
 		return nil, zero, ErrDispatchEvidenceUnavailable
 	}
 	root, err := j.open()
@@ -152,11 +152,22 @@ func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, 
 		slot.Close()
 		return nil, zero, err
 	}
-	if err := writeWitness(slot, "started.json", start); err != nil {
+	lock, err := lockWitnessSlot(slot)
+	if err != nil {
 		slot.Close()
 		return nil, zero, err
 	}
-	return slot, start, nil
+	lease := &dispatchLease{Root: slot, lock: lock}
+	start.Incarnation, err = witnessIncarnation(slot)
+	if err != nil || start.Validate() != nil {
+		lease.Close()
+		return nil, zero, ErrDispatchEvidenceUnavailable
+	}
+	if err := writeWitness(slot, "started.json", start); err != nil {
+		lease.Close()
+		return nil, zero, err
+	}
+	return lease, start, nil
 }
 func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdentity, plan Plan) (DispatchStart, DispatchCompletion, error) {
 	var s DispatchStart
@@ -197,6 +208,16 @@ func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdenti
 	}
 	if c.Validate(s) != nil {
 		return s, c, ErrDispatchEvidenceUnavailable
+	}
+	if s.Version == 2 {
+		var invoked DispatchInvocation
+		if readWitness(slot, "invoked.json", &invoked) != nil || invoked.Validate(s) != nil ||
+			invoked.ArmedAt.After(c.ReturnedAt) || !witnessAbsent(slot, "not-invoked.json") {
+			return s, c, ErrDispatchEvidenceUnavailable
+		}
+	}
+	if err := syncRoot(root); err != nil {
+		return s, c, err
 	}
 	if err := ctx.Err(); err != nil {
 		return s, c, err
