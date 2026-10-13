@@ -1,0 +1,33 @@
+name: Publisher continuation source
+on:
+  push:
+    branches: [fix/publisher-returned-invocation-20261013]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 0d24364b7c4fadd6183a7cfc4ff39a1d91640f56
+          persist-credentials: false
+      - name: Archive exact tracked public source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 0d24364b7c4fadd6183a7cfc4ff39a1d91640f56
+          mkdir "$RUNNER_TEMP/source"
+          git archive --format=tar HEAD > "$RUNNER_TEMP/source/source.tar"
+          git rev-parse HEAD > "$RUNNER_TEMP/source/SOURCE_SHA"
+          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/source/SOURCE_TREE"
+          (cd "$RUNNER_TEMP/source" && sha256sum source.tar > SHA256SUMS)
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: publisher-continuation-source-0d24364
+          path: ${{ runner.temp }}/source
+          if-no-files-found: error
+          retention-days: 1
+# Read-only fixed tracked-source transport, removed before final PR qualification.
+# No environment/credentials/.git archive, model, publication or ref writes.
