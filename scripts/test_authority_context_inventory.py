@@ -60,7 +60,7 @@ class ContextInventoryTests(unittest.TestCase):
                 # A regression to blocking open must terminate as a test failure.
                 import sys
                 code = "from pathlib import Path; from authority_context_inventory import _read_source; _read_source(Path(__import__('sys').argv[1]))"
-                proc = subprocess.run([sys.executable,"-c",code,str(special)],cwd=Path(__file__).resolve().parent,
+                proc = subprocess.run([sys.executable,"-B","-c",code,str(special)],cwd=Path(__file__).resolve().parent,
                                       capture_output=True,timeout=3)
                 self.assertNotEqual(proc.returncode,0)
                 self.assertIn(b"bounded regular Go source required",proc.stderr)
