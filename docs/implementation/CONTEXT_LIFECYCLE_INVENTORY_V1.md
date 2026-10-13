@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:8923a9f32a8eabd1a4516f34605ac47932347081b510b23322ce9fae67c649ae`
+`sha256:c9e6c19c53fed22b95a1659375ddc9d6d447262f5dc96cdbacb640b442a4ff51`
 
 ## Reviewed categories
 

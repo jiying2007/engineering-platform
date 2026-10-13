@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
-	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
@@ -164,7 +163,9 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication invocation barrier unavailable; no replay")
 		return
 	}
-	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle, req.Identity)
+	proofs := &completionProofLog{}
+	invocationContext := context.WithValue(r.Context(), completionProofKey{}, proofs)
+	receipt, err := s.remote.Publish(invocationContext, req.Plan, bundle, req.Identity)
 	if errors.Is(err, ErrPublisherGitQuiescenceUnknown) {
 		quarantined = true
 	}
@@ -178,12 +179,11 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	}
 	// The original invocation returned successfully and validated before this
 	// append-only completion marker can be written. On any failure keep STARTED.
-	digest, err := canonical.Digest(start)
+	completion, err := proofs.completed(start, receipt, time.Now().UTC())
 	if err != nil {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication witness unavailable")
 		return
 	}
-	completion := DispatchCompletion{Version: 1, StartDigest: digest, Receipt: receipt, ReturnedAt: time.Now().UTC()}
 	settle, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 	defer cancel()
 	if err := errors.Join(settle.Err(), completion.Validate(start)); err != nil {
@@ -357,7 +357,7 @@ func (s *RemoteService) handleDispatchEvidence(w http.ResponseWriter, r *http.Re
 		return
 	}
 	start, completed, err := s.journal.completed(r.Context(), req.Identity, req.Plan)
-	if err != nil {
+	if err != nil || completed.ValidateForRecovery(start) != nil {
 		writePublisherError(w, http.StatusConflict, "original completion is unavailable; operation remains unresolved")
 		return
 	}
@@ -367,7 +367,7 @@ func (s *RemoteService) handleDispatchEvidence(w http.ResponseWriter, r *http.Re
 		return
 	}
 	evidence := PublicationEvidence{Version: 1, Start: start, Completion: completed, Observation: observed, ObservedAt: time.Now().UTC()}
-	if evidence.Validate() != nil {
+	if evidence.ValidateForRecovery() != nil {
 		writePublisherError(w, http.StatusConflict, "current publication does not match original positive completion")
 		return
 	}

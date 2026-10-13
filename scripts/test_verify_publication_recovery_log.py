@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from verify_publication_recovery_log import REQUIRED, RESTORE_REQUIRED, PUBLISHER_REQUIRED, PUBLISHER_PACKAGE, PACKAGE, NO_INVOCATION_REQUIRED, NO_INVOCATION_PUBLISHER_REQUIRED, verify
+from verify_publication_recovery_log import REQUIRED, RESTORE_REQUIRED, PUBLISHER_REQUIRED, PUBLISHER_PACKAGE, PACKAGE, PROOF_REQUIRED, NO_INVOCATION_REQUIRED, NO_INVOCATION_PUBLISHER_REQUIRED, verify
 
 class GateTests(unittest.TestCase):
     def test_success_and_negative_events(self):
@@ -38,7 +38,7 @@ class GateTests(unittest.TestCase):
                 path.write_text("\n".join(json.dumps(e) for e in bad))
                 with self.assertRaises(ValueError):verify(path,required=PUBLISHER_REQUIRED,package=PUBLISHER_PACKAGE)
     def test_no_invocation_gates_require_exact_cases_and_package(self):
-        for required, package in ((NO_INVOCATION_REQUIRED, PACKAGE), (NO_INVOCATION_PUBLISHER_REQUIRED, PUBLISHER_PACKAGE)):
+        for required, package in ((NO_INVOCATION_REQUIRED, PACKAGE), (NO_INVOCATION_PUBLISHER_REQUIRED, PUBLISHER_PACKAGE), (PROOF_REQUIRED, PUBLISHER_PACKAGE)):
             good=[{"Action":"pass","Test":n,"Package":package} for n in sorted(required) for _ in range(3)]
             good.append({"Action":"pass","Package":package})
             with tempfile.TemporaryDirectory() as tmp:

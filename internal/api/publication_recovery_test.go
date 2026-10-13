@@ -11,6 +11,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	"github.com/jiying2007/engineering-platform/internal/store"
 )
@@ -66,9 +67,13 @@ func publicationRecoveryTestFixture() (githubpublish.PublicationRecoveryRequest,
 	p := githubpublish.Plan{Version: 1, RunID: id.RunID, Repository: "example/fixture", BaseRef: "main", BaseCommit: strings.Repeat("1", 40), Branch: "test/result", ResultCommit: strings.Repeat("2", 40), ResultDigest: "sha256:" + strings.Repeat("3", 64), ReceiptDigest: "sha256:" + strings.Repeat("4", 64), BundleDigest: "sha256:" + strings.Repeat("5", 64), BundleSize: 7, ExecutionID: strings.Repeat("6", 64)}
 	receipt := githubpublish.PublicationReceipt{Version: 1, Repository: p.Repository, BaseRef: p.BaseRef, BaseCommit: p.BaseCommit, Branch: p.Branch, ResultCommit: p.ResultCommit, PullRequestNumber: 7, PullRequestURL: "https://github.com/example/fixture/pull/7", PullRequestState: "open", PublicationOutcome: "CREATED"}
 	at := time.Now().UTC().Add(-time.Second)
-	start := githubpublish.DispatchStart{Version: 1, Identity: id, Plan: p, StartedAt: at}
+	start := githubpublish.DispatchStart{Version: 2, Incarnation: "sha256:" + strings.Repeat("a", 64), Identity: id, Plan: p, StartedAt: at}
 	d, _ := canonical.Digest(start)
-	completion := githubpublish.DispatchCompletion{Version: 1, StartDigest: d, Receipt: receipt, ReturnedAt: at.Add(time.Millisecond)}
+	completion := githubpublish.DispatchCompletion{Version: 2, StartDigest: d, Receipt: receipt, ReturnedAt: at.Add(time.Millisecond)}
+	// Controlled fixture; not selected-host process evidence.
+	proofs := []processscope.Proof{{Version: 1, Mechanism: processscope.Mechanism, HostPID: 17, NamespaceID: 2, ParentNamespaceID: 1, StartedAt: at, ReapedAt: at, InitReaped: true}}
+	proofDigest, _ := canonical.Digest(proofs)
+	completion.GitQuiescence = &githubpublish.GitQuiescence{Version: 1, Proofs: proofs, Digest: proofDigest}
 	receipt.PublicationOutcome = "OBSERVED"
 	e := githubpublish.PublicationEvidence{Version: 1, Start: start, Completion: completion, Observation: githubpublish.ObserveResult{Outcome: githubpublish.ObservedConfirmed, Receipt: receipt}, ObservedAt: at.Add(2 * time.Millisecond)}
 	backend := &publicationRecoveryTestStore{Memory: store.NewMemory(), op: action.Operation{ID: id.OperationID, RunID: id.RunID, ExecutionEpoch: id.ExecutionEpoch, RecoveryEpoch: id.RecoveryEpoch, Action: githubpublish.Action, Capability: githubpublish.Capability, RiskClass: action.ControlledMutation, IdempotencyKey: id.IdempotencyKey, RequestDigest: id.RequestDigest, State: action.Manual}, current: recovery.Manager{Epoch: 1, Mode: recovery.RecoveryReconciliation}}
@@ -104,11 +109,14 @@ func TestPublicationRecoveryMTLSRequiresSeparateReconcilerAndRetainsReadback(t *
 	}
 }
 func TestPublicationRecoveryRejectsUnprovedAndPreservesCommitUnknown(t *testing.T) {
-	for _, mode := range []string{"absent", "wrong-pr", "missing-completion", "observer-error", "commit-unknown", "normal", "stale"} {
+	for _, mode := range []string{"absent", "wrong-pr", "missing-completion", "observer-error", "commit-unknown", "normal", "stale", "legacy-completion"} {
 		t.Run(mode, func(t *testing.T) {
 			req, backend, observer := publicationRecoveryTestFixture()
 			want := http.StatusConflict
 			switch mode {
+			case "legacy-completion":
+				observer.e.Completion.Version = 1
+				observer.e.Completion.GitQuiescence = nil
 			case "absent":
 				observer.e.Observation.Outcome = githubpublish.ObservedAbsent
 			case "wrong-pr":

@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 PACKAGE = "github.com/jiying2007/engineering-platform/internal/store/postgres"
-REQUIRED = {
+TRANSACTION_REQUIRED = {
     "TestPublicationRecoveryDatabaseTerminalReadbackAndNoReplay",
     "TestPublicationRecoveryDatabaseRejectsInsufficientEvidence",
     "TestPublicationRecoveryDatabaseCorruptionBlocksProofAndReadback",
@@ -16,6 +16,21 @@ REQUIRED = {
     "TestPublicationRecoveryDatabaseRealCommitAckLoss",
     "TestPublicationRecoveryDatabaseCompletionRechecksEvidence",
     "TestPublicationRecoveryDatabaseMTLSIndependentCompletion",
+}
+
+REQUIRED = TRANSACTION_REQUIRED | {
+    "TestPublicationRecoveryDatabaseRequiresOriginalGitProof",
+    "TestPublicationRecoveryDatabaseHistoricalReceiptReadback",
+}
+PROOF_REQUIRED = {
+    "TestPublisherCompletionProofLegacyCannotBePromoted",
+    "TestPublisherCompletionProofRejectsTampering",
+    "TestPublisherCompletionProofMissingCollectorWithholdsWitness",
+    "TestPublisherCompletionProofCollectorBounds",
+    "TestPublisherCompletionProofActualKernel",
+    "TestPublisherWitnessIntegrityRejectsAliasedAndSpecialFiles",
+    "TestPublisherWitnessIntegrityRejectsUnsafeRootModes",
+    "TestPublisherWitnessIntegrityDescriptorOpenDoesNotFollowOrBlock",
 }
 
 RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill", "TestNoInvocationRestoreDrill"}
@@ -33,7 +48,7 @@ PUBLISHER_REQUIRED = {
     "TestGitHubNullOpenPullReadbackNeverAuthorizesCreate",
 }
 
-NO_INVOCATION_REQUIRED = {name.replace("TestPublicationRecoveryDatabase", "TestNoInvocationDatabase") for name in REQUIRED}
+NO_INVOCATION_REQUIRED = {name.replace("TestPublicationRecoveryDatabase", "TestNoInvocationDatabase") for name in TRANSACTION_REQUIRED}
 NO_INVOCATION_PUBLISHER_REQUIRED = {
  "TestPublisherNoInvocationFenceRejectsActiveAndReplays",
  "TestPublisherNoInvocationFenceRejectsHistoricalAndArmed",
@@ -68,10 +83,12 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         raise ValueError("missing exact targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher")):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof]")
     try:
-        if len(sys.argv)==3 and sys.argv[2]=="--no-invocation-db":
+        if len(sys.argv)==3 and sys.argv[2]=="--publisher-proof":
+            verify(Path(sys.argv[1]), required=PROOF_REQUIRED, package=PUBLISHER_PACKAGE)
+        elif len(sys.argv)==3 and sys.argv[2]=="--no-invocation-db":
             verify(Path(sys.argv[1]), required=NO_INVOCATION_REQUIRED)
         elif len(sys.argv)==3 and sys.argv[2]=="--no-invocation-publisher":
             verify(Path(sys.argv[1]), required=NO_INVOCATION_PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)

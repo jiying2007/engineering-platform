@@ -186,7 +186,7 @@ func TestPublicationEvidenceCannotOverrideCompletion(t *testing.T) {
 	digest, _ := canonical.Digest(start)
 	original := observed.Receipt
 	original.PublicationOutcome = "CREATED"
-	completion := DispatchCompletion{1, digest, original, time.Now().UTC()}
+	completion := DispatchCompletion{Version: 1, StartDigest: digest, Receipt: original, ReturnedAt: time.Now().UTC()}
 	e := PublicationEvidence{1, start, completion, observed, time.Now().UTC()}
 	if e.Validate() != nil {
 		t.Fatal("fixture invalid")

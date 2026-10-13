@@ -71,6 +71,9 @@ func (s *Store) ConfirmRecoveredPublication(ctx context.Context, reconciler stri
 	if !githubpublish.RecoverablePublicationState(action.State(state)) || len(raw) != 0 || len(reconciliation) != 0 {
 		return zero, corestore.ErrConflict
 	}
+	if evidence.ValidateForRecovery() != nil {
+		return zero, githubpublish.ErrDispatchEvidenceUnavailable
+	}
 	var now time.Time
 	if err := tx.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); err != nil {
 		return zero, err

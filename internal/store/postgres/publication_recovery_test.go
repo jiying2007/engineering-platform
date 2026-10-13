@@ -11,6 +11,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/action"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 )
 
@@ -65,10 +66,14 @@ func publicationDatabaseFixture(t *testing.T, state action.State) (*Store, githu
 	req := githubpublish.PublicationRecoveryRequest{Version: 1, Identity: id, RecoveryEpoch: 1}
 	p := githubpublish.Plan{Version: 1, RunID: runID, Repository: "example/recovery", BaseRef: "main", BaseCommit: strings.Repeat("1", 40), Branch: "evidence/one", ResultCommit: strings.Repeat("2", 40), ResultDigest: canonical.BytesDigest([]byte("result")), ReceiptDigest: canonical.BytesDigest([]byte("receipt")), BundleDigest: canonical.BytesDigest([]byte("bundle")), BundleSize: 6, ExecutionID: strings.Repeat("3", 64)}
 	at := time.Now().UTC().Add(-time.Second)
-	start := githubpublish.DispatchStart{Version: 1, Identity: id, Plan: p, StartedAt: at}
+	start := githubpublish.DispatchStart{Version: 2, Incarnation: "sha256:" + strings.Repeat("a", 64), Identity: id, Plan: p, StartedAt: at}
 	d, _ := canonical.Digest(start)
 	pr := githubpublish.PublicationReceipt{Version: 1, Repository: p.Repository, BaseRef: p.BaseRef, BaseCommit: p.BaseCommit, Branch: p.Branch, ResultCommit: p.ResultCommit, PullRequestNumber: 12, PullRequestURL: "https://github.com/example/recovery/pull/12", PullRequestState: "open", PublicationOutcome: "CREATED"}
-	completion := githubpublish.DispatchCompletion{Version: 1, StartDigest: d, Receipt: pr, ReturnedAt: at.Add(time.Millisecond)}
+	completion := githubpublish.DispatchCompletion{Version: 2, StartDigest: d, Receipt: pr, ReturnedAt: at.Add(time.Millisecond)}
+	// Controlled fixture; not selected-host process evidence.
+	proofs := []processscope.Proof{{Version: 1, Mechanism: processscope.Mechanism, HostPID: 17, NamespaceID: 2, ParentNamespaceID: 1, StartedAt: at, ReapedAt: at, InitReaped: true}}
+	proofDigest, _ := canonical.Digest(proofs)
+	completion.GitQuiescence = &githubpublish.GitQuiescence{Version: 1, Proofs: proofs, Digest: proofDigest}
 	pr.PublicationOutcome = "OBSERVED"
 	evidence := githubpublish.PublicationEvidence{Version: 1, Start: start, Completion: completion, Observation: githubpublish.ObserveResult{Outcome: githubpublish.ObservedConfirmed, Receipt: pr}, ObservedAt: at.Add(2 * time.Millisecond)}
 	return s, req, evidence

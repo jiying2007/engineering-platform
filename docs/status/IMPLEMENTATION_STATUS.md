@@ -328,6 +328,19 @@ production qualification. #228 still needs an implemented and qualified
 provider-specific effectful terminal disposition; the state matrix is an
 acceptance contract and regression coverage, not that implementation.
 
+## Original completion proof and witness integrity
+
+New positive Recovery admission requires completion-v2 with the original bounded
+Git namespace-init reap proof list, not merely a successful PR receipt or a current
+binary version. Older audit-consistent Core receipts keep exact read-only history;
+legacy pending completion records cannot be promoted. Publisher, client, Provider,
+Core and new database settlement enforce this distinction. Private witness files
+reject wrong ownership, special modes, hard links and final symlink/FIFO opens.
+No original witness/key is erased and no replay or new schema is introduced.
+See `docs/implementation/PUBLICATION_COMPLETION_PROOF_V2.md` for the acceptance and
+storage/kernel limits. #228/#229 remain BLOCKED; neither the historical byte
+reader nor a local reap proof is remote cancellation or production qualification.
+
 ## Pre-invocation publication recovery
 
 The Publisher now writes STARTED-v2 while holding the original slot inode lock,

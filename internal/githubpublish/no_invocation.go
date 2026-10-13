@@ -124,7 +124,7 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	defer root.Close()
 	name := dispatchSlot(plan)
 	before, err := root.Lstat(name)
-	if err != nil || !before.IsDir() || before.Mode().Perm() != 0700 || before.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+	if err != nil || !witnessPrivateDirectory(before) {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	slot, err := root.OpenRoot(name)
@@ -133,7 +133,7 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	}
 	defer slot.Close()
 	opened, err := slot.Stat(".")
-	if err != nil || !os.SameFile(before, opened) {
+	if err != nil || !witnessPrivateDirectory(opened) || !os.SameFile(before, opened) {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	lock, err := lockWitnessSlot(slot)

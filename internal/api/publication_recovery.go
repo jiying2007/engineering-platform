@@ -82,7 +82,7 @@ func (s *Server) handleConfirmRecoveredPublication(w http.ResponseWriter, r *htt
 		writePublicationRecoveryError(w, err)
 		return
 	}
-	if evidence.Validate() != nil || evidence.Start.Identity != identity {
+	if evidence.ValidateForRecovery() != nil || evidence.Start.Identity != identity {
 		writePublicError(w, http.StatusConflict)
 		return
 	}
