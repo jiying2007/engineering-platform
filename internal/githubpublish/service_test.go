@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 type serviceRemote struct {
@@ -24,13 +26,16 @@ type serviceRemote struct {
 	onPublish    func(string) error
 }
 
-func (r *serviceRemote) Publish(_ context.Context, plan Plan, bundlePath string, _ DispatchIdentity) (PublicationReceipt, error) {
+func (r *serviceRemote) Publish(ctx context.Context, plan Plan, bundlePath string, _ DispatchIdentity) (PublicationReceipt, error) {
 	r.publishCalls++
 	if r.onPublish != nil {
 		if err := r.onPublish(bundlePath); err != nil {
 			return PublicationReceipt{}, err
 		}
 	}
+	// Synthetic proof for protocol fixtures only; actual kernel tests are separate.
+	at := time.Now().UTC()
+	_ = recordPublicationReap(ctx, processscope.Proof{Version: 1, Mechanism: processscope.Mechanism, HostPID: 17, NamespaceID: 2, ParentNamespaceID: 1, StartedAt: at, ReapedAt: at, InitReaped: true})
 	return PublicationReceipt{
 		Version: 1, Repository: plan.Repository, BaseRef: plan.BaseRef, BaseCommit: plan.BaseCommit,
 		Branch: plan.Branch, ResultCommit: plan.ResultCommit, PullRequestNumber: 17,

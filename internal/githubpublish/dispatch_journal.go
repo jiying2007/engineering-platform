@@ -25,7 +25,7 @@ type dispatchJournal struct {
 
 func newDispatchJournal(path string) (*dispatchJournal, error) {
 	p, info, err := canonicalDirectory(path)
-	if err != nil || info == nil || info.Mode().Perm() != 0700 {
+	if err != nil || !witnessPrivateDirectory(info) {
 		return nil, fmt.Errorf("publisher witness root must be a pre-created canonical private 0700 directory")
 	}
 	return &dispatchJournal{p, info}, nil
@@ -35,7 +35,7 @@ func (j *dispatchJournal) open() (*os.Root, error) {
 		return nil, ErrDispatchEvidenceUnavailable
 	}
 	current, err := os.Lstat(j.path)
-	if err != nil || current.Mode().Perm() != 0700 || !current.IsDir() || !os.SameFile(current, j.identity) {
+	if err != nil || !witnessPrivateDirectory(current) || !os.SameFile(current, j.identity) {
 		return nil, ErrDispatchEvidenceUnavailable
 	}
 	r, err := os.OpenRoot(j.path)
@@ -43,7 +43,7 @@ func (j *dispatchJournal) open() (*os.Root, error) {
 		return nil, err
 	}
 	opened, err := r.Stat(".")
-	if err != nil || !os.SameFile(current, opened) {
+	if err != nil || !witnessPrivateDirectory(opened) || !os.SameFile(current, opened) {
 		r.Close()
 		return nil, ErrDispatchEvidenceUnavailable
 	}
@@ -87,16 +87,16 @@ func writeWitness(r *os.Root, name string, value any) error {
 }
 func readWitness(r *os.Root, name string, dst any) error {
 	before, err := r.Lstat(name)
-	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm() != 0600 || before.Size() <= 0 || before.Size() > 64<<10 {
+	if err != nil || !witnessPrivateFile(before) {
 		return ErrDispatchEvidenceUnavailable
 	}
-	f, err := r.OpenFile(name, os.O_RDONLY, 0)
+	f, err := openWitnessRead(r, name)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	info, err := f.Stat()
-	if err != nil || !os.SameFile(before, info) {
+	if err != nil || !witnessPrivateFile(info) || !os.SameFile(before, info) {
 		return ErrDispatchEvidenceUnavailable
 	}
 	raw, err := io.ReadAll(io.LimitReader(f, (64<<10)+1))
@@ -104,7 +104,7 @@ func readWitness(r *os.Root, name string, dst any) error {
 		return ErrDispatchEvidenceUnavailable
 	}
 	after, err := r.Lstat(name)
-	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() || int64(len(raw)) != before.Size() {
+	if err != nil || !witnessPrivateFile(after) || !os.SameFile(before, after) || after.Size() != before.Size() || !after.ModTime().Equal(before.ModTime()) || int64(len(raw)) != before.Size() {
 		return ErrDispatchEvidenceUnavailable
 	}
 	if err := strictjson.Decode(raw, dst); err != nil {
@@ -152,6 +152,11 @@ func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, 
 		slot.Close()
 		return nil, zero, err
 	}
+	info, err := slot.Stat(".")
+	if err != nil || !witnessPrivateDirectory(info) {
+		slot.Close()
+		return nil, zero, ErrDispatchEvidenceUnavailable
+	}
 	lock, err := lockWitnessSlot(slot)
 	if err != nil {
 		slot.Close()
@@ -185,7 +190,7 @@ func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdenti
 	defer root.Close()
 	name := dispatchSlot(plan)
 	before, err := root.Lstat(name)
-	if err != nil || !before.IsDir() || before.Mode().Perm() != 0700 {
+	if err != nil || !witnessPrivateDirectory(before) {
 		return s, c, ErrDispatchEvidenceUnavailable
 	}
 	slot, err := root.OpenRoot(name)
@@ -194,7 +199,7 @@ func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdenti
 	}
 	defer slot.Close()
 	opened, err := slot.Stat(".")
-	if err != nil || !os.SameFile(before, opened) {
+	if err != nil || !witnessPrivateDirectory(opened) || !os.SameFile(before, opened) {
 		return s, c, ErrDispatchEvidenceUnavailable
 	}
 	if err := readWitness(slot, "started.json", &s); err != nil {

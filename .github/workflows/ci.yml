@@ -173,6 +173,12 @@ jobs:
           python3 -B scripts/test_verify_publication_recovery_log.py
           go test -json -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestPublicationRecoveryDatabase' | tee "$RUNNER_TEMP/publication-recovery-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publication-recovery-tests.jsonl"
+      - name: Original Publisher reap proof and witness inode integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -json -race -count=3 -timeout 2m ./internal/githubpublish -run '^TestPublisher(CompletionProof|WitnessIntegrity)' | tee "$RUNNER_TEMP/publication-proof-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publication-proof-tests.jsonl" --publisher-proof
       - name: Publisher pre-invocation fence and non-success Recovery
         shell: bash
         run: |

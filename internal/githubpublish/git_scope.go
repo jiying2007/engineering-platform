@@ -63,6 +63,7 @@ func runPublisherGit(ctx context.Context, git string, args []string, env []strin
 		waitErr = errors.Join(waitErr, stopErr)
 	}
 	if !proof.Quiescent() {
+		_ = recordPublicationReap(ctx, proof)
 		if state, _ := ctx.Value(gitProofKey{}).(*gitProofLog); state != nil {
 			state.uncertain = true
 		}
@@ -71,5 +72,5 @@ func runPublisherGit(ctx context.Context, git string, args []string, env []strin
 	if collector, _ := ctx.Value(gitProofKey{}).(*gitProofLog); collector != nil {
 		collector.proofs = append(collector.proofs, proof)
 	}
-	return errors.Join(gateErr, closeErr, waitErr)
+	return errors.Join(gateErr, closeErr, waitErr, recordPublicationReap(ctx, proof))
 }

@@ -62,10 +62,11 @@ func (s DispatchStart) Validate() error {
 }
 
 type DispatchCompletion struct {
-	Version     int                `json:"version"`
-	StartDigest string             `json:"start_digest"`
-	Receipt     PublicationReceipt `json:"receipt"`
-	ReturnedAt  time.Time          `json:"returned_at"`
+	GitQuiescence *GitQuiescence     `json:"git_quiescence,omitempty"`
+	Version       int                `json:"version"`
+	StartDigest   string             `json:"start_digest"`
+	Receipt       PublicationReceipt `json:"receipt"`
+	ReturnedAt    time.Time          `json:"returned_at"`
 }
 
 func (c DispatchCompletion) Validate(s DispatchStart) error {
@@ -75,7 +76,14 @@ func (c DispatchCompletion) Validate(s DispatchStart) error {
 	default:
 		return ErrDispatchEvidenceUnavailable
 	}
-	if err != nil || s.Validate() != nil || c.Version != 1 || c.StartDigest != digest || c.Receipt.Validate(s.Plan) != nil || c.ReturnedAt.IsZero() || c.ReturnedAt.Before(s.StartedAt) {
+	if err != nil || s.Validate() != nil || (c.Version != 1 && c.Version != 2) || c.StartDigest != digest || c.Receipt.Validate(s.Plan) != nil || c.ReturnedAt.IsZero() || c.ReturnedAt.Before(s.StartedAt) {
+		return ErrDispatchEvidenceUnavailable
+	}
+	if c.Version == 1 {
+		if c.GitQuiescence != nil {
+			return ErrDispatchEvidenceUnavailable
+		}
+	} else if s.Version != 2 || c.GitQuiescence == nil || c.GitQuiescence.validate(s.StartedAt, c.ReturnedAt) != nil {
 		return ErrDispatchEvidenceUnavailable
 	}
 	return nil
@@ -191,7 +199,7 @@ func (p *Provider) ObserveOriginalPublication(ctx context.Context, op action.Ope
 	if err != nil {
 		return zero, err
 	}
-	if e.Validate() != nil || e.Start.Identity != identity || e.Start.Plan != plan {
+	if e.ValidateForRecovery() != nil || e.Start.Identity != identity || e.Start.Plan != plan {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	if err := ctx.Err(); err != nil {
@@ -207,7 +215,7 @@ func (c *remoteClient) ObserveDispatch(ctx context.Context, identity DispatchIde
 	if err := c.call(ctx, "/v1/dispatch-evidence", publishRequest{Plan: plan, Identity: identity}, &e); err != nil {
 		return PublicationEvidence{}, fmt.Errorf("original publisher evidence: %w", err)
 	}
-	if e.Validate() != nil || e.Start.Identity != identity || e.Start.Plan != plan {
+	if e.ValidateForRecovery() != nil || e.Start.Identity != identity || e.Start.Plan != plan {
 		return PublicationEvidence{}, ErrDispatchEvidenceUnavailable
 	}
 	return e, nil
