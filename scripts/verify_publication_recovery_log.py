@@ -34,6 +34,12 @@ PROOF_REQUIRED = {
     "TestPublisherWitnessIntegrityRejectsAliasedAndSpecialFiles",
     "TestPublisherWitnessIntegrityRejectsUnsafeRootModes",
     "TestPublisherWitnessIntegrityDescriptorOpenDoesNotFollowOrBlock",
+    "TestPublisherWitnessIntegrityContextPreCancelled",
+    "TestPublisherWitnessIntegrityContextWriteMarshallingCancellation",
+    "TestPublisherWitnessIntegrityContextReadDecodeCancellation",
+    "TestPublisherWitnessIntegrityContextReadCheckpoints",
+    "TestPublisherWitnessIntegrityContextReadNoDescriptorLeak",
+    "TestPublisherWitnessIntegrityContextOriginalCompletionSettlement",
 }
 
 RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill", "TestNoInvocationRestoreDrill"}

@@ -56,6 +56,9 @@ func dispatchSlot(plan Plan) string {
 	}{plan.Repository, plan.ExecutionID})
 	return strings.TrimPrefix(digest, "sha256:")
 }
+
+// Finish a durability operation once started; a completed sync is not evidence
+// that the caller Context remains live. Callers fence their next action.
 func syncRoot(r *os.Root) error {
 	f, err := r.Open(".")
 	if err != nil {
@@ -63,13 +66,25 @@ func syncRoot(r *os.Root) error {
 	}
 	return errors.Join(f.Sync(), f.Close())
 }
-func writeWitness(r *os.Root, name string, value any) error {
+
+// Check caller/settlement cancellation before reserving an immutable name.
+// Once created, finish this bounded (<=64KiB) write and both syncs exactly once.
+// In particular arm must retain the fact of its own successful durable intent
+// before acting on late cancellation; otherwise its v2 certificate is lost.
+// Failure leaves occupied bytes. No detached writer, deletion or retry exists.
+func writeWitness(ctx context.Context, r *os.Root, name string, value any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
 	if len(raw) == 0 || len(raw) > 64<<10 {
 		return ErrDispatchEvidenceUnavailable
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	f, err := r.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -82,26 +97,39 @@ func writeWitness(r *os.Root, name string, value any) error {
 	err = errors.Join(werr, f.Sync(), f.Close())
 	if err != nil {
 		return err
-	} // Keep incomplete bytes and occupied slot, never retry.
+	}
 	return syncRoot(r)
 }
-func readWitness(r *os.Root, name string, dst any) error {
+
+func readWitness(ctx context.Context, r *os.Root, name string, dst any) (err error) {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	before, err := r.Lstat(name)
 	if err != nil || !witnessPrivateFile(before) {
 		return ErrDispatchEvidenceUnavailable
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	f, err := openWitnessRead(r, name)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { err = errors.Join(err, f.Close()) }()
 	info, err := f.Stat()
 	if err != nil || !witnessPrivateFile(info) || !os.SameFile(before, info) {
 		return ErrDispatchEvidenceUnavailable
 	}
-	raw, err := io.ReadAll(io.LimitReader(f, (64<<10)+1))
-	if err != nil || len(raw) > 64<<10 {
+	raw, err := io.ReadAll(io.LimitReader(bundleContextReader{ctx, f}, (64<<10)+1))
+	if err != nil {
+		return errors.Join(ErrDispatchEvidenceUnavailable, err)
+	}
+	if len(raw) > 64<<10 {
 		return ErrDispatchEvidenceUnavailable
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	after, err := r.Lstat(name)
 	if err != nil || !witnessPrivateFile(after) || !os.SameFile(before, after) || after.Size() != before.Size() || !after.ModTime().Equal(before.ModTime()) || int64(len(raw)) != before.Size() {
@@ -110,16 +138,22 @@ func readWitness(r *os.Root, name string, dst any) error {
 	if err := strictjson.Decode(raw, dst); err != nil {
 		return ErrDispatchEvidenceUnavailable
 	}
-	// A prior failed fsync is never inferred to have succeeded; exact readback
-	// re-establishes durability before Core may retain these observed bytes.
 	canonicalBytes, marshalErr := json.Marshal(dst)
 	if marshalErr != nil || !bytes.Equal(raw, canonicalBytes) {
 		return ErrDispatchEvidenceUnavailable
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Re-establish durability, but only within the supplied lifecycle. A late
+	// cancellation is an error even if the bytes were synchronized successfully.
 	if err := f.Sync(); err != nil {
 		return err
 	}
-	return syncRoot(r)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return errors.Join(syncRoot(r), ctx.Err())
 }
 func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, plan Plan) (*dispatchLease, DispatchStart, error) {
 	var zero DispatchStart
@@ -168,7 +202,7 @@ func (j *dispatchJournal) begin(ctx context.Context, identity DispatchIdentity, 
 		lease.Close()
 		return nil, zero, ErrDispatchEvidenceUnavailable
 	}
-	if err := writeWitness(slot, "started.json", start); err != nil {
+	if err := writeWitness(ctx, slot, "started.json", start); err != nil {
 		lease.Close()
 		return nil, zero, err
 	}
@@ -202,13 +236,13 @@ func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdenti
 	if err != nil || !witnessPrivateDirectory(opened) || !os.SameFile(before, opened) {
 		return s, c, ErrDispatchEvidenceUnavailable
 	}
-	if err := readWitness(slot, "started.json", &s); err != nil {
+	if err := readWitness(ctx, slot, "started.json", &s); err != nil {
 		return s, c, err
 	}
 	if s.Validate() != nil || s.Identity != identity || s.Plan != plan {
 		return s, c, ErrDispatchEvidenceUnavailable
 	}
-	if err := readWitness(slot, "completed.json", &c); err != nil {
+	if err := readWitness(ctx, slot, "completed.json", &c); err != nil {
 		return s, c, err
 	}
 	if c.Validate(s) != nil {
@@ -216,7 +250,10 @@ func (j *dispatchJournal) completed(ctx context.Context, identity DispatchIdenti
 	}
 	if s.Version == 2 {
 		var invoked DispatchInvocation
-		if readWitness(slot, "invoked.json", &invoked) != nil || invoked.Validate(s) != nil ||
+		if err := readWitness(ctx, slot, "invoked.json", &invoked); err != nil {
+			return s, c, err
+		}
+		if invoked.Validate(s) != nil ||
 			invoked.ArmedAt.After(c.ReturnedAt) || !witnessAbsent(slot, "not-invoked.json") {
 			return s, c, ErrDispatchEvidenceUnavailable
 		}

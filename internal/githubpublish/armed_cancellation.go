@@ -46,8 +46,16 @@ func (l *dispatchLease) retainArmedCancellation(ctx context.Context, start Dispa
 	}
 	var original DispatchStart
 	var invoked DispatchInvocation
-	if readWitness(l.Root, "started.json", &original) != nil || original != start ||
-		readWitness(l.Root, "invoked.json", &invoked) != nil || invoked != *l.invocation || invoked.Validate(start) != nil ||
+	if err := readWitness(ctx, l.Root, "started.json", &original); err != nil {
+		return err
+	}
+	if original != start {
+		return ErrDispatchEvidenceUnavailable
+	}
+	if err := readWitness(ctx, l.Root, "invoked.json", &invoked); err != nil {
+		return err
+	}
+	if invoked != *l.invocation || invoked.Validate(start) != nil ||
 		!witnessAbsent(l.Root, "completed.json") || !witnessAbsent(l.Root, "not-invoked.json") {
 		return ErrDispatchEvidenceUnavailable
 	}
@@ -64,7 +72,7 @@ func (l *dispatchLease) retainArmedCancellation(ctx context.Context, start Dispa
 	}
 	// EXCL append-only. Partial write/fsync failure leaves the occupied slot intact.
 	// This independent budget is cooperative; it cannot interrupt a blocked fsync.
-	if err := writeWitness(l.Root, "not-invoked.json", seal); err != nil {
+	if err := writeWitness(ctx, l.Root, "not-invoked.json", seal); err != nil {
 		return err
 	}
 	return ctx.Err()

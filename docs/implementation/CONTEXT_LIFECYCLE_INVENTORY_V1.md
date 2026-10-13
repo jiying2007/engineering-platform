@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:eab62f84d285961622b0bcdf363bfb3320890e0bbc6f45229583a719b39e676a`
+`sha256:6d82aacb91feef00839249e4407711ebb9b46d4a1fa1ec24830a06dd3c2d12ae`
 
 ## Reviewed categories
 
@@ -228,3 +228,24 @@ retain a certificate only after its own synced invocation marker and before it
 enters Remote.Publish. The certificate writer is synchronous under the original
 slot lock. Failure preserves unresolved state and occupied bytes. This is a
 cooperative durability budget, not forced fsync interruption or a new retry lane.
+
+## Caller-bound witness I/O
+
+Witness reads now require the initiating Context through metadata validation,
+no-follow descriptor open, bounded source reads, decoding and durability checks.
+Cancelled readers return no accepted evidence and retain the immutable bytes for
+later independent readback. Descriptor closure errors are preserved. The existing
+read path still requires exact canonical bytes, original inode and private modes.
+
+Witness writes accept either the original caller Context or the existing bounded
+independent settlement Context. Cancellation is checked before marshalling and
+again before the exclusive filename reservation. Once a <=64KiB write starts, its
+file sync and directory sync finish synchronously exactly once. Successful sync
+is a durability fact: the original arm records it before its next cancellation
+check, preserving the original armed-cancellation v2 certificate. No asynchronous
+writer, new timeout, retry, deletion, or historical evidence promotion is added.
+
+The original completion path passes its existing five-second settlement Context;
+client cancellation does not erase a genuinely completed publication. These are
+cooperative I/O checkpoints, not forced interruption of kernel reads/fsync or
+selected-host latency qualification. Internal blockers [228,229] remain OPEN.

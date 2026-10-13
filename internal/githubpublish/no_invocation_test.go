@@ -100,7 +100,7 @@ func TestPublisherNoInvocationFenceRejectsHistoricalAndArmed(t *testing.T) {
 			case "corrupt-seal":
 				err = os.WriteFile(filepath.Join(slot, "not-invoked.json"), []byte("null"), 0600)
 			case "foreign-seal":
-				err = writeWitness(lease.Root, "not-invoked.json", DispatchNonInvocation{Kind: "PUBLISH_NOT_INVOKED_V1", StartDigest: canonical.BytesDigest([]byte("wrong")), SealedAt: time.Now().UTC()})
+				err = writeWitness(context.Background(), lease.Root, "not-invoked.json", DispatchNonInvocation{Kind: "PUBLISH_NOT_INVOKED_V1", StartDigest: canonical.BytesDigest([]byte("wrong")), SealedAt: time.Now().UTC()})
 			case "completed":
 				err = os.WriteFile(filepath.Join(slot, "completed.json"), []byte("{}"), 0600)
 			}
@@ -135,10 +135,10 @@ func TestPublisherInvocationBarrierPrecedesRemote(t *testing.T) {
 		defer root.Close()
 		var st DispatchStart
 		var i DispatchInvocation
-		if err = readWitness(root, "started.json", &st); err != nil {
+		if err = readWitness(context.Background(), root, "started.json", &st); err != nil {
 			return err
 		}
-		if err = readWitness(root, "invoked.json", &i); err != nil {
+		if err = readWitness(context.Background(), root, "invoked.json", &i); err != nil {
 			return err
 		}
 		if err = i.Validate(st); err != nil {

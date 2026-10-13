@@ -75,7 +75,7 @@ func (l *dispatchLease) arm(ctx context.Context, start DispatchStart) error {
 	if err := i.Validate(start); err != nil {
 		return err
 	}
-	if err := writeWitness(l.Root, "invoked.json", i); err != nil {
+	if err := writeWitness(ctx, l.Root, "invoked.json", i); err != nil {
 		return err
 	}
 	l.invocation = &i // Set only after this original write and sync succeed.
@@ -178,7 +178,10 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	}
 	defer lock.Close()
 	var start DispatchStart
-	if readWitness(slot, "started.json", &start) != nil || start.Version != 2 || start.Validate() != nil || start.Identity != identity || start.Plan != plan {
+	if err := readWitness(ctx, slot, "started.json", &start); err != nil {
+		return zero, err
+	}
+	if start.Version != 2 || start.Validate() != nil || start.Identity != identity || start.Plan != plan {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	// A copied/restored directory or a reboot does not prove what the original
@@ -194,7 +197,10 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	if !witnessAbsent(slot, "invoked.json") {
 		// Only read an original certificate; never generate one after the fact.
 		invocation = &DispatchInvocation{}
-		if readWitness(slot, "invoked.json", invocation) != nil || invocation.Validate(start) != nil || witnessAbsent(slot, "not-invoked.json") {
+		if err := readWitness(ctx, slot, "invoked.json", invocation); err != nil {
+			return zero, err
+		}
+		if invocation.Validate(start) != nil || witnessAbsent(slot, "not-invoked.json") {
 			return zero, ErrDispatchEvidenceUnavailable
 		}
 	}
@@ -208,12 +214,12 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 		if err := seal.Validate(start); err != nil {
 			return zero, err
 		}
-		if err := writeWitness(slot, "not-invoked.json", seal); err != nil {
+		if err := writeWitness(ctx, slot, "not-invoked.json", seal); err != nil {
 			return zero, err
 		}
 	}
 	// Exact repeat never rewrites a marker; readback re-establishes durability.
-	if err := readWitness(slot, "not-invoked.json", &seal); err != nil {
+	if err := readWitness(ctx, slot, "not-invoked.json", &seal); err != nil {
 		return zero, err
 	}
 	e := NonInvocationEvidence{Version: 1, Start: start, Seal: seal, Invocation: invocation}

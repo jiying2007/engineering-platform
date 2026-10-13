@@ -3,6 +3,7 @@
 package githubpublish
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -48,7 +49,7 @@ func TestPublisherWitnessIntegrityRejectsAliasedAndSpecialFiles(t *testing.T) {
 			var decoded struct {
 				OK bool `json:"ok"`
 			}
-			if readWitness(root, "witness.json", &decoded) == nil {
+			if readWitness(context.Background(), root, "witness.json", &decoded) == nil {
 				t.Fatal("aliased or special witness accepted", kind)
 			}
 		})
