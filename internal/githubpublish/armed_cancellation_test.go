@@ -235,7 +235,7 @@ func TestPublisherNoInvocationAfterArmFailedRetentionStaysBlocked(t *testing.T) 
 	if err = l.arm(context.Background(), start); err != nil {
 		t.Fatal(err)
 	}
-	if err = writeWitness(l.Root, "not-invoked.json", map[string]string{"partial": "existing"}); err != nil {
+	if err = writeWitness(context.Background(), l.Root, "not-invoked.json", map[string]string{"partial": "existing"}); err != nil {
 		t.Fatal(err)
 	}
 	if err = l.retainArmedCancellation(context.Background(), start); err == nil {

@@ -190,7 +190,7 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication witness unavailable")
 		return
 	}
-	if err := writeWitness(slot.Root, "completed.json", completion); err != nil {
+	if err := writeWitness(settle, slot.Root, "completed.json", completion); err != nil {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication completion not retained; exact readback required")
 		return
 	}

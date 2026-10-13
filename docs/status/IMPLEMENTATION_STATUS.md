@@ -369,6 +369,14 @@ ambiguous external results and selected-host lifecycle/backup/long-run acceptanc
 are not promoted by this pre-effect path. Nine existing database fault/transport
 suites and the non-invocation restore drill now cover both evidence versions.
 
+Publisher witness readback now propagates caller cancellation through its existing
+bounded descriptor/decoding/durability path. Witness writes check the original
+caller or existing independent settlement Context before reserving a name, then
+finish the bounded write and sync once so durable invocation provenance is not
+lost on late cancellation. No witness format, retry authority, or terminal
+recovery transition is added. These cooperative checkpoints do not qualify
+blocked kernel I/O or selected-host lifecycle/storage behavior.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**
