@@ -46,7 +46,7 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 		RequestedBy:      "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("b", 64), now)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	status, err = s.ReadOperationalStatus(ctx)
@@ -57,7 +57,7 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err := op.Transition(action.Dispatched, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	status, err = s.ReadOperationalStatus(ctx)
@@ -68,7 +68,7 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err := op.Transition(action.Unknown, now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 
@@ -82,7 +82,7 @@ func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
 	if err := op.Transition(action.Reconciling, now.Add(3*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	seedHistoricalSafeToRetry(t, s, op.ID)

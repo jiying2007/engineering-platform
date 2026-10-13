@@ -389,10 +389,6 @@ func (m *Memory) GetTaskRevisionContext(ctx context.Context, id string, revision
 	return task, nil
 }
 
-func (m *Memory) GetTaskRevision(id string, revision uint64) (core.TaskContract, error) {
-	return m.GetTaskRevisionContext(context.Background(), id, revision)
-}
-
 func (m *Memory) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
@@ -541,10 +537,6 @@ func (m *Memory) GetAttemptContext(ctx context.Context, runID, attemptID string)
 		return run.Attempt{}, ErrNotFound
 	}
 	return attempt, nil
-}
-
-func (m *Memory) GetAttempt(runID, attemptID string) (run.Attempt, error) {
-	return m.GetAttemptContext(context.Background(), runID, attemptID)
 }
 
 func (m *Memory) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
@@ -699,10 +691,6 @@ func (m *Memory) RecordSteeringContext(ctx context.Context, id string, expectedV
 	return nil
 }
 
-func (m *Memory) RecordSteering(id string, expectedVersion uint64, value run.Run, sess session.Session, cmd session.SteeringCommand) error {
-	return m.RecordSteeringContext(context.Background(), id, expectedVersion, value, sess, cmd)
-}
-
 func (m *Memory) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
 	if err := ctx.Err(); err != nil {
 		return session.SteeringCommand{}, err
@@ -837,17 +825,6 @@ func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
 	m.operations[op.ID] = op
 	return nil
 }
-
-// Core's in-memory development lane implements the same caller-bound Action
-// Repository contract as production PostgreSQL. No second ledger or retry.
-func (m *Memory) Create(op action.Operation) error { return m.CreateContext(context.Background(), op) }
-func (m *Memory) Get(id string) (action.Operation, error) {
-	return m.GetContext(context.Background(), id)
-}
-func (m *Memory) GetByIdempotencyKey(key string) (action.Operation, error) {
-	return m.GetByIdempotencyKeyContext(context.Background(), key)
-}
-func (m *Memory) Update(op action.Operation) error { return m.UpdateContext(context.Background(), op) }
 
 func (m *Memory) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
 	if err := ctx.Err(); err != nil {
@@ -1093,99 +1070,4 @@ func (m *Memory) GetClosureContext(ctx context.Context, id string) (core.Closure
 		return core.ClosureReceipt{}, ErrNotFound
 	}
 	return item, nil
-}
-
-// These are caller-scoped views of the single existing in-memory Core ledger.
-// Gateway Authorization/Run/Recovery checks are now always bound to the
-// initiating request; only a separately authorized context may outlive it.
-func (m *Memory) GetExecution(id string) (run.Run, session.Session, error) {
-	return m.GetExecutionContext(context.Background(), id)
-}
-func (m *Memory) GetTaskByDigest(digest string) (core.TaskContract, error) {
-	return m.GetTaskByDigestContext(context.Background(), digest)
-}
-func (m *Memory) GetRecovery() (recovery.Manager, error) {
-	return m.GetRecoveryContext(context.Background())
-}
-
-// DEV/test uses the same bounded caller admission fence as PostgreSQL
-// for Recovery Begin/Complete. No new Recovery ledger or replay mechanism.
-func (m *Memory) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
-	return m.BeginRecoveryContext(context.Background(), expectedEpoch)
-}
-func (m *Memory) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
-	return m.CompleteRecoveryContext(context.Background(), epoch, reconciled)
-}
-
-// The HTTP Core Store contract is scoped even in the in-memory DEV/test
-// implementation. These methods delegate to the original single ledger;
-// they do not add a second set of records or independent mutation authority.
-func (m *Memory) CreateWork(item core.WorkItem) error {
-	return m.CreateWorkContext(context.Background(), item)
-}
-func (m *Memory) GetWork(id string) (core.WorkItem, error) {
-	return m.GetWorkContext(context.Background(), id)
-}
-func (m *Memory) UpdateWork(id string, expectedVersion uint64, item core.WorkItem) error {
-	return m.UpdateWorkContext(context.Background(), id, expectedVersion, item)
-}
-func (m *Memory) CreateTaskAndUpdateWork(task core.TaskContract, plan verification.Plan, expectedWorkVersion uint64, work core.WorkItem) error {
-	return m.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, expectedWorkVersion, work)
-}
-func (m *Memory) GetTask(id string) (core.TaskContract, error) {
-	return m.GetTaskContext(context.Background(), id)
-}
-func (m *Memory) GetVerificationPlanByDigest(digest string) (verification.Plan, error) {
-	return m.GetVerificationPlanByDigestContext(context.Background(), digest)
-}
-func (m *Memory) CreateExecutionAndUpdateWork(value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, expectedWorkVersion uint64, work core.WorkItem) error {
-	return m.CreateExecutionAndUpdateWorkContext(context.Background(), value, attempt, sess, input, expectedWorkVersion, work)
-}
-func (m *Memory) GetRunInputByDigest(digest string) (core.RunInputManifest, error) {
-	return m.GetRunInputByDigestContext(context.Background(), digest)
-}
-func (m *Memory) UpdateExecution(id string, expectedVersion uint64, value run.Run, sess session.Session) error {
-	return m.UpdateExecutionContext(context.Background(), id, expectedVersion, value, sess)
-}
-func (m *Memory) UpdateExecutionAndWork(id string, expectedRunVersion uint64, value run.Run, sess session.Session, expectedWorkVersion uint64, work core.WorkItem) error {
-	return m.UpdateExecutionAndWorkContext(context.Background(), id, expectedRunVersion, value, sess, expectedWorkVersion, work)
-}
-func (m *Memory) CreateCheckpoint(item session.Checkpoint) (string, error) {
-	return m.CreateCheckpointContext(context.Background(), item)
-}
-func (m *Memory) GetCheckpoint(id string) (session.Checkpoint, string, error) {
-	return m.GetCheckpointContext(context.Background(), id)
-}
-func (m *Memory) CreateDelivery(item core.DeliveryReceipt) error {
-	return m.CreateDeliveryContext(context.Background(), item)
-}
-func (m *Memory) GetDelivery(id string) (core.DeliveryReceipt, error) {
-	return m.GetDeliveryContext(context.Background(), id)
-}
-func (m *Memory) CreateEvidence(item core.EvidenceRef) error {
-	return m.CreateEvidenceContext(context.Background(), item)
-}
-func (m *Memory) GetEvidence(id string) (core.EvidenceRef, error) {
-	return m.GetEvidenceContext(context.Background(), id)
-}
-func (m *Memory) CreateVerification(report verification.Report) error {
-	return m.CreateVerificationContext(context.Background(), report)
-}
-func (m *Memory) GetVerification(id string) (verification.Report, error) {
-	return m.GetVerificationContext(context.Background(), id)
-}
-func (m *Memory) CreateReviewAndUpdateWork(report review.Report, expectedVersion uint64, work core.WorkItem) error {
-	return m.CreateReviewAndUpdateWorkContext(context.Background(), report, expectedVersion, work)
-}
-func (m *Memory) GetReview(id string) (review.Report, error) {
-	return m.GetReviewContext(context.Background(), id)
-}
-func (m *Memory) CreateClosureAndUpdateWork(item core.ClosureReceipt, expectedVersion uint64, work core.WorkItem) error {
-	return m.CreateClosureAndUpdateWorkContext(context.Background(), item, expectedVersion, work)
-}
-func (m *Memory) GetClosure(id string) (core.ClosureReceipt, error) {
-	return m.GetClosureContext(context.Background(), id)
-}
-func (m *Memory) GetSteering(id string) (session.SteeringCommand, error) {
-	return m.GetSteeringContext(context.Background(), id)
 }

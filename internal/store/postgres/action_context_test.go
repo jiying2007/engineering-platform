@@ -50,7 +50,7 @@ func TestPostgresActionIndependentBoundedSettlementAfterCallerCancellation(t *te
 		t.Fatalf("cancelled caller erased real Provider completion: receipt=%#v err=%v calls=%d",
 			receipt, err, provider.calls)
 	}
-	stored, err := s.Get(request.ID)
+	stored, err := s.GetContext(context.Background(), request.ID)
 	if err != nil || stored.State != action.Confirmed ||
 		stored.ExternalRef != receipt.ExternalRef {
 		t.Fatalf("post-effect settlement was not durable: %#v err=%v", stored, err)

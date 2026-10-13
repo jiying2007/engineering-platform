@@ -13,7 +13,7 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 	s := newIsolatedIntegrationStore(t)
 	ctx := context.Background()
 
-	state, err := s.GetRecovery()
+	state, err := s.GetRecoveryContext(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 		t.Fatalf("unexpected initial recovery state: %#v", state)
 	}
 
-	active, err := s.BeginRecovery(0)
+	active, err := s.BeginRecoveryContext(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,15 +29,15 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 		t.Fatalf("unexpected active recovery state: %#v", active)
 	}
 
-	if _, err := s.BeginRecovery(0); !errors.Is(err, corestore.ErrConflict) {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); !errors.Is(err, corestore.ErrConflict) {
 		t.Fatalf("expected stale/duplicate begin conflict, got %v", err)
 	}
 
-	if _, err := s.CompleteRecovery(1, false); !errors.Is(err, recovery.ErrReconciliationRequired) {
+	if _, err := s.CompleteRecoveryContext(context.Background(), 1, false); !errors.Is(err, recovery.ErrReconciliationRequired) {
 		t.Fatalf("expected reconciliation requirement, got %v", err)
 	}
 
-	stillActive, err := s.GetRecovery()
+	stillActive, err := s.GetRecoveryContext(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 		t.Fatalf("failed completion must keep recovery active: %#v", stillActive)
 	}
 
-	if _, err := s.CompleteRecovery(1, true); !errors.Is(err, recovery.ErrReconciliationRequired) {
+	if _, err := s.CompleteRecoveryContext(context.Background(), 1, true); !errors.Is(err, recovery.ErrReconciliationRequired) {
 		t.Fatalf("completion without durable proof accepted: %v", err)
 	}
 	proof, err := s.CreateRecoveryProof(ctx, 1, "urn:engineering-platform:operator:reconciler")
@@ -61,11 +61,11 @@ func TestPostgresRecoveryLifecycle(t *testing.T) {
 	if err := s.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:completer", 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CompleteRecovery(0, true); !errors.Is(err, corestore.ErrConflict) {
+	if _, err := s.CompleteRecoveryContext(context.Background(), 0, true); !errors.Is(err, corestore.ErrConflict) {
 		t.Fatalf("expected stale recovery epoch conflict, got %v", err)
 	}
 
-	normal, err := s.CompleteRecovery(1, true)
+	normal, err := s.CompleteRecoveryContext(context.Background(), 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}

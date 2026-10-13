@@ -28,8 +28,8 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse PostgreSQL config: %w", err)
 	}
-	// Every production connection must have an independent database-side
-	// deadline even when a legacy Store method still uses context.Background.
+	// Caller Context and independent database-side ceilings are complementary.
+	// A caller without a deadline must not leave an unbounded statement or lock wait.
 	if err := applyConnectionDeadlines(config); err != nil {
 		return nil, err
 	}
@@ -64,10 +64,6 @@ func (s *Store) ApplyCoreMigration(ctx context.Context) error {
 	return nil
 }
 
-func (s *Store) GetRecovery() (recovery.Manager, error) {
-	return s.GetRecoveryContext(context.Background())
-}
-
 func (s *Store) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
@@ -84,10 +80,6 @@ func (s *Store) GetRecoveryContext(ctx context.Context) (recovery.Manager, error
 		return recovery.Manager{}, fmt.Errorf("read recovery state: unknown mode %q", mode)
 	}
 	return state, nil
-}
-
-func (s *Store) BeginRecovery(expectedEpoch uint64) (recovery.Manager, error) {
-	return s.BeginRecoveryContext(context.Background(), expectedEpoch)
 }
 
 func (s *Store) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
@@ -131,10 +123,6 @@ RETURNING recovery_epoch,recovery_mode`
 		return recovery.Manager{}, err
 	}
 	return result, nil
-}
-
-func (s *Store) CompleteRecovery(epoch uint64, reconciled bool) (recovery.Manager, error) {
-	return s.CompleteRecoveryContext(context.Background(), epoch, reconciled)
 }
 
 // CompleteRecoveryContext verifies the original immutable Recovery Proof and

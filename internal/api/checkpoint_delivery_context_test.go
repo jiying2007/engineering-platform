@@ -26,28 +26,28 @@ func (p *checkpointDeliveryContextProbe) CreateCheckpointContext(ctx context.Con
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	return p.Memory.CreateCheckpoint(item)
+	return p.Memory.CreateCheckpointContext(context.Background(), item)
 }
 func (p *checkpointDeliveryContextProbe) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
 	p.readCheckpointCalls++
 	if err := ctx.Err(); err != nil {
 		return session.Checkpoint{}, "", err
 	}
-	return p.Memory.GetCheckpoint(id)
+	return p.Memory.GetCheckpointContext(context.Background(), id)
 }
 func (p *checkpointDeliveryContextProbe) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
 	p.createDeliveryCalls++
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateDelivery(item)
+	return p.Memory.CreateDeliveryContext(context.Background(), item)
 }
 func (p *checkpointDeliveryContextProbe) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
 	p.readDeliveryCalls++
 	if err := ctx.Err(); err != nil {
 		return core.DeliveryReceipt{}, err
 	}
-	return p.Memory.GetDelivery(id)
+	return p.Memory.GetDeliveryContext(context.Background(), id)
 }
 
 func TestCheckpointDeliveryHTTPRoutesUseRequestContext(t *testing.T) {
@@ -103,7 +103,7 @@ func TestCheckpointDeliveryHTTPRoutesUseRequestContext(t *testing.T) {
 	if rec.Code == http.StatusCreated || probe.createDeliveryCalls != 1 {
 		t.Fatalf("cancelled request created delivery: status=%d calls=%d", rec.Code, probe.createDeliveryCalls)
 	}
-	if _, err := probe.Memory.GetDelivery("must-not-create"); err != store.ErrNotFound {
+	if _, err := probe.Memory.GetDeliveryContext(context.Background(), "must-not-create"); err != store.ErrNotFound {
 		t.Fatalf("cancelled delivery mutated historical Core records: %v", err)
 	}
 }

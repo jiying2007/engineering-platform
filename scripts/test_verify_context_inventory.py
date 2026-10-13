@@ -20,6 +20,10 @@ class ContextInventoryBindingTests(unittest.TestCase):
             for bad in (good.replace(digest,"sha256:"+"0"*64),good.replace(":3`",":4`"),good.replace("| `cmd/main.go:3`","| `cmd/other.go:3`"),good+"| `cmd/main.go:3` | `Background` | Explicitly timed command root |\n",good.replace("| Explicitly timed command root | 1 |","| Explicitly timed command root | 2 |"),good.replace("` | Explicitly timed command root |","` | Assumed safe |")):
                 doc.write_text(bad)
                 with self.assertRaises(ValueError):verify(root,doc)
+            # Retired wrapper categories cannot be restored by updating counts.
+            retired=good.replace("Explicitly timed command root", "Concrete convenience wrapper")
+            doc.write_text(retired)
+            with self.assertRaises(ValueError):verify(root,doc)
             doc.write_text(good)
             src.write_text(src.read_text()+"// changed source\n")
             with self.assertRaises(ValueError):verify(root,doc)

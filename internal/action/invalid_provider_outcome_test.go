@@ -33,7 +33,7 @@ func TestInvalidProviderDispatchOutcomePersistsUnknownAndNeverReplays(t *testing
 		receipt.OperationID != "" || calls != 1 {
 		t.Fatalf("invalid dispatch was acknowledged: receipt=%#v err=%v calls=%d", receipt, err, calls)
 	}
-	stored, err := repository.Get(request.ID)
+	stored, err := repository.GetContext(context.Background(), request.ID)
 	if err != nil || stored.State != Unknown || stored.ExternalRef != "" ||
 		stored.ObservedState != "INVALID_PROVIDER_DISPATCH_OUTCOME" {
 		t.Fatalf("untrusted dispatch did not persist fail-closed UNKNOWN: state=%#v err=%v", stored, err)
@@ -47,7 +47,7 @@ func TestInvalidProviderDispatchOutcomePersistsUnknownAndNeverReplays(t *testing
 
 func TestInvalidProviderReconcileOutcomePersistsManual(t *testing.T) {
 	repository := NewMemoryRepository()
-	if err := repository.Create(Operation{
+	if err := repository.CreateContext(context.Background(), Operation{
 		ID: "op-invalid-observe", RunID: "run-1", State: Unknown,
 		Action: "ci.dispatch", Capability: "ci.dispatch",
 		IdempotencyKey: "invalid-observe-once",
@@ -69,7 +69,7 @@ func TestInvalidProviderReconcileOutcomePersistsManual(t *testing.T) {
 		receipt.OperationID != "" {
 		t.Fatalf("unrecognized reconciliation was acknowledged: receipt=%#v err=%v", receipt, err)
 	}
-	stored, err := repository.Get("op-invalid-observe")
+	stored, err := repository.GetContext(context.Background(), "op-invalid-observe")
 	if err != nil || stored.State != Manual || stored.ExternalRef != "" ||
 		stored.ObservedState != "INVALID_PROVIDER_RECONCILE_OUTCOME" {
 		t.Fatalf("unrecognized observation did not persist MANUAL: state=%#v err=%v", stored, err)
@@ -96,7 +96,7 @@ func TestInvalidProviderOutcomesCannotClaimUnpersistedSettlement(t *testing.T) {
 		if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" {
 			t.Fatalf("unpersisted UNKNOWN was acknowledged: receipt=%#v err=%v", receipt, err)
 		}
-		stored, err := repository.Get("op-invalid-unpersisted-dispatch")
+		stored, err := repository.GetContext(context.Background(), "op-invalid-unpersisted-dispatch")
 		if err != nil || stored.State != Dispatched {
 			t.Fatalf("expected retained pre-effect reservation: state=%#v err=%v", stored, err)
 		}
@@ -105,7 +105,7 @@ func TestInvalidProviderOutcomesCannotClaimUnpersistedSettlement(t *testing.T) {
 		repository := &settlementUpdateRejector{
 			MemoryRepository: NewMemoryRepository(), reject: Manual,
 		}
-		if err := repository.Create(Operation{
+		if err := repository.CreateContext(context.Background(), Operation{
 			ID: "op-invalid-unpersisted-observe", RunID: "run-1", State: Unknown,
 			Action: "ci.dispatch", Capability: "ci.dispatch",
 			IdempotencyKey: "invalid-unpersisted-observe",
@@ -120,7 +120,7 @@ func TestInvalidProviderOutcomesCannotClaimUnpersistedSettlement(t *testing.T) {
 		if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" {
 			t.Fatalf("unpersisted MANUAL was acknowledged: receipt=%#v err=%v", receipt, err)
 		}
-		stored, err := repository.Get("op-invalid-unpersisted-observe")
+		stored, err := repository.GetContext(context.Background(), "op-invalid-unpersisted-observe")
 		if err != nil || stored.State != Reconciling {
 			t.Fatalf("expected retained reconciliation reservation: state=%#v err=%v", stored, err)
 		}

@@ -29,7 +29,7 @@ func TestCoreMemoryActionRepositoryRespectsCancelledContext(t *testing.T) {
 	if err := core.UpdateContext(ctx, op); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled Core Action update accepted: %v", err)
 	}
-	if _, err := core.Get(op.ID); !errors.Is(err, action.ErrOperationAbsent) {
+	if _, err := core.GetContext(context.Background(), op.ID); !errors.Is(err, action.ErrOperationAbsent) {
 		t.Fatalf("cancelled Action reservation leaked: %v", err)
 	}
 	if err := core.CreateContext(context.Background(), op); err != nil {

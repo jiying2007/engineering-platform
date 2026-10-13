@@ -22,10 +22,10 @@ func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
 		RequestedBy: "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("2", 64), now)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
@@ -37,10 +37,10 @@ func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
 	if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); !errors.Is(err, recovery.ErrStaleEpoch) {
+	if err := s.UpdateContext(context.Background(), *op); !errors.Is(err, recovery.ErrStaleEpoch) {
 		t.Fatalf("Recovery authorized new external dispatch: %v", err)
 	}
-	stored, err := s.Get(op.ID)
+	stored, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || stored.State != action.Planned {
 		t.Fatalf("Recovery changed pre-effect reservation: %#v err=%v", stored, err)
 	}
@@ -52,7 +52,7 @@ func TestRecoveryProofBlocksUnresolvedExternalOperation(t *testing.T) {
 func TestRecoveryProofBlocksLiveMutationOutboxLease(t *testing.T) {
 	s := newIsolatedIntegrationStore(t)
 	ctx := context.Background()
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	_, err := s.pool.Exec(ctx, `INSERT INTO outbox_events
@@ -83,16 +83,16 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 		RequestedBy: "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("4", 64), now)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	if err := op.Transition(action.Dispatched, now.Add(time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {
@@ -103,7 +103,7 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 	if err := op.Transition(action.Confirmed, now.Add(2*time.Second)); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Update(*op); err != nil {
+	if err := s.UpdateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); err != nil {
@@ -122,19 +122,19 @@ func TestRecoveryProofBlocksLegacySafeToRetryWithoutQuiescence(t *testing.T) {
 		RequestedBy: "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("b", 64), now)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	for i, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling} {
 		if err := op.Transition(state, now.Add(time.Duration(i+1)*time.Second)); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Update(*op); err != nil {
+		if err := s.UpdateContext(context.Background(), *op); err != nil {
 			t.Fatal(err)
 		}
 	}
 	seedHistoricalSafeToRetry(t, s, op.ID)
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); !errors.Is(err, ErrRecoveryFactsUnresolved) {

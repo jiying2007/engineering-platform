@@ -295,10 +295,6 @@ func (s *Service) Execute(ctx context.Context, req Request) (Receipt, error) {
 	return receiptFromOperation(req.ID, *op, s.now()), nil
 }
 
-func (s *Service) Get(operationID string) (Operation, error) {
-	return s.GetContext(context.Background(), operationID)
-}
-
 // GetContext binds authoritative Action readback to the initiating caller.
 // No observation, reconciliation, publication or replay happens on GET.
 func (s *Service) GetContext(ctx context.Context, operationID string) (Operation, error) {
@@ -422,21 +418,6 @@ func NewMemoryRepository() *MemoryRepository {
 		items:       make(map[string]Operation),
 		idempotency: make(map[string]string),
 	}
-}
-
-// Concrete convenience methods share the exact same ledger and cancellation
-// contract. No goroutine is detached; RWMutex acquisition is not cancellable.
-func (r *MemoryRepository) Create(op Operation) error {
-	return r.CreateContext(context.Background(), op)
-}
-func (r *MemoryRepository) Get(id string) (Operation, error) {
-	return r.GetContext(context.Background(), id)
-}
-func (r *MemoryRepository) GetByIdempotencyKey(key string) (Operation, error) {
-	return r.GetByIdempotencyKeyContext(context.Background(), key)
-}
-func (r *MemoryRepository) Update(op Operation) error {
-	return r.UpdateContext(context.Background(), op)
 }
 
 func (r *MemoryRepository) CreateContext(ctx context.Context, op Operation) error {

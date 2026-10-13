@@ -93,7 +93,7 @@ func TestPostgresFaultInjectionSchemaIsolation(t *testing.T) {
 	if _, err := first.pool.Exec(context.Background(), "DELETE FROM audit_journal_state; DELETE FROM platform_state", pgx.QueryExecModeSimpleProtocol); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := second.BeginRecovery(0); err != nil {
+	if _, err := second.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatalf("another test's missing state contaminated recovery: %v", err)
 	}
 	assertCount(t, second, "SELECT count(*) FROM audit_events", 1)

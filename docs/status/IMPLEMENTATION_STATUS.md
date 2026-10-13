@@ -219,7 +219,8 @@ Configuration v1 reader incorrectly rejected valid deployed v2 configuration.
 Canonical paths, disjoint artifact/evidence roots, role ownership and access are
 checked; no v1 fallback or provider qualification is added.
 
-The direct Context inventory is updated to 132 constructors and checked in CI
+The direct Context inventory is now 58 constructors after removal of 75 unused
+context-free wrappers from the previous 133-site source, and is checked in CI
 against exact source digest, ordered locations and category counts. Its scope is
 still direct enumeration, not interprocedural or selected-host qualification.
 The older completed-publication candidate is reviewed and registered as a seventh
@@ -282,8 +283,10 @@ changes do not supply original Publisher dispatcher quiescence or close #228/#22
 The service-facing Core Store contract now contains only caller-Context methods;
 31 unscoped interface entries were removed. Historical Attempt/Task-revision/
 Steering methods use the same required Context contract and Memory post-lock
-cancellation checks. Concrete convenience wrappers remain for direct fixtures,
-not a network fallback. Memory historical Steering also matches PostgreSQL's
+cancellation checks. All 75 context-free concrete wrappers are now removed;
+329 test call sites explicitly use the same Context methods, with no fixture
+compatibility shim. A concrete-method-set regression prevents those unscoped
+entry points from returning. Memory historical Steering also matches PostgreSQL's
 Run/Session identity rejection.
 
 Preparation cleanup now preserves primary and cleanup errors together. Managed
@@ -307,8 +310,9 @@ this slice does not overwrite or reimplement #262. Nested domain checks remain
 the consumer's responsibility.
 
 Memory's existing scoped methods additionally recheck cancellation after the
-original RWMutex is acquired, before ledger access or mutation. Context-free
-concrete methods delegate to the same implementation; there is no second ledger.
+original RWMutex is acquired, before ledger access or mutation. The redundant
+context-free methods are removed; the scoped implementation and single ledger
+remain unchanged.
 RWMutex waiting itself is not cancellable. This closes the post-wait access
 race, not all #229 lifecycle, pool-wait or production latency qualification.
 
@@ -383,6 +387,24 @@ permit a later publication attempt. Failed or cancelled response decoding cannot
 partially replace accepted output. Loopback HTTP truncation and local-only Git
 attempt probes test this boundary; no live Provider or post-entry recovery
 qualification is implied, and no absence-to-retry authority is added.
+
+## Concrete authority Context surface cleanup
+
+The 75 retired wrappers had zero production references in the type-resolved
+Linux source review. Removal covers Memory Core/Action, PostgreSQL Core/Action,
+Action MemoryRepository and Action Service GET. Only the wrappers and stale
+comments are removed from production: existing Context implementations,
+transactions, cancellation/settlement budgets, recovery state and retry policy
+are unchanged. Tests supply explicit Context at the former 329 call sites;
+no test is removed and no context-free test compatibility layer is added.
+The concrete-method-set regression requires all 75 scoped replacements and
+rejects their unscoped names. The five remaining direct-origin categories total
+58, retain their original classifications, and remain bound to current bytes.
+
+This is concrete surface and compatibility-residue cleanup, not selected-host
+lifecycle/latency or full interprocedural cancellation qualification. Internal
+blockers [228,229] remain OPEN/BLOCKED; real Provider and production gates remain
+separate. It does not supply post-entry publication recovery or authorize retry.
 
 ## Typed embedded routing and Skill maturity
 

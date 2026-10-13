@@ -27,7 +27,7 @@ func (p *runStartContextProbe) GetTaskByDigestContext(ctx context.Context, diges
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
 	}
-	return p.Memory.GetTaskByDigest(digest)
+	return p.Memory.GetTaskByDigestContext(context.Background(), digest)
 }
 
 func (p *runStartContextProbe) CreateExecutionAndUpdateWorkContext(ctx context.Context, value run.Run, attempt run.Attempt, sess session.Session, input core.RunInputManifest, version uint64, work core.WorkItem) error {
@@ -35,7 +35,7 @@ func (p *runStartContextProbe) CreateExecutionAndUpdateWorkContext(ctx context.C
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateExecutionAndUpdateWork(value, attempt, sess, input, version, work)
+	return p.Memory.CreateExecutionAndUpdateWorkContext(context.Background(), value, attempt, sess, input, version, work)
 }
 
 func (p *runStartContextProbe) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
@@ -43,7 +43,7 @@ func (p *runStartContextProbe) GetExecutionContext(ctx context.Context, id strin
 	if err := ctx.Err(); err != nil {
 		return run.Run{}, session.Session{}, err
 	}
-	return p.Memory.GetExecution(id)
+	return p.Memory.GetExecutionContext(context.Background(), id)
 }
 
 func (p *runStartContextProbe) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
@@ -51,7 +51,7 @@ func (p *runStartContextProbe) GetRunInputByDigestContext(ctx context.Context, d
 	if err := ctx.Err(); err != nil {
 		return core.RunInputManifest{}, err
 	}
-	return p.Memory.GetRunInputByDigest(digest)
+	return p.Memory.GetRunInputByDigestContext(context.Background(), digest)
 }
 
 func runStartBody(runID, taskDigest string) map[string]any {
@@ -99,10 +99,10 @@ func TestCancelledRunHTTPDoesNotStartExecutionOrOutbox(t *testing.T) {
 	if response.Code == http.StatusCreated || p.starts != 0 {
 		t.Fatalf("canceled Run was created: status=%d calls=%d", response.Code, p.starts)
 	}
-	if _, _, err := p.Memory.GetExecution("cancelled-run"); err != store.ErrNotFound {
+	if _, _, err := p.Memory.GetExecutionContext(context.Background(), "cancelled-run"); err != store.ErrNotFound {
 		t.Fatalf("canceled request created Run authority: %v", err)
 	}
-	if work, err := p.Memory.GetWork("work-cancel-run-context"); err != nil ||
+	if work, err := p.Memory.GetWorkContext(context.Background(), "work-cancel-run-context"); err != nil ||
 		work.State != core.WorkReady || work.ActiveRunID != "" {
 		t.Fatalf("canceled Run advanced Work: %#v err=%v", work, err)
 	}

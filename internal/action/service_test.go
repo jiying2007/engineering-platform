@@ -85,7 +85,7 @@ func TestDispatchErrorBecomesUnknownAndMustReconcile(t *testing.T) {
 		t.Fatalf("expected UNKNOWN, got %s", receipt.Result)
 	}
 
-	op, err := repo.Get("op-1")
+	op, err := repo.GetContext(context.Background(), "op-1")
 	if err != nil {
 		t.Fatal(err)
 	}

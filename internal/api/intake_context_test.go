@@ -26,34 +26,34 @@ func (p *intakeContextProbe) CreateWorkContext(ctx context.Context, item core.Wo
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateWork(item)
+	return p.Memory.CreateWorkContext(context.Background(), item)
 }
 func (p *intakeContextProbe) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
 	p.readWorkCalls++
 	if err := ctx.Err(); err != nil {
 		return core.WorkItem{}, err
 	}
-	return p.Memory.GetWork(id)
+	return p.Memory.GetWorkContext(context.Background(), id)
 }
 func (p *intakeContextProbe) UpdateWorkContext(ctx context.Context, id string, version uint64, item core.WorkItem) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.UpdateWork(id, version, item)
+	return p.Memory.UpdateWorkContext(context.Background(), id, version, item)
 }
 func (p *intakeContextProbe) CreateTaskAndUpdateWorkContext(ctx context.Context, task core.TaskContract, plan verification.Plan, version uint64, work core.WorkItem) error {
 	p.freezeTaskCalls++
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateTaskAndUpdateWork(task, plan, version, work)
+	return p.Memory.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, version, work)
 }
 func (p *intakeContextProbe) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
 	p.readTaskCalls++
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
 	}
-	return p.Memory.GetTask(id)
+	return p.Memory.GetTaskContext(context.Background(), id)
 }
 
 func TestWorkTaskHTTPRoutesUseContextualCoreStoreWhenAvailable(t *testing.T) {
@@ -88,7 +88,7 @@ func TestCancelledWorkHTTPCallCannotCreateCoreRecord(t *testing.T) {
 	if response.Code == http.StatusCreated || p.createWorkCalls != 0 {
 		t.Fatalf("cancelled HTTP request created WorkItem: status=%d calls=%d", response.Code, p.createWorkCalls)
 	}
-	if _, err := p.Memory.GetWork("cancelled-work-http"); err != store.ErrNotFound {
+	if _, err := p.Memory.GetWorkContext(context.Background(), "cancelled-work-http"); err != store.ErrNotFound {
 		t.Fatalf("cancelled request mutated authoritative Core state: %v", err)
 	}
 }

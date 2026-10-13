@@ -27,35 +27,35 @@ func (p *evidenceVerificationContextProbe) GetVerificationPlanByDigestContext(ct
 	if err := ctx.Err(); err != nil {
 		return verification.Plan{}, err
 	}
-	return p.Memory.GetVerificationPlanByDigest(digest)
+	return p.Memory.GetVerificationPlanByDigestContext(context.Background(), digest)
 }
 func (p *evidenceVerificationContextProbe) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
 	p.registerEvidenceCalls++
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateEvidence(item)
+	return p.Memory.CreateEvidenceContext(context.Background(), item)
 }
 func (p *evidenceVerificationContextProbe) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
 	p.getEvidenceCalls++
 	if err := ctx.Err(); err != nil {
 		return core.EvidenceRef{}, err
 	}
-	return p.Memory.GetEvidence(id)
+	return p.Memory.GetEvidenceContext(context.Background(), id)
 }
 func (p *evidenceVerificationContextProbe) CreateVerificationContext(ctx context.Context, report verification.Report) error {
 	p.createVerifyCalls++
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateVerification(report)
+	return p.Memory.CreateVerificationContext(context.Background(), report)
 }
 func (p *evidenceVerificationContextProbe) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
 	p.getVerifyCalls++
 	if err := ctx.Err(); err != nil {
 		return verification.Report{}, err
 	}
-	return p.Memory.GetVerification(id)
+	return p.Memory.GetVerificationContext(context.Background(), id)
 }
 
 func TestEvidenceVerificationHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T) {
@@ -109,7 +109,7 @@ func TestEvidenceVerificationHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T)
 	if rec.Code == http.StatusCreated || probe.registerEvidenceCalls != 1 {
 		t.Fatalf("cancelled Evidence request mutated Core: status=%d calls=%d", rec.Code, probe.registerEvidenceCalls)
 	}
-	if _, err := probe.Memory.GetEvidence("never-create-cancelled"); err != store.ErrNotFound {
+	if _, err := probe.Memory.GetEvidenceContext(context.Background(), "never-create-cancelled"); err != store.ErrNotFound {
 		t.Fatalf("canceled Evidence created record: %v", err)
 	}
 }

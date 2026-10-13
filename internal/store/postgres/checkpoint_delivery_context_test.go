@@ -16,7 +16,7 @@ func TestCheckpointContextCancelsDatabaseLockWithoutAuditOrReservation(t *testin
 	s := newIsolatedIntegrationStore(t)
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	runID := setupPostgresActionRun(t, s, suffix)
-	value, _, err := s.GetExecution(runID)
+	value, _, err := s.GetExecutionContext(context.Background(), runID)
 	if err != nil {
 		t.Fatal(err)
 	}

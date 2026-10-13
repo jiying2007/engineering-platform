@@ -54,7 +54,7 @@ func TestPostgresActionRepositoryAndService(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	runID := setupPostgresActionRun(t, s, suffix)
 
-	recoveryState, err := s.GetRecovery()
+	recoveryState, err := s.GetRecoveryContext(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestPostgresActionRepositoryAndService(t *testing.T) {
 	if second.OperationID != first.OperationID || second.Result != string(action.Confirmed) {
 		t.Fatalf("unexpected idempotent retry receipt: %#v", second)
 	}
-	stored, err := s.Get(req.ID)
+	stored, err := s.GetContext(context.Background(), req.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func setupPostgresActionRun(t *testing.T, s *Store, suffix string) string {
 		Version:    1,
 		CreatedAt:  time.Now().UTC(),
 	}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 
@@ -212,10 +212,10 @@ func setupPostgresActionRun(t *testing.T, s *Store, suffix string) string {
 	if err := ready.Transition(core.WorkReady); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateTaskAndUpdateWork(task, plan, work.Version, ready); err != nil {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, work.Version, ready); err != nil {
 		t.Fatal(err)
 	}
-	ready, err = s.GetWork(work.ID)
+	ready, err = s.GetWorkContext(context.Background(), work.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func setupPostgresActionRun(t *testing.T, s *Store, suffix string) string {
 	if err := executing.Transition(core.WorkExecuting); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateExecutionAndUpdateWork(
+	if err := s.CreateExecutionAndUpdateWorkContext(context.Background(),
 		*value,
 		attempt,
 		*sess,

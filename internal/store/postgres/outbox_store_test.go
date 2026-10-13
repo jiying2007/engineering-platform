@@ -52,7 +52,7 @@ func TestPostgresOutboxRecoveryGateAndLeaseRecovery(t *testing.T) {
 	ctx := context.Background()
 	queueMessage(t, s, "observe", action.Observe)
 	queueMessage(t, s, "mutation", action.ControlledMutation)
-	recovery, err := s.BeginRecovery(0)
+	recovery, err := s.BeginRecoveryContext(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestPostgresOutboxRecoveryGateAndLeaseRecovery(t *testing.T) {
 	if _, err := s.CreateRecoveryProof(ctx, recovery.Epoch, "test-reconciler"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CompleteRecovery(recovery.Epoch, true); err != nil {
+	if _, err := s.CompleteRecoveryContext(context.Background(), recovery.Epoch, true); err != nil {
 		t.Fatal(err)
 	}
 	first := claimOne(t, s, "worker-a")
@@ -133,7 +133,7 @@ func TestPostgresRecoveryAfterClaimAndOldEpochAfterCompletion(t *testing.T) {
 			ctx := context.Background()
 			queueMessage(t, s, "change", risk)
 			old := claimOne(t, s, "worker")
-			recovery, err := s.BeginRecovery(0)
+			recovery, err := s.BeginRecoveryContext(context.Background(), 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -152,7 +152,7 @@ func TestPostgresRecoveryAfterClaimAndOldEpochAfterCompletion(t *testing.T) {
 			if _, err := s.CreateRecoveryProof(ctx, recovery.Epoch, "test-reconciler"); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := s.CompleteRecovery(recovery.Epoch, true); err != nil {
+			if _, err := s.CompleteRecoveryContext(context.Background(), recovery.Epoch, true); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := s.Dispatch(ctx, old.Lease(), risk, deliver); !errors.Is(err, outbox.ErrRecoveryBlocked) {
@@ -218,7 +218,7 @@ func TestPostgresDispatchHoldsRecoveryLockUntilSettlement(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	stored, err := s.GetOutbox(ctx, m.Key)

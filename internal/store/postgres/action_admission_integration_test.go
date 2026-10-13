@@ -39,7 +39,7 @@ WHERE singleton_id=true AND recovery_epoch=0 AND recovery_mode='NORMAL'`); err !
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- s.Create(op) }()
+	go func() { done <- s.CreateContext(context.Background(), op) }()
 	select {
 	case err := <-done:
 		t.Fatalf("admission bypassed unfinished recovery transaction: %v", err)
@@ -56,15 +56,15 @@ WHERE singleton_id=true AND recovery_epoch=0 AND recovery_mode='NORMAL'`); err !
 	case <-ctx.Done():
 		t.Fatal("admission did not complete after recovery committed")
 	}
-	if _, err := s.Get(op.ID); !errors.Is(err, action.ErrOperationAbsent) {
+	if _, err := s.GetContext(context.Background(), op.ID); !errors.Is(err, action.ErrOperationAbsent) {
 		t.Fatalf("rejected action created durable operation: %v", err)
 	}
 	op.RecoveryEpoch = 1
-	if err := s.Create(op); !errors.Is(err, recovery.ErrRecoveryMode) {
+	if err := s.CreateContext(context.Background(), op); !errors.Is(err, recovery.ErrRecoveryMode) {
 		t.Fatalf("mutation admitted during recovery: %v", err)
 	}
 	op.RiskClass = action.Observe
-	if err := s.Create(op); err != nil {
+	if err := s.CreateContext(context.Background(), op); err != nil {
 		t.Fatalf("read-only observation unexpectedly denied during recovery: %v", err)
 	}
 }
@@ -95,10 +95,10 @@ func TestPostgresActionAdmissionFencesRunControlAndSession(t *testing.T) {
 			if _, err := s.pool.Exec(ctx, "UPDATE sessions SET paused=$1 WHERE run_id=$2", tc.paused, op.RunID); err != nil {
 				t.Fatal(err)
 			}
-			if err := s.Create(op); !errors.Is(err, action.ErrDenied) {
+			if err := s.CreateContext(context.Background(), op); !errors.Is(err, action.ErrDenied) {
 				t.Fatalf("non-runtime or paused Run admitted privileged Action: %v", err)
 			}
-			if _, err := s.Get(op.ID); !errors.Is(err, action.ErrOperationAbsent) {
+			if _, err := s.GetContext(context.Background(), op.ID); !errors.Is(err, action.ErrOperationAbsent) {
 				t.Fatalf("denied Action left a reservation: %v", err)
 			}
 		})
@@ -108,26 +108,26 @@ func TestPostgresActionAdmissionFencesRunControlAndSession(t *testing.T) {
 func TestPostgresActionDispatchRechecksChangesAfterPlannedReservation(t *testing.T) {
 	t.Run("recovery-begin", func(t *testing.T) {
 		s, op := actionAdmissionFixture(t)
-		if err := s.Create(op); err != nil {
+		if err := s.CreateContext(context.Background(), op); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := s.BeginRecovery(0); err != nil {
+		if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 			t.Fatal(err)
 		}
 		if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Update(op); !errors.Is(err, recovery.ErrStaleEpoch) {
+		if err := s.UpdateContext(context.Background(), op); !errors.Is(err, recovery.ErrStaleEpoch) {
 			t.Fatalf("dispatched stale recovery grant: %v", err)
 		}
-		stored, err := s.Get(op.ID)
+		stored, err := s.GetContext(context.Background(), op.ID)
 		if err != nil || stored.State != action.Planned {
 			t.Fatalf("recovery race changed operation into dispatched: %#v %v", stored, err)
 		}
 	})
 	t.Run("pause-after-plan", func(t *testing.T) {
 		s, op := actionAdmissionFixture(t)
-		if err := s.Create(op); err != nil {
+		if err := s.CreateContext(context.Background(), op); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := s.pool.Exec(context.Background(), "UPDATE runs SET state='PAUSED' WHERE run_id=$1", op.RunID); err != nil {
@@ -136,10 +136,10 @@ func TestPostgresActionDispatchRechecksChangesAfterPlannedReservation(t *testing
 		if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Update(op); !errors.Is(err, action.ErrDenied) {
+		if err := s.UpdateContext(context.Background(), op); !errors.Is(err, action.ErrDenied) {
 			t.Fatalf("dispatched privileged action after Pause: %v", err)
 		}
-		stored, err := s.Get(op.ID)
+		stored, err := s.GetContext(context.Background(), op.ID)
 		if err != nil || stored.State != action.Planned {
 			t.Fatalf("pause race changed operation into dispatched: %#v %v", stored, err)
 		}

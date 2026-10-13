@@ -147,7 +147,7 @@ func TestCodexControlsUnknownNotReplayedAndLateQueueRejected(t *testing.T) {
 				t.Fatal("sealed delivery replay")
 			}
 			workerOK(t, s.FailCodex(ctx, codexTestWorker, p.Token))
-			state, err := s.BeginRecovery(p.Token.RecoveryEpoch)
+			state, err := s.BeginRecoveryContext(context.Background(), p.Token.RecoveryEpoch)
 			workerOK(t, err)
 			if _, err = s.CreateRecoveryProof(ctx, state.Epoch, "reconciler"); err == nil {
 				t.Fatal("unknown model execution disappeared from recovery")
@@ -326,7 +326,7 @@ func TestCodexControlsMTLSToLiveProcess(t *testing.T) {
 				expectHTTP(t, engineer.Call(ctx, http.MethodPost, "/api/v1/runs/"+req.RunID+"/"+op, map[string]uint64{"execution_epoch": 1}, nil), http.StatusConflict)
 			}
 			if mode == "recovery" {
-				_, err = s.BeginRecovery(permit.Token.RecoveryEpoch)
+				_, err = s.BeginRecoveryContext(context.Background(), permit.Token.RecoveryEpoch)
 				workerOK(t, err)
 			} else {
 				input := codexexec.ControlInput{ID: "wire-control", ExecutionEpoch: 1, Sequence: 1, Actor: operator, ThreadID: "thread", TurnID: "turn", Text: "只修复失败测试，不要修改权限。"}

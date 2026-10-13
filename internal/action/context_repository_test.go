@@ -16,21 +16,21 @@ func (r *trackingActionContextStore) CreateContext(ctx context.Context, op Opera
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return r.MemoryRepository.Create(op)
+	return r.MemoryRepository.CreateContext(context.Background(), op)
 }
 
 func (r *trackingActionContextStore) GetContext(ctx context.Context, id string) (Operation, error) {
 	if err := ctx.Err(); err != nil {
 		return Operation{}, err
 	}
-	return r.MemoryRepository.Get(id)
+	return r.MemoryRepository.GetContext(context.Background(), id)
 }
 
 func (r *trackingActionContextStore) GetByIdempotencyKeyContext(ctx context.Context, key string) (Operation, error) {
 	if err := ctx.Err(); err != nil {
 		return Operation{}, err
 	}
-	return r.MemoryRepository.GetByIdempotencyKey(key)
+	return r.MemoryRepository.GetByIdempotencyKeyContext(context.Background(), key)
 }
 
 func (r *trackingActionContextStore) UpdateContext(ctx context.Context, op Operation) error {
@@ -47,7 +47,7 @@ func (r *trackingActionContextStore) UpdateContext(ctx context.Context, op Opera
 			return errors.New("injected ambiguous post-effect database commit")
 		}
 	}
-	return r.MemoryRepository.Update(op)
+	return r.MemoryRepository.UpdateContext(context.Background(), op)
 }
 
 type cancelAfterEffectProvider struct {
@@ -109,7 +109,7 @@ func TestActionContextRepositorySettlesRemoteEffectAfterCallerCancel(t *testing.
 				t.Fatalf("cancel after remote effect lost ledger settlement: receipt=%#v err=%v calls=%d",
 					receipt, err, calls)
 			}
-			stored, err := repo.Get(req.ID)
+			stored, err := repo.GetContext(context.Background(), req.ID)
 			if err != nil || stored.State != tc.want ||
 				len(repo.settledStates) != 1 || repo.settledStates[0] != tc.want {
 				t.Fatalf("remote effect was not settled under independent bounded context: %#v err=%v", stored, err)
@@ -140,7 +140,7 @@ func TestActionContextRepositoryNeverFabricatesSettlementAfterAmbiguousCommit(t 
 	if !errors.Is(err, ErrExternalEffectUnresolved) || receipt.OperationID != "" || calls != 1 {
 		t.Fatalf("ambiguous COMMIT generated successful receipt: %#v err=%v calls=%d", receipt, err, calls)
 	}
-	stored, err := repo.Get(req.ID)
+	stored, err := repo.GetContext(context.Background(), req.ID)
 	if err != nil || stored.State != Dispatched {
 		t.Fatalf("lost durable ambiguous pre-settlement state: %#v err=%v", stored, err)
 	}

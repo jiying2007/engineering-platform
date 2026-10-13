@@ -44,13 +44,13 @@ func actionPlannedRecoveryFixture(t *testing.T) (*Store, *action.Operation, reco
 func TestPlannedActionRecoveryNoEffectNoReplayAndIndependentProof(t *testing.T) {
 	s, op, req := actionPlannedRecoveryFixture(t)
 	ctx := context.Background()
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.ReconcilePlannedActionAbandoned(ctx, plannedReconciler, req); !errors.Is(err, recovery.ErrStaleEpoch) {
 		t.Fatalf("normal-mode PLANNED reservation was abandoned outside Recovery: %v", err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.CreateRecoveryProof(ctx, 1, plannedReconciler); !errors.Is(err, ErrRecoveryFactsUnresolved) {
@@ -61,7 +61,7 @@ func TestPlannedActionRecoveryNoEffectNoReplayAndIndependentProof(t *testing.T) 
 		receipt.ReplayAuthorized || receipt.ExecutionAuthorized || receipt.EffectConfirmed {
 		t.Fatalf("invalid planned-only disposition: %#v err=%v", receipt, err)
 	}
-	stored, err := s.Get(op.ID)
+	stored, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || stored.State != action.AbandonedReconciled ||
 		stored.RequestDigest != op.RequestDigest || stored.IdempotencyKey != op.IdempotencyKey ||
 		stored.ExternalRef != "" || stored.ObservedState != "" {
@@ -100,7 +100,7 @@ func TestPlannedActionRecoveryNoEffectNoReplayAndIndependentProof(t *testing.T) 
 	if _, err := service.Execute(ctx, request); !errors.Is(err, action.ErrIdempotencyConflict) || provider.dispatchCalls != 0 {
 		t.Fatalf("different request reused old operation: %v calls=%d", err, provider.dispatchCalls)
 	}
-	if err := s.Update(action.Operation{ID: op.ID, State: action.Dispatched}); err == nil {
+	if err := s.UpdateContext(context.Background(), action.Operation{ID: op.ID, State: action.Dispatched}); err == nil {
 		t.Fatal("ordinary repository update re-entered abandoned Action")
 	}
 	proof, err := s.CreateRecoveryProof(ctx, 1, plannedReconciler)
@@ -113,7 +113,7 @@ func TestPlannedActionRecoveryNoEffectNoReplayAndIndependentProof(t *testing.T) 
 	if err := s.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:completer", 1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CompleteRecovery(1, true); err != nil {
+	if _, err := s.CompleteRecoveryContext(context.Background(), 1, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.GetPlannedActionAbandonReceipt(ctx, op.ID); err != nil {
@@ -136,13 +136,13 @@ func TestPlannedRecoveryRefusesPotentiallyEffectfulActionStates(t *testing.T) {
 		t.Run(string(state), func(t *testing.T) {
 			s, op, req := actionPlannedRecoveryFixture(t)
 			ctx := context.Background()
-			if err := s.Create(*op); err != nil {
+			if err := s.CreateContext(context.Background(), *op); err != nil {
 				t.Fatal(err)
 			}
 			if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 				t.Fatal(err)
 			}
-			if err := s.Update(*op); err != nil {
+			if err := s.UpdateContext(context.Background(), *op); err != nil {
 				t.Fatal(err)
 			}
 			if state != action.Dispatched {
@@ -162,18 +162,18 @@ func TestPlannedRecoveryRefusesPotentiallyEffectfulActionStates(t *testing.T) {
 					if err := op.Transition(next, time.Now().UTC()); err != nil {
 						t.Fatal(err)
 					}
-					if err := s.Update(*op); err != nil {
+					if err := s.UpdateContext(context.Background(), *op); err != nil {
 						t.Fatal(err)
 					}
 				}
 			}
-			if _, err := s.BeginRecovery(0); err != nil {
+			if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := s.ReconcilePlannedActionAbandoned(ctx, plannedReconciler, req); !errors.Is(err, corestore.ErrConflict) {
 				t.Fatalf("potentially effectful state %s was abandoned as PLANNED: %v", state, err)
 			}
-			original, err := s.Get(op.ID)
+			original, err := s.GetContext(context.Background(), op.ID)
 			if err != nil || original.State != state {
 				t.Fatalf("Action state silently changed: %#v err=%v", original, err)
 			}
@@ -187,10 +187,10 @@ func TestPlannedRecoveryRefusesPotentiallyEffectfulActionStates(t *testing.T) {
 func TestPlannedActionRecoveryCannotPersistWithoutAudit(t *testing.T) {
 	s, op, req := actionPlannedRecoveryFixture(t)
 	ctx := context.Background()
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	// Fault injection is confined to this test's own isolated PostgreSQL schema.
@@ -200,7 +200,7 @@ func TestPlannedActionRecoveryCannotPersistWithoutAudit(t *testing.T) {
 	if _, err := s.ReconcilePlannedActionAbandoned(ctx, plannedReconciler, req); err == nil {
 		t.Fatal("lost audit head still allowed terminal Action settlement")
 	}
-	stored, err := s.Get(op.ID)
+	stored, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || stored.State != action.Planned {
 		t.Fatalf("Action settlement survived failed atomic audit: %#v %v", stored, err)
 	}
@@ -211,10 +211,10 @@ func TestPlannedActionRecoveryCannotPersistWithoutAudit(t *testing.T) {
 
 func TestPlannedActionRecoveryRequestMustMatchFrozenReservation(t *testing.T) {
 	s, op, req := actionPlannedRecoveryFixture(t)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	for _, mutate := range []func(*recovery.ActionPlannedAbandonRequest){
@@ -232,7 +232,7 @@ func TestPlannedActionRecoveryRequestMustMatchFrozenReservation(t *testing.T) {
 			t.Fatalf("changed frozen Action identity accepted: %#v", bad)
 		}
 	}
-	original, err := s.Get(op.ID)
+	original, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || original.State != action.Planned {
 		t.Fatalf("changed request mutated old reservation: %#v err=%v", original, err)
 	}
@@ -240,10 +240,10 @@ func TestPlannedActionRecoveryRequestMustMatchFrozenReservation(t *testing.T) {
 
 func TestPlannedActionRecoveryHonorsCancelledCaller(t *testing.T) {
 	s, op, req := actionPlannedRecoveryFixture(t)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BeginRecovery(0); err != nil {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -251,7 +251,7 @@ func TestPlannedActionRecoveryHonorsCancelledCaller(t *testing.T) {
 	if _, err := s.ReconcilePlannedActionAbandoned(ctx, plannedReconciler, req); err == nil {
 		t.Fatal("cancelled Action reconciliation returned a success receipt")
 	}
-	stored, err := s.Get(op.ID)
+	stored, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || stored.State != action.Planned {
 		t.Fatalf("cancelled recovery changed Action: %#v %v", stored, err)
 	}

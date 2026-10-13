@@ -38,7 +38,7 @@ func TestUnknownCommitOutcomeAPINeverClaimsRollbackOrExposesSQL(t *testing.T) {
 type ambiguousRecoveryStore struct{ *store.Memory }
 
 func (p *ambiguousRecoveryStore) GetRecoveryContext(_ context.Context) (recovery.Manager, error) {
-	return p.Memory.GetRecovery()
+	return p.Memory.GetRecoveryContext(context.Background())
 }
 
 func (p *ambiguousRecoveryStore) BeginRecoveryContext(_ context.Context, _ uint64) (recovery.Manager, error) {

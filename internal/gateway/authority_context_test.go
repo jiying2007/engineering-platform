@@ -29,7 +29,7 @@ func (p *contextAuthorityProbe) GetExecutionContext(ctx context.Context, id stri
 	if err := ctx.Err(); err != nil {
 		return run.Run{}, session.Session{}, err
 	}
-	return p.Memory.GetExecution(id)
+	return p.Memory.GetExecutionContext(context.Background(), id)
 }
 
 func (p *contextAuthorityProbe) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
@@ -37,7 +37,7 @@ func (p *contextAuthorityProbe) GetTaskByDigestContext(ctx context.Context, dige
 	if err := ctx.Err(); err != nil {
 		return core.TaskContract{}, err
 	}
-	return p.Memory.GetTaskByDigest(digest)
+	return p.Memory.GetTaskByDigestContext(context.Background(), digest)
 }
 
 func (p *contextAuthorityProbe) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
@@ -45,7 +45,7 @@ func (p *contextAuthorityProbe) GetRecoveryContext(ctx context.Context) (recover
 	if err := ctx.Err(); err != nil {
 		return recovery.Manager{}, err
 	}
-	return p.Memory.GetRecovery()
+	return p.Memory.GetRecoveryContext(context.Background())
 }
 
 func TestGatewayUsesCallerContextForAllThreePreDispatchChecks(t *testing.T) {

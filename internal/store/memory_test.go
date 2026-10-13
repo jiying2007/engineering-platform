@@ -1,5 +1,7 @@
 package store
 
+import "context"
+
 import (
 	"errors"
 	"strings"
@@ -75,14 +77,14 @@ func TestTaskRevisionsAreImmutableAndMonotonic(t *testing.T) {
 		t.Fatal("expected revision digest to change")
 	}
 
-	latest, err := s.GetTask("task-1")
+	latest, err := s.GetTaskContext(context.Background(), "task-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if latest.Revision != 2 {
 		t.Fatalf("expected latest revision 2, got %d", latest.Revision)
 	}
-	old, err := s.GetTaskByDigest(d1)
+	old, err := s.GetTaskByDigestContext(context.Background(), d1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,11 +138,11 @@ func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	first, firstSession, err := s.GetExecution("run-1")
+	first, firstSession, err := s.GetExecutionContext(context.Background(), "run-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	stale, staleSession, err := s.GetExecution("run-1")
+	stale, staleSession, err := s.GetExecutionContext(context.Background(), "run-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +153,7 @@ func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 	if err := firstSession.Pause(first.CurrentEpoch); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateExecution(first.ID, first.Version, first, firstSession); err != nil {
+	if err := s.UpdateExecutionContext(context.Background(), first.ID, first.Version, first, firstSession); err != nil {
 		t.Fatal(err)
 	}
 
@@ -161,14 +163,14 @@ func TestExecutionUpdateUsesOptimisticConcurrency(t *testing.T) {
 	if err := staleSession.Resume(stale.CurrentEpoch); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.UpdateExecution(stale.ID, stale.Version, stale, staleSession); !errors.Is(err, ErrConflict) {
+	if err := s.UpdateExecutionContext(context.Background(), stale.ID, stale.Version, stale, staleSession); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected optimistic concurrency conflict, got %v", err)
 	}
 }
 
 func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 	s := NewMemory()
-	initial, err := s.GetRecovery()
+	initial, err := s.GetRecoveryContext(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +178,7 @@ func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 		t.Fatalf("unexpected initial recovery state: %#v", initial)
 	}
 
-	active, err := s.BeginRecovery(0)
+	active, err := s.BeginRecoveryContext(context.Background(), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,16 +186,16 @@ func TestRecoveryStateUsesEpochCASAndRequiresReconciliation(t *testing.T) {
 		t.Fatalf("unexpected active recovery state: %#v", active)
 	}
 
-	if _, err := s.BeginRecovery(0); !errors.Is(err, ErrConflict) {
+	if _, err := s.BeginRecoveryContext(context.Background(), 0); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected stale begin conflict, got %v", err)
 	}
-	if _, err := s.BeginRecovery(1); !errors.Is(err, recovery.ErrAlreadyRecovering) {
+	if _, err := s.BeginRecoveryContext(context.Background(), 1); !errors.Is(err, recovery.ErrAlreadyRecovering) {
 		t.Fatalf("expected duplicate recovery begin rejection, got %v", err)
 	}
-	if _, err := s.CompleteRecovery(1, false); !errors.Is(err, recovery.ErrReconciliationRequired) {
+	if _, err := s.CompleteRecoveryContext(context.Background(), 1, false); !errors.Is(err, recovery.ErrReconciliationRequired) {
 		t.Fatalf("expected reconciliation requirement, got %v", err)
 	}
-	completed, err := s.CompleteRecovery(1, true)
+	completed, err := s.CompleteRecoveryContext(context.Background(), 1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +210,7 @@ func TestCreateTaskAndUpdateWorkIsAtomicOnStaleVersion(t *testing.T) {
 		ID: "work-atomic-task", Title: "atomic task", HumanOwner: "owner",
 		State: core.WorkDraft, Version: 1, CreatedAt: time.Unix(1, 0),
 	}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 	plan := planFor("A", "ci.test")
@@ -226,13 +228,13 @@ func TestCreateTaskAndUpdateWorkIsAtomicOnStaleVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.CreateTaskAndUpdateWork(task, plan, 0, desired); !errors.Is(err, ErrConflict) {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 0, desired); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected stale work conflict, got %v", err)
 	}
-	if _, err := s.GetTask(task.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.GetTaskContext(context.Background(), task.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("task survived failed atomic mutation: %v", err)
 	}
-	unchanged, err := s.GetWork(work.ID)
+	unchanged, err := s.GetWorkContext(context.Background(), work.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,10 +242,10 @@ func TestCreateTaskAndUpdateWorkIsAtomicOnStaleVersion(t *testing.T) {
 		t.Fatalf("work changed during failed atomic mutation: %#v", unchanged)
 	}
 
-	if err := s.CreateTaskAndUpdateWork(task, plan, 1, desired); err != nil {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, desired); err != nil {
 		t.Fatal(err)
 	}
-	ready, err := s.GetWork(work.ID)
+	ready, err := s.GetWorkContext(context.Background(), work.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +260,7 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 		ID: "work-atomic-run", Title: "atomic run", HumanOwner: "owner",
 		State: core.WorkDraft, Version: 1, CreatedAt: time.Unix(1, 0),
 	}
-	if err := s.CreateWork(work); err != nil {
+	if err := s.CreateWorkContext(context.Background(), work); err != nil {
 		t.Fatal(err)
 	}
 	plan := planFor("A", "ci.test")
@@ -274,10 +276,10 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 	if err := readyWork.Transition(core.WorkReady); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateTaskAndUpdateWork(task, plan, 1, readyWork); err != nil {
+	if err := s.CreateTaskAndUpdateWorkContext(context.Background(), task, plan, 1, readyWork); err != nil {
 		t.Fatal(err)
 	}
-	readyWork, _ = s.GetWork(work.ID)
+	readyWork, _ = s.GetWorkContext(context.Background(), work.ID)
 
 	input := core.RunInputManifest{
 		RunID: "run-atomic", TaskContractDigest: taskDigest,
@@ -297,20 +299,20 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, readyWork.Version-1, executingWork); !errors.Is(err, ErrConflict) {
+	if err := s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, readyWork.Version-1, executingWork); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected stale work conflict, got %v", err)
 	}
-	if _, _, err := s.GetExecution(value.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, err := s.GetExecutionContext(context.Background(), value.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("run survived failed atomic create: %v", err)
 	}
-	if _, err := s.GetAttempt(value.ID, attempt.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.GetAttemptContext(context.Background(), value.ID, attempt.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("attempt survived failed atomic create: %v", err)
 	}
 
-	if err := s.CreateExecutionAndUpdateWork(*value, attempt, *sess, input, readyWork.Version, executingWork); err != nil {
+	if err := s.CreateExecutionAndUpdateWorkContext(context.Background(), *value, attempt, *sess, input, readyWork.Version, executingWork); err != nil {
 		t.Fatal(err)
 	}
-	persistedAttempt, err := s.GetAttempt(value.ID, attempt.ID)
+	persistedAttempt, err := s.GetAttemptContext(context.Background(), value.ID, attempt.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,11 +320,11 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 		t.Fatalf("unexpected attempt: %#v", persistedAttempt)
 	}
 
-	currentRun, currentSession, err := s.GetExecution(value.ID)
+	currentRun, currentSession, err := s.GetExecutionContext(context.Background(), value.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	currentWork, err := s.GetWork(work.ID)
+	currentWork, err := s.GetWorkContext(context.Background(), work.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +337,7 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.UpdateExecutionAndWork(
+	if err := s.UpdateExecutionAndWorkContext(context.Background(),
 		value.ID,
 		currentRun.Version,
 		completedRun,
@@ -345,13 +347,13 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 	); !errors.Is(err, ErrConflict) {
 		t.Fatalf("expected stale completion conflict, got %v", err)
 	}
-	stillRunning, _, _ := s.GetExecution(value.ID)
-	stillExecuting, _ := s.GetWork(work.ID)
+	stillRunning, _, _ := s.GetExecutionContext(context.Background(), value.ID)
+	stillExecuting, _ := s.GetWorkContext(context.Background(), work.ID)
 	if stillRunning.State != run.Running || stillExecuting.State != core.WorkExecuting {
 		t.Fatalf("failed completion partially persisted run=%s work=%s", stillRunning.State, stillExecuting.State)
 	}
 
-	if err := s.UpdateExecutionAndWork(
+	if err := s.UpdateExecutionAndWorkContext(context.Background(),
 		value.ID,
 		currentRun.Version,
 		completedRun,
@@ -361,8 +363,8 @@ func TestCreateAndCompleteExecutionAreAtomicWithWork(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	finished, _, _ := s.GetExecution(value.ID)
-	verifying, _ := s.GetWork(work.ID)
+	finished, _, _ := s.GetExecutionContext(context.Background(), value.ID)
+	verifying, _ := s.GetWorkContext(context.Background(), work.ID)
 	if finished.State != run.Completed || verifying.State != core.WorkVerifying {
 		t.Fatalf("atomic completion failed run=%s work=%s", finished.State, verifying.State)
 	}
@@ -397,16 +399,16 @@ func TestMemoryEvidenceRequiresExactFrozenRequirement(t *testing.T) {
 		Result:            "PASS",
 		Applicable:        true,
 	}
-	if err := store.CreateEvidence(base); !errors.Is(err, ErrConflict) {
+	if err := store.CreateEvidenceContext(context.Background(), base); !errors.Is(err, ErrConflict) {
 		t.Fatalf("wrong requirement persisted: %v", err)
 	}
 	base.RequirementID = "req-1"
 	base.SubjectDigest = "sha256:other"
-	if err := store.CreateEvidence(base); !errors.Is(err, ErrConflict) {
+	if err := store.CreateEvidenceContext(context.Background(), base); !errors.Is(err, ErrConflict) {
 		t.Fatalf("wrong subject persisted: %v", err)
 	}
 	base.SubjectDigest = "sha256:subject"
-	if err := store.CreateEvidence(base); err != nil {
+	if err := store.CreateEvidenceContext(context.Background(), base); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -442,12 +444,12 @@ func TestMemoryReviewReportIsImmutableAcrossCallers(t *testing.T) {
 	if err := reviewing.Transition(core.WorkReviewing); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CreateReviewAndUpdateWork(report, work.Version, reviewing); err != nil {
+	if err := store.CreateReviewAndUpdateWorkContext(context.Background(), report, work.Version, reviewing); err != nil {
 		t.Fatal(err)
 	}
 	report.Findings[0].Summary = "caller rewrite"
 	report.KnownLimits[0] = "caller rewrite"
-	first, err := store.GetReview("review-copy")
+	first, err := store.GetReviewContext(context.Background(), "review-copy")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +458,7 @@ func TestMemoryReviewReportIsImmutableAcrossCallers(t *testing.T) {
 	}
 	first.Findings[0].Summary = "returned rewrite"
 	first.KnownLimits[0] = "returned rewrite"
-	second, err := store.GetReview("review-copy")
+	second, err := store.GetReviewContext(context.Background(), "review-copy")
 	if err != nil {
 		t.Fatal(err)
 	}

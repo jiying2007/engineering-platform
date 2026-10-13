@@ -26,7 +26,7 @@ func (p *reviewClosureContextProbe) CreateReviewAndUpdateWorkContext(ctx context
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateReviewAndUpdateWork(report, version, work)
+	return p.Memory.CreateReviewAndUpdateWorkContext(context.Background(), report, version, work)
 }
 
 func (p *reviewClosureContextProbe) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
@@ -34,7 +34,7 @@ func (p *reviewClosureContextProbe) GetReviewContext(ctx context.Context, id str
 	if err := ctx.Err(); err != nil {
 		return review.Report{}, err
 	}
-	return p.Memory.GetReview(id)
+	return p.Memory.GetReviewContext(context.Background(), id)
 }
 
 func (p *reviewClosureContextProbe) CreateClosureAndUpdateWorkContext(ctx context.Context, item core.ClosureReceipt, version uint64, work core.WorkItem) error {
@@ -42,7 +42,7 @@ func (p *reviewClosureContextProbe) CreateClosureAndUpdateWorkContext(ctx contex
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return p.Memory.CreateClosureAndUpdateWork(item, version, work)
+	return p.Memory.CreateClosureAndUpdateWorkContext(context.Background(), item, version, work)
 }
 
 func (p *reviewClosureContextProbe) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
@@ -50,7 +50,7 @@ func (p *reviewClosureContextProbe) GetClosureContext(ctx context.Context, id st
 	if err := ctx.Err(); err != nil {
 		return core.ClosureReceipt{}, err
 	}
-	return p.Memory.GetClosure(id)
+	return p.Memory.GetClosureContext(context.Background(), id)
 }
 
 func TestReviewClosureHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T) {
@@ -104,13 +104,13 @@ func TestReviewClosureHTTPRoutesUseCallerBoundCoreAuthority(t *testing.T) {
 		}
 	}
 	sendCancelled("/api/v1/reviews", reviewPayload)
-	if _, err := probe.Memory.GetReview("review-context-report"); err != store.ErrNotFound || probe.createReviewCalls != 0 {
+	if _, err := probe.Memory.GetReviewContext(context.Background(), "review-context-report"); err != store.ErrNotFound || probe.createReviewCalls != 0 {
 		t.Fatalf("cancelled review wrote authority: err=%v calls=%d", err, probe.createReviewCalls)
 	}
 	mustRequest(t, handler, http.MethodPost, "/api/v1/reviews", reviewPayload, http.StatusCreated)
 	mustRequest(t, handler, http.MethodGet, "/api/v1/reviews/review-context-report", nil, http.StatusOK)
 	sendCancelled("/api/v1/closures", closurePayload)
-	if _, err := probe.Memory.GetClosure("review-context-closure"); err != store.ErrNotFound || probe.createClosureCalls != 0 {
+	if _, err := probe.Memory.GetClosureContext(context.Background(), "review-context-closure"); err != store.ErrNotFound || probe.createClosureCalls != 0 {
 		t.Fatalf("cancelled closure wrote authority: err=%v calls=%d", err, probe.createClosureCalls)
 	}
 	mustRequest(t, handler, http.MethodPost, "/api/v1/closures", closurePayload, http.StatusCreated)

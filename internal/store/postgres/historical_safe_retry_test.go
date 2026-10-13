@@ -37,30 +37,30 @@ func TestLegacySafeToRetryCannotBeRedispatchedThroughPostgresStore(t *testing.T)
 		RequestedBy: "runtime", RequestedAt: now,
 	}
 	op := action.NewWithRequestDigest(req, "sha256:"+strings.Repeat("b", 64), now)
-	if err := s.Create(*op); err != nil {
+	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
 	for _, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling} {
 		if err := op.Transition(state, now.Add(time.Second)); err != nil {
 			t.Fatal(err)
 		}
-		if err := s.Update(*op); err != nil {
+		if err := s.UpdateContext(context.Background(), *op); err != nil {
 			t.Fatal(err)
 		}
 	}
 	seedHistoricalSafeToRetry(t, s, op.ID)
-	stored, err := s.Get(op.ID)
+	stored, err := s.GetContext(context.Background(), op.ID)
 	if err != nil || stored.State != action.SafeToRetry || stored.IdempotencyKey != req.IdempotencyKey {
 		t.Fatalf("historical original identity not preserved: %+v err=%v", stored, err)
 	}
 	for _, target := range []action.State{action.Dispatched, action.SafeToRetry} {
 		forged := stored
 		forged.State = target
-		if err := s.Update(forged); !errors.Is(err, action.ErrInvalidTransition) {
+		if err := s.UpdateContext(context.Background(), forged); !errors.Is(err, action.ErrInvalidTransition) {
 			t.Fatalf("unqualified legacy transition %s was accepted: %v", target, err)
 		}
 	}
-	retained, err := s.GetByIdempotencyKey(req.IdempotencyKey)
+	retained, err := s.GetByIdempotencyKeyContext(context.Background(), req.IdempotencyKey)
 	if err != nil || retained.State != action.SafeToRetry {
 		t.Fatalf("denied redispatch modified unique reservation: %+v err=%v", retained, err)
 	}

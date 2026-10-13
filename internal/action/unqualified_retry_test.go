@@ -35,7 +35,7 @@ func TestUnqualifiedRetryVerdictPersistsManualWithoutReplay(t *testing.T) {
 	if _, err := service.Reconcile(context.Background(), req.ID); err == nil {
 		t.Fatal("unqualified SAFE_TO_RETRY outcome returned a success receipt")
 	}
-	stored, err := repository.Get(req.ID)
+	stored, err := repository.GetContext(context.Background(), req.ID)
 	if err != nil || stored.State != Manual || stored.ObservedState != "UNQUALIFIED_RETRY_VERDICT" ||
 		stored.ExternalRef != "" || dispatchCalls != 1 {
 		t.Fatalf("unsafe retry observation was not durably fenced: %+v err=%v dispatch=%d", stored, err, dispatchCalls)
@@ -69,13 +69,13 @@ func TestHistoricalSafeToRetryCannotBeResubmittedAsNewExternalDispatch(t *testin
 	}
 	original := NewWithRequestDigest(req, digest, time.Now().UTC())
 	original.State = SafeToRetry
-	if err := repository.Create(*original); err != nil {
+	if err := repository.CreateContext(context.Background(), *original); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.Execute(context.Background(), req); !errors.Is(err, ErrDenied) || calls != 0 {
 		t.Fatalf("legacy SAFE_TO_RETRY allowed replay: err=%v calls=%d", err, calls)
 	}
-	if stored, err := repository.Get(req.ID); err != nil || stored.State != SafeToRetry {
+	if stored, err := repository.GetContext(context.Background(), req.ID); err != nil || stored.State != SafeToRetry {
 		t.Fatalf("legacy reservation was rewritten: %+v err=%v", stored, err)
 	}
 }
