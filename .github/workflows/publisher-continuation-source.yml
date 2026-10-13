@@ -5,29 +5,124 @@ on:
 permissions:
   contents: read
 jobs:
-  source:
+  validate-cancelled-arm:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/fix/publisher-returned-invocation-20261013' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
+    permissions:
+      contents: write # Immutable blob export only; no commits or ref writes.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 0d24364b7c4fadd6183a7cfc4ff39a1d91640f56
+          ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Archive exact tracked public source
+          fetch-depth: 3
+      - name: Materialize hash-pinned source and verify complete target tree
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 0d24364b7c4fadd6183a7cfc4ff39a1d91640f56
-          mkdir "$RUNNER_TEMP/source"
-          git archive --format=tar HEAD > "$RUNNER_TEMP/source/source.tar"
-          git rev-parse HEAD > "$RUNNER_TEMP/source/SOURCE_SHA"
-          git rev-parse HEAD^{tree} > "$RUNNER_TEMP/source/SOURCE_TREE"
-          (cd "$RUNNER_TEMP/source" && sha256sum source.tar > SHA256SUMS)
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+          python3 - <<'PY'
+          import base64,gzip,hashlib,subprocess
+          from pathlib import Path
+          data=b''.join(Path(f'.ci-armed/patch.{i}.b64').read_bytes() for i in range(3))
+          assert len(data)==17736
+          compressed=base64.b64decode(data,validate=True)
+          assert hashlib.sha256(compressed).hexdigest()=='7b81c1b757eed7564273fc315d5a7eb7a909d2d95652406f878fdd2ffb3acc32'
+          patch=gzip.decompress(compressed)
+          assert hashlib.sha256(patch).hexdigest()=='5c9ab8db1498cb834ea230019d7906377b7d2910ef2bbb09afb06daa5443b930'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.github/workflows/publisher-continuation-source.yml',*[f'.ci-armed/patch.{i}.b64' for i in range(3)]],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='476fcf367a02d609adf86ca3e64799a471796171'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          name: publisher-continuation-source-0d24364
-          path: ${{ runner.temp }}/source
+          go-version-file: go.mod
+          cache: false
+      - name: Prove old boundary fails and fixed Publisher proofs pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/armed-evidence"
+          mkdir "$out"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          git show 0d24364b7c4fadd6183a7cfc4ff39a1d91640f56:internal/githubpublish/service.go > "$out/original-service.go"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'armed-evidence'
+          (out/'overlay.json').write_text(json.dumps({'Replace':{str(Path('internal/githubpublish/service.go').resolve()):str(out/'original-service.go')}}))
+          PY
+          set +e
+          go test -overlay "$out/overlay.json" -race -json -count=1 -timeout 2m ./internal/githubpublish -run '^TestPublisherNoInvocationAfterArmCancellation$' > "$out/original-boundary.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          grep -F 'original certificate unavailable' "$out/original-boundary.jsonl"
+          grep -F '"Action":"fail"' "$out/original-boundary.jsonl"
+          ! grep -Fq '"Action":"skip"' "$out/original-boundary.jsonl"
+          python3 -B scripts/test_verify_publication_recovery_log.py
+          python3 -B scripts/verify_context_inventory.py --root .
+          go test -json -race -count=3 -timeout 3m ./internal/githubpublish -run '^TestPublisher(NoInvocation|InvocationBarrier|Uninvoked)' | tee "$out/publisher.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$out/publisher.jsonl" --no-invocation-publisher
+      - name: Exercise both evidence versions on actual PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/armed-evidence"
+          go test -json -race -count=3 -timeout 3m ./internal/store/postgres -run '^TestNoInvocationDatabase' | tee "$out/database-pg17.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$out/database-pg17.jsonl" --no-invocation-db
+          go vet ./internal/githubpublish ./internal/store/postgres ./internal/api
+      - name: Export exact immutable source blobs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          base='0d24364b7c4fadd6183a7cfc4ff39a1d91640f56'
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(paths)==14 and all(not p.startswith('.ci-') and not p.endswith('continuation-source.yml') for p in paths)
+          records=[]
+          for name in paths:
+              p=Path(name);assert p.is_file() and not p.is_symlink()
+              data=p.read_bytes();assert len(data)<100000
+              sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              request=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode()
+              observed=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=request))
+              assert observed['sha']==sha
+              mode=subprocess.check_output(['git','ls-files','-s','--',name],text=True).split()[0]
+              records.append({'path':name,'mode':mode,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+          result={'version':1,'repository':repo,'base':base,'tree':'476fcf367a02d609adf86ca3e64799a471796171','files':records,'ref_writes':False,'provider_executed':False,'production_qualified':False}
+          out=Path(os.environ['RUNNER_TEMP'])/'armed-evidence'
+          (out/'source-objects.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: armed-cancellation-validation-${{ github.sha }}
+          path: ${{ runner.temp }}/armed-evidence
           if-no-files-found: error
-          retention-days: 1
-# Read-only fixed tracked-source transport, removed before final PR qualification.
-# No environment/credentials/.git archive, model, publication or ref writes.
+          retention-days: 30
+# Final tree excludes this temporary workflow and capsule. No deployment/model,
+# live GitHub publication, commit, push, merge or credential changes in this job.
