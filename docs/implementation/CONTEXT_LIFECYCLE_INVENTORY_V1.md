@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:c9e6c19c53fed22b95a1659375ddc9d6d447262f5dc96cdbacb640b442a4ff51`
+`sha256:61e38cab4166ec2642752e3a6d9902de7b1759adceac29dc0a83a0c6715becd0`
 
 ## Reviewed categories
 
@@ -188,3 +188,20 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/workeragent/failure_settlement.go:27` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/workspace/cleanup.go:23` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/workspace/cleanup.go:151` | `WithoutCancel` | Independent bounded cleanup/settlement |
+
+## Caller-bound bundle source reads
+
+Both the Core-side Provider digest check and independent Publisher private-copy
+check now pass the initiating Context through pre-open validation and every
+bounded source read. A cancelled request cannot yield a valid source/snapshot
+or reserve a Publisher invocation; no detached reader or second publication is
+started. Reading is limited to the frozen expected size plus one byte and at
+most 64 KiB per underlying read, including ReaderFrom optimizations.
+
+The opened artifact directory must match its captured startup identity. Bundle
+leaf opens reuse the held-directory no-follow/nonblocking primitive before
+checking regular-file, immutable inode, expected size and nonspecial mode.
+Worker-readable 0640 files remain valid; Publisher-only witness ownership is not
+imposed on the independent Worker artifact. Existing digest and private snapshot
+checks remain authoritative. This does not forcibly interrupt a blocked regular-
+file syscall/fsync or qualify selected-host latency, storage or #229 overall.
