@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -50,6 +51,18 @@ class GateTests(unittest.TestCase):
         self.write(events)
         with self.assertRaises(ValueError):
             gate.verify(self.path, **kwargs)
+
+    def test_canonical_publisher_selector_includes_every_required_test(self):
+        workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text()
+        commands = [line for line in workflow.splitlines()
+                    if "go test -json" in line and "publisher-kernel-tests.jsonl" in line]
+        self.assertEqual(len(commands), 1, "one canonical Publisher event stream required")
+        self.assertIn("-count=3", commands[0], "keep original repeated gate")
+        match = re.search(r"-run '([^']+)'", commands[0])
+        self.assertIsNotNone(match, "explicit canonical test selector required")
+        missing = sorted(name for name in gate.PUBLISHER_REQUIRED
+                         if re.search(match.group(1), name) is None)
+        self.assertEqual(missing, [], "required tests must actually be selected by CI")
 
     def test_all_modes_require_complete_exact_repetitions(self):
         for required, package, repeats, option in MODES:

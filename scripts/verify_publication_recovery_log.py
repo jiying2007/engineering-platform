@@ -46,6 +46,13 @@ RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecover
 
 PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"
 PUBLISHER_REQUIRED = {
+    "TestPublisherRemoteResponseRejectsIncompleteBody",
+    "TestPublisherRemoteResponseAtomicDecode",
+    "TestPublisherRemoteResponseCancelledBeforeExchange",
+    "TestPublisherRemoteHealthCompleteObservation",
+    "TestPublisherRemoteResponseTransportFailure",
+    "TestPublisherRemoteResponsePublicErrorsHaveNoReceipt",
+    "TestPublisherRemoteResponseRealMTLS",
     "TestPublisherGitHubResponseIncomplete404",
     "TestPublisherGitHubResponseCompleteStatus",
     "TestPublisherGitHubResponseAtomicDecode",

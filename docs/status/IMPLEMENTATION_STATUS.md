@@ -406,6 +406,15 @@ lifecycle/latency or full interprocedural cancellation qualification. Internal
 blockers [228,229] remain OPEN/BLOCKED; real Provider and production gates remain
 separate. It does not supply post-entry publication recovery or authorize retry.
 
+The independent Publisher mTLS client now uses the same complete body and atomic
+output-commit checks as GitHub REST, preserving its stricter internal schema and
+separate response/health budgets. Read/close/cancellation failure cannot create
+an observation or partially populate publication/recovery receipts; transport
+causes remain inspectable without reflecting diagnostics. Explicit cancellation
+before marshalling/exchange starts no new request. Local mTLS truncation and
+complete-response controls exercise the original client, not real external
+publishing or post-entry recovery qualification. No automatic retry is added.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**

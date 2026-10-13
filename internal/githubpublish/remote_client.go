@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime"
 	"net"
 	"net/http"
@@ -157,11 +156,17 @@ func (c *remoteClient) health(ctx context.Context, configurationDigest string) (
 		return zero, err
 	}
 	req.Header.Set("Accept", "application/json")
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
 	response, err := c.client.Do(req)
 	if err != nil {
-		return zero, fmt.Errorf("publisher health transport: %w", err)
+		return zero, &publisherResponseError{cause: err}
 	}
-	defer response.Body.Close()
+	body, err := readPublisherResponseBody(ctx, response, 4<<10)
+	if err != nil {
+		return zero, err
+	}
 	if response.StatusCode != http.StatusOK {
 		return zero, fmt.Errorf("publisher health returned HTTP %d", response.StatusCode)
 	}
@@ -169,13 +174,11 @@ func (c *remoteClient) health(ctx context.Context, configurationDigest string) (
 	if err != nil || mediaType != "application/json" || response.Header.Get("Content-Encoding") != "" {
 		return zero, fmt.Errorf("publisher health requires unencoded JSON")
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, (4<<10)+1))
-	if err != nil || len(body) == 0 || len(body) > 4<<10 {
-		return zero, fmt.Errorf("publisher health response outside size limit")
-	}
 	var payload publisherHealthPayload
-	if err := strictjson.Decode(body, &payload); err != nil ||
-		payload.Status != "ok" || payload.Service != "engineering-github-publisher" {
+	if err := decodePublisherResponse(ctx, body, &payload, strictjson.Decode); err != nil {
+		return zero, err
+	}
+	if payload.Status != "ok" || payload.Service != "engineering-github-publisher" {
 		return zero, fmt.Errorf("publisher health identity mismatch")
 	}
 	return PublisherHealthObservation{
@@ -219,6 +222,9 @@ func (c *remoteClient) Observe(ctx context.Context, plan Plan) (ObserveResult, e
 }
 
 func (c *remoteClient) call(ctx context.Context, path string, input, output any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	data, err := json.Marshal(input)
 	if err != nil || len(data) == 0 || len(data) > 1<<20 {
 		return fmt.Errorf("publisher remote request outside size limit")
@@ -229,11 +235,17 @@ func (c *remoteClient) call(ctx context.Context, path string, input, output any)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	response, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("publisher remote transport: %w", err)
+		return &publisherResponseError{cause: err}
 	}
-	defer response.Body.Close()
+	body, err := readPublisherResponseBody(ctx, response, 1<<20)
+	if err != nil {
+		return err
+	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return fmt.Errorf("publisher remote returned HTTP %d", response.StatusCode)
 	}
@@ -241,12 +253,5 @@ func (c *remoteClient) call(ctx context.Context, path string, input, output any)
 	if err != nil || mediaType != "application/json" || response.Header.Get("Content-Encoding") != "" {
 		return fmt.Errorf("publisher remote requires unencoded JSON response")
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
-	if err != nil || len(body) == 0 || len(body) > 1<<20 {
-		return fmt.Errorf("publisher remote response outside size limit")
-	}
-	if err := strictjson.Decode(body, output); err != nil {
-		return fmt.Errorf("publisher remote returned invalid JSON")
-	}
-	return nil
+	return decodePublisherResponse(ctx, body, output, strictjson.Decode)
 }
