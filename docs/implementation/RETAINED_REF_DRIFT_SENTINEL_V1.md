@@ -5,10 +5,11 @@ Status: **READ-ONLY OPERATIONAL MONITOR — NOT BRANCH PROTECTION**
 ## Gap and scope
 
 The repository intentionally retains two historical, closed M1 Feature/Debug
-Git refs and six divergent superseded-prototype refs. Required PR/main CI
-already checks their exact name and expected head from frozen manifests. Those
-eight refs are **not** administrator-protected; CI detects unexpected changes
-only when CI runs. It cannot prevent a direct ref mutation.
+Git refs and the divergent superseded-prototype refs registered in the current
+pinned manifests. Required PR/main CI checks every exact name and expected head;
+the manifests, not a fixed count in this document, define that inventory. These
+refs are **not** administrator-protected; CI detects unexpected changes only
+when CI runs. It cannot prevent a direct ref mutation.
 
 **Availability limit:** GitHub may delay scheduled events and automatically
 **disable schedules in a public repository after 60 days of inactivity**.
