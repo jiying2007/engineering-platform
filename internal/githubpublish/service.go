@@ -88,6 +88,7 @@ func (s *RemoteService) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/publish", s.handlePublish)
 	mux.HandleFunc("POST /v1/observe", s.handleObserve)
 	mux.HandleFunc("POST /v1/dispatch-evidence", s.handleDispatchEvidence)
+	mux.HandleFunc("POST /v1/dispatch-no-invocation", s.handleNoInvocation)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s == nil || !s.authorized(r) {
 			writePublisherError(w, http.StatusUnauthorized, "verified control-plane identity required")
@@ -157,6 +158,12 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication cancelled before remote invocation")
 		return
 	}
+	// A durable intent precedes every possible remote invocation. A crashed
+	// STARTED-v2 with no intent is recoverable only while owning this same lock.
+	if err := slot.arm(r.Context(), start); err != nil {
+		writePublisherError(w, http.StatusServiceUnavailable, "publication invocation barrier unavailable; no replay")
+		return
+	}
 	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle, req.Identity)
 	if errors.Is(err, ErrPublisherGitQuiescenceUnknown) {
 		quarantined = true
@@ -183,7 +190,7 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication witness unavailable")
 		return
 	}
-	if err := writeWitness(slot, "completed.json", completion); err != nil {
+	if err := writeWitness(slot.Root, "completed.json", completion); err != nil {
 		writePublisherError(w, http.StatusServiceUnavailable, "publication completion not retained; exact readback required")
 		return
 	}

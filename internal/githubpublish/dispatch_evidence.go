@@ -44,14 +44,18 @@ func IdentityForOperation(o action.Operation) (DispatchIdentity, error) {
 }
 
 type DispatchStart struct {
-	Version   int              `json:"version"`
-	Identity  DispatchIdentity `json:"identity"`
-	Plan      Plan             `json:"plan"`
-	StartedAt time.Time        `json:"started_at"`
+	Incarnation string           `json:"incarnation,omitempty"`
+	Version     int              `json:"version"`
+	Identity    DispatchIdentity `json:"identity"`
+	Plan        Plan             `json:"plan"`
+	StartedAt   time.Time        `json:"started_at"`
 }
 
 func (s DispatchStart) Validate() error {
-	if s.Version != 1 || s.Identity.Validate() != nil || s.Plan.Validate() != nil || s.Identity.RunID != s.Plan.RunID || s.StartedAt.IsZero() {
+	if (s.Version == 1 && s.Incarnation != "") || (s.Version == 2 && !canonical.ValidDigest(s.Incarnation)) {
+		return ErrDispatchEvidenceUnavailable
+	}
+	if (s.Version != 1 && s.Version != 2) || s.Identity.Validate() != nil || s.Plan.Validate() != nil || s.Identity.RunID != s.Plan.RunID || s.StartedAt.IsZero() {
 		return ErrDispatchEvidenceUnavailable
 	}
 	return nil

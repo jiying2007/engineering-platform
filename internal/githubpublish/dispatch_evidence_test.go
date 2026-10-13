@@ -376,7 +376,7 @@ func TestPublisherRestoredWitnessKeepsReservation(t *testing.T) {
 	if err := os.Mkdir(slot, 0700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"started.json", "completed.json"} {
+	for _, name := range []string{"started.json", "invoked.json", "completed.json"} {
 		data, err := os.ReadFile(filepath.Join(source, dispatchSlot(p), name))
 		if err != nil {
 			t.Fatal(err)
@@ -406,6 +406,24 @@ func TestPublisherRestoredWitnessKeepsReservation(t *testing.T) {
 	}
 	if remote.publishCalls != 1 || remote.observeCalls != 1 {
 		t.Fatal("restore replayed mutation")
+	}
+	// An incomplete v2 restore cannot omit its durable invocation marker.
+	invokedPath := filepath.Join(slot, "invoked.json")
+	invoked, err := os.ReadFile(invokedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(invokedPath); err != nil {
+		t.Fatal(err)
+	}
+	if w := evidenceCall(t, s, p, id, "/v1/dispatch-evidence"); w.Code != http.StatusConflict {
+		t.Fatal("missing restored invocation accepted", w.Code)
+	}
+	if remote.observeCalls != 1 {
+		t.Fatal("incomplete restore called upstream")
+	}
+	if err := os.WriteFile(invokedPath, invoked, 0600); err != nil {
+		t.Fatal(err)
 	}
 	// Incomplete restores deny observation before contacting the upstream.
 	if err := os.Remove(filepath.Join(slot, "completed.json")); err != nil {

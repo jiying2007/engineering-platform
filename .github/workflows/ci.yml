@@ -173,6 +173,14 @@ jobs:
           python3 -B scripts/test_verify_publication_recovery_log.py
           go test -json -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestPublicationRecoveryDatabase' | tee "$RUNNER_TEMP/publication-recovery-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publication-recovery-tests.jsonl"
+      - name: Publisher pre-invocation fence and non-success Recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^TestPublisher(NoInvocation|InvocationBarrier|Uninvoked)' | tee "$RUNNER_TEMP/no-invocation-publisher.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/no-invocation-publisher.jsonl" --no-invocation-publisher
+          go test -json -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestNoInvocationDatabase' | tee "$RUNNER_TEMP/no-invocation-database.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/no-invocation-database.jsonl" --no-invocation-db
       - name: Action original reservation repeated database regression
         run: go test -race -v -count=3 -timeout 2m ./internal/store/postgres -run '^TestPostgresAction(RejectsBorrowedRunAuthority|SettlementBindsEveryOriginalIdentityField)$'
       - name: Recovery proof repeated database regression
@@ -357,7 +365,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -json -race -count=1 -timeout 8m ./internal/store/postgres -run '^(TestPostgresAuthorityRestoreDrill|TestPublicationRecoveryRestoreDrill)$' | tee "$RUNNER_TEMP/publication-restore-tests.jsonl"
+          go test -json -race -count=1 -timeout 8m ./internal/store/postgres -run '^(TestPostgresAuthorityRestoreDrill|TestPublicationRecoveryRestoreDrill|TestNoInvocationRestoreDrill)$' | tee "$RUNNER_TEMP/publication-restore-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publication-restore-tests.jsonl" --restore
 
   codex:

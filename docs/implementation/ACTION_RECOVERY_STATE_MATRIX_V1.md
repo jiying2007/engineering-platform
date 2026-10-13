@@ -53,3 +53,15 @@ and audit unchanged. Original post-Provider settlement remains allowed after a
 new Recovery epoch begins; it must carry the old immutable identity, never be
 rebased onto current authority. This closes an identity-substitution gap, not
 original-dispatcher quiescence or effectful terminal Recovery.
+
+## Additional pre-effect evidence boundary (2026-10-13)
+
+The existing PLANNED-only endpoint remains unchanged. A separate explicit
+`abandon-uninvoked` path now accepts an unresolved publication only when the
+independent Publisher seals an original STARTED-v2 before its durable invocation
+barrier, under the same inode lock, boot and directory identity. It stores a typed
+non-success receipt and audit in the existing row; no normal transition, idempotency
+release, CONFIRMED receipt or remote-absence retry is added. Old/missing/copied/
+restored/armed witnesses cannot use it. See PUBLICATION_NO_INVOCATION_RECOVERY_V1.
+The earlier table's general potentially-effectful cases remain blocked without
+this concrete pre-invocation proof or the existing positive completion witness.
