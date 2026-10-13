@@ -19,6 +19,9 @@ import (
 type dispatchLease struct {
 	*os.Root
 	lock *os.File
+	// In-memory provenance belongs only to this original, newly created lease.
+	invocation *DispatchInvocation
+	entered    bool
 }
 
 func (l *dispatchLease) Close() error {
@@ -75,19 +78,33 @@ func (l *dispatchLease) arm(ctx context.Context, start DispatchStart) error {
 	if err := writeWitness(l.Root, "invoked.json", i); err != nil {
 		return err
 	}
-	return ctx.Err() // Cancellation AFTER arming stays ambiguous, never grants retry.
+	l.invocation = &i // Set only after this original write and sync succeed.
+	return ctx.Err()  // No certificate is inferred merely from an on-disk intent.
 }
 
 type DispatchNonInvocation struct {
-	Kind        string    `json:"kind"`
-	StartDigest string    `json:"start_digest"`
-	SealedAt    time.Time `json:"sealed_at"`
+	Kind             string    `json:"kind"`
+	StartDigest      string    `json:"start_digest"`
+	SealedAt         time.Time `json:"sealed_at"`
+	InvocationDigest string    `json:"invocation_digest,omitempty"`
 }
 
 func (n DispatchNonInvocation) Validate(s DispatchStart) error {
 	d, err := canonical.Digest(s)
-	if err != nil || s.Validate() != nil || s.Version != 2 || n.Kind != "PUBLISH_NOT_INVOKED_V1" ||
+	if err != nil || s.Validate() != nil || s.Version != 2 ||
 		n.StartDigest != d || n.SealedAt.IsZero() || n.SealedAt.Before(s.StartedAt) {
+		return ErrDispatchEvidenceUnavailable
+	}
+	switch n.Kind {
+	case "PUBLISH_NOT_INVOKED_V1":
+		if n.InvocationDigest != "" {
+			return ErrDispatchEvidenceUnavailable
+		}
+	case "PUBLISH_NOT_INVOKED_AFTER_ARM_V2":
+		if !canonical.ValidDigest(n.InvocationDigest) {
+			return ErrDispatchEvidenceUnavailable
+		}
+	default:
 		return ErrDispatchEvidenceUnavailable
 	}
 	return nil
@@ -95,19 +112,38 @@ func (n DispatchNonInvocation) Validate(s DispatchStart) error {
 
 // This evidence contains NO external observation or success receipt. The
 // independent Publisher sealed a known v2 pre-invocation slot under its lock.
-// Absent historical slots, v1 starts and any present/partial invocation marker
-// can never enter this path, regardless of remote absence or a stopped PID.
+// Version 1 is sealed before arming. Version 2 additionally binds the original
+// writer's cancellation certificate after durable arming but BEFORE Remote.Publish.
+// An armed marker alone, absent history or an old start never authorizes a seal.
 type NonInvocationEvidence struct {
-	Version int                   `json:"version"`
-	Start   DispatchStart         `json:"start"`
-	Seal    DispatchNonInvocation `json:"seal"`
+	Version    int                   `json:"version"`
+	Start      DispatchStart         `json:"start"`
+	Seal       DispatchNonInvocation `json:"seal"`
+	Invocation *DispatchInvocation   `json:"invocation,omitempty"`
 }
 
 func (e NonInvocationEvidence) Validate() error {
-	if e.Version != 1 {
+	if e.Seal.Validate(e.Start) != nil {
 		return ErrDispatchEvidenceUnavailable
 	}
-	return e.Seal.Validate(e.Start)
+	switch e.Version {
+	case 1:
+		if e.Seal.Kind != "PUBLISH_NOT_INVOKED_V1" || e.Invocation != nil {
+			return ErrDispatchEvidenceUnavailable
+		}
+	case 2:
+		if e.Seal.Kind != "PUBLISH_NOT_INVOKED_AFTER_ARM_V2" || e.Invocation == nil ||
+			e.Invocation.Validate(e.Start) != nil || e.Invocation.ArmedAt.After(e.Seal.SealedAt) {
+			return ErrDispatchEvidenceUnavailable
+		}
+		d, err := canonical.Digest(*e.Invocation)
+		if err != nil || d != e.Seal.InvocationDigest {
+			return ErrDispatchEvidenceUnavailable
+		}
+	default:
+		return ErrDispatchEvidenceUnavailable
+	}
+	return nil
 }
 func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchIdentity, plan Plan) (NonInvocationEvidence, error) {
 	var zero NonInvocationEvidence
@@ -151,11 +187,19 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	if err != nil || incarnation != start.Incarnation {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
-	if !witnessAbsent(slot, "invoked.json") || !witnessAbsent(slot, "completed.json") {
+	if !witnessAbsent(slot, "completed.json") {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
+	var invocation *DispatchInvocation
+	if !witnessAbsent(slot, "invoked.json") {
+		// Only read an original certificate; never generate one after the fact.
+		invocation = &DispatchInvocation{}
+		if readWitness(slot, "invoked.json", invocation) != nil || invocation.Validate(start) != nil || witnessAbsent(slot, "not-invoked.json") {
+			return zero, ErrDispatchEvidenceUnavailable
+		}
+	}
 	var seal DispatchNonInvocation
-	if witnessAbsent(slot, "not-invoked.json") {
+	if invocation == nil && witnessAbsent(slot, "not-invoked.json") {
 		if err := ctx.Err(); err != nil {
 			return zero, err
 		}
@@ -172,7 +216,10 @@ func (j *dispatchJournal) sealUninvoked(ctx context.Context, identity DispatchId
 	if err := readWitness(slot, "not-invoked.json", &seal); err != nil {
 		return zero, err
 	}
-	e := NonInvocationEvidence{Version: 1, Start: start, Seal: seal}
+	e := NonInvocationEvidence{Version: 1, Start: start, Seal: seal, Invocation: invocation}
+	if invocation != nil {
+		e.Version = 2
+	}
 	if e.Validate() != nil {
 		return zero, ErrDispatchEvidenceUnavailable
 	}

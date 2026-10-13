@@ -12,19 +12,33 @@ import (
 )
 
 // Isolated real SQL with synthetic Publisher witnesses; never live GitHub proof.
-func noInvocationDatabaseFixture(t *testing.T, state action.State) (*Store, githubpublish.PublicationRecoveryRequest, githubpublish.NonInvocationEvidence) {
+func noInvocationDatabaseFixture(t *testing.T, state action.State, version int) (*Store, githubpublish.PublicationRecoveryRequest, githubpublish.NonInvocationEvidence) {
 	s, request, positive := publicationDatabaseFixture(t, state)
 	start := positive.Start
 	start.Version = 2
 	start.Incarnation = canonical.BytesDigest([]byte("synthetic-local-slot"))
 	digest, _ := canonical.Digest(start)
 	seal := githubpublish.DispatchNonInvocation{Kind: "PUBLISH_NOT_INVOKED_V1", StartDigest: digest, SealedAt: start.StartedAt.Add(time.Millisecond)}
-	return s, request, githubpublish.NonInvocationEvidence{Version: 1, Start: start, Seal: seal}
+	e := githubpublish.NonInvocationEvidence{Version: 1, Start: start, Seal: seal}
+	if version == 2 {
+		invocation := &githubpublish.DispatchInvocation{Version: 1, StartDigest: digest, ArmedAt: start.StartedAt.Add(time.Microsecond)}
+		e.Version = 2
+		e.Invocation = invocation
+		e.Seal.Kind = "PUBLISH_NOT_INVOKED_AFTER_ARM_V2"
+		e.Seal.InvocationDigest, _ = canonical.Digest(*invocation)
+	}
+	if e.Validate() != nil {
+		t.Fatal("invalid synthetic evidence fixture", version)
+	}
+	return s, request, e
 }
 func TestNoInvocationDatabaseTerminalReadbackAndNoReplay(t *testing.T) {
+	forNoInvocationVersions(t, testNoInvocationDatabaseTerminalReadbackAndNoReplay)
+}
+func testNoInvocationDatabaseTerminalReadbackAndNoReplay(t *testing.T, version int) {
 	for _, state := range []action.State{action.Dispatched, action.Unknown, action.Reconciling, action.Manual, action.SafeToRetry} {
 		t.Run(string(state), func(t *testing.T) {
-			s, req, evidence := noInvocationDatabaseFixture(t, state)
+			s, req, evidence := noInvocationDatabaseFixture(t, state, version)
 			ctx := context.Background()
 			if _, err := s.CreateRecoveryProof(ctx, 1, plannedReconciler); !errors.Is(err, ErrRecoveryFactsUnresolved) {
 				t.Fatal("orphan did not block proof", err)
@@ -85,13 +99,16 @@ func TestNoInvocationDatabaseTerminalReadbackAndNoReplay(t *testing.T) {
 	}
 }
 func TestNoInvocationDatabaseRejectsInsufficientEvidence(t *testing.T) {
+	forNoInvocationVersions(t, testNoInvocationDatabaseRejectsInsufficientEvidence)
+}
+func testNoInvocationDatabaseRejectsInsufficientEvidence(t *testing.T, version int) {
 	for _, mode := range []string{"planned", "legacy", "missing-seal", "wrong-seal", "wrong-identity", "stale-recovery", "success-ref"} {
 		t.Run(mode, func(t *testing.T) {
 			state := action.Manual
 			if mode == "planned" {
 				state = action.Planned
 			}
-			s, req, e := noInvocationDatabaseFixture(t, state)
+			s, req, e := noInvocationDatabaseFixture(t, state, version)
 			ctx := context.Background()
 			before := actionIdentityAuditCount(t, s, req.Identity.OperationID)
 			switch mode {
@@ -118,5 +135,17 @@ func TestNoInvocationDatabaseRejectsInsufficientEvidence(t *testing.T) {
 				t.Fatal("rejection mutated ledger", op, err)
 			}
 		})
+	}
+}
+
+// Both evidence versions use the same production transaction/audit/state path.
+// No version/environment flag is introduced into production code.
+func forNoInvocationVersions(t *testing.T, run func(*testing.T, int)) {
+	for _, version := range []int{1, 2} {
+		name := "before-arm"
+		if version == 2 {
+			name = "cancelled-after-arm"
+		}
+		t.Run(name, func(t *testing.T) { run(t, version) })
 	}
 }

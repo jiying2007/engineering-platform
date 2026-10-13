@@ -7,7 +7,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:61e38cab4166ec2642752e3a6d9902de7b1759adceac29dc0a83a0c6715becd0`
+`sha256:eab62f84d285961622b0bcdf363bfb3320890e0bbc6f45229583a719b39e676a`
 
 ## Reviewed categories
 
@@ -16,7 +16,7 @@ Production `cmd` / `internal` Go source digest from the existing scanner:
 | Explicitly timed command root | 27 |
 | Signal-owned command/service root | 10 |
 | Command with downstream budget | 2 |
-| Independent bounded cleanup/settlement | 15 |
+| Independent bounded cleanup/settlement | 16 |
 | Concrete convenience wrapper | 75 |
 | Test support helper | 3 |
 
@@ -101,6 +101,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/action/service.go:433` | `Background` | Concrete convenience wrapper |
 | `internal/action/service.go:436` | `Background` | Concrete convenience wrapper |
 | `internal/action/service.go:439` | `Background` | Concrete convenience wrapper |
+| `internal/githubpublish/armed_cancellation.go:31` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/service.go:187` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
@@ -205,3 +206,11 @@ Worker-readable 0640 files remain valid; Publisher-only witness ownership is not
 imposed on the independent Worker artifact. Existing digest and private snapshot
 checks remain authoritative. This does not forcibly interrupt a blocked regular-
 file syscall/fsync or qualify selected-host latency, storage or #229 overall.
+
+## Original armed-cancellation certificate
+
+The original Publisher uses one five-second cancellation-independent context to
+retain a certificate only after its own synced invocation marker and before it
+enters Remote.Publish. The certificate writer is synchronous under the original
+slot lock. Failure preserves unresolved state and occupied bytes. This is a
+cooperative durability budget, not forced fsync interruption or a new retry lane.

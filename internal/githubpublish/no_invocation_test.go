@@ -202,24 +202,42 @@ func TestPublisherWitnessLockChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lease, _, err := j.begin(context.Background(), request.Identity, request.Plan)
+	lease, start, err := j.begin(context.Background(), request.Identity, request.Plan)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer lease.Close()
+	switch os.Getenv("EP_TEST_WITNESS_MODE") {
+	case "armed-no-certificate":
+		if err := lease.arm(context.Background(), start); err != nil {
+			t.Fatal(err)
+		}
+	case "armed-cancelled":
+		parent, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx := cancelAfterIntentContext{parent, cancel, filepath.Join(path, dispatchSlot(request.Plan), "invoked.json")}
+		if !errors.Is(lease.prepareInvocation(ctx, start), context.Canceled) {
+			t.Fatal("original child did not retain cancellation")
+		}
+	}
 	fmt.Println("STARTED_LOCK_HELD")
 	// Parent owns this pipe; finite parent deadline guarantees cleanup on failure.
 	var one [1]byte
 	_, _ = os.Stdin.Read(one[:])
 }
 func TestPublisherNoInvocationFenceAfterRealProcessExit(t *testing.T) {
+	for _, mode := range []string{"before-arm", "armed-no-certificate", "armed-cancelled"} {
+		t.Run(mode, func(t *testing.T) { testPublisherFenceAfterRealProcessExit(t, mode) })
+	}
+}
+func testPublisherFenceAfterRealProcessExit(t *testing.T, mode string) {
 	s, p := publisherServiceFixture(t)
 	id := testDispatchIdentity(p)
 	raw, _ := json.Marshal(publishRequest{Plan: p, Identity: id})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestPublisherWitnessLockChild$")
-	cmd.Env = append(os.Environ(), "EP_TEST_WITNESS_CHILD="+s.journal.path, "EP_TEST_WITNESS_REQUEST="+string(raw))
+	cmd.Env = append(os.Environ(), "EP_TEST_WITNESS_CHILD="+s.journal.path, "EP_TEST_WITNESS_REQUEST="+string(raw), "EP_TEST_WITNESS_MODE="+mode)
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -254,8 +272,18 @@ func TestPublisherNoInvocationFenceAfterRealProcessExit(t *testing.T) {
 	}
 	waited = true
 	e, err := s.journal.sealUninvoked(context.Background(), id, p)
-	if err != nil || e.Validate() != nil {
-		t.Fatal("terminated pre-invocation not recoverable", err)
+	if mode == "armed-no-certificate" {
+		if err == nil {
+			t.Fatal("dead process manufactured missing original cancellation certificate")
+		}
+	} else {
+		version := 1
+		if mode == "armed-cancelled" {
+			version = 2
+		}
+		if err != nil || e.Validate() != nil || e.Version != version {
+			t.Fatal("original pre-entry evidence lost", e.Version, err)
+		}
 	}
 	if w := evidenceCall(t, s, p, id, "/v1/publish"); w.Code != http.StatusConflict {
 		t.Fatal("killed original execution replayed")

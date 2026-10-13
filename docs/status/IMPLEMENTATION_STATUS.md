@@ -36,11 +36,13 @@ issues remain #103 (managed-workspace WIF), #106 (optional relay/provider) and
 fixtures or CI alone. The independently identified internal P0 #228 covers
 crash-orphaned Action PLANNED/DISPATCHED/RECONCILING/MANUAL states: visibility
 and transaction fencing do not constitute a verified terminal no-replay
-disposition. Migration v13 adds an **explicit, audited, no-replay
-disposition only for a database-proven pre-dispatch PLANNED reservation**;
-it does not prove or settle already-dispatched effects. The remaining
-DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases in #228 continue to block
-Recovery Proof pending provider-specific, independently retained observations.
+disposition. Migration v13 established an **explicit, audited, no-replay
+PLANNED-only disposition**. Subsequent Publisher paths also handle exact positive
+original-completion evidence and independently proven non-invocation, including
+an original armed-cancellation certificate before Remote.Publish entry. These
+specific proofs do not qualify other already-dispatched effects. Remaining
+DISPATCHED/UNKNOWN/RECONCILING/MANUAL cases without the required evidence keep
+Recovery Proof blocked; no general terminal override is provided.
 
 The Action Gateway now binds frozen authorization, Run epoch and Recovery
 epoch prechecks to the initiating caller Context, rather than waiting in
@@ -345,23 +347,27 @@ reader nor a local reap proof is remote cancellation or production qualification
 
 The Publisher now writes STARTED-v2 while holding the original slot inode lock,
 then durably arms invoked.json before Remote.Publish. A new explicit recovery
-path can seal and abandon only a same-boot/original-inode STARTED-v2 with no
-invocation/completion record. This is independent proof of **not calling the
+path can seal a same-boot/original-inode STARTED-v2 before arming (evidence v1),
+or read an explicit original-writer cancellation certificate written after a
+fully synced invocation marker but before Remote.Publish entry (evidence v2). This is independent proof of **not calling the
 Publisher remote**, not a remote-absence inference. It creates a typed
 non-success reconciliation receipt in the existing Action row, preserves the
 original idempotency reservation and diagnostic, and never creates a PR/success
 receipt or grants replay. Core obtains the proof through its configured mTLS
 Publisher; request JSON cannot substitute evidence. Active holders, old v1 starts,
-restored/copied directories, foreign boot/slot identities and any partial/complete
-intent stay blocked. The positive #268 path and #269 processscope remain intact.
+restored/copied directories and foreign boot/slot identities stay blocked. An
+armed/partial intent without the original cancellation certificate remains
+unresolved; after function entry, errors or timeouts cannot mint this certificate. The positive #268 path and #269 processscope remain intact.
 
 The direct Context inventory remains source-bound. Database/mTLS/concurrency/
 COMMIT-loss/corruption/restore checks extend existing canonical gates. The exact
 scope and local-filesystem assumptions are recorded in
 `docs/implementation/PUBLICATION_NO_INVOCATION_RECOVERY_V1.md`.
 **#228 and #229 remain internal blockers**: historical missing witnesses,
-post-intent/original-error/ambiguous external results and selected-host lifecycle/
-backup/long-run acceptance are not promoted by this pre-effect path.
+post-intent crashes without the certificate, errors after function entry,
+ambiguous external results and selected-host lifecycle/backup/long-run acceptance
+are not promoted by this pre-effect path. Nine existing database fault/transport
+suites and the non-invocation restore drill now cover both evidence versions.
 
 ## Typed embedded routing and Skill maturity
 

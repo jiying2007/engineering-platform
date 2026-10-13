@@ -1,22 +1,22 @@
 # Action recovery state matrix v1
 
-Scope: the existing Action ledger and Recovery epoch after #262 at
-`bcdf350c2916e5194aa4930979bc50af7904fa86`. This document freezes acceptance
-requirements; it does not implement a new effectful terminal transaction or
-qualify a live provider. Internal P0 #228 remains OPEN.
+Scope: the existing Action ledger and Recovery epoch, original reservation
+identity, witnessed positive publication and pre-invocation evidence v1/v2.
+This is the current acceptance map, not a claim of live-provider qualification.
+Internal blocker 228 remains OPEN for cases lacking the required original proof.
 
 | Durable state | Established fact | Current permitted path | What is still required |
 | --- | --- | --- | --- |
 | PLANNED | The reservation precedes durable DISPATCHED | Existing authorized schema-v13 planned-only abandonment | Exact original ledger/audit/epoch readback; no replay or success receipt |
-| DISPATCHED | A provider effect may be in flight or already complete | Preserve the original reservation and block Recovery Proof | Original-dispatcher quiescence plus independently retained provider-specific observation |
-| UNKNOWN | The outcome is unresolved | Existing observation-only Reconcile admission | An absent-at-one-instant result is not proof of quiescence or safe retry |
-| RECONCILING | An observation was admitted but may lack durable settlement | Preserve unresolved state; no new publish/model call | Exact original observation/process/epoch readback; no generic reset to UNKNOWN |
-| MANUAL | Existing observation could not settle the operation | Preserve unresolved state | Evidence-backed, separately authorized terminal disposition, not direct SQL or a generic success override |
-| SAFE_TO_RETRY | Historical verdict lacks independent dispatcher proof | No redispatch; Recovery remains blocked | Never reinterpret an old verdict as current replay authority |
+| DISPATCHED | A provider effect may be in flight or already complete | Exact positive completion or non-invocation recovery; otherwise block | Original proof and bound receipt/audit; remote absence alone is insufficient |
+| UNKNOWN | The outcome is unresolved | Existing observation-only Reconcile or exact recovery evidence | An absent-at-one-instant result is not proof of quiescence or safe retry |
+| RECONCILING | An observation was admitted but may lack durable settlement | Exact positive completion or non-invocation recovery; otherwise unresolved | Exact original observation/process/epoch readback; no generic reset to UNKNOWN |
+| MANUAL | Existing observation could not settle the operation | Exact positive completion or non-invocation recovery; otherwise unresolved | Evidence-backed, separately authorized disposition, not direct SQL or a success override |
+| SAFE_TO_RETRY | Historical verdict lacks independent dispatcher proof | No redispatch; only exact new recovery evidence may settle | Never reinterpret an old verdict as current replay authority |
 | CONFIRMED | The ledger retained a positive settlement | Existing immutable result/subject readback | Do not infer that a current remote ref remains unchanged from this historical fact alone |
-| ABANDONED_RECONCILED | Existing planned-only recovery recorded a non-success no-replay disposition | Existing receipt/audit/Recovery proof | Never manufacture Delivery/PR confirmation or free the idempotency key |
+| ABANDONED_RECONCILED | Planned-only or proven-uninvoked recovery recorded a non-success no-replay disposition | Existing receipt/audit/Recovery proof | Never manufacture Delivery/PR confirmation or free the idempotency key |
 
-## Required effectful disposition contract (not yet implemented)
+## Remaining effectful disposition contract outside accepted evidence lanes
 
 Reuse the existing ledger and Recovery transaction. Bind exact operation ID,
 original Run and execution epoch, current Recovery epoch, frozen publication
@@ -59,9 +59,11 @@ original-dispatcher quiescence or effectful terminal Recovery.
 The existing PLANNED-only endpoint remains unchanged. A separate explicit
 `abandon-uninvoked` path now accepts an unresolved publication only when the
 independent Publisher seals an original STARTED-v2 before its durable invocation
-barrier, under the same inode lock, boot and directory identity. It stores a typed
+barrier, under the same inode lock, boot and directory identity; or reads a
+version-2 cancellation certificate appended by that original writer after its
+synced intent but before Remote.Publish entry. It stores a typed
 non-success receipt and audit in the existing row; no normal transition, idempotency
 release, CONFIRMED receipt or remote-absence retry is added. Old/missing/copied/
-restored/armed witnesses cannot use it. See PUBLICATION_NO_INVOCATION_RECOVERY_V1.
+restored witnesses and armed records without that original certificate cannot use it. See PUBLICATION_NO_INVOCATION_RECOVERY_V1.
 The earlier table's general potentially-effectful cases remain blocked without
 this concrete pre-invocation proof or the existing positive completion witness.

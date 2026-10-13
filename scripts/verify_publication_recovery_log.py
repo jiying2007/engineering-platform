@@ -53,6 +53,14 @@ PUBLISHER_REQUIRED = {
 
 NO_INVOCATION_REQUIRED = {name.replace("TestPublicationRecoveryDatabase", "TestNoInvocationDatabase") for name in TRANSACTION_REQUIRED}
 NO_INVOCATION_PUBLISHER_REQUIRED = {
+ "TestPublisherNoInvocationAfterArmPreservesLegacyBytes",
+ "TestPublisherNoInvocationAfterArmCancellation",
+ "TestPublisherNoInvocationAfterArmCannotCertifyEnteredCall",
+ "TestPublisherNoInvocationAfterArmRequiresOriginalWriter",
+ "TestPublisherNoInvocationAfterArmRejectsCorruptEvidence",
+ "TestPublisherNoInvocationAfterArmEvidenceRealMTLS",
+ "TestPublisherNoInvocationAfterArmFailedRetentionStaysBlocked",
+
  "TestPublisherNoInvocationFenceRejectsActiveAndReplays",
  "TestPublisherNoInvocationFenceRejectsHistoricalAndArmed",
  "TestPublisherInvocationBarrierPrecedesRemote",
