@@ -58,7 +58,7 @@ assert sha(raw) == '9b1215756b4bdf698c6602103e18e2b2b6914f3c'
 s = raw.decode()
 names = re.findall(r'^func (TestPublisherGitHubResponse\w+)\(', Path('internal/githubpublish/github_response_test.go').read_text(), re.M)
 assert len(names) == 6
-s = once(s, 'PUBLISHER_REQUIRED = {\n', 'PUBLISHER_REQUIRED = {\n'+''.join('    "'+n+'",\n' for n in names))
+s = once(s, '\nPUBLISHER_REQUIRED = {\n', '\nPUBLISHER_REQUIRED = {\n'+''.join('    "'+n+'",\n' for n in names))
 p.write_text(s)
 p = Path('docs/status/IMPLEMENTATION_STATUS.md')
 raw = p.read_bytes()
