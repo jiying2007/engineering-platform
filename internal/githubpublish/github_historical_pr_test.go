@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -125,6 +126,7 @@ func TestGitHubObserveDeletedBranchWithClosedPRNeverGrantsAbsent(t *testing.T) {
 }
 
 func TestGitHubPublishNeverReopensClosedDeterministicBranch(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	for _, branchExists := range []bool{false, true} {
 		t.Run(fmt.Sprint("branch-exists=", branchExists), func(t *testing.T) {
 			plan, config := historicalPullProbePlan(t)

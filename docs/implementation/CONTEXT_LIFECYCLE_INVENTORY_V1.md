@@ -1,13 +1,13 @@
 # Caller and maintenance Context inventory — current source slice
 
-Base: `a9a73d36ff04811d26e0960f02058a4189c63b85`, plus the positive publication
-recovery candidate in this change. This closes the *enumeration* of the current
+Base: `c449d7c3f1bfaab3f9f07b61d1992d7248c6d285`, plus the scoped Publisher
+Git and v2 host-admission corrections in this change. This closes the *enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:56e29c17994fe6289893ad3c833a69e08b95c06aa415d40a833ef7b8a9fc885d`
+`sha256:bf6fd91bed628e4acd04a45ec66a8fb051e6223116118e683e56af3aa31ddae3`
 
 ## Reviewed categories
 
@@ -16,7 +16,7 @@ Production `cmd` / `internal` Go source digest from the existing scanner:
 | Explicitly timed command root | 27 |
 | Signal-owned command/service root | 10 |
 | Command with downstream budget | 2 |
-| Independent bounded cleanup/settlement | 14 |
+| Independent bounded cleanup/settlement | 15 |
 | Concrete convenience wrapper | 75 |
 | Test support helper | 3 |
 
@@ -35,13 +35,19 @@ Independent cleanup/settlement includes original Action DB settlement (5 s),
 PostgreSQL rollback (5 s), owned workspace cleanup (5 s plus traversal budgets),
 Codex control/history/stop/close (5–6 s), failed Worker report (6 s), checkpoint
 retention (30 s), sandbox cleanup (20 s) and qualification/probe stop budgets.
-Publisher witness completion now has its own 5 s cancellation-independent,
+Publisher Git stop/reap uses the existing 5 s independent process-scope budget.
+An unconfirmed reap quarantines its staging instead of deleting under a live
+descendant. Publisher witness completion has its own 5 s cancellation-independent,
 synchronous lifetime. It never detaches work or runs Publish a second time.
 
 For every filesystem or RWMutex operation, cancellation is cooperative: a
 blocking kernel syscall or lock acquisition is not made forcibly interruptible
 by this inventory or by a numerical deadline. Tests need to preserve exact
 unknown-result and cleanup errors, not merely return quickly.
+
+The existing CI now verifies this exact source digest, ordered path/line/constructor
+rows and category counts with `scripts/verify_context_inventory.py`. That gate
+prevents a stale inventory from silently staying green; it is not a full call graph.
 
 ## Exact direct candidates
 
@@ -95,7 +101,8 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/action/service.go:433` | `Background` | Concrete convenience wrapper |
 | `internal/action/service.go:436` | `Background` | Concrete convenience wrapper |
 | `internal/action/service.go:439` | `Background` | Concrete convenience wrapper |
-| `internal/githubpublish/service.go:172` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/githubpublish/service.go:180` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/controls.go:122` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
@@ -181,6 +188,3 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/workeragent/failure_settlement.go:27` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/workspace/cleanup.go:23` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/workspace/cleanup.go:151` | `WithoutCancel` | Independent bounded cleanup/settlement |
-
-The scanner/test remains in existing CI. Future source changes require another
-review of these categories; this file is not a live readiness assertion.

@@ -72,6 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B scripts/test_authority_context_inventory.py
+          python3 -B scripts/test_verify_context_inventory.py
+          python3 -B scripts/verify_context_inventory.py --root .
           python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/authority-context-inventory.json"
           cat "$RUNNER_TEMP/authority-context-inventory.json"
       - name: Module hygiene
@@ -119,6 +121,12 @@ jobs:
         run: go test -race -timeout 5m ./...
       - name: Kernel process-tree regression
         run: go test -race -count=10 -timeout 1m ./internal/processscope
+      - name: Publisher kernel quiescence and no-skip regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publisher-kernel-tests.jsonl" --publisher-kernel
       - name: Outbox authority repeated regression
         run: |
           go test -race -count=20 -timeout 1m ./internal/outbox

@@ -3,6 +3,7 @@ package githubpublish
 import (
 	"context"
 	"encoding/json"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestGitHubNullOpenPullReadbackNeverAuthorizesCreate(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	plan, config := historicalPullProbePlan(t)
 	var mutations, historyQueries atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

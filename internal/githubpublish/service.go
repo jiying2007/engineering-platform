@@ -141,7 +141,12 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 	// Publish consumes only the privately staged, digest-verified snapshot.
 	// The original Worker artifact may change after verification; never pass
 	// its mutable path to Git or GitHub transport.
-	defer cleanup()
+	quarantined := false
+	defer func() {
+		if !quarantined {
+			cleanup()
+		}
+	}()
 	slot, start, err := s.journal.begin(r.Context(), req.Identity, req.Plan)
 	if err != nil {
 		writePublisherError(w, http.StatusConflict, "original publication slot occupied or unavailable; no replay")
@@ -153,6 +158,9 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	receipt, err := s.remote.Publish(r.Context(), req.Plan, bundle, req.Identity)
+	if errors.Is(err, ErrPublisherGitQuiescenceUnknown) {
+		quarantined = true
+	}
 	if err != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication failed")
 		return

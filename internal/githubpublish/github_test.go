@@ -2,6 +2,7 @@ package githubpublish
 
 import (
 	"context"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -62,6 +63,7 @@ func TestGitHubAuthenticatedAPINeverFollowsRedirect(t *testing.T) {
 }
 
 func TestPublisherGitCredentialNeverFollowsRemoteRedirect(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	gitPath, err := exec.LookPath("git")
 	if err != nil {
 		t.Skip("git executable required for direct Git transport policy test")

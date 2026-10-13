@@ -202,6 +202,29 @@ schema/runtime compatibility obligation.
 #54 and Debug #55 closure. It does not qualify later runtime changes. Do not rerun
 those subjects or rewrite their receipts to manufacture current production proof.
 
+## Publisher kernel and host-admission correction
+
+The production Git transport now uses the existing dedicated PID-namespace
+launcher, not plain exec. Successful original Git return requires namespace-init
+reaping; cancellation has one bounded stop/reap lifecycle. Unconfirmed local
+termination quarantines staging and cannot create a completion witness. This
+local kernel fact does not cancel an already accepted GitHub server operation,
+upgrade historical evidence, or authorize replay of negative/partial observations.
+
+Production host admission now reads the same Publisher v2 ServiceConfiguration as
+the service, including its Publisher-owned private witness_root. The old host
+Configuration v1 reader incorrectly rejected valid deployed v2 configuration.
+Canonical paths, disjoint artifact/evidence roots, role ownership and access are
+checked; no v1 fallback or provider qualification is added.
+
+The direct Context inventory is updated to 132 constructors and checked in CI
+against exact source digest, ordered locations and category counts. Its scope is
+still direct enumeration, not interprocedural or selected-host qualification.
+The older completed-publication candidate is reviewed and registered as a seventh
+retained prototype; only its scoped Git launch is absorbed, not its alternate
+schema/table/endpoints. See [the disposition record](../implementation/RECOVERY_PREPARATION_DISPOSITION_V1.md).
+Internal #228/#229 remain open; all current readiness flags stay BLOCKED.
+
 ## Response, Memory and readiness hardening
 
 A positive-only publication recovery path now requires original independent

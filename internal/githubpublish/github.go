@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -91,6 +91,10 @@ func newGitHubRemote(git, tokenFile string) (*githubRemote, error) {
 
 func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string, identity DispatchIdentity) (PublicationReceipt, error) {
 	var empty PublicationReceipt
+	// Owned by this original synchronous invocation, never shared with a later
+	// request. All Git descendants must be reaped before successful publication.
+	state := &gitProofLog{}
+	ctx = context.WithValue(ctx, gitProofKey{}, state)
 	if g == nil || plan.Validate() != nil || bundlePath == "" || identity.Validate() != nil || identity.RunID != plan.RunID {
 		return empty, fmt.Errorf("valid GitHub publication plan and bundle are required")
 	}
@@ -181,6 +185,9 @@ func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string
 	receipt := receiptFromPull(plan, pr, outcome)
 	if err := receipt.Validate(plan); err != nil {
 		return empty, err
+	}
+	if state.uncertain || len(state.proofs) == 0 {
+		return empty, ErrPublisherGitQuiescenceUnknown
 	}
 	return receipt, nil
 }
@@ -419,7 +426,12 @@ func (g *githubRemote) stageBundle(ctx context.Context, token string, plan Plan,
 	if err != nil {
 		return "", func() {}, err
 	}
-	cleanup := func() { _ = os.RemoveAll(root) }
+	cleanup := func() {
+		// No deletion may race an unconfirmed original Git descendant.
+		if publisherGitQuiescent(ctx) {
+			_ = os.RemoveAll(root)
+		}
+	}
 	if err := os.Chmod(root, 0o700); err != nil {
 		cleanup()
 		return "", func() {}, err
@@ -448,7 +460,7 @@ func (g *githubRemote) stageBundle(ctx context.Context, token string, plan Plan,
 	base, err := g.gitOutput(ctx, token, repository, home, "rev-parse", "--verify", "refs/ep/base^{commit}")
 	if err != nil || strings.TrimSpace(base) != plan.BaseCommit {
 		cleanup()
-		return "", func() {}, fmt.Errorf("fetched target base does not match frozen commit")
+		return "", func() {}, errors.Join(fmt.Errorf("fetched target base does not match frozen commit"), err)
 	}
 	if _, err := g.gitOutput(ctx, token, repository, home, "bundle", "verify", bundlePath); err != nil {
 		cleanup()
@@ -463,12 +475,12 @@ func (g *githubRemote) stageBundle(ctx context.Context, token string, plan Plan,
 	result, err := g.gitOutput(ctx, token, repository, home, "rev-parse", "--verify", "refs/ep/result^{commit}")
 	if err != nil || strings.TrimSpace(result) != plan.ResultCommit {
 		cleanup()
-		return "", func() {}, fmt.Errorf("Git bundle does not contain the retained result commit")
+		return "", func() {}, errors.Join(fmt.Errorf("Git bundle does not contain the retained result commit"), err)
 	}
 	if _, err := g.gitOutput(ctx, token, repository, home,
 		"merge-base", "--is-ancestor", "refs/ep/base", "refs/ep/result"); err != nil {
 		cleanup()
-		return "", func() {}, fmt.Errorf("retained result is not based on frozen target commit")
+		return "", func() {}, errors.Join(fmt.Errorf("retained result is not based on frozen target commit"), err)
 	}
 	if _, err := g.gitOutput(ctx, token, repository, home, "fsck", "--strict", "--no-reflogs"); err != nil {
 		cleanup()
@@ -511,9 +523,8 @@ func (g *githubRemote) gitOutput(ctx context.Context, token, directory, home str
 		"-c", "gc.auto=0",
 		"-C", directory,
 	}
-	command := exec.CommandContext(ctx, g.git, append(fixed, args...)...)
 	basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
-	command.Env = []string{
+	environment := []string{
 		"PATH=" + filepath.Dir(g.git) + ":/usr/bin:/bin",
 		"HOME=" + home,
 		"XDG_CONFIG_HOME=" + home,
@@ -529,10 +540,8 @@ func (g *githubRemote) gitOutput(ctx context.Context, token, directory, home str
 		"GIT_CONFIG_KEY_0=http.https://github.com/.extraheader",
 		"GIT_CONFIG_VALUE_0=AUTHORIZATION: basic " + basic,
 	}
-	command.WaitDelay = 2 * time.Second
 	var output, diagnostic boundedOutput
-	command.Stdout, command.Stderr = &output, &diagnostic
-	if err := command.Run(); err != nil {
+	if err := runPublisherGit(ctx, g.git, append(fixed, args...), environment, &output, &diagnostic); err != nil {
 		return "", fmt.Errorf("publisher Git command failed: %w", err)
 	}
 	return string(output.data), nil
