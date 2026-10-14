@@ -84,11 +84,11 @@ class RetirementTests(unittest.TestCase):
         self.assertEqual(len(retire.inventory(self.root)), 3)
 
     def test_protected_names_invalid_manifests_and_duplicates_rejected(self):
-        for valid in ("test/verified", "chore/verified"):
+        for valid in ("test/verified", "chore/verified", "refactor/verified"):
             retire.validate_manifest({"version": 1, "repository": retire.REPOSITORY, "branches": [
                 {"branch": valid, "expected_head": self.topic, "integrated_commit": self.main, "tree": self.tree}
             ]})
-        for name in ("main", "engineering-platform/retained", "release/stable", "feat/../main", "feat//bad", "--force", "feat/trailing/"):
+        for name in ("main", "engineering-platform/retained", "release/stable", "feat/../main", "feat//bad", "--force", "feat/trailing/", "refactor/../main", "refactor//bad", "refactor/trailing/", "refactor/"):
             bad = copy.deepcopy(self.manifest)
             bad["branches"][0]["branch"] = name
             with self.assertRaises(ValueError):
@@ -127,6 +127,48 @@ class RetirementTests(unittest.TestCase):
             mutate(bad)
             with self.assertRaises(ValueError):
                 retire.merged_head_from_pull(bad, self.main, self.tree)
+
+    def test_refactor_head_retirement_keeps_tree_and_lease_guards(self):
+        name = "refactor/context-only"
+        self.git("branch", name, self.topic)
+        self.git("push", "origin", name)
+        pr = {
+            "state": "closed", "merged_at": "2026-10-14T00:00:00Z", "merge_commit_sha": self.main,
+            "base": {"ref": "main", "repo": {"id": 1383377268}},
+            "head": {"ref": name, "sha": self.topic,
+                     "repo": {"id": 1383377268, "full_name": retire.REPOSITORY}},
+        }
+        entry = retire.merged_head_from_pull(pr, self.main, self.tree)
+        manifest = {"version": 1, "repository": retire.REPOSITORY, "branches": [entry]}
+        result = retire.retire(self.root, manifest, self.main)
+        self.assertFalse(result["mutation_attempted"])
+        self.assertEqual(result["branches"][0]["state"], "ELIGIBLE")
+        # The new prefix supplies no integration proof or stale-ref override.
+        for change in ({"tree": self.git("rev-parse", self.base + "^{tree}")},
+                       {"integrated_commit": self.topic}, {"expected_head": self.base}):
+            bad = copy.deepcopy(manifest)
+            bad["branches"][0].update(change)
+            with self.assertRaises(ValueError):
+                retire.retire(self.root, bad, self.main, apply=True)
+        plan = retire.plan(self.root, manifest, self.main)
+        newer = self.git("commit-tree", self.tree, "-p", self.topic, "-m", "parallel refactor")
+        self.git("push", "origin", newer + ":refs/heads/" + name)
+        with self.assertRaises(ValueError):
+            self.git(*retire.push_arguments(plan))
+        self.assertEqual(retire.inventory(self.root)["refs/heads/" + name], newer)
+        # Re-read, do not silently reuse the old SHA. Integration tree is still
+        # exact, so a new explicit lease may retire only that verified ref.
+        manifest["branches"][0]["expected_head"] = newer
+        result = retire.retire(self.root, manifest, self.main, apply=True)
+        self.assertEqual(result["branches"][0]["state"], "DELETED_READBACK_VERIFIED")
+        self.assertEqual(retire.inventory(self.root), {
+            "refs/heads/main": self.main,
+            "refs/heads/feat/one": self.topic,
+            "refs/heads/fix/two": self.topic,
+        })
+        result = retire.retire(self.root, manifest, self.main, apply=True)
+        self.assertFalse(result["mutation_attempted"])
+        self.assertEqual(result["branches"][0]["state"], "ABSENT")
 
     def test_cli_cannot_apply_outside_protected_main_workflow(self):
         manifest = self.root / "manifest.json"
