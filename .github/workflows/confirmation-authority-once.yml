@@ -1,0 +1,149 @@
+name: Verify original confirmation and independent Recovery
+on:
+  push:
+    branches: [fix/original-confirmation-authority-20261014]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # Immutable source blobs only; no commit/ref/issue mutations.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Require exact reviewed patch and whole source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/confirmation-evidence"
+          python3 -B - <<'PY'
+          import base64,gzip,hashlib,subprocess
+          from pathlib import Path
+          parts=[Path(f'.ci-confirmation/patch.{i}.b64').read_bytes() for i in range(3)]
+          expected=['9156d2af9ce4eacaac3ffc8d0383fca807648c6f','f9626bf82399e76d05361c1b5faad1e51d4f247c','f5182d6598d56f9e053083c92c7a301b0973c27b']
+          assert [hashlib.sha1(b'blob '+str(len(p)).encode()+b'\0'+p).hexdigest() for p in parts]==expected
+          raw=base64.b64decode(b''.join(parts),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='4ecdc521eb9fba0745bd57ee2ce1446d5721eb974e2f5355273ee818f4951b9c'
+          patch=gzip.decompress(raw)
+          assert len(patch)==64134 and hashlib.sha256(patch).hexdigest()=='0df5c4ed9420761de06af1af95049de459361c017cd8259598678c2cd2c668c5'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.github/workflows/confirmation-authority-once.yml',*[f'.ci-confirmation/patch.{i}.b64' for i in range(3)]],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='48b15e8061482133e00afda38b1d79fb9e684953'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Retain original production-source negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/confirmation-evidence"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          python3 -B - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'confirmation-evidence';replace={}
+          paths=['internal/action/ledger.go','internal/action/service.go','internal/store/memory.go','internal/githubpublish/provider.go','internal/store/postgres/action_store.go','internal/store/postgres/operational_status.go','internal/store/postgres/recovery_proof.go']
+          for name in paths:
+              dst=out/'original'/name;dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(subprocess.check_output(['git','show','d460fcc58c4760a64287e3cf79ef550723a45eb2:'+name]))
+              replace[str(Path(name).resolve())]=str(dst)
+          (out/'original-overlay.json').write_text(json.dumps({'Replace':replace}))
+          PY
+          set +e
+          go test -overlay "$out/original-overlay.json" -json -race -count=1 -timeout 1m ./internal/action ./internal/store ./internal/githubpublish ./internal/store/postgres -run '^(TestActionPositiveObservationCannotConfirmMutation|TestCoreMemoryActionUpdatesPreserveTerminalAndConfirmationBoundary|TestPublisherPositiveObservationRequiresRecoveryEvidence|TestPublicationRecoveryDatabaseOrdinaryConfirmationIsNotRecovery|TestPublicationRecoveryDatabaseDirectConfirmationCannotBypassEvidence|TestPublicationRecoveryDatabaseHistoricalObservedConfirmationBlocksProof)$' > "$out/original-boundary.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python3 -B - <<'PY'
+          import json,os
+          from pathlib import Path
+          events=[json.loads(line) for line in (Path(os.environ['RUNNER_TEMP'])/'confirmation-evidence/original-boundary.jsonl').read_text().splitlines()]
+          expected={'TestActionPositiveObservationCannotConfirmMutation','TestCoreMemoryActionUpdatesPreserveTerminalAndConfirmationBoundary','TestPublisherPositiveObservationRequiresRecoveryEvidence','TestPublicationRecoveryDatabaseOrdinaryConfirmationIsNotRecovery','TestPublicationRecoveryDatabaseDirectConfirmationCannotBypassEvidence','TestPublicationRecoveryDatabaseHistoricalObservedConfirmationBlocksProof'}
+          assert {e.get('Test') for e in events if e['Action']=='fail' and e.get('Test') in expected}==expected
+          assert not any(e['Action']=='skip' for e in events)
+          assert len({e['Package'] for e in events if e['Action']=='fail' and not e.get('Test')})==4
+          PY
+      - name: Require fixed normal and independent Recovery paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/confirmation-evidence"
+          go test -json -race -count=3 -timeout 3m ./internal/store/postgres -run '^TestPublicationRecoveryDatabase' | tee "$out/pg17-publication-3.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$out/pg17-publication-3.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/action | tee "$out/action-3.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/store | tee "$out/memory-3.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/api ./internal/gateway | tee "$out/api-gateway-3.jsonl"
+          go test -json -race -count=20 -timeout 1m ./internal/githubpublish -run '^TestPublisherPositiveObservationRequiresRecoveryEvidence$' | tee "$out/publisher-positive-20.jsonl"
+          python3 -B - <<'PY'
+          import json,os,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts');import verify_publication_recovery_log as gate
+          out=Path(os.environ['RUNNER_TEMP'])/'confirmation-evidence';root='github.com/jiying2007/engineering-platform/'
+          gate.verify(out/'action-3.jsonl',repeats=3,required={'TestActionPositiveObservationCannotConfirmMutation','TestActionMemoryUpdatesKeepNormalTransitionBoundary','TestActionUnqualifiedPositiveSettlesManualAfterCancellation'},package=root+'internal/action')
+          gate.verify(out/'memory-3.jsonl',repeats=3,required={'TestCoreMemoryActionUpdatesPreserveTerminalAndConfirmationBoundary'},package=root+'internal/store')
+          gate.verify(out/'publisher-positive-20.jsonl',repeats=20,required={'TestPublisherPositiveObservationRequiresRecoveryEvidence'},package=root+'internal/githubpublish')
+          events=[json.loads(l) for l in (out/'api-gateway-3.jsonl').read_text().splitlines()]
+          assert not any(e['Action'] in ('fail','skip') for e in events)
+          assert {e['Package'] for e in events if e['Action']=='pass' and not e.get('Test')}=={root+'internal/api',root+'internal/gateway'}
+          PY
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-binding.json"
+          go vet ./...
+      - name: Export only immutable validated source files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='d460fcc58c4760a64287e3cf79ef550723a45eb2';tree='48b15e8061482133e00afda38b1d79fb9e684953'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          names=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(names)==27 and not any(p.startswith(('.ci-','.github/','cmd/')) for p in names)
+          files=[]
+          for name in names:
+              data=Path(name).read_bytes();assert len(data)<100000
+              sha=hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+              payload=json.dumps({'encoding':'base64','content':base64.b64encode(data).decode()}).encode()
+              result=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload));assert result['sha']==sha
+              files.append({'path':name,'sha':sha,'sha256':hashlib.sha256(data).hexdigest(),'size':len(data)})
+          out=Path(os.environ['RUNNER_TEMP'])/'confirmation-evidence'
+          (out/'source-objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':files,'ref_writes':False,'live_provider_executed':False,'production_qualified':False},indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          (out/'candidate.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary',base]))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: confirmation-authority-pg17-${{ github.sha }}
+          path: ${{ runner.temp }}/confirmation-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Temporary source transport: excluded from the exact final tree.
+# Internal blockers [228,229] remain OPEN/BLOCKED. No external publishing or replay.
