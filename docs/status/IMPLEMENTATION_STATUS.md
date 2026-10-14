@@ -415,6 +415,19 @@ before marshalling/exchange starts no new request. Local mTLS truncation and
 complete-response controls exercise the original client, not real external
 publishing or post-entry recovery qualification. No automatic retry is added.
 
+The CLI/Worker Control client also requires complete read/close/cancellation
+observation before accepting success bytes or a precise server error. Truncated
+4xx/5xx and failed response closure preserve observed HTTP status but keep POST
+outcome unobserved; they never assert rollback or authorize replay. Typed decode
+uses the original caller Context and cannot replace output after observed
+cancellation. Exact complete COMMIT-unknown and external-effect-unresolved codes
+stay distinct. Worker polling ignores only an exact complete 409 verdict; it
+does not swallow a wrapped status from an incomplete or cancelled response.
+Existing full-package race x20 is now checked as a complete
+no-skip event stream, including real local mTLS truncation. This extends transport
+and caller-lifecycle coverage only; it supplies no new orphaned-effect terminal
+recovery, original dispatcher quiescence or selected-host qualification.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**

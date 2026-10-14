@@ -19,6 +19,7 @@ MODES = (
     (gate.NO_INVOCATION_REQUIRED, gate.PACKAGE, 3, "--no-invocation-db"),
     (gate.NO_INVOCATION_PUBLISHER_REQUIRED, gate.PUBLISHER_PACKAGE, 3, "--no-invocation-publisher"),
     (gate.PROOF_REQUIRED, gate.PUBLISHER_PACKAGE, 3, "--publisher-proof"),
+    (gate.CONTROL_REQUIRED, gate.CONTROL_PACKAGE, 20, "--control-response"),
 )
 
 
@@ -63,6 +64,22 @@ class GateTests(unittest.TestCase):
         missing = sorted(name for name in gate.PUBLISHER_REQUIRED
                          if re.search(match.group(1), name) is None)
         self.assertEqual(missing, [], "required tests must actually be selected by CI")
+
+    def test_control_gate_runs_the_full_existing_package(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text()
+        commands = [line for line in workflow.splitlines()
+                    if "go test -json" in line and "control-response-tests.jsonl" in line]
+        self.assertEqual(len(commands), 1)
+        self.assertIn("-race -count=20 -timeout 2m ./internal/controlclient", commands[0])
+        self.assertNotIn("-run", commands[0], "do not silently reduce the previous full-package gate")
+        self.assertIn('"$RUNNER_TEMP/control-response-tests.jsonl" --control-response', workflow)
+        existing = {name for path in (root / "internal/controlclient").glob("*_test.go")
+                    for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
+        self.assertTrue(gate.CONTROL_REQUIRED <= existing)
+        lifecycle = {name for name in existing if name.startswith("TestControlResponseLifecycle")}
+        self.assertEqual(len(lifecycle), 7)
+        self.assertTrue(lifecycle <= gate.CONTROL_REQUIRED)
 
     def test_all_modes_require_complete_exact_repetitions(self):
         for required, package, repeats, option in MODES:

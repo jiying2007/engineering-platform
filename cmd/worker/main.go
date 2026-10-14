@@ -115,8 +115,7 @@ func serveWorker() error {
 	}
 	err = workerloop.Run(ctx, time.Second, func(ctx context.Context) error {
 		err := step(ctx)
-		var rejected *controlclient.HTTPError
-		if errors.As(err, &rejected) && rejected.Status == 409 {
+		if controlclient.IsCompleteHTTPStatus(err, 409) {
 			return nil
 		}
 		return err

@@ -2,6 +2,7 @@ package controlclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,7 +22,10 @@ func responseDestination(out any) (reflect.Value, error) {
 // Decode into a new value, not a shallow copy: a map/slice/pointer in the
 // caller's previous receipt must not be mutated by a failed decode, nor may
 // omitted members silently retain data from an earlier operation.
-func decodeResponse(data []byte, out any) error {
+func decodeResponse(ctx context.Context, data []byte, out any) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	dst, err := responseDestination(out)
 	if err != nil {
 		return err
@@ -30,12 +34,15 @@ func decodeResponse(data []byte, out any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(temporary.Interface()); err != nil {
-		return err
+		return errors.Join(ctx.Err(), err)
 	}
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
-		return fmt.Errorf("trailing control JSON")
+		return errors.Join(ctx.Err(), fmt.Errorf("trailing control JSON"))
 	}
 	if err := requireResponseMembers(data, dst.Type()); err != nil {
+		return errors.Join(ctx.Err(), err)
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	dst.Set(temporary.Elem())

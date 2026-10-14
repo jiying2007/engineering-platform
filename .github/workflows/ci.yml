@@ -151,7 +151,9 @@ jobs:
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          go test -race -count=20 -timeout 2m ./internal/workerqueue ./internal/workeragent ./internal/workerloop ./internal/controlclient
+          go test -race -count=20 -timeout 2m ./internal/workerqueue ./internal/workeragent ./internal/workerloop
+          go test -json -race -count=20 -timeout 2m ./internal/controlclient | tee "$RUNNER_TEMP/control-response-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/control-response-tests.jsonl" --control-response
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run TestWorkerInbox
           go test -race -count=3 -timeout 2m ./cmd/control-plane -run TestWorkerCommand
           python3 -B scripts/test_ci_admission_characterization.py
