@@ -102,6 +102,9 @@ func checkActionAdmission(ctx context.Context, tx pgx.Tx, op action.Operation) e
 // authoritative PostgreSQL admission transaction. If COMMIT becomes
 // ambiguous, callers must read back the idempotency key rather than retry.
 func (s *Store) CreateContext(ctx context.Context, op action.Operation) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	input, err := auditInput("action.planned", "ExternalOperation", op.ID, op)
 	if err != nil {
 		return err
@@ -134,10 +137,16 @@ INSERT INTO external_operations (
 }
 
 func (s *Store) GetContext(ctx context.Context, id string) (action.Operation, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	return s.readOperation(ctx, "WHERE operation_id=$1", id)
 }
 
 func (s *Store) GetByIdempotencyKeyContext(ctx context.Context, key string) (action.Operation, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	return s.readOperation(ctx, "WHERE idempotency_key=$1", key)
 }
 
@@ -173,6 +182,9 @@ FROM external_operations `
 // idempotency/audit subject. Do not compare settlement to the *current* Recovery
 // epoch: an original Provider result must survive a later Recovery Begin.
 func (s *Store) UpdateContext(ctx context.Context, op action.Operation) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	allowedPrevious, err := previousStates(op.State)
 	if err != nil {
 		return err
