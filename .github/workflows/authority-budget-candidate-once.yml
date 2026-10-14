@@ -5,28 +5,148 @@ on:
 permissions:
   contents: read
 jobs:
-  transport-readback:
+  qualify:
     if: ${{ github.repository == 'jiying2007/engineering-platform' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 8
+    permissions:
+      contents: write # Only immutable blob export; no commit/ref/issue mutation.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Retain source transport before qualification
+          fetch-depth: 3
+      - name: Require original reviewed patch and complete tree
         shell: bash
         run: |
           set -euo pipefail
-          mkdir "$RUNNER_TEMP/budget-transport"
-          cp .ci-authority-budget/part.* "$RUNNER_TEMP/budget-transport/"
-          (cd "$RUNNER_TEMP/budget-transport" && sha256sum part.* > SHA256SUMS)
-          printf '%s\n' 'Transport readback only. No source applied, test qualification or readiness promotion.' > "$RUNNER_TEMP/budget-transport/STATUS"
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+          mkdir "$RUNNER_TEMP/budget-evidence"
+          python3 -B - <<'PY'
+          import base64,gzip,hashlib,os,subprocess
+          from pathlib import Path
+          def blob(data):return hashlib.sha1(b'blob '+str(len(data)).encode()+b'\0'+data).hexdigest()
+          first=Path('.ci-authority-budget/part.0').read_bytes()
+          assert blob(first)=='4bea3b6b27c4a00b6fd83cbb58883379cbbba122'
+          # Exact two transcription differences independently located in the
+          # downloaded raw transport. The reviewed source is never modified.
+          text=base64.b64encode(first).decode()
+          assert len(text)==10856 and text[692:694]=='uw'
+          first=base64.b64decode(text[:692]+'/'+text[694:]+'8',validate=True)
+          assert blob(first)=='9cf851f15f50d2485aadb2f8c25b847940071e1f'
+          second=Path('.ci-authority-budget/part.1').read_bytes()
+          assert blob(second)=='0997a8e04a43670bfa6c0c2fc3af783c2bc12d70'
+          data=first+second
+          assert len(data)==16287 and hashlib.sha256(data).hexdigest()=='a8d5202cc83dd16992f8f1228453bbc9dec3d7c901a402845fac5385772e3d51'
+          patch=gzip.decompress(data)
+          assert len(patch)==58288 and hashlib.sha256(patch).hexdigest()=='2bc48b3238f88ab4136b40696e05f94699dc90e38d2592ad3d0a1753d7e23e1b'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.ci-authority-budget/part.0','.ci-authority-budget/part.1','.github/workflows/authority-budget-candidate-once.yml'],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='c8b80d5a2071ac74a689ee82b7670361ff24949f'
+          out=Path(os.environ['RUNNER_TEMP'])/'budget-evidence'
+          (out/'candidate.patch').write_bytes(patch)
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
-          name: authority-budget-transport-${{ github.sha }}
-          path: ${{ runner.temp }}/budget-transport
+          go-version-file: go.mod
+          cache: false
+      - name: Retain original no-deadline failure controls on PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/budget-evidence"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          python3 -B - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'budget-evidence';old=out/'original';old.mkdir()
+          entries={}
+          for name in ('action_store.go','codex_continuation.go','core_store.go','mutation.go','outbox_store.go','recovery_proof.go','store.go'):
+              path='internal/store/postgres/'+name
+              target=old/name
+              target.write_bytes(subprocess.check_output(['git','show','93b9b8a209159692cb87b91e303388304722afc1:'+path]))
+              entries[str(Path(path).resolve())]=str(target)
+          (out/'overlay.json').write_text(json.dumps({'Replace':entries}))
+          PY
+          set +e
+          go test -overlay "$out/overlay.json" -json -race -count=1 -timeout 90s ./internal/store/postgres -run '^TestPostgresAuthorityBudget(NoDeadlinePoolWait|CoversWholeMutation)$' > "$out/original-pg17.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python3 -B - <<'PY'
+          import json,os
+          from pathlib import Path
+          events=[json.loads(x) for x in (Path(os.environ['RUNNER_TEMP'])/'budget-evidence/original-pg17.jsonl').read_text().splitlines()]
+          expected={'TestPostgresAuthorityBudgetNoDeadlinePoolWait','TestPostgresAuthorityBudgetCoversWholeMutation'}
+          failed={e['Test'] for e in events if e['Action']=='fail' and e.get('Test')}
+          assert failed==expected and not any(e['Action']=='skip' for e in events)
+          assert events[-1]['Action']=='fail' and 'Test' not in events[-1]
+          PY
+      - name: Require fixed budget and preserved recovery regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/budget-evidence"
+          go test -json -race -count=1 -timeout 2m ./internal/store/postgres -run '^TestPostgresAuthorityBudget' | tee "$out/fixed-pg17.jsonl"
+          python3 -B scripts/verify_authority_budget_log.py "$out/fixed-pg17.jsonl"
+          go test -json -race -count=1 -timeout 3m ./internal/store/postgres -run '^(TestPostgresCallerContextBoundsPoolWait|TestProductionConnectionDeadlines|TestProductionOpenActually|TestProductionCommitSites|TestPublicationRecoveryDatabase|TestNoInvocationDatabase|TestCommit|TestPostgres.*(Context|Ack|Identity|Recovery))' | tee "$out/preserved-pg17.jsonl"
+          python3 -B - <<'PY'
+          import os,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import verify_publication_recovery_log as gate
+          gate.verify(Path(os.environ['RUNNER_TEMP'])/'budget-evidence/preserved-pg17.jsonl',repeats=1,required=gate.REQUIRED|{'TestPostgresCallerContextBoundsPoolWait'})
+          PY
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-binding.json"
+          go vet ./...
+      - name: Export only immutable reviewed source objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='93b9b8a209159692cb87b91e303388304722afc1';tree='c8b80d5a2071ac74a689ee82b7670361ff24949f'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(paths)==16 and not any(p.startswith('.ci-') or p.endswith('candidate-once.yml') for p in paths)
+          records=[]
+          for name in paths:
+              raw=Path(name).read_bytes();assert len(raw)<100000
+              sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+              payload=json.dumps({'encoding':'base64','content':base64.b64encode(raw).decode()}).encode()
+              response=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+              assert response['sha']==sha
+              records.append({'path':name,'sha':sha,'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)})
+          out=Path(os.environ['RUNNER_TEMP'])/'budget-evidence'
+          (out/'source-objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False,'live_provider_executed':False,'production_qualified':False},indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: authority-budget-pg17-${{ github.sha }}
+          path: ${{ runner.temp }}/budget-evidence
           if-no-files-found: error
           retention-days: 30
-# Branch-only transport; no model/provider/credentials/deployment or ref writes.
-# Original expected patch/tree must match before any later source validation.
+# Only exact tested source is exported; temporary files are absent from final tree.
+# Internal blockers [228,229] remain OPEN/BLOCKED. No ref writes, models or deployment.
