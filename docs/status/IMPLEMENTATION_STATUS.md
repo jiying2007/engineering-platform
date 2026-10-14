@@ -452,6 +452,36 @@ or a new external-effect disposition. See
 [PostgreSQL authority budgets](../implementation/POSTGRES_AUTHORITY_BUDGET_V1.md).
 Internal blockers [228,229] remain OPEN/BLOCKED pending their remaining evidence.
 
+## Ordinary confirmation versus independent Recovery
+
+Ordinary positive observation is now diagnostic for mutating Actions. The Action
+state machine, Service and all three ledgers allow ordinary RECONCILING to
+CONFIRMED only for explicit OBSERVE risk; unknown risks do not inherit that
+exception. Original DISPATCHED-to-CONFIRMED settlement remains independently
+bounded and valid after a newer Recovery Begin. No mutation is replayed.
+
+New ordinary mutation confirmations carry a causal marker in the original atomic
+audit event, binding the exact stored Operation (UTC microsecond timestamp,
+identity, state and result). Recovery Proof, final completion and operational
+readback require that exact payload and event digest, not a state-change count.
+The check detects absent, duplicate or inconsistent provenance; it is not
+cryptographic proof against an administrator rewriting the database and journal.
+Operational counts and this check use one read-only repeatable snapshot.
+
+Historical bare CONFIRMED labels are not upgraded by counting events or guessing
+lost timestamp precision. A historical GitHub publication with the same original
+identity/PR may obtain one full positive Recovery receipt through the existing
+independently authorized observer: original completion/reap evidence and fresh
+positive observation remain mandatory. A lost receipt with a surviving recovery
+audit is corruption, not a new enrichment opportunity. Original audit events and
+idempotency reservations remain; negative/no-invocation paths cannot take a
+CONFIRMED row. Other historical/unproved outcomes remain blocked without repair
+by direct SQL, invented evidence, success override or a repeat Provider call.
+
+See [confirmation authority](../implementation/ACTION_CONFIRMATION_AUTHORITY_V1.md).
+Internal blockers [228,229] remain OPEN/BLOCKED; source/run qualification is not
+selected-host/provider or independent human acceptance.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**

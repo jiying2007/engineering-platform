@@ -137,11 +137,12 @@ func TestPostgresActionRepositoryAndService(t *testing.T) {
 
 	provider.dispatchErr = nil
 	reconciled, err := service.Reconcile(ctx, unknownReq.ID)
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, action.ErrExternalEffectUnresolved) || reconciled.OperationID != "" {
+		t.Fatalf("unqualified positive observation confirmed an effect: %#v %v", reconciled, err)
 	}
-	if reconciled.Result != string(action.Confirmed) {
-		t.Fatalf("expected reconciled CONFIRMED receipt, got %#v", reconciled)
+	unresolved, err := s.GetContext(ctx, unknownReq.ID)
+	if err != nil || unresolved.State != action.Manual {
+		t.Fatalf("missing durable MANUAL readback: %#v %v", unresolved, err)
 	}
 	if provider.reconcileCalls != 1 {
 		t.Fatalf("expected one reconciliation call, got %d", provider.reconcileCalls)

@@ -64,7 +64,7 @@ func (s *Server) handleConfirmRecoveredPublication(w http.ResponseWriter, r *htt
 		return
 	}
 	identity, err := githubpublish.IdentityForOperation(original)
-	if err != nil || identity != request.Identity || !githubpublish.RecoverablePublicationState(original.State) {
+	if err != nil || identity != request.Identity || !githubpublish.PositiveRecoveryState(original.State) {
 		writePublicError(w, http.StatusConflict)
 		return
 	}

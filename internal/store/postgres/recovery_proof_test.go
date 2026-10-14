@@ -2,12 +2,15 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/audit"
+	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 )
 
@@ -86,7 +89,7 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 	if err := s.CreateContext(context.Background(), *op); err != nil {
 		t.Fatal(err)
 	}
-	if err := op.Transition(action.Dispatched, now.Add(time.Second)); err != nil {
+	if err := op.Transition(action.Dispatched, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.UpdateContext(context.Background(), *op); err != nil {
@@ -99,8 +102,10 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 		t.Fatalf("in-flight dispatch was erased from Recovery: %v", err)
 	}
 	// Recovery must allow an old dispatched operation to settle; it must not
-	// authorize a NEW dispatch during the reconciliation epoch.
-	if err := op.Transition(action.Confirmed, now.Add(2*time.Second)); err != nil {
+	// authorize a NEW dispatch during the reconciliation epoch. Use the actual
+	// settlement clock: a synthetic now+2s timestamp can be later than its
+	// transaction audit and must not qualify as original completion provenance.
+	if err := op.Transition(action.Confirmed, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.UpdateContext(context.Background(), *op); err != nil {
@@ -108,6 +113,54 @@ func TestRecoveryProofAcceptsSettlementOfPreviouslyDispatchedAction(t *testing.T
 	}
 	if _, err := s.CreateRecoveryProof(context.Background(), 1, "urn:engineering-platform:operator:reconciler"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRecoveryProofOriginalConfirmationChronology(t *testing.T) {
+	at := time.Date(2026, time.October, 14, 6, 0, 0, 123456000, time.UTC)
+	op := action.Operation{
+		ID: "original-clock-op", RunID: "original-clock-run", ExecutionEpoch: 1,
+		Action: "ci.dispatch", RiskClass: action.ControlledMutation, Capability: "ci",
+		IdempotencyKey: "original-clock-key", RequestDigest: "sha256:" + strings.Repeat("5", 64),
+		State: action.Confirmed, UpdatedAt: at,
+	}
+	payload, err := canonical.Digest(op)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		offset time.Duration
+		valid  bool
+	}{
+		{"audit-before-settlement-two-seconds", -2 * time.Second, false},
+		{"audit-before-settlement-one-microsecond", -time.Microsecond, false},
+		{"audit-at-settlement", 0, true},
+		{"audit-after-settlement", time.Microsecond, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			event, err := audit.Build(1, "", audit.Input{
+				Type: "action.state_changed", AggregateType: "ExternalOperation", AggregateID: op.ID,
+				PayloadDigest: payload, CausationID: originalConfirmationCause,
+			}, at.Add(tc.offset))
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal([]audit.Event{event})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// All identity, payload and event digest fields are valid in every
+			// case. Only chronology decides whether provenance is acceptable.
+			err = validateOriginalConfirmation(op, raw)
+			if tc.valid {
+				if err != nil {
+					t.Fatal("valid original chronology rejected", err)
+				}
+			} else if !errors.Is(err, ErrRecoveryFactsUnresolved) {
+				t.Fatal("future settlement incorrectly qualified", err)
+			}
+		})
 	}
 }
 

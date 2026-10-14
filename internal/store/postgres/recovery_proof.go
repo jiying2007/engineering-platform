@@ -23,6 +23,9 @@ func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 	if err := validateUninvokedPublications(ctx, tx); err != nil {
 		return facts, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
 	}
+	if err := validateOrdinaryConfirmations(ctx, tx); err != nil {
+		return facts, err
+	}
 	queries := []struct {
 		dst *uint64
 		q   string

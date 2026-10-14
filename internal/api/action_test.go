@@ -225,7 +225,7 @@ func TestActionAPIReconcilesUnknownOperation(t *testing.T) {
 		"requested_by":      "runtime",
 	}, http.StatusAccepted)
 
-	mustRequest(t, h, http.MethodPost, "/api/v1/actions/act-unknown/reconcile", nil, http.StatusOK)
+	mustRequest(t, h, http.MethodPost, "/api/v1/actions/act-unknown/reconcile", nil, http.StatusServiceUnavailable)
 	if provider.dispatchCalls != 1 || provider.reconcileCalls != 1 {
 		t.Fatalf("unexpected provider calls dispatch=%d reconcile=%d", provider.dispatchCalls, provider.reconcileCalls)
 	}

@@ -357,7 +357,17 @@ func (s *Service) Reconcile(ctx context.Context, operationID string) (Receipt, e
 	invalidReconcileOutcome := false
 	switch result.Outcome {
 	case ReconcileConfirmed:
-		err = op.Transition(Confirmed, s.now())
+		if op.RiskClass == Observe {
+			err = op.Transition(Confirmed, s.now())
+		} else {
+			// ReconcileResult has no original completion/quiescence evidence,
+			// Recovery epoch or reconciler binding. Never let a positive-only
+			// verdict bypass the separately authorized full-evidence transaction.
+			invalidReconcileOutcome = true
+			err = op.Transition(Manual, s.now())
+			result.ExternalRef = ""
+			result.ObservedState = "UNQUALIFIED_CONFIRMATION_VERDICT"
+		}
 	case ReconcileSafeToRetry:
 		// The ReconcileResult contract has no independently retained proof
 		// that the original external dispatcher stopped. Any provider's
@@ -488,6 +498,11 @@ func (r *MemoryRepository) UpdateContext(ctx context.Context, op Operation) erro
 	}
 	if !original.SameReservation(op) {
 		return ErrInvalidTransition
+	}
+	// Apply the same normal-state boundary as the durable repository while
+	// holding the original lock. Recovery-only states are never generic updates.
+	if err := original.Transition(op.State, op.UpdatedAt); err != nil {
+		return err
 	}
 	r.items[op.ID] = op
 	return nil

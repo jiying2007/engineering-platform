@@ -127,7 +127,7 @@ func TestCancelledReconciliationCannotStartProviderObservation(t *testing.T) {
 	}
 }
 
-func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *testing.T) {
+func TestReadOnlyReconciliationSettlesDespiteCallerCancellation(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		result ReconcileResult
@@ -151,7 +151,7 @@ func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *te
 			id := "observed-reconcile-" + tc.name
 			repo := &trackingActionContextStore{MemoryRepository: NewMemoryRepository()}
 			if err := repo.CreateContext(context.Background(), Operation{
-				ID: id, RunID: "run-1", State: Unknown,
+				ID: id, RunID: "run-1", State: Unknown, RiskClass: Observe,
 				IdempotencyKey: "reconcile-once-" + tc.name,
 			}); err != nil {
 				t.Fatal(err)
@@ -163,7 +163,7 @@ func TestReconciliationAfterObservedEffectSettlesDespiteCallerCancellation(t *te
 			receipt, err := service.Reconcile(ctx, id)
 			if err != nil || provider.reconcileCalls != 1 ||
 				receipt.Result != string(tc.want) {
-				t.Fatalf("observed effect lost independent settlement: receipt=%#v err=%v calls=%d",
+				t.Fatalf("read-only observation lost independent settlement: receipt=%#v err=%v calls=%d",
 					receipt, err, provider.reconcileCalls)
 			}
 			stored, err := repo.GetContext(context.Background(), id)

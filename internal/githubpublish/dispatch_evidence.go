@@ -146,6 +146,13 @@ func RecoverablePublicationState(s action.State) bool {
 	return false
 }
 
+// PositiveRecoveryState also admits evidence enrichment of a historical bare
+// confirmation. It is NEVER used by non-invocation/abandonment. Existing
+// receipts remain immutable; all original completion and identity checks apply.
+func PositiveRecoveryState(s action.State) bool {
+	return RecoverablePublicationState(s) || s == action.Confirmed
+}
+
 type PublicationRecoveryReceipt struct {
 	Kind                string                     `json:"kind"`
 	Request             PublicationRecoveryRequest `json:"request"`
@@ -162,7 +169,7 @@ type PublicationRecoveryReceipt struct {
 func (r PublicationRecoveryReceipt) Validate() error {
 	request, err := r.Request.Digest()
 	evidence, eerr := r.Evidence.Digest()
-	if err != nil || eerr != nil || request != r.RequestDigest || evidence != r.EvidenceDigest || r.Kind != "RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1" || r.Request.Identity != r.Evidence.Start.Identity || !RecoverablePublicationState(r.PreviousState) || r.Reconciler == "" || len(r.Reconciler) > 256 || strings.TrimSpace(r.Reconciler) != r.Reconciler || strings.ContainsAny(r.Reconciler, "\x00\r\n") || r.RecordedAt.IsZero() || r.ReplayAuthorized || r.ProductionQualified {
+	if err != nil || eerr != nil || request != r.RequestDigest || evidence != r.EvidenceDigest || r.Kind != "RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1" || r.Request.Identity != r.Evidence.Start.Identity || !PositiveRecoveryState(r.PreviousState) || r.Reconciler == "" || len(r.Reconciler) > 256 || strings.TrimSpace(r.Reconciler) != r.Reconciler || strings.ContainsAny(r.Reconciler, "\x00\r\n") || r.RecordedAt.IsZero() || r.ReplayAuthorized || r.ProductionQualified {
 		return ErrDispatchEvidenceUnavailable
 	}
 	return nil

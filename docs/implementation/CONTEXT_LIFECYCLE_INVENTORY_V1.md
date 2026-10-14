@@ -8,7 +8,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:3b926d2ac87e7550700a19866918dcd6ff13552b09365c0ccd156ab080512461`
+`sha256:a85a1d5b7be85ed364340ccdcc4f300ed032bb46f2f6d34cc71b6310d7e8f96d`
 
 ## Reviewed categories
 
@@ -279,3 +279,13 @@ independent rollback/settlement and immutable reservations are retained.
 See POSTGRES_AUTHORITY_BUDGET_V1.md for the public-boundary guard and measured
 held-pool test. These are finite cooperative operation policies, not a proof of
 hard real-time kernel interruption or selected-host latency/soak qualification.
+
+## Confirmation authority and shared snapshot
+
+The original Action settlement Context and all58 origin classifications remain.
+Ordinary mutating reconciliation cannot mint confirmation from observation.
+Operational readback validates bound original-confirmation provenance and counts
+in one read-only repeatable transaction, under the same five-second deadline and
+existing independently bounded rollback. Recovery uses its existing serializable
+transaction and caller-derived budget. No new Context origin or timer is added.
+See ACTION_CONFIRMATION_AUTHORITY_V1.md; internal blockers [228,229] remain OPEN.

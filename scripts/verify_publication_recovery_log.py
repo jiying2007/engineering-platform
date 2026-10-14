@@ -22,6 +22,12 @@ TRANSACTION_REQUIRED = {
 }
 
 REQUIRED = TRANSACTION_REQUIRED | {
+    "TestPublicationRecoveryDatabaseOrdinaryConfirmationIsNotRecovery",
+    "TestPublicationRecoveryDatabaseDirectConfirmationCannotBypassEvidence",
+    "TestPublicationRecoveryDatabaseHistoricalObservedConfirmationBlocksProof",
+    "TestPublicationRecoveryDatabaseOriginalDispatchConfirmationStillValid",
+    "TestPublicationRecoveryDatabaseHistoricalConfirmationEnrichment",
+    "TestPublicationRecoveryDatabaseConfirmationProvenanceCorruption",
     "TestPublicationRecoveryDatabaseRequiresOriginalGitProof",
     "TestPublicationRecoveryDatabaseHistoricalReceiptReadback",
 }

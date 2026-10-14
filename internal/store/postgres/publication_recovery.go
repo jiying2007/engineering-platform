@@ -45,10 +45,10 @@ func (s *Store) ConfirmRecoveredPublication(ctx context.Context, reconciler stri
 		return zero, recovery.ErrReconciliationRequired
 	}
 	var identity githubpublish.DispatchIdentity
-	var actionName, risk, capability, state string
+	var actionName, risk, capability, state, externalRef, observedState string
 	var raw, reconciliation []byte
-	const query = `SELECT operation_id,run_id,execution_epoch,recovery_epoch,idempotency_key,request_digest,action,risk_class,capability,state,receipt_json,reconciliation_json FROM external_operations WHERE operation_id=$1 FOR UPDATE`
-	if err := tx.QueryRow(ctx, query, request.Identity.OperationID).Scan(&identity.OperationID, &identity.RunID, &identity.ExecutionEpoch, &identity.RecoveryEpoch, &identity.IdempotencyKey, &identity.RequestDigest, &actionName, &risk, &capability, &state, &raw, &reconciliation); err != nil {
+	const query = `SELECT operation_id,run_id,execution_epoch,recovery_epoch,idempotency_key,request_digest,action,risk_class,capability,state,receipt_json,reconciliation_json,COALESCE(external_ref,''),COALESCE(observed_state,'') FROM external_operations WHERE operation_id=$1 FOR UPDATE`
+	if err := tx.QueryRow(ctx, query, request.Identity.OperationID).Scan(&identity.OperationID, &identity.RunID, &identity.ExecutionEpoch, &identity.RecoveryEpoch, &identity.IdempotencyKey, &identity.RequestDigest, &actionName, &risk, &capability, &state, &raw, &reconciliation, &externalRef, &observedState); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return zero, corestore.ErrNotFound
 		}
@@ -58,21 +58,37 @@ func (s *Store) ConfirmRecoveredPublication(ctx context.Context, reconciler stri
 		return zero, corestore.ErrConflict
 	}
 	requestDigest, _ := request.Digest()
-	if state == string(action.Confirmed) && len(raw) > 0 {
-		retained, err := readRecoveredPublication(ctx, tx, identity.OperationID)
-		if err != nil {
-			return zero, err
-		}
-		if retained.RequestDigest != requestDigest || retained.Reconciler != reconciler {
+	// Check BOTH row and recovery audit before considering historical enrichment.
+	// An old recovery event whose receipt was lost/corrupted is not a fresh bare
+	// confirmation and must never be "repaired" by appending another success.
+	retainedPrior, priorErr := readRecoveredPublication(ctx, tx, identity.OperationID)
+	if priorErr == nil {
+		if retainedPrior.RequestDigest != requestDigest || retainedPrior.Reconciler != reconciler {
 			return zero, corestore.ErrConflict
 		}
-		return retained, nil // Read-only exact repeat. Deferred rollback releases locks.
+		return retainedPrior, nil // Read-only exact repeat; deferred rollback releases locks.
 	}
-	if !githubpublish.RecoverablePublicationState(action.State(state)) || len(raw) != 0 || len(reconciliation) != 0 {
+	if !errors.Is(priorErr, corestore.ErrNotFound) {
+		return zero, priorErr
+	}
+	if !githubpublish.PositiveRecoveryState(action.State(state)) || len(raw) != 0 || len(reconciliation) != 0 {
 		return zero, corestore.ErrConflict
 	}
 	if evidence.ValidateForRecovery() != nil {
 		return zero, githubpublish.ErrDispatchEvidenceUnavailable
+	}
+	if state == string(action.Confirmed) {
+		// A historical state label is not new evidence, and it must not let an
+		// unrelated old receipt be overwritten. Enrich only this same original
+		// PR/plan after acquiring the full independently collected witness.
+		var prior githubpublish.PublicationReceipt
+		if strictjson.Decode([]byte(observedState), &prior) != nil ||
+			prior.Validate(evidence.Start.Plan) != nil ||
+			prior.PullRequestURL != evidence.Completion.Receipt.PullRequestURL ||
+			prior.PullRequestNumber != evidence.Completion.Receipt.PullRequestNumber ||
+			externalRef != prior.PullRequestURL {
+			return zero, githubpublish.ErrDispatchEvidenceUnavailable
+		}
 	}
 	var now time.Time
 	if err := tx.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); err != nil {

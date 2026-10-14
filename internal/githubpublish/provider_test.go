@@ -142,7 +142,7 @@ func TestProviderReconciliationNeverReplaysPublication(t *testing.T) {
 		seen Observation
 		want action.ReconcileOutcome
 	}{
-		{"confirmed", ObservedConfirmed, action.ReconcileConfirmed},
+		{"confirmed", ObservedConfirmed, action.ReconcileManual},
 		{"absent", ObservedAbsent, action.ReconcileManual},
 		{"partial", ObservedPartial, action.ReconcileManual},
 		{"conflict", ObservedConflict, action.ReconcileManual},
@@ -181,7 +181,7 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 		observation Observation
 		want        action.ReconcileOutcome
 	}{
-		{"remote-confirmed", ObservedConfirmed, action.ReconcileConfirmed},
+		{"remote-confirmed", ObservedConfirmed, action.ReconcileManual},
 		{"remote-absent", ObservedAbsent, action.ReconcileManual},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -200,7 +200,7 @@ func TestProviderReconcilesUnknownPublicationAfterLocalBundleLoss(t *testing.T) 
 			}
 		})
 	}
-	// Read-only confirmation is allowed without local source bytes. In contrast,
+	// Diagnostic observation is allowed without local source bytes. In contrast,
 	// remote absence is MANUAL regardless of local source bytes, since the
 	// original Publisher may still be in flight. Dispatch separately rejects
 	// missing source bytes before any Git mutation.
