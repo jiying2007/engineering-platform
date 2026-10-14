@@ -822,6 +822,11 @@ func (m *Memory) UpdateContext(ctx context.Context, op action.Operation) error {
 	if !original.SameReservation(op) {
 		return action.ErrInvalidTransition
 	}
+	// Apply the same normal-state boundary as the durable repository while
+	// holding the original lock. Recovery-only states are never generic updates.
+	if err := original.Transition(op.State, op.UpdatedAt); err != nil {
+		return err
+	}
 	m.operations[op.ID] = op
 	return nil
 }

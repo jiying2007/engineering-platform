@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/jiying2007/engineering-platform/internal/production"
 )
 
@@ -16,6 +18,22 @@ func (s *Store) ReadOperationalStatus(ctx context.Context) (production.Operation
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	// A read-only repeatable snapshot keeps provenance and operational counts
+	// consistent without a second authority or a COMMIT capable of mutation.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return production.OperationalStatus{}, err
+	}
+	defer rollbackOutbox(tx)
+	if err := validateRecoveredPublications(ctx, tx); err != nil {
+		return production.OperationalStatus{}, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
+	}
+	if err := validateUninvokedPublications(ctx, tx); err != nil {
+		return production.OperationalStatus{}, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
+	}
+	if err := validateOrdinaryConfirmations(ctx, tx); err != nil {
+		return production.OperationalStatus{}, err
+	}
 	snapshot := production.Snapshot{Version: production.OperationalStatusVersion}
 	const query = `SELECT
  statement_timestamp(),
@@ -59,7 +77,7 @@ FROM platform_state p
 WHERE p.singleton_id=true`
 
 	var workerPollsRaw []byte
-	if err := s.pool.QueryRow(ctx, query).Scan(
+	if err := tx.QueryRow(ctx, query).Scan(
 		&snapshot.CapturedAt,
 		&snapshot.RecoveryEpoch,
 		&snapshot.RecoveryMode,

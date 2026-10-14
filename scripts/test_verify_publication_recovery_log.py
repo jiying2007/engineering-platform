@@ -81,6 +81,17 @@ class GateTests(unittest.TestCase):
         self.assertEqual(len(lifecycle), 7)
         self.assertTrue(lifecycle <= gate.CONTROL_REQUIRED)
 
+    def test_confirmation_boundary_is_permanently_selected(self):
+        import re
+        root = Path(__file__).resolve().parents[1]
+        source = (root / "internal/store/postgres/confirmation_boundary_test.go").read_text()
+        names = set(re.findall(r"^func (TestPublicationRecoveryDatabase\w+)\(", source, re.M))
+        self.assertEqual(len(names), 6)
+        self.assertTrue(names <= gate.REQUIRED)
+        workflow = (root / ".github/workflows/ci.yml").read_text()
+        self.assertIn("-run '^TestPublicationRecoveryDatabase'", workflow)
+        self.assertIn("scripts/verify_publication_recovery_log.py", workflow)
+
     def test_all_modes_require_complete_exact_repetitions(self):
         for required, package, repeats, option in MODES:
             with self.subTest(mode=option):

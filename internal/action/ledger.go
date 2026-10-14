@@ -74,7 +74,9 @@ func (o *Operation) Transition(to State, now time.Time) error {
 	case Unknown:
 		valid = to == Reconciling
 	case Reconciling:
-		valid = to == Confirmed || to == Manual
+		// Ordinary reconciliation carries only an observation. Potentially
+		// effectful Actions need their independent Recovery evidence route.
+		valid = to == Manual || (to == Confirmed && o.RiskClass == Observe)
 	}
 	if !valid {
 		return ErrInvalidTransition

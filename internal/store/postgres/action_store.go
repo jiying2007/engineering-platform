@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -189,7 +190,23 @@ func (s *Store) UpdateContext(ctx context.Context, op action.Operation) error {
 	if err != nil {
 		return err
 	}
+	if op.State == action.Confirmed && op.RiskClass != action.Observe {
+		// Only original post-dispatch settlement may confirm through this
+		// ordinary API. The explicit full-evidence Recovery transaction is
+		// separate and rechecks identity, epochs, receipt and independent actor.
+		allowedPrevious = []string{string(action.Dispatched)}
+	}
+	// Bind future original-success audit payloads to exactly the microsecond
+	// timestamp PostgreSQL stores; old nano timestamps cannot be reconstructed
+	// from a historical row, and are never guessed or upgraded by counting.
+	originalConfirmation := op.State == action.Confirmed && op.RiskClass != action.Observe
+	if originalConfirmation {
+		op.UpdatedAt = op.UpdatedAt.UTC().Truncate(time.Microsecond)
+	}
 	input, err := auditInput("action.state_changed", "ExternalOperation", op.ID, op)
+	if originalConfirmation {
+		input.CausationID = originalConfirmationCause
+	}
 	if err != nil {
 		return err
 	}

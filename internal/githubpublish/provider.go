@@ -169,8 +169,11 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 		if err != nil {
 			return action.ReconcileResult{}, err
 		}
+		// Keep the exact current observation for diagnosis, not as terminal
+		// authority. Only the existing Recovery route can bind it to an
+		// original completion, quiescence, epoch and independent reconciler.
 		return action.ReconcileResult{
-			Outcome:       action.ReconcileConfirmed,
+			Outcome:       action.ReconcileManual,
 			ExternalRef:   result.Receipt.PullRequestURL,
 			ObservedState: observed,
 		}, nil

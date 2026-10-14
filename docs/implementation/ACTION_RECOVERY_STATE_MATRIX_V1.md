@@ -67,3 +67,15 @@ release, CONFIRMED receipt or remote-absence retry is added. Old/missing/copied/
 restored witnesses and armed records without that original certificate cannot use it. See PUBLICATION_NO_INVOCATION_RECOVERY_V1.
 The earlier table's general potentially-effectful cases remain blocked without
 this concrete pre-invocation proof or the existing positive completion witness.
+
+## Ordinary positive observations
+
+The ordinary RECONCILING-to-CONFIRMED edge is restricted to explicit OBSERVE risk.
+For CONTROLLED_MUTATION/HIGH_RISK (and unrecognized risk), a Provider's bare
+positive verdict stays MANUAL; only original returned dispatch success or the
+separate full-evidence Recovery path can establish terminal confirmation. All
+three ledgers enforce this boundary. Historical CONFIRMED labels without bound
+original audit provenance remain unresolved; independent positive enrichment
+preserves their old audit and original idempotency reservation. See
+ACTION_CONFIRMATION_AUTHORITY_V1.md. This does not qualify other post-entry or
+ambiguous effects, nor allow non-invocation abandonment of a confirmed row.

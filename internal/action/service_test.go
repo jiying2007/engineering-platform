@@ -94,11 +94,12 @@ func TestDispatchErrorBecomesUnknownAndMustReconcile(t *testing.T) {
 	}
 
 	reconciled, err := svc.Reconcile(context.Background(), "op-1")
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, ErrExternalEffectUnresolved) || reconciled.OperationID != "" {
+		t.Fatalf("positive-only observation created a successful receipt: %+v %v", reconciled, err)
 	}
-	if reconciled.Result != string(Confirmed) {
-		t.Fatalf("expected CONFIRMED after reconcile, got %s", reconciled.Result)
+	stored, err := repo.GetContext(context.Background(), "op-1")
+	if err != nil || stored.State != Manual {
+		t.Fatalf("missing unresolved original operation: %+v %v", stored, err)
 	}
 }
 
