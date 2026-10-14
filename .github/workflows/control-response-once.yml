@@ -1,0 +1,125 @@
+name: Verify complete Control response lifecycle
+on:
+  push:
+    branches: [fix/control-response-lifecycle-20261014]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write # Immutable source blobs only; never commits, refs or issues.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Require the exact approved patch and complete source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/control-evidence"
+          python3 -B - <<'PY'
+          import gzip,hashlib,subprocess
+          from pathlib import Path
+          data=Path('.ci-control-response/patch.gz').read_bytes()
+          assert len(data)==10017 and hashlib.sha256(data).hexdigest()=='62e131b50d646d93e1136f661621a67f7c5c73b741f07db7895627e992d95c95'
+          patch=gzip.decompress(data)
+          assert len(patch)==32316 and hashlib.sha256(patch).hexdigest()=='1743419cf7665d75bf3fcfdba36ada5bc3474dbb3c15ab3404e8f87699988fc3'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.ci-control-response/patch.gz','.github/workflows/control-response-once.yml'],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='6d196201a583a41ff6d866bb3a67180cc99cf3c6'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Preserve actual original-source failures and validate final regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/control-evidence"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          python3 -B - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'control-evidence'
+          replacements={}
+          base='efbd306bcc71865283cde6036cd2b65dc0c7851e'
+          for name in ('client.go','response.go'):
+            path='internal/controlclient/'+name
+            target=out/('original-'+name)
+            target.write_bytes(subprocess.check_output(['git','show',base+':'+path]))
+            replacements[str(Path(path).resolve())]=str(target)
+          # The seventh test exercises the new public completeness helper.
+          # Original-source comparison uses only the six original reproductions,
+          # not a signature-adapted replacement for that absent API.
+          path=Path('internal/controlclient/response_lifecycle_test.go')
+          text=path.read_text(); marker='func TestControlResponseLifecycleOnlyCompleteConflictIsIgnorable('
+          assert text.count(marker)==1
+          target=out/'original-regressions_test.go';target.write_text(text[:text.index(marker)])
+          replacements[str(path.resolve())]=str(target)
+          (out/'overlay.json').write_text(json.dumps({'Replace':replacements}))
+          PY
+          set +e
+          go test -overlay "$out/overlay.json" -json -race -count=1 -timeout 2m ./internal/controlclient -run '^TestControlResponseLifecycle' > "$out/original-control.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          python3 -B - <<'PY'
+          import json,os
+          from pathlib import Path
+          events=[json.loads(line) for line in (Path(os.environ['RUNNER_TEMP'])/'control-evidence/original-control.jsonl').read_text().splitlines()]
+          assert not any(e['Action']=='skip' for e in events)
+          tops={e['Test']:e['Action'] for e in events if e.get('Test') and '/' not in e['Test'] and e['Action'] in ('pass','fail')}
+          assert len(tops)==6 and list(tops.values()).count('fail')==5
+          assert tops['TestControlResponseLifecycleCompleteStatuses']=='pass'
+          assert events[-1]['Action']=='fail' and 'Test' not in events[-1]
+          PY
+          go test -json -race -count=20 -timeout 2m ./internal/controlclient | tee "$out/control-full-20.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$out/control-full-20.jsonl" --control-response
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-binding.json"
+          go vet ./internal/controlclient ./cmd/worker
+      - name: Export immutable verified source blobs without changing refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='efbd306bcc71865283cde6036cd2b65dc0c7851e';tree='6d196201a583a41ff6d866bb3a67180cc99cf3c6'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          expected={'.github/workflows/ci.yml':'7ed64dea6c3e1a6c2450e20245daf291c5f72211','cmd/worker/main.go':'b9cd993bb6452739a92bbec14d7d6fd6f46cf42f','docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md':'df94a04d9aeae7c32a0d6cd392e83552bdbbf2b8','docs/status/IMPLEMENTATION_STATUS.md':'cacbed9a9ca5a76b29e7f1cb777d0cd57ea75e9d','internal/controlclient/client.go':'71c9cc46d8a87e95cfb325f802306f85d7ac81f6','internal/controlclient/response.go':'7e079c9164aae097ba6f0787bcdac10a23f02904','internal/controlclient/response_body.go':'590bc177cb8f121c31dbda765e55f10568449cc1','internal/controlclient/response_lifecycle_test.go':'30b7074fd81e615b70a82b74ab9830236f3d353e','scripts/test_verify_publication_recovery_log.py':'bdf752cf0314ee91f112507539510792e32e906d','scripts/verify_publication_recovery_log.py':'333353a4e2a915a312db5dd64a6773247e4a9e28'}
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert set(paths)==set(expected)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()==tree
+          records=[]
+          for name in paths:
+            raw=Path(name).read_bytes();assert len(raw)<100000
+            sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest();assert sha==expected[name]
+            payload=json.dumps({'encoding':'base64','content':base64.b64encode(raw).decode()}).encode()
+            obj=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+            assert obj['sha']==sha
+            records.append({'path':name,'sha':sha,'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)})
+          out=Path(os.environ['RUNNER_TEMP'])/'control-evidence'
+          (out/'source-objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False,'live_provider_executed':False,'production_qualified':False},indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          (out/'candidate.patch').write_bytes(subprocess.check_output(['git','diff','--cached','--binary','--full-index',base]))
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: control-response-lifecycle-${{ github.sha }}
+          path: ${{ runner.temp }}/control-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Temporary branch-only preparation; absent from the final source tree.
+# Existing recovery authority and internal blockers [228,229] remain unchanged.
