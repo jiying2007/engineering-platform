@@ -8,7 +8,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:82683ee82edd8616ea1b18265562ee52a7557ec6d43a983e1036e6f5e837c443`
+`sha256:7809725e27528c1c090cb8522d5c2424508bfef0c029cf8cec29f6f142df8cf4`
 
 ## Reviewed categories
 
@@ -187,3 +187,19 @@ become a ref-absence fact. Successful decoding uses a fresh target committed onl
 after read/close/decode/cancellation checks. No independent lifecycle or automatic
 retry is introduced. A complete negative observation still does not prove original
 dispatcher quiescence or authorize replay; internal blockers [228,229] remain OPEN.
+
+## Independent Publisher response lifetimes
+
+The independent mTLS Publisher client now shares bounded response-body reading,
+close/cancellation checks and atomic output commit with GitHub REST. Its original
+strict internal JSON schema, media checks and 1 MiB response budget remain separate
+from GitHub's foreign schema and 2 MiB budget. Health retains its 4 KiB budget and
+exact HTTP 200/endpoint-only meaning. Failed read/close/transport causes remain
+available through errors.Is without exposing diagnostic text. Cancelled calls do
+not begin marshalling or a new exchange; failures never return partial receipts.
+
+This covers publish, observe, original-completion and no-invocation evidence
+transport. It adds no recovery state, retry, independent lifecycle or post-entry
+quiescence proof. Real local mTLS truncation is controlled protocol evidence, not
+selected-host/provider or production qualification. Internal blockers [228,229]
+remain OPEN/BLOCKED.
