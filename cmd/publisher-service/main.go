@@ -14,6 +14,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/githubpublish"
+	"github.com/jiying2007/engineering-platform/internal/servicelifecycle"
 	"github.com/jiying2007/engineering-platform/internal/servicenotify"
 )
 
@@ -73,25 +74,47 @@ func serve(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log.Printf("publisher service listening on %s; scope=authenticated-endpoint-not-provider-readiness", listener.Addr())
-	done := make(chan error, 1)
-	go func() { done <- server.ServeTLS(notifier.Listener(ctx, listener), "", "") }()
-	select {
-	case <-ctx.Done():
-	case err := <-done:
-		if !errors.Is(err, http.ErrServerClosed) {
-			return err
-		}
-		return nil
-	}
-	shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	if err := server.Shutdown(shutdown); err != nil {
-		_ = server.Close()
+	return runPublisherServer(ctx, server, notifier.Listener(ctx, listener))
+}
+
+// The entrypoint and loopback mTLS tests share the same serving lifecycle.
+// Stop request-scoped work before draining; independently authorized settlement
+// still uses its existing bounded Context and must finish before graceful exit.
+func runPublisherServer(ctx context.Context, server *http.Server, listener net.Listener) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	err = <-done
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	if err := servicelifecycle.BindHTTP(runCtx, server); err != nil {
+		return err
 	}
-	return err
+	done := make(chan error, 1)
+	go func() { done <- server.ServeTLS(listener, "", "") }()
+	var serverErr error
+	serverRead := false
+	select {
+	case <-ctx.Done():
+	case serverErr = <-done:
+		serverRead = true
+	}
+	// Listener failure must also revoke active request contexts and drain them;
+	// returning directly from the Serve case could leave handlers running.
+	cancelRun()
+	shutdown, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	shutdownErr := server.Shutdown(shutdown)
+	var closeErr error
+	if shutdownErr != nil {
+		closeErr = server.Close()
+	}
+	if !serverRead {
+		serverErr = <-done
+	}
+	// A mixed listener error must not disappear because one joined leaf is the
+	// normal HTTP stop sentinel. Reuse the original Control classifier.
+	if servicelifecycle.OnlyStopError(serverErr, http.ErrServerClosed) {
+		serverErr = nil
+	}
+	return errors.Join(serverErr, shutdownErr, closeErr)
 }

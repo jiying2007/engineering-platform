@@ -131,6 +131,16 @@ jobs:
           echo "EP_REQUIRE_PID_NAMESPACE_TESTS=1" >> "$GITHUB_ENV"
       - name: Test
         run: go test -race -timeout 5m ./...
+      - name: Service-owned HTTP request no-skip regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$POSTGRES_TEST_URL"
+          python3 -B scripts/test_verify_service_lifecycle_log.py
+          go test -json -race -count=3 -timeout 2m ./cmd/control-plane -run '^(TestControlLifecycle|TestControlStopError)' | tee "$RUNNER_TEMP/service-control-tests.jsonl"
+          go test -json -race -count=3 -timeout 2m ./cmd/publisher-service -run '^TestPublisherLifecycle' | tee "$RUNNER_TEMP/service-publisher-tests.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/servicelifecycle | tee "$RUNNER_TEMP/service-helper-tests.jsonl"
+          python3 -B scripts/verify_service_lifecycle_log.py "$RUNNER_TEMP/service-control-tests.jsonl" "$RUNNER_TEMP/service-publisher-tests.jsonl" "$RUNNER_TEMP/service-helper-tests.jsonl"
       - name: Kernel process-tree regression
         run: go test -race -count=10 -timeout 1m ./internal/processscope
       - name: Publisher kernel quiescence and no-skip regression

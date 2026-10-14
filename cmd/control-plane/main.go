@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jiying2007/engineering-platform/internal/servicelifecycle"
 	"github.com/jiying2007/engineering-platform/internal/servicenotify"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
 	pgstore "github.com/jiying2007/engineering-platform/internal/store/postgres"
@@ -110,6 +111,9 @@ func runControlServer(ctx context.Context, server *http.Server, listener net.Lis
 	}
 	runCtx, cancelRun := context.WithCancel(ctx)
 	defer cancelRun()
+	if err := servicelifecycle.BindHTTP(runCtx, server); err != nil {
+		return err
+	}
 	serverDone := make(chan error, 1)
 	go func() {
 		if development {
@@ -140,8 +144,9 @@ func runControlServer(ctx context.Context, server *http.Server, listener net.Lis
 	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	shutdownErr := server.Shutdown(shutdown)
+	var closeErr error
 	if shutdownErr != nil {
-		_ = server.Close()
+		closeErr = server.Close()
 	}
 	if !serverRead {
 		serverErr = <-serverDone
@@ -151,45 +156,11 @@ func runControlServer(ctx context.Context, server *http.Server, listener net.Lis
 	}
 	// errors.Is matches ANY branch of errors.Join. Clearing such a whole tree
 	// would silently discard an independent listener/database/relay failure.
-	if onlyControlStopError(serverErr, http.ErrServerClosed) {
+	if servicelifecycle.OnlyStopError(serverErr, http.ErrServerClosed) {
 		serverErr = nil
 	}
-	if relayStopExpected && onlyControlStopError(relayErr, context.Canceled) {
+	if relayStopExpected && servicelifecycle.OnlyStopError(relayErr, context.Canceled) {
 		relayErr = nil
 	}
-	return errors.Join(serverErr, relayErr, shutdownErr)
-}
-
-// Normalize only error trees whose EVERY leaf is the exact expected sentinel.
-// Opaque Is implementations, empty unwraps, cycles and oversized error trees
-// remain failures; do not discard useful error details to simplify exit status.
-func onlyControlStopError(err, expected error) bool {
-	budget := 128
-	var visit func(error) bool
-	visit = func(current error) bool {
-		budget--
-		if current == nil || budget < 0 {
-			return false
-		}
-		switch wrapped := current.(type) {
-		case interface{ Unwrap() []error }:
-			children := wrapped.Unwrap()
-			seen := false
-			for _, child := range children {
-				if child == nil {
-					continue
-				}
-				seen = true
-				if !visit(child) {
-					return false
-				}
-			}
-			return seen
-		case interface{ Unwrap() error }:
-			return visit(wrapped.Unwrap())
-		default:
-			return current == expected
-		}
-	}
-	return visit(err)
+	return errors.Join(serverErr, relayErr, shutdownErr, closeErr)
 }

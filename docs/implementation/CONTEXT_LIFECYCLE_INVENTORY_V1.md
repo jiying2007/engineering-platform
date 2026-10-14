@@ -8,16 +8,16 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:add3f703fa76b5a89a33861d968f17ac0a555aba33dd1ab093106fb0ab84d436`
+`sha256:4cd6e94198720494cc9281818d1a29f7576cfa22b7c43eff083d2f010fdf1fb9`
 
 ## Reviewed categories
 
 | Category | Direct call sites |
 | --- | ---: |
-| Explicitly timed command root | 27 |
+| Explicitly timed command root | 25 |
 | Signal-owned command/service root | 10 |
 | Command with downstream budget | 2 |
-| Independent bounded cleanup/settlement | 16 |
+| Independent bounded cleanup/settlement | 18 |
 | Test support helper | 3 |
 
 Command roots either own a signal lifetime or have explicit operation budgets.
@@ -62,8 +62,8 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/codex-qualifier/main.go:22` | `Background` | Explicitly timed command root |
 | `cmd/codex-saved-login-live/main.go:25` | `Background` | Explicitly timed command root |
 | `cmd/codex-wif-live/main.go:27` | `Background` | Explicitly timed command root |
-| `cmd/control-plane/main.go:57` | `Background` | Signal-owned command/service root |
-| `cmd/control-plane/main.go:140` | `Background` | Explicitly timed command root |
+| `cmd/control-plane/main.go:58` | `Background` | Signal-owned command/service root |
+| `cmd/control-plane/main.go:144` | `Background` | Independent bounded cleanup/settlement |
 | `cmd/eng/artifact_capture.go:63` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_offline_capture.go:47` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_retention.go:51` | `Background` | Signal-owned command/service root |
@@ -93,8 +93,8 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/run_control.go:107` | `Background` | Explicitly timed command root |
 | `cmd/eng/source_checkpoint.go:26` | `Background` | Explicitly timed command root |
 | `cmd/eng/work_intake.go:298` | `Background` | Explicitly timed command root |
-| `cmd/publisher-service/main.go:73` | `Background` | Signal-owned command/service root |
-| `cmd/publisher-service/main.go:86` | `Background` | Explicitly timed command root |
+| `cmd/publisher-service/main.go:74` | `Background` | Signal-owned command/service root |
+| `cmd/publisher-service/main.go:104` | `Background` | Independent bounded cleanup/settlement |
 | `cmd/sandbox-guard/build_outputs.go:27` | `Background` | Explicitly timed command root |
 | `cmd/sandbox-guard/main.go:33` | `Background` | Explicitly timed command root |
 | `cmd/worker/main.go:85` | `Background` | Signal-owned command/service root |
@@ -225,3 +225,36 @@ kernel I/O. The original full Control package race x20 regression now produces
 one complete no-skip event stream checked by the existing parser. Direct Context
 origin enumeration is unchanged; this is not full interprocedural/host proof and
 internal blockers [228,229] remain OPEN/BLOCKED.
+
+
+## Service stop and HTTP request ownership
+
+Both command-owned HTTP servers now bind BaseContext to the cancellable serving
+Context before accepting connections. A service stop, Control relay failure or
+listener failure cancels request-scoped authority work before draining handlers.
+Client disconnect cancellation, inherited values and caller deadlines remain
+intact. Replacement BaseContext/ConnContext hooks are rejected rather than
+silently overriding or merging unrelated lifetimes. This is an in-process helper,
+not a new service, queue, independent lifetime or recovery authority.
+
+The existing Control ten-second and Publisher fifteen-second shutdown budgets
+remain. Their two existing constructors are now correctly classified as bounded
+independent cleanup, not task-command roots; the total remains 58. Known original
+post-effect settlement still uses its existing independent bounded Context.
+Cancellation alone never implies rollback, dispatcher quiescence or retry.
+
+Publisher listener failure follows the same cancel-and-drain path instead of
+returning while active handlers remain. Both commands share the unchanged
+all-leaf stop-error classifier; a mixed sentinel plus real failure is retained.
+Shutdown/forced-close errors are joined. Graceful drain still waits for handlers;
+these changes do not forcibly interrupt blocked kernel I/O or a misbehaving
+callback. Existing supervisor deadlines remain the outer process boundary.
+
+Regression covers live HTTP and ephemeral mTLS clients which stay connected,
+pre-effect rejection, original Action settlement and no replay, late listener
+failure, and a real isolated PostgreSQL Work insert observed waiting on a table
+lock before service cancellation. The lock remains held until the response
+completes; post-cancel Work/audit/external-operation counts must remain zero.
+The database test is conditional locally and must run under the canonical
+PostgreSQL CI environment; absence of that environment is not a PASS substitute.
+Internal blockers [228,229] remain OPEN/BLOCKED; no selected-host qualification.
