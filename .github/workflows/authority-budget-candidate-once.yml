@@ -1,0 +1,32 @@
+name: Authority budget exact-source preparation
+on:
+  push:
+    branches: [fix/authority-operation-budget-20261014]
+permissions:
+  contents: read
+jobs:
+  transport-readback:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Retain source transport before qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/budget-transport"
+          cp .ci-authority-budget/part.* "$RUNNER_TEMP/budget-transport/"
+          (cd "$RUNNER_TEMP/budget-transport" && sha256sum part.* > SHA256SUMS)
+          printf '%s\n' 'Transport readback only. No source applied, test qualification or readiness promotion.' > "$RUNNER_TEMP/budget-transport/STATUS"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: authority-budget-transport-${{ github.sha }}
+          path: ${{ runner.temp }}/budget-transport
+          if-no-files-found: error
+          retention-days: 30
+# Branch-only transport; no model/provider/credentials/deployment or ref writes.
+# Original expected patch/tree must match before any later source validation.
