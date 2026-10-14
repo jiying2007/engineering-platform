@@ -1,0 +1,136 @@
+name: Verify exact service request lifecycle candidate
+on:
+  push:
+    branches: [fix/service-request-lifecycle-20261014]
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: ${{ github.repository == 'jiying2007/engineering-platform' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # Immutable source blobs only; no commit/ref/issue writes.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s --health-timeout 5s --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - name: Materialize exact uploaded candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/lifecycle-evidence"
+          python3 -B - <<'PY'
+          import gzip,hashlib,subprocess
+          from pathlib import Path
+          data=Path('.ci-lifecycle/candidate.patch.gz').read_bytes()
+          assert hashlib.sha256(data).hexdigest()=='e94370afc6bda3f99810b05e5bf3936d04ec79d5139d2459e49a8892180c4878'
+          patch=gzip.decompress(data)
+          assert len(patch)==37493 and hashlib.sha256(patch).hexdigest()=='41858e8107bb8aaca98b67950c64f803cf615a0f714332a932e0cc5db2209a78'
+          subprocess.run(['git','apply','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--index','-'],input=patch,check=True)
+          subprocess.run(['git','rm','--cached','.ci-lifecycle/candidate.patch.gz','.github/workflows/service-lifecycle-candidate-once.yml'],check=True)
+          assert subprocess.check_output(['git','write-tree'],text=True).strip()=='a2aa529b7edabdfb1fde94d42f670bb635ecdca9'
+          PY
+          git diff --cached --check
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Retain original-source failure controls on PostgreSQL 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/lifecycle-evidence"
+          go version | tee "$out/go-version.txt"
+          go mod download
+          git show 263ca26030cfb72b9f644408b8713a27dca10b2b:cmd/control-plane/main.go > "$out/original-control-main.go"
+          python3 -B - <<'PY'
+          import json,os
+          from pathlib import Path
+          out=Path(os.environ['RUNNER_TEMP'])/'lifecycle-evidence'
+          (out/'overlay.json').write_text(json.dumps({'Replace':{str(Path('cmd/control-plane/main.go').resolve()):str(out/'original-control-main.go')}}))
+          PY
+          set +e
+          go test -overlay "$out/overlay.json" -json -race -count=1 -timeout 1m ./cmd/control-plane -run '^TestControlLifecycle(RequestCancellationBeforeDrain|ServiceStopCancelsActualPostgresWait)$' > "$out/original-control-pg17.jsonl" 2>&1
+          result=$?
+          set -e
+          test "$result" -ne 0
+          grep -F 'service cancellation did not stop PostgreSQL wait while its lock remained held' "$out/original-control-pg17.jsonl"
+          grep -F 'stopped service admitted new authority write' "$out/original-control-pg17.jsonl"
+          ! grep -Fq '"Action":"skip"' "$out/original-control-pg17.jsonl"
+      - name: Require complete repeated actual service tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/lifecycle-evidence"
+          go test -json -race -count=20 -timeout 3m ./cmd/control-plane -run '^(TestControlLifecycle|TestControlStopError)' | tee "$out/control-pg17-20.jsonl"
+          go test -json -race -count=20 -timeout 3m ./cmd/publisher-service -run '^TestPublisherLifecycle' | tee "$out/publisher-lifecycle-20.jsonl"
+          go test -json -race -count=20 -timeout 1m ./internal/servicelifecycle | tee "$out/helper-20.jsonl"
+          python3 -B - <<'PY'
+          import os,re,sys
+          from pathlib import Path
+          sys.path.insert(0,'scripts')
+          import verify_publication_recovery_log as gate
+          out=Path(os.environ['RUNNER_TEMP'])/'lifecycle-evidence'
+          root='github.com/jiying2007/engineering-platform/'
+          groups=[('control-pg17-20.jsonl','cmd/control-plane',['cmd/control-plane/lifecycle_test.go','cmd/control-plane/request_lifecycle_test.go','cmd/control-plane/request_lifecycle_postgres_test.go'],9),('publisher-lifecycle-20.jsonl','cmd/publisher-service',['cmd/publisher-service/request_lifecycle_test.go'],4),('helper-20.jsonl','internal/servicelifecycle',['internal/servicelifecycle/http_test.go'],1)]
+          for log,pkg,files,count in groups:
+              names=set()
+              for path in files:names.update(re.findall(r'^func (Test\w+)\(',Path(path).read_text(),re.M))
+              assert len(names)==count
+              gate.verify(out/log,repeats=20,required=names,package=root+pkg)
+          PY
+          python3 -B -m unittest discover -s scripts -p 'test_*.py' -v 2>&1 | tee "$out/python-tests.log"
+          python3 -B scripts/verify_context_inventory.py --root . | tee "$out/context-binding.json"
+          go vet ./cmd/control-plane ./cmd/publisher-service ./internal/servicelifecycle
+      - name: Export only immutable tested source objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - <<'PY'
+          import base64,hashlib,json,os,subprocess
+          from pathlib import Path
+          repo='jiying2007/engineering-platform';base='263ca26030cfb72b9f644408b8713a27dca10b2b';tree='a2aa529b7edabdfb1fde94d42f670bb635ecdca9'
+          assert os.environ['GITHUB_REPOSITORY']==repo
+          paths=subprocess.check_output(['git','diff','--cached','--name-only',base],text=True).splitlines()
+          assert len(paths)==10 and all(not p.startswith(('.github/','.ci-')) for p in paths)
+          records=[]
+          for name in paths:
+              raw=Path(name).read_bytes();assert len(raw)<100000
+              sha=hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
+              payload=json.dumps({'encoding':'base64','content':base64.b64encode(raw).decode()}).encode()
+              obj=json.loads(subprocess.check_output(['gh','api','--method','POST',f'repos/{repo}/git/blobs','--input','-'],input=payload))
+              assert obj['sha']==sha
+              records.append({'path':name,'sha':sha,'sha256':hashlib.sha256(raw).hexdigest(),'size':len(raw)})
+          out=Path(os.environ['RUNNER_TEMP'])/'lifecycle-evidence'
+          (out/'source-objects.json').write_text(json.dumps({'base':base,'tree':tree,'files':records,'ref_writes':False,'live_provider_executed':False,'production_qualified':False},indent=2)+'\n')
+          (out/'source.tar').write_bytes(subprocess.check_output(['git','archive','--format=tar',tree]))
+          print('All ten source blobs match the exact uploaded candidate')
+          PY
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        if: ${{ always() }}
+        with:
+          name: service-lifecycle-pg17-${{ github.sha }}
+          path: ${{ runner.temp }}/lifecycle-evidence
+          if-no-files-found: error
+          retention-days: 30
+# Temporary exact-source preparation is absent from the final tree.
+# Internal blockers [228,229] remain OPEN/BLOCKED; no deployment or external publication.
