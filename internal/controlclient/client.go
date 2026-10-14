@@ -82,6 +82,14 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("control API returned HTTP %d", e.Status)
 }
 
+// IsCompleteHTTPStatus recognizes only the client's complete, top-level status
+// verdict. An embedded status joined/wrapped with another failure cannot erase
+// uncertainty, cancellation or a damaged response. It grants no replay authority.
+func IsCompleteHTTPStatus(err error, status int) bool {
+	observed, ok := err.(*HTTPError)
+	return ok && observed != nil && observed.Status == status && observed.cause == nil
+}
+
 func (e *HTTPError) Unwrap() error { return e.cause }
 
 // Preserve errors.As(*HTTPError) and Status while providing a typed,
@@ -94,8 +102,12 @@ func (e *HTTPError) Is(target error) bool {
 // Only the Control API's bounded JSON error code may be surfaced. In
 // particular, never copy SQL, tokens or attacker-controlled response bodies
 // into caller-visible diagnostics.
-func classifyControlHTTPError(response *http.Response) *HTTPError {
+func classifyControlHTTPError(response *http.Response, data []byte, readErr error) *HTTPError {
 	result := &HTTPError{Status: response.StatusCode}
+	if readErr != nil {
+		result.cause = readErr
+		return result
+	}
 	if response.StatusCode < http.StatusInternalServerError {
 		return result
 	}
@@ -106,16 +118,6 @@ func classifyControlHTTPError(response *http.Response) *HTTPError {
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" {
 		result.cause = errors.New("invalid control error media type")
-		return result
-	}
-	const maxErrorBytes = 1024
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxErrorBytes+1))
-	if err != nil {
-		result.cause = err
-		return result
-	}
-	if len(data) > maxErrorBytes {
-		result.cause = errors.New("control error response exceeds limit")
 		return result
 	}
 	var payload struct {
@@ -137,8 +139,8 @@ func classifyControlHTTPError(response *http.Response) *HTTPError {
 // A server failure without an intact precise classification is not rollback
 // evidence. Retain the HTTP status and internal read cause, hide response text,
 // and require readback on POST without claiming COMMIT or a Provider effect.
-func classifyResponseHTTPError(method string, response *http.Response) error {
-	err := classifyControlHTTPError(response)
+func classifyResponseHTTPError(method string, response *http.Response, data []byte, readErr error) error {
+	err := classifyControlHTTPError(response, data, readErr)
 	if err.cause != nil {
 		return classifyUnobservedPost(method, err)
 	}
@@ -249,6 +251,9 @@ func validPath(p string) bool {
 	return (p == "/healthz" || strings.HasPrefix(p, "/api/v1/")) && path.Clean(p) == p && !strings.ContainsAny(p, "%?#\\\r\n") && !strings.Contains(p, "//")
 }
 func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, classifyUnobservedPost(method, err)
+	}
 	if c == nil || c.http == nil || !validPath(p) || (method != http.MethodGet && method != http.MethodPost) {
 		return nil, fmt.Errorf("invalid control request")
 	}
@@ -263,34 +268,44 @@ func (c *Client) Raw(ctx context.Context, method, p string, body []byte) ([]byte
 	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, classifyUnobservedPost(method, err)
+	}
 	response, err := c.http.Do(req)
 	if err != nil {
 		if method == http.MethodPost {
 			return nil, classifyUnobservedPost(method, err)
 		}
-		return nil, fmt.Errorf("control transport: %w", err)
+		return nil, &controlResponseError{cause: err}
 	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, classifyResponseHTTPError(method, response)
+	limit := int64(MaxResponse)
+	failedStatus := response.StatusCode < 200 || response.StatusCode >= 300
+	if failedStatus {
+		limit = 1024 // Keep the existing small error-response budget for every status.
+	}
+	data, readErr := readControlResponseBody(ctx, response, limit)
+	if failedStatus {
+		return nil, classifyResponseHTTPError(method, response, data, readErr)
+	}
+	if readErr != nil {
+		return nil, classifyUnobservedPost(method, readErr)
 	}
 	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	if err != nil || contentType != "application/json" || response.Header.Get("Content-Encoding") != "" {
 		return nil, classifyUnobservedPost(method, fmt.Errorf("unencoded JSON response required"))
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, MaxResponse+1))
-	if err != nil {
-		return nil, classifyUnobservedPost(method, err)
-	}
-	if len(data) > MaxResponse {
-		return nil, classifyUnobservedPost(method, fmt.Errorf("control response exceeds limit"))
-	}
 	if strictjson.ValidateForeignObjectLimit(data, MaxResponse) != nil {
 		return nil, classifyUnobservedPost(method, fmt.Errorf("unambiguous control JSON object required"))
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, classifyUnobservedPost(method, &controlResponseError{cause: err})
 	}
 	return data, nil
 }
 func (c *Client) Call(ctx context.Context, method, p string, in, out any) error {
+	if err := ctx.Err(); err != nil {
+		return classifyUnobservedPost(method, err)
+	}
 	// Reject programmer errors before admitting a potentially mutating request.
 	if out != nil {
 		if _, err := responseDestination(out); err != nil {
@@ -312,8 +327,8 @@ func (c *Client) Call(ctx context.Context, method, p string, in, out any) error 
 	if out == nil {
 		return nil
 	}
-	if err := decodeResponse(data, out); err != nil {
-		return classifyUnobservedPost(method, err)
+	if err := decodeResponse(ctx, data, out); err != nil {
+		return classifyUnobservedPost(method, &controlResponseError{cause: err})
 	}
 	return nil
 }

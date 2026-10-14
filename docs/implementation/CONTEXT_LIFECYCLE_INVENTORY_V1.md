@@ -8,7 +8,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:7809725e27528c1c090cb8522d5c2424508bfef0c029cf8cec29f6f142df8cf4`
+`sha256:add3f703fa76b5a89a33861d968f17ac0a555aba33dd1ab093106fb0ab84d436`
 
 ## Reviewed categories
 
@@ -203,3 +203,25 @@ transport. It adds no recovery state, retry, independent lifecycle or post-entry
 quiescence proof. Real local mTLS truncation is controlled protocol evidence, not
 selected-host/provider or production qualification. Internal blockers [228,229]
 remain OPEN/BLOCKED.
+
+## Control client response lifetime and result uncertainty
+
+The shared CLI/Worker Control client now carries its caller Context through
+bounded response reads and typed response decoding, and closes every response
+before accepting bytes or a precise HTTP error classification. Failure or
+cancellation during read, close or decode cannot replace an earlier output.
+All status bodies are bounded: success retains 4 MiB and error responses retain
+1 KiB, with at most 64 KiB per underlying read. HTTP status is still observable,
+but a truncated 4xx/5xx or failed close cannot become a complete rejection or a
+precise server-issued COMMIT/external-effect verdict. POST retains the existing
+unobserved-outcome classification and exact identity/epoch/audit readback rule.
+Complete server classifications remain distinct. Worker polling suppresses only
+an exact complete 409, never an embedded status from a damaged response.
+No automatic replay is added.
+
+Cancelled calls cannot begin encoding or a new HTTP exchange. The existing
+15-second client timeout remains; checkpoints do not forcibly interrupt arbitrary
+kernel I/O. The original full Control package race x20 regression now produces
+one complete no-skip event stream checked by the existing parser. Direct Context
+origin enumeration is unchanged; this is not full interprocedural/host proof and
+internal blockers [228,229] remain OPEN/BLOCKED.

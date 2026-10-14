@@ -90,6 +90,32 @@ NO_INVOCATION_PUBLISHER_REQUIRED = {
  "TestPublisherNoInvocationEvidenceRealMTLS",
 }
 
+CONTROL_PACKAGE = "github.com/jiying2007/engineering-platform/internal/controlclient"
+CONTROL_REQUIRED = {
+    "TestControlResponseLifecycleOnlyCompleteConflictIsIgnorable",
+    "TestBroken503RetainsHTTPStatusUncertaintyAndReadCause",
+    "TestControlResponseLifecycleCancelledBeforeExchange",
+    "TestControlResponseLifecycleCancelledDecode",
+    "TestControlResponseLifecycleCompleteStatuses",
+    "TestControlResponseLifecycleIncompleteBody",
+    "TestControlResponseLifecycleReadBudgets",
+    "TestControlResponseLifecycleRealMTLSTruncatedError",
+    "TestExternalEffectUnresolvedPreservesExactHTTPStatusAndNoReplay",
+    "TestPostCancelledBeforeSendPreservesContextCauseWithoutReplay",
+    "TestPostTransportCutAfterHandlerNeverClaimsRollbackOrRetries",
+    "TestRawNullRejectedEvenWithoutTypedDestination",
+    "TestRealMTLSAndNoAmbientProxy",
+    "TestRedirectsErrorsAndOversizeResponses",
+    "TestResponseClaimDistinguishesMissingAndExplicitNull",
+    "TestResponseDestinationRejectedBeforePOST",
+    "TestResponseObjectContractPreservesOutputAndNeverRetries",
+    "TestTLSConstructionDoesNotInheritOverridesOrDERAliases",
+    "TestTLSKeyFileBounds",
+    "TestUnknownCommitTransportErrorRequiresReadbackWithoutSQLLeakOrReplay",
+    "TestUnsafeClientConfigurationAndPathsFailClosed",
+    "TestUnusablePostSuccessCannotBeTreatedAsCompletedOrRetried",
+}
+
 # Evidence is read as a bounded event stream, not a list of PASS summaries.
 # This validates structure/completeness only. CI/run/source/Artifact provenance
 # remains an independent requirement; a fabricated complete stream is not proof.
@@ -225,10 +251,12 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         raise ValueError("missing complete targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof")):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof", "--control-response")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof|--control-response]")
     try:
-        if len(sys.argv)==3 and sys.argv[2]=="--publisher-proof":
+        if len(sys.argv)==3 and sys.argv[2]=="--control-response":
+            verify(Path(sys.argv[1]), repeats=20, required=CONTROL_REQUIRED, package=CONTROL_PACKAGE)
+        elif len(sys.argv)==3 and sys.argv[2]=="--publisher-proof":
             verify(Path(sys.argv[1]), required=PROOF_REQUIRED, package=PUBLISHER_PACKAGE)
         elif len(sys.argv)==3 and sys.argv[2]=="--no-invocation-db":
             verify(Path(sys.argv[1]), required=NO_INVOCATION_REQUIRED)
