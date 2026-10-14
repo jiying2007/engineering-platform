@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jiying2007/engineering-platform/internal/servicelifecycle"
 )
 
 func lifecycleListener(t *testing.T) net.Listener {
@@ -213,8 +215,8 @@ func TestControlStopErrorClassification(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := onlyControlStopError(tc.err, tc.expected); got != tc.ok {
-				t.Fatalf("onlyControlStopError(%v)=%v, want %v", tc.err, got, tc.ok)
+			if got := servicelifecycle.OnlyStopError(tc.err, tc.expected); got != tc.ok {
+				t.Fatalf("servicelifecycle.OnlyStopError(%v)=%v, want %v", tc.err, got, tc.ok)
 			}
 		})
 	}

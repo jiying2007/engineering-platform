@@ -428,6 +428,17 @@ no-skip event stream, including real local mTLS truncation. This extends transpo
 and caller-lifecycle coverage only; it supplies no new orphaned-effect terminal
 recovery, original dispatcher quiescence or selected-host qualification.
 
+The Control and independent Publisher serving lifecycles now cancel their
+HTTP request roots before draining on service, relay or listener termination.
+An already connected client can no longer keep request-scoped authority alive
+solely because net/http normally allows active requests to drain. Existing
+independent post-effect settlement and ten/fifteen-second shutdown budgets are
+preserved. Publisher listener failures are joined after drain, not hidden by a
+mixed normal-stop sentinel. The shared in-process Context/error helper adds no
+service, background worker, state transition or retry authority. Real HTTP/mTLS
+and isolated PostgreSQL lock-wait tests cover this service-to-request-to-store
+boundary; they are not full interprocedural or selected-host qualification.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**
