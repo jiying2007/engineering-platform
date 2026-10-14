@@ -131,6 +131,14 @@ jobs:
           echo "EP_REQUIRE_PID_NAMESPACE_TESTS=1" >> "$GITHUB_ENV"
       - name: Test
         run: go test -race -timeout 5m ./...
+      - name: PostgreSQL no-deadline authority budget regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$POSTGRES_TEST_URL"
+          python3 -B scripts/test_verify_authority_budget_log.py
+          go test -json -race -count=1 -timeout 2m ./internal/store/postgres -run '^TestPostgresAuthorityBudget' | tee "$RUNNER_TEMP/authority-budget-tests.jsonl"
+          python3 -B scripts/verify_authority_budget_log.py "$RUNNER_TEMP/authority-budget-tests.jsonl"
       - name: Service-owned HTTP request no-skip regression
         shell: bash
         run: |

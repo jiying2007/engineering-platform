@@ -34,6 +34,9 @@ type MutationResult struct {
 }
 
 func (s *Store) Mutate(ctx context.Context, mutation Mutation) (MutationResult, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return MutationResult{}, fmt.Errorf("PostgreSQL store is not configured")
 	}

@@ -43,6 +43,9 @@ func scanOutbox(row pgx.Row) (outbox.Message, error) {
 }
 
 func (s *Store) Claim(ctx context.Context, workerID string, limit int, duration time.Duration) ([]outbox.Message, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return nil, fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -222,18 +225,27 @@ func settleOutbox(ctx context.Context, db outboxExecer, lease outbox.Lease, r ou
 // These receipt-only methods never invoke a handler and require the same exact
 // live lease as Dispatch. They do not authorize external side effects.
 func (s *Store) MarkDispatched(ctx context.Context, lease outbox.Lease) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("PostgreSQL store is not configured")
 	}
 	return settleOutbox(ctx, s.pool, lease, outbox.Resolution{State: outbox.Dispatched})
 }
 func (s *Store) MarkRetry(ctx context.Context, lease outbox.Lease, delay time.Duration, lastError string) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("PostgreSQL store is not configured")
 	}
 	return settleOutbox(ctx, s.pool, lease, outbox.Resolution{State: outbox.Pending, RetryAfter: delay, LastError: lastError})
 }
 func (s *Store) MarkDeadLetter(ctx context.Context, lease outbox.Lease, lastError string) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -241,6 +253,9 @@ func (s *Store) MarkDeadLetter(ctx context.Context, lease outbox.Lease, lastErro
 }
 
 func (s *Store) GetOutbox(ctx context.Context, key string) (outbox.Message, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return outbox.Message{}, fmt.Errorf("PostgreSQL store is not configured")
 	}

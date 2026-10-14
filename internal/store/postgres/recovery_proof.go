@@ -52,6 +52,9 @@ func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 }
 
 func (s *Store) CreateRecoveryProof(ctx context.Context, epoch uint64, reconciler string) (recovery.Proof, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var proof recovery.Proof
 	if s == nil || s.pool == nil || epoch == 0 || reconciler == "" {
 		return proof, fmt.Errorf("PostgreSQL recovery proof store is not configured")
@@ -124,6 +127,9 @@ func (s *Store) CreateRecoveryProof(ctx context.Context, epoch uint64, reconcile
 }
 
 func (s *Store) GetRecoveryProof(ctx context.Context, epoch uint64) (recovery.Proof, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if s == nil || s.pool == nil || epoch == 0 {
 		return recovery.Proof{}, corestore.ErrNotFound
@@ -147,6 +153,9 @@ func (s *Store) GetRecoveryProof(ctx context.Context, epoch uint64) (recovery.Pr
 // AuthorizeCompletion is the authenticated API gate. The completion identity
 // must be distinct from the identity that generated the database facts.
 func (s *Store) AuthorizeCompletion(ctx context.Context, subject string, epoch uint64) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	proof, err := s.GetRecoveryProof(ctx, epoch)
 	if err != nil {
 		return err

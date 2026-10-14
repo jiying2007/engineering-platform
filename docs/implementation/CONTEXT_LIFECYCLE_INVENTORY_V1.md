@@ -8,7 +8,7 @@ capacity, or prove all indirect/aliased Context propagation.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:4cd6e94198720494cc9281818d1a29f7576cfa22b7c43eff083d2f010fdf1fb9`
+`sha256:3b926d2ac87e7550700a19866918dcd6ff13552b09365c0ccd156ab080512461`
 
 ## Reviewed categories
 
@@ -111,7 +111,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |
 | `internal/sandbox/testutil/image.go:82` | `Background` | Test support helper |
-| `internal/store/postgres/outbox_store.go:182` | `Background` | Independent bounded cleanup/settlement |
+| `internal/store/postgres/outbox_store.go:185` | `Background` | Independent bounded cleanup/settlement |
 | `internal/testsupport/processscope.go:39` | `Background` | Test support helper |
 | `internal/workeragent/codex_checkpoint.go:37` | `Background` | Independent bounded cleanup/settlement |
 | `internal/workeragent/failure_settlement.go:27` | `WithoutCancel` | Independent bounded cleanup/settlement |
@@ -258,3 +258,24 @@ completes; post-cancel Work/audit/external-operation counts must remain zero.
 The database test is conditional locally and must run under the canonical
 PostgreSQL CI environment; absence of that environment is not a PASS substitute.
 Internal blockers [228,229] remain OPEN/BLOCKED; no selected-host qualification.
+
+## No-deadline PostgreSQL authority callers
+
+All 84 public PostgreSQL Context entry points now have an explicit finite
+operation policy. Forty-seven previously unbounded entries use the existing
+20-second database statement safety ceiling as a fallback **only when the caller
+has no deadline**. Thirty-six existing caller-derived timers (including 5-second
+settlement and 30-second Outbox work) are unchanged. The original finite relay
+batch keeps its at-most-64 individually bounded 5-second steps, with immediate
+per-step cancellation; its reviewed implementation is unchanged.
+
+This closes the gap before SQL begins: server-side statement/lock settings cannot
+bound pool acquisition. Nested public calls inherit the first deadline rather
+than starting another full budget. Explicit caller/maintenance deadlines are
+not shortened or widened. No independent Context origin was added; the same58
+origins above remain. An expired attempted COMMIT remains unknown, and existing
+independent rollback/settlement and immutable reservations are retained.
+
+See POSTGRES_AUTHORITY_BUDGET_V1.md for the public-boundary guard and measured
+held-pool test. These are finite cooperative operation policies, not a proof of
+hard real-time kernel interruption or selected-host latency/soak qualification.

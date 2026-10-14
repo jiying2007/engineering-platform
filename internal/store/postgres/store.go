@@ -21,6 +21,9 @@ type Store struct {
 }
 
 func Open(ctx context.Context, databaseURL string) (*Store, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if databaseURL == "" {
 		return nil, fmt.Errorf("database URL is required")
 	}
@@ -55,6 +58,9 @@ func (s *Store) Close() {
 }
 
 func (s *Store) ApplyCoreMigration(ctx context.Context) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -65,6 +71,9 @@ func (s *Store) ApplyCoreMigration(ctx context.Context) error {
 }
 
 func (s *Store) GetRecoveryContext(ctx context.Context) (recovery.Manager, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -83,6 +92,9 @@ func (s *Store) GetRecoveryContext(ctx context.Context) (recovery.Manager, error
 }
 
 func (s *Store) BeginRecoveryContext(ctx context.Context, expectedEpoch uint64) (recovery.Manager, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if s == nil || s.pool == nil {
 		return recovery.Manager{}, fmt.Errorf("PostgreSQL store is not configured")
 	}
@@ -129,6 +141,9 @@ RETURNING recovery_epoch,recovery_mode`
 // independent completion authorization in its existing serializable transaction.
 // Caller cancellation is not proof that a possibly-issued COMMIT rolled back.
 func (s *Store) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if !reconciled {
 		return recovery.Manager{}, recovery.ErrReconciliationRequired
 	}

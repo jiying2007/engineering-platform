@@ -40,6 +40,9 @@ func readContinuation(row pgx.Row) (codexexec.ContinuationReceipt, error) {
 const continuationColumns = `receipt_json,receipt_digest,actor,request_digest,source_run_id,successor_run_id`
 
 func (s *Store) GetCodexContinuation(ctx context.Context, source string) (codexexec.ContinuationReceipt, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	return readContinuation(s.pool.QueryRow(ctx, `SELECT `+continuationColumns+` FROM codex_continuations WHERE source_run_id=$1`, source))
 }
 

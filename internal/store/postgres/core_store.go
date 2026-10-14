@@ -69,6 +69,9 @@ func auditInput(eventType, aggregateType, aggregateID string, payload any) (audi
 // CreateWorkContext uses the request context for Work/audit transactions.
 // A cancelled COMMIT does not establish rollback: use exact Work readback.
 func (s *Store) CreateWorkContext(ctx context.Context, item core.WorkItem) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if item.Version == 0 {
 		item.Version = 1
 	}
@@ -98,6 +101,9 @@ INSERT INTO work_items (
 }
 
 func (s *Store) GetWorkContext(ctx context.Context, id string) (core.WorkItem, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = `
 SELECT work_item_id,COALESCE(source_ref,''),title,human_owner,COALESCE(target_id,''),
        COALESCE(assurance_class,''),COALESCE(active_task_contract_digest,''),
@@ -119,6 +125,9 @@ WHERE work_item_id=$1`
 }
 
 func (s *Store) UpdateWorkContext(ctx context.Context, id string, expectedVersion uint64, item core.WorkItem) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	payload := struct {
 		ExpectedVersion uint64        `json:"expected_version"`
 		Work            core.WorkItem `json:"work"`
@@ -163,6 +172,9 @@ func (s *Store) CreateTaskAndUpdateWorkContext(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	taskDigest, err := task.Digest()
 	if err != nil {
 		return err
@@ -272,6 +284,9 @@ WHERE work_item_id=$4 AND version=$5`
 }
 
 func (s *Store) GetTaskContext(ctx context.Context, id string) (core.TaskContract, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = `
 SELECT contract_json
 FROM task_contracts
@@ -282,11 +297,17 @@ LIMIT 1`
 }
 
 func (s *Store) GetTaskRevisionContext(ctx context.Context, id string, revision uint64) (core.TaskContract, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = "SELECT contract_json FROM task_contracts WHERE task_contract_id=$1 AND revision=$2"
 	return s.readTaskContext(ctx, q, id, revision)
 }
 
 func (s *Store) GetTaskByDigestContext(ctx context.Context, digest string) (core.TaskContract, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = "SELECT contract_json FROM task_contracts WHERE content_digest=$1"
 	return s.readTaskContext(ctx, q, digest)
 }
@@ -304,6 +325,9 @@ func (s *Store) readTaskContext(ctx context.Context, query string, args ...any) 
 }
 
 func (s *Store) GetVerificationPlanByDigestContext(ctx context.Context, digest string) (verification.Plan, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,
@@ -332,6 +356,9 @@ func (s *Store) CreateExecutionAndUpdateWorkContext(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if inputManifest.Continuation != nil {
 		return corestore.ErrConflict
 	}
@@ -500,6 +527,9 @@ VALUES ($1,$2,$3,$4,$5)`
 }
 
 func (s *Store) GetExecutionContext(ctx context.Context, id string) (run.Run, session.Session, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = `
 SELECT r.run_id,r.task_contract_digest,r.run_input_manifest_digest,r.state,r.version,
        r.current_epoch,COALESCE(r.current_attempt_id,''),r.control_owner,
@@ -526,6 +556,9 @@ WHERE r.run_id=$1`
 }
 
 func (s *Store) GetAttemptContext(ctx context.Context, runID, attemptID string) (run.Attempt, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = `
 SELECT attempt_id,execution_epoch,started_at,ended_at
 FROM run_attempts
@@ -544,6 +577,9 @@ WHERE run_id=$1 AND attempt_id=$2`
 }
 
 func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (core.RunInputManifest, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,
@@ -562,6 +598,9 @@ func (s *Store) GetRunInputByDigestContext(ctx context.Context, digest string) (
 // UpdateExecutionContext atomically persists Run/Session ownership and audit,
 // honoring the request deadline even when a competing Run row is locked.
 func (s *Store) UpdateExecutionContext(ctx context.Context, id string, expectedVersion uint64, value run.Run, sess session.Session) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	payload := struct {
 		ExpectedVersion uint64          `json:"expected_version"`
 		Run             run.Run         `json:"run"`
@@ -624,6 +663,9 @@ func (s *Store) RecordSteeringContext(
 	sess session.Session,
 	cmd session.SteeringCommand,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	// The command, proposed Run and Session must refer to one immutable Run.
 	// A foreign cmd.RunID can otherwise insert a valid FK row for another Run
 	// while mutating this Run and producing a misleading audit aggregate.
@@ -701,6 +743,9 @@ WHERE run_id=$1 AND version=$2`
 }
 
 func (s *Store) GetSteeringContext(ctx context.Context, id string) (session.SteeringCommand, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	const q = `
 SELECT steering_command_id,run_id,execution_epoch,sequence,actor,content_digest,created_at
 FROM steering_commands
@@ -727,6 +772,9 @@ func (s *Store) UpdateExecutionAndWorkContext(
 	expectedWorkVersion uint64,
 	work core.WorkItem,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	payload := struct {
 		Run  run.Run         `json:"run"`
 		Work core.WorkItem   `json:"work"`
@@ -797,6 +845,9 @@ WHERE work_item_id=$4 AND version=$5`
 // CreateCheckpointContext retains the original checkpoint/audit transaction,
 // while honoring the HTTP/Worker caller's cancellation during lock waits.
 func (s *Store) CreateCheckpointContext(ctx context.Context, item session.Checkpoint) (string, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	digest, err := item.Digest()
 	if err != nil {
 		return "", err
@@ -833,6 +884,9 @@ INSERT INTO checkpoints (
 }
 
 func (s *Store) GetCheckpointContext(ctx context.Context, id string) (session.Checkpoint, string, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	var digest string
 	if err := s.pool.QueryRow(
@@ -852,6 +906,9 @@ func (s *Store) GetCheckpointContext(ctx context.Context, id string) (session.Ch
 // Delivery creation and its existing audit are one caller-bound transaction.
 // Cancellation or an ambiguous COMMIT never proves that a Delivery was absent.
 func (s *Store) CreateDeliveryContext(ctx context.Context, item core.DeliveryReceipt) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	raw, err := encodeJSON(item)
 	if err != nil {
 		return err
@@ -881,6 +938,9 @@ INSERT INTO delivery_receipts (
 }
 
 func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.DeliveryReceipt, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,
@@ -900,6 +960,9 @@ func (s *Store) GetDeliveryContext(ctx context.Context, id string) (core.Deliver
 // ledger, now bound to the caller's cancellation. A lost COMMIT response does
 // not authorize another evidence registration without exact ID readback.
 func (s *Store) CreateEvidenceContext(ctx context.Context, item core.EvidenceRef) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	delivery, err := s.GetDeliveryContext(ctx, item.DeliveryReceiptID)
 	if err != nil {
 		return err
@@ -945,6 +1008,9 @@ INSERT INTO evidence (
 }
 
 func (s *Store) GetEvidenceContext(ctx context.Context, id string) (core.EvidenceRef, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,
@@ -963,6 +1029,9 @@ func (s *Store) GetEvidenceContext(ctx context.Context, id string) (core.Evidenc
 // Verification report and audit retain their original single transaction;
 // request cancellation never creates PASS or bypasses frozen Evidence.
 func (s *Store) CreateVerificationContext(ctx context.Context, report verification.Report) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	raw, err := encodeJSON(report)
 	if err != nil {
 		return err
@@ -992,6 +1061,9 @@ INSERT INTO verification_reports (
 }
 
 func (s *Store) GetVerificationContext(ctx context.Context, id string) (verification.Report, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,
@@ -1013,6 +1085,9 @@ func (s *Store) CreateReviewAndUpdateWorkContext(
 	expectedVersion uint64,
 	work core.WorkItem,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	if err := report.Validate(); err != nil {
 		return err
 	}
@@ -1110,6 +1185,9 @@ WHERE work_item_id=$2 AND version=$3 AND state=$4
 }
 
 func (s *Store) GetReviewContext(ctx context.Context, id string) (review.Report, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(ctx, "SELECT report_json FROM review_reports WHERE review_report_id=$1", id).Scan(&raw); err != nil {
 		return review.Report{}, mapReadError(err)
@@ -1127,6 +1205,9 @@ func (s *Store) CreateClosureAndUpdateWorkContext(
 	expectedVersion uint64,
 	work core.WorkItem,
 ) error {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	raw, err := encodeJSON(item)
 	if err != nil {
 		return err
@@ -1198,6 +1279,9 @@ WHERE work_item_id=$4 AND version=$5 AND state=$6
 }
 
 func (s *Store) GetClosureContext(ctx context.Context, id string) (core.ClosureReceipt, error) {
+	ctx, cancel := authorityContext(ctx)
+	defer cancel()
+
 	var raw []byte
 	if err := s.pool.QueryRow(
 		ctx,

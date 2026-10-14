@@ -439,6 +439,19 @@ service, background worker, state transition or retry authority. Real HTTP/mTLS
 and isolated PostgreSQL lock-wait tests cover this service-to-request-to-store
 boundary; they are not full interprocedural or selected-host qualification.
 
+PostgreSQL authority now covers callers without an explicit deadline as well as
+callers which already cancel. Forty-seven public entry points add a caller-derived
+20-second fallback using the existing statement safety ceiling; explicit caller
+budgets and the other37 existing bounded policies are preserved. The deadline is
+shared through nested Store/transaction phases rather than refreshed per query.
+A saturated-pool regression holds the only connection until seven real authority
+paths return deadline errors, with no Provider dispatch or record/audit residue.
+The 84-entry source guard, SQL Context-provenance guard and six required tests run in ordinary CI; database
+execution cannot silently skip. This is a finite fallback, not a production SLO
+or a new external-effect disposition. See
+[PostgreSQL authority budgets](../implementation/POSTGRES_AUTHORITY_BUDGET_V1.md).
+Internal blockers [228,229] remain OPEN/BLOCKED pending their remaining evidence.
+
 ## Typed embedded routing and Skill maturity
 
 The post-RC domain hardening adds an **optional explicit target_context**
