@@ -214,7 +214,9 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: admission-characterization-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/admission-characterization.json
+          path: |
+            ${{ runner.temp }}/admission-characterization.json
+            ${{ runner.temp }}/admission-matrix-events.jsonl
           if-no-files-found: error
           retention-days: 90
       - name: Worker preparation and independent workspace regression
@@ -249,7 +251,7 @@ jobs:
       - name: Action original reservation repeated database regression
         run: go test -race -v -count=3 -timeout 2m ./internal/store/postgres -run '^TestPostgresAction(RejectsBorrowedRunAuthority|SettlementBindsEveryOriginalIdentityField)$'
       - name: Recovery proof repeated database regression
-        run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run 'Test(PostgresRecoveryLifecycle|RecoveryProof)'
+        run: go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run 'Test(PostgresRecovery(Lifecycle|Proof)|RecoveryProof)'
       - name: Vet
         run: go vet ./...
       - name: Build candidate binaries with raw-byte manifest
@@ -576,7 +578,11 @@ jobs:
           manifest="$(find "$RUNNER_TEMP/binaries" -type f -name file-manifest.json -print -quit)"
           test -n "$manifest"
           while IFS= read -r role; do chmod 0755 "$RUNNER_TEMP/binaries/$role"; done < internal/distribution/binaries.txt
-          "$RUNNER_TEMP/binaries/eng" distribution-verify --dir "$RUNNER_TEMP/binaries"
+          # Verify candidate bytes with the checked-out source, then bind the
+          # embedded build revision to this exact CI head before admitting them.
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          go run ./cmd/eng distribution-verify --dir "$RUNNER_TEMP/binaries" |
+            jq -e --arg sha "$SOURCE_SHA" '.status=="BYTES_VERIFIED" and .source_commit==$sha and .binary_count==6' >/dev/null
 
           jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
           artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-compatibility-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
@@ -624,7 +630,9 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ci-job-timing-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/ci-job-timing.json
+          path: |
+            ${{ runner.temp }}/ci-job-timing.json
+            ${{ runner.temp }}/jobs.json
           if-no-files-found: error
           retention-days: 90
       - name: Retain verified CI evidence envelope

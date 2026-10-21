@@ -21,7 +21,7 @@
 This is the single live implementation-status authority. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
-`a8557646ca27eb4d7feb09144995478a20a0664c`.
+`a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
 
 ## Comprehensive audit remediation — 2026-10-21
 
@@ -48,6 +48,38 @@ remains **BLOCKED**, with internal blockers **#228 and #229**, production
 qualification **#105**, and credential-dependent gates **#103 and #106** still
 open. Repository tests cannot establish original external-dispatcher quiescence,
 selected-host read isolation, long-run operation, or unattended acceptance.
+
+## Production maturity audit — 2026-10-21
+
+The follow-up audit found reproducible gaps in aggregate Recovery Proof
+projection integrity and Runtime helper/live-probe subprocess boundaries, plus
+missing retained raw inputs for the existing CI characterization reports.
+The bounded fixes and their verification scope are recorded in the frozen
+[production maturity review](../reviews/PRODUCTION_MATURITY_REVIEW_2026-10-21.md);
+the [official-source comparison](../research/PRODUCTION_MATURITY_REFERENCE_REVIEW_2026-10-21.md)
+explains the production practices adopted and those that remain conditional on
+the selected deployment. Exact-head/main CI and actual delivered artifacts,
+not this status paragraph, establish delivery of each source slice.
+
+**Production also has unfinished repository capabilities.** The v5 database
+snapshot deliberately returns `ServiceReadiness=NOT_OBSERVED` and `Ready=false`;
+`production-live-observe` does not supply a production health/capacity evaluator.
+The 14 frozen terminal gates have a plan emitter but no complete gate-by-gate
+evidence verifier. The proposed per-case receipt in the terminal blocker
+contract is documentation, not a deployed parser. Existing latency summaries
+do not implement failure denominators, p99/resource trend acceptance, sustained
+service monitoring or independently tested alert delivery.
+
+These are implementation and selected-environment design tasks under #105 and
+the #229 host-acceptance boundary, not merely missing accounts or a final human
+signature. Their workload, observation windows, numeric targets, provider/host
+identities and evidence procedures must be frozen before a qualification run.
+Any future coverage checker must read the existing Core's frozen plan,
+Delivery/Evidence/Verification/Review/Closure identities; it cannot create a
+second authority ledger or turn self-reported PASS fields into READY. Operational
+and fault evidence must be available to the independent review; post-closure
+readback must not make a Closure its own prerequisite. Historical W01-W10
+acceptance remains limited to its declared repository slices.
 
 ## Maturity boundary
 
@@ -246,7 +278,7 @@ Configuration v1 reader incorrectly rejected valid deployed v2 configuration.
 Canonical paths, disjoint artifact/evidence roots, role ownership and access are
 checked; no v1 fallback or provider qualification is added.
 
-The direct Context inventory is now 58 constructors after removal of 75 unused
+The direct Context inventory is now 59 constructors after removal of 75 unused
 context-free wrappers from the previous 133-site source, and is checked in CI
 against exact source digest, ordered locations and category counts. Its scope is
 still direct enumeration, not interprocedural or selected-host qualification.
@@ -426,7 +458,8 @@ are unchanged. Tests supply explicit Context at the former 329 call sites;
 no test is removed and no context-free test compatibility layer is added.
 The concrete-method-set regression requires all 75 scoped replacements and
 rejects their unscoped names. The five remaining direct-origin categories total
-58, retain their original classifications, and remain bound to current bytes.
+59, including the new bounded Runtime probe cleanup origin, and remain bound to
+current bytes. Existing classifications are unchanged.
 
 This is concrete surface and compatibility-residue cleanup, not selected-host
 lifecycle/latency or full interprocedural cancellation qualification. Internal

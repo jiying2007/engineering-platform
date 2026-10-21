@@ -18,9 +18,7 @@ func TestRuntimeRetainsFinalCompletionOnImmediateExit(t *testing.T) {
 	for _, lane := range []string{"live-saved", "live-wif", "engineering-saved", "engineering-wif"} {
 		t.Run(lane, func(t *testing.T) {
 			engineering := strings.HasPrefix(lane, "engineering-")
-			if engineering {
-				testsupport.RequireProcessNamespaces(t)
-			}
+			testsupport.RequireProcessNamespaces(t)
 			root := t.TempDir()
 			work, home, credentials := filepath.Join(root, "work"), filepath.Join(root, "home"), filepath.Join(root, "credentials")
 			for _, dir := range []string{work, home, credentials} {
@@ -81,6 +79,7 @@ func TestRuntimeRetainsFinalCompletionOnImmediateExit(t *testing.T) {
 }
 
 func TestLiveProbeStartupErrorHasConcurrentBoundedDiagnostics(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	for _, lane := range []string{"saved", "wif"} {
 		t.Run(lane, func(t *testing.T) {
 			root := t.TempDir()

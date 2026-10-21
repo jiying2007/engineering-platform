@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -137,8 +136,8 @@ RETURNING recovery_epoch,recovery_mode`
 	return result, nil
 }
 
-// CompleteRecoveryContext verifies the original immutable Recovery Proof and
-// independent completion authorization in its existing serializable transaction.
+// CompleteRecoveryContext rechecks the exact immutable Recovery Proof in its
+// serializable transaction after the API's independent principal authorization.
 // Caller cancellation is not proof that a possibly-issued COMMIT rolled back.
 func (s *Store) CompleteRecoveryContext(ctx context.Context, epoch uint64, reconciled bool) (recovery.Manager, error) {
 	ctx, cancel := authorityContext(ctx)
@@ -165,16 +164,12 @@ func (s *Store) CompleteRecoveryContext(ctx context.Context, epoch uint64, recon
 	if currentEpoch != epoch || mode != string(recovery.RecoveryReconciliation) {
 		return recovery.Manager{}, corestore.ErrConflict
 	}
-	var proofRaw []byte
-	if err := tx.QueryRow(ctx, `SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=$1`, epoch).Scan(&proofRaw); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return recovery.Manager{}, recovery.ErrReconciliationRequired
+	proof, err := readRecoveryProof(ctx, tx, epoch)
+	if err != nil {
+		if errors.Is(err, corestore.ErrNotFound) || errors.Is(err, ErrRecoveryFactsUnresolved) {
+			return recovery.Manager{}, fmt.Errorf("%w: %w", recovery.ErrReconciliationRequired, err)
 		}
 		return recovery.Manager{}, err
-	}
-	var proof recovery.Proof
-	if err := json.Unmarshal(proofRaw, &proof); err != nil || proof.Validate() != nil {
-		return recovery.Manager{}, recovery.ErrReconciliationRequired
 	}
 	facts, err := recoveryFacts(ctx, tx)
 	if err != nil {

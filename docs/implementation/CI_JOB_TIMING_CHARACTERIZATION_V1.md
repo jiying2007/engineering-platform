@@ -22,7 +22,29 @@ The single JSON report contains only the allowlisted required job/step names,
 durations, SHA/Run identity and the SHA-256 of original read-only jobs JSON.
 No environment variables, logs, tokens, command arguments, arbitrary output,
 runner identity, or private source content are copied into the report.
-The artifact name is `ci-job-timing-<source-sha>`, retained for 90 days.
+The artifact name is `ci-job-timing-<source-sha>`, retained for 90 days. It
+contains both `ci-job-timing.json` and the exact `jobs.json` consumed by the
+parser. The latter contains GitHub's job metadata, not job logs, environment
+variables or credentials. A later API response is not an interchangeable
+input: the dependent Evidence job's state may have changed after collection.
+
+After authenticating the artifact's run/source identity and archive digest,
+use the parser from that exact source checkout to reproduce the report:
+
+```sh
+python3 -B scripts/ci_job_timing.py \
+  --jobs /absolute/extracted/jobs.json \
+  --source-sha "$SOURCE_SHA" --run-id "$RUN_ID" --attempt "$RUN_ATTEMPT" \
+  --out /absolute/new/ci-job-timing-rebuilt.json
+cmp /absolute/extracted/ci-job-timing.json /absolute/new/ci-job-timing-rebuilt.json
+```
+
+The existing `admission-characterization-<source-sha>` artifact likewise retains
+`admission-matrix-events.jsonl` beside `admission-characterization.json`.
+Recompute it with the same source's `scripts/ci_admission_characterization.py`
+and the exact SHA/run/attempt. These retained inputs close reproducibility of
+the original snapshots; they do not independently authenticate a collector or
+grant production/SLO authority.
 
 ## Interpretation and lifecycle
 

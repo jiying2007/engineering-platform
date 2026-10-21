@@ -222,10 +222,13 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 		return receipt, err
 	}
 	defer os.RemoveAll(versionHome)
-	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
 	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
-	if err != nil || parseErr != nil || actualVersion != qualifiedVersion {
-		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q; probe=%v parse=%v; stderr=%s", strings.TrimSpace(string(versionOut)), "codex-cli "+qualifiedVersion, err, parseErr, strings.TrimSpace(diagnostics))
+	if err != nil || parseErr != nil {
+		return receipt, fmt.Errorf("engineering execution version probe: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
+	}
+	if actualVersion != qualifiedVersion {
+		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q", actualVersion, qualifiedVersion)
 	}
 	assertion, err := os.ReadFile(tokenPath)
 	if err != nil {
@@ -354,10 +357,13 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 		return receipt, err
 	}
 	defer os.RemoveAll(versionHome)
-	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
 	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
-	if err != nil || parseErr != nil || actualVersion != qualifiedVersion {
-		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q; probe=%v parse=%v; stderr=%s", strings.TrimSpace(string(versionOut)), "codex-cli "+qualifiedVersion, err, parseErr, strings.TrimSpace(diagnostics))
+	if err != nil || parseErr != nil {
+		return receipt, fmt.Errorf("engineering execution version probe: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
+	}
+	if actualVersion != qualifiedVersion {
+		return receipt, fmt.Errorf("engineering execution binary/version drift: got %q want %q", actualVersion, qualifiedVersion)
 	}
 	runCtx, cancel := context.WithTimeout(ctx, engineeringSavedLoginTurnTimeout)
 	defer cancel()

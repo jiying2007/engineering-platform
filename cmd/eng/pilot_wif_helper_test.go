@@ -11,9 +11,11 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func TestWIFQualificationHelperHandoffWithFakeGitHub(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		t.Skip("bash unavailable")

@@ -62,7 +62,34 @@ func NewPinnedProvider(executable, digest string) (*Provider, error) {
 	if !canonical.ValidDigest(digest) {
 		return nil, fmt.Errorf("valid executable digest required")
 	}
-	return &Provider{executable: executable, digest: digest}, nil
+	// Version probes run before Command. Reject an unqualified executable here
+	// as well as at Command so even that first launch obeys the pinned identity.
+	resolved, err := trustedExecutable(executable, digest)
+	if err != nil {
+		return nil, err
+	}
+	return &Provider{executable: resolved, digest: digest}, nil
+}
+
+func trustedExecutable(path, digest string) (string, error) {
+	executable, err := canonicalPath(path, false)
+	if err != nil {
+		return "", err
+	}
+	fi, err := os.Stat(executable)
+	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o022 != 0 || fi.Mode().Perm()&0o111 == 0 {
+		return "", fmt.Errorf("trusted executable required")
+	}
+	if digest != "" {
+		actual, err := executableDigest(executable)
+		if err != nil {
+			return "", err
+		}
+		if actual != digest {
+			return "", fmt.Errorf("qualified executable bytes changed")
+		}
+	}
+	return executable, nil
 }
 
 // NewPinnedWIFProvider enables the platform-owned credential-safe startup profile.
@@ -122,22 +149,9 @@ func (p *Provider) Command(ctx context.Context, spec runtimeprovider.LaunchSpec)
 	if p == nil || !filepath.IsAbs(p.executable) || len(spec.Args) != 0 || spec.Executable != "" {
 		return nil, fmt.Errorf("absolute configured executable required; launch overrides are forbidden")
 	}
-	executable, err := canonicalPath(p.executable, false)
+	executable, err := trustedExecutable(p.executable, p.digest)
 	if err != nil {
 		return nil, err
-	}
-	fi, err := os.Stat(executable)
-	if err != nil || !fi.Mode().IsRegular() || fi.Mode().Perm()&0o022 != 0 || fi.Mode().Perm()&0o111 == 0 {
-		return nil, fmt.Errorf("trusted executable required")
-	}
-	if p.digest != "" {
-		actual, err := executableDigest(executable)
-		if err != nil {
-			return nil, err
-		}
-		if actual != p.digest {
-			return nil, fmt.Errorf("qualified executable bytes changed")
-		}
 	}
 	work, err := canonicalPath(spec.Dir, true)
 	if err != nil {
@@ -348,14 +362,26 @@ func ValidateSavedLoginFile(path string) error {
 }
 
 func executableDigest(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 1<<30 {
+		return "", fmt.Errorf("bounded regular Codex executable required")
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	opened, statErr := f.Stat()
+	if statErr != nil || !os.SameFile(info, opened) {
+		_ = f.Close()
+		return "", fmt.Errorf("Codex executable changed before hash read")
+	}
 	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	n, copyErr := io.Copy(h, io.LimitReader(f, (1<<30)+1))
+	closeErr := f.Close()
+	after, afterErr := os.Lstat(path)
+	if copyErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(info, after) ||
+		n != info.Size() || n > 1<<30 || after.Size() != info.Size() {
+		return "", fmt.Errorf("Codex executable changed during hash read or exceeds limit")
 	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }

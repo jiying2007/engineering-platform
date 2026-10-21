@@ -11,6 +11,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func TestPilotPreflightReportsOnlyExternalBlockers(t *testing.T) {
@@ -200,6 +201,7 @@ func pilotPreflightSavedLoginFixture(t *testing.T) (pilotPreflightOptions, codex
 
 func pilotPreflightFixtureWithProvider(t *testing.T, provider provideridentity.Identity) (pilotPreflightOptions, codexProfileOutput, string) {
 	t.Helper()
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	repository := filepath.Join(root, "repository")
 	if err := os.Mkdir(repository, 0o700); err != nil {

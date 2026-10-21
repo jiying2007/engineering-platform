@@ -10,6 +10,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/codexexec"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func profileQualificationFixture(t *testing.T, binary, version, model string) codexapp.QualificationReceipt {
@@ -39,6 +40,7 @@ func profileQualificationFixture(t *testing.T, binary, version, model string) co
 }
 
 func TestBuildCodexProfileBindsExactBinaryModelAndPolicyGrant(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("shell fixture")
 	}
@@ -71,6 +73,7 @@ func TestBuildCodexProfileBindsExactBinaryModelAndPolicyGrant(t *testing.T) {
 }
 
 func TestBuildCodexProfileRejectsQualificationDriftAndUnsafeBinary(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	if runtime.GOOS == "windows" {
 		t.Skip("shell fixture")
 	}
