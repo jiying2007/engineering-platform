@@ -259,6 +259,12 @@
       "expected_head": "9735e64fb24889308cd9409eac20d144d5473ba6",
       "integrated_commit": "474d6a8b0e406a7730cc5edc561923ce40921a75",
       "tree": "fb1d6d58d60d1c9cc894da122011241bab11a39b"
+    },
+    {
+      "branch": "fix/audit-20261021",
+      "expected_head": "b992b2abe86291a7faf20265bd9d81cd69a5d5f9",
+      "integrated_commit": "484dfb25d70998b43eb0fb94f2a06204deaf8c89",
+      "tree": "ec73dec8e45bdc39b0c35e5bd7cc6f4d69548540"
     }
   ]
 }

@@ -19,11 +19,11 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
-    # Bounded regression + binary packaging has measured 525-604 s end-to-end;
-    # the former 10-minute limit cancelled exact-main 37804882565 after all
-    # tests/build/upload succeeded. Keep full checks; allow runner variance.
+    # The complete reviewed PR run 39530869925 took 828 s; exact-main
+    # 39532457963 exceeded the 15-minute ceiling without a recorded test failure.
+    # Keep every check and package deadline; allow measured runner variance.
     # This timeout is a CI safety ceiling, not a production latency SLO.
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
