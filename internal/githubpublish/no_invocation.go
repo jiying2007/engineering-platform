@@ -267,7 +267,7 @@ type nonInvocationRemote interface {
 
 func (p *Provider) FenceUninvokedPublication(ctx context.Context, op action.Operation) (NonInvocationEvidence, error) {
 	var zero NonInvocationEvidence
-	if p == nil {
+	if p == nil || !RecoverablePublicationState(op.State) {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	identity, err := IdentityForOperation(op)
@@ -278,7 +278,7 @@ func (p *Provider) FenceUninvokedPublication(ctx context.Context, op action.Oper
 	if !ok {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
-	plan, _, err := p.derive(ctx, op.RunID, op.ExecutionEpoch, "", false)
+	plan, err := p.originalPlan(ctx, op)
 	if err != nil {
 		return zero, err
 	}

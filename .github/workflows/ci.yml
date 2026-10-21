@@ -41,9 +41,15 @@ jobs:
     env:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Require immutable workflow dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/test_verify_workflow_pins.py
+          python3 -B scripts/verify_workflow_pins.py
       - name: Reject unresolved-gate closing metadata
         shell: bash
         run: |
@@ -61,7 +67,7 @@ jobs:
       - name: Verify exact retained superseded prototype refs
         shell: bash
         run: python3 -B scripts/verify_retained_prototype_refs.py --manifest .github/retained-prototype-refs.json
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -114,6 +120,24 @@ jobs:
             gofmt -d .
             exit 1
           fi
+      - name: Scan known Go vulnerabilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          scan_dir="$RUNNER_TEMP/go-vulnerability-scan"
+          mkdir -p "$scan_dir/bin"
+          go version > "$scan_dir/toolchain.txt"
+          GOBIN="$scan_dir/bin" timeout 180s go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          # Text mode exits nonzero for reachable findings; JSON mode alone does not.
+          timeout 120s "$scan_dir/bin/govulncheck" -show=version,traces ./... | tee "$scan_dir/govulncheck.txt"
+      - name: Retain Go vulnerability scan evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: go-vulnerability-scan-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/go-vulnerability-scan/*.txt
+          if-no-files-found: warn
+          retention-days: 90
       - name: Require kernel process-scope tests
         shell: bash
         run: |
@@ -184,7 +208,7 @@ jobs:
             --attempt "$GITHUB_RUN_ATTEMPT" \
             --out "$RUNNER_TEMP/admission-characterization.json"
       - name: Retain bounded admission characterization (not a production SLO)
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: admission-characterization-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/admission-characterization.json
@@ -237,7 +261,7 @@ jobs:
           cp -a "$dist/." "$install_root/"
           (cd "$install_root" && ./eng distribution-verify --dir "$install_root" && ./eng --help && ./eng capabilities >/dev/null)
       - name: Retain candidate binary bytes
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: engineering-binaries-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/engineering-dist
@@ -266,10 +290,10 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
       EP_SANDBOX_INTEGRATION: '1'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -335,7 +359,7 @@ jobs:
           set -euo pipefail
           bash scripts/ci-retention-systemd-maintenance.sh "$RUNNER_TEMP/current-release-dist/eng"
       - name: Checkout fixed retained rollback baseline
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: 98d146048fb04b7a4bfc165267040a8d7a6c0a9a
           path: _release-switch-baseline
@@ -372,10 +396,10 @@ jobs:
       POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
       EP_RESTORE_DRILL: '1'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -403,7 +427,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -json -race -count=1 -timeout 8m ./internal/store/postgres -run '^(TestPostgresAuthorityRestoreDrill|TestPublicationRecoveryRestoreDrill|TestNoInvocationRestoreDrill)$' | tee "$RUNNER_TEMP/publication-restore-tests.jsonl"
+          go test -json -race -count=1 -timeout 8m ./internal/store/postgres -run '^(TestPostgresAuthorityRestoreDrill|TestPublicationRecoveryRestoreDrill|TestNoInvocationRestoreDrill|TestPlannedActionRestorePreservesBoundReceiptAndRejectsLaterCorruption)$' | tee "$RUNNER_TEMP/publication-restore-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publication-restore-tests.jsonl" --restore
 
   codex:
@@ -413,10 +437,10 @@ jobs:
     env:
       CODEX_COMPATIBILITY_BASELINE_VERSION: '0.157.1'
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -434,7 +458,7 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           package-manager-cache: false
@@ -487,7 +511,7 @@ jobs:
           cmp "$RUNNER_TEMP/codex-qualification.json" "$RUNNER_TEMP/codex-qualification-repeat.json"
           cat "$RUNNER_TEMP/codex-qualification.json"
       - name: Retain Codex qualification receipt
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: codex-compatibility-qualification-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -504,10 +528,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -594,14 +618,14 @@ jobs:
             --attempt "$GITHUB_RUN_ATTEMPT" \
             --out "$RUNNER_TEMP/ci-job-timing.json"
       - name: Retain required-job timing characterization (not billing or SLO)
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ci-job-timing-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/ci-job-timing.json
           if-no-files-found: error
           retention-days: 90
       - name: Retain verified CI evidence envelope
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: trusted-ci-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: ${{ runner.temp }}/ci-evidence-envelope.json
@@ -639,7 +663,7 @@ jobs:
           cat "$RUNNER_TEMP/internal-rc-delivery-envelope.json"
       - name: Retain exact internal RC delivery envelope
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: internal-rc-delivery-${{ github.sha }}
           path: ${{ runner.temp }}/internal-rc-delivery-envelope.json

@@ -25,6 +25,9 @@ func (s *Store) ReadOperationalStatus(ctx context.Context) (production.Operation
 		return production.OperationalStatus{}, err
 	}
 	defer rollbackOutbox(tx)
+	if err := validatePlannedActionAbandonments(ctx, tx); err != nil {
+		return production.OperationalStatus{}, err
+	}
 	if err := validateRecoveredPublications(ctx, tx); err != nil {
 		return production.OperationalStatus{}, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
 	}
@@ -46,12 +49,12 @@ func (s *Store) ReadOperationalStatus(ctx context.Context) (production.Operation
  (SELECT count(*) FROM outbox_events WHERE state='PENDING'),
  (SELECT count(*) FROM outbox_events WHERE state='LEASED'),
  (SELECT count(*) FROM outbox_events WHERE state='DEAD_LETTER'),
- (SELECT count(*) FROM external_operations WHERE state='PLANNED'),
- (SELECT count(*) FROM external_operations WHERE state='DISPATCHED'),
- (SELECT count(*) FROM external_operations WHERE state='UNKNOWN'),
- (SELECT count(*) FROM external_operations WHERE state='RECONCILING'),
- (SELECT count(*) FROM external_operations WHERE state='MANUAL'),
- (SELECT count(*) FROM external_operations WHERE state='SAFE_TO_RETRY'),
+ operations.planned,
+ operations.dispatched,
+ operations.unknown,
+ operations.reconciling,
+ operations.manual,
+ operations.safe_to_retry,
  (SELECT count(*) FROM worker_codex_executions WHERE state='UNKNOWN'),
  (SELECT min(received_at) FROM worker_inbox WHERE state='PENDING'),
  (SELECT min(created_at) FROM outbox_events WHERE state='PENDING'),
@@ -74,6 +77,15 @@ func (s *Store) ReadOperationalStatus(ctx context.Context) (production.Operation
   ) q
  ), '[]'::jsonb)
 FROM platform_state p
+CROSS JOIN (
+ SELECT count(*) FILTER (WHERE state='PLANNED') AS planned,
+        count(*) FILTER (WHERE state='DISPATCHED') AS dispatched,
+        count(*) FILTER (WHERE state='UNKNOWN') AS unknown,
+        count(*) FILTER (WHERE state='RECONCILING') AS reconciling,
+        count(*) FILTER (WHERE state='MANUAL') AS manual,
+        count(*) FILTER (WHERE state='SAFE_TO_RETRY') AS safe_to_retry
+ FROM external_operations
+) operations
 WHERE p.singleton_id=true`
 
 	var workerPollsRaw []byte

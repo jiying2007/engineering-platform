@@ -20,7 +20,34 @@
 
 This is the single live implementation-status authority. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
-parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b98b`.
+parallel live checklists. Latest comprehensive audit baseline:
+`a8557646ca27eb4d7feb09144995478a20a0664c`.
+
+## Comprehensive audit remediation — 2026-10-21
+
+The source changes from the comprehensive audit address dependency advisories,
+request-time Publisher certificate validity, historical publication readback,
+PLANNED recovery receipt integrity, full-history provenance query cost, and
+runtime subprocess output ownership and diagnostics concurrency. Schema v14
+adds a provenance index without rewriting historical authority. The mandatory
+PostgreSQL restore gate now includes restored PLANNED receipt verification and
+later historical corruption rejection. External workflow actions are pinned to
+full commit identities and the Go gate retains a fail-closed vulnerability scan.
+
+New Codex qualification schema v4 explicitly records `host-uid-trust` and that
+filesystem read isolation is **unqualified**. Existing engineering configuration
+bytes and historical receipt digests remain unchanged. Strictly bound retained
+v3 evidence can be archived for completed results; this readback grants no new
+runtime authority. Reissued qualifications and receipt-based Profile construction
+require v4; existing frozen Permit identities remain unchanged.
+The implementation and regression mapping are recorded in
+[the audit remediation record](../reviews/AUDIT_REMEDIATION_2026-10-21.md).
+
+These repairs strengthen the existing evidence paths. The authoritative posture
+remains **BLOCKED**, with internal blockers **#228 and #229**, production
+qualification **#105**, and credential-dependent gates **#103 and #106** still
+open. Repository tests cannot establish original external-dispatcher quiescence,
+selected-host read isolation, long-run operation, or unattended acceptance.
 
 ## Maturity boundary
 

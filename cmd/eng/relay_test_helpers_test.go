@@ -15,7 +15,7 @@ func runtimeQualificationFixtureForCLI(t *testing.T, executable, model string) c
 		t.Fatal(err)
 	}
 	return codexapp.QualificationReceipt{
-		SchemaVersion:                3,
+		SchemaVersion:                codexapp.QualificationSchemaVersion,
 		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -39,5 +39,6 @@ func runtimeQualificationFixtureForCLI(t *testing.T, executable, model string) c
 		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		IsolatedEngineeringStartup:   true,
 		NamespaceInitReaped:          true,
+		FilesystemReadBoundary:       codexapp.FilesystemReadBoundaryHostUID,
 	}
 }

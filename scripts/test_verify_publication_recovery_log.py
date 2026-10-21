@@ -81,6 +81,21 @@ class GateTests(unittest.TestCase):
         self.assertEqual(len(lifecycle), 7)
         self.assertTrue(lifecycle <= gate.CONTROL_REQUIRED)
 
+    def test_restore_selector_includes_every_required_test(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text()
+        commands = [line for line in workflow.splitlines()
+                    if "go test -json" in line and "publication-restore-tests.jsonl" in line]
+        self.assertEqual(len(commands), 1)
+        self.assertIn("-race -count=1", commands[0])
+        match = re.search(r"-run '([^']+)'", commands[0])
+        self.assertIsNotNone(match)
+        self.assertEqual(sorted(name for name in gate.RESTORE_REQUIRED
+                                if re.search(match.group(1), name) is None), [])
+        existing = {name for path in (root / "internal/store/postgres").glob("*_test.go")
+                    for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
+        self.assertTrue(gate.RESTORE_REQUIRED <= existing)
+
     def test_confirmation_boundary_is_permanently_selected(self):
         import re
         root = Path(__file__).resolve().parents[1]

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -103,15 +104,38 @@ func (s *RemoteService) authorized(r *http.Request) bool {
 		return false
 	}
 	leaf := r.TLS.PeerCertificates[0]
-	verified := false
-	for _, chain := range r.TLS.VerifiedChains {
-		if len(chain) > 0 && chain[0] != nil && leaf != nil && bytes.Equal(chain[0].Raw, leaf.Raw) {
-			verified = true
-			break
+	if leaf == nil || len(leaf.URIs) != 1 || leaf.URIs[0] == nil || leaf.URIs[0].String() != s.controlSubject {
+		return false
+	}
+	clientPurpose := false
+	for _, usage := range leaf.ExtKeyUsage {
+		if usage == x509.ExtKeyUsageClientAuth {
+			clientPurpose = true
 		}
 	}
-	return verified && leaf != nil && len(leaf.URIs) == 1 && leaf.URIs[0] != nil &&
-		leaf.URIs[0].String() == s.controlSubject
+	if !clientPurpose {
+		return false
+	}
+	// VerifiedChains describes the handshake, not the time of this request.
+	// Recheck the entire chain so an active keep-alive or multiplexed connection
+	// cannot extend the authority of an expired leaf or issuer certificate.
+	now := time.Now()
+	for _, chain := range r.TLS.VerifiedChains {
+		if len(chain) == 0 || chain[0] == nil || !bytes.Equal(chain[0].Raw, leaf.Raw) {
+			continue
+		}
+		valid := true
+		for _, cert := range chain {
+			if cert == nil || now.Before(cert.NotBefore) || !now.Before(cert.NotAfter) {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *RemoteService) handleHealth(w http.ResponseWriter, _ *http.Request) {

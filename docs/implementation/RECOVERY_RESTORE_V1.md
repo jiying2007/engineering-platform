@@ -86,7 +86,42 @@ Action continues to block. Recovery completion still requires a separate
 authenticated principal and retained proof of the exact epoch. A successful
 local fixture/CI is not proof of production, publisher, provider or operator
 qualification. Existing installations require explicit quiescence and
-migration before running binaries that require schema v13.
+migration before running binaries that require the current schema v14.
+
+### Retained PLANNED receipt integrity
+
+Readback, exact repeat, Recovery facts, operational status, completion
+authorization and completion validate the same retained projection. The Action
+row, strict receipt and unique original abandonment audit event must agree on
+the original operation, Run and epochs, idempotency key, request digest,
+observation, disposition, actor and timestamps. The audit payload digest is
+recomputed. Missing, duplicate, orphaned or mismatched original evidence blocks
+the read/proof; the implementation does not reconstruct missing history.
+
+Validation includes retained dispositions from earlier Recovery epochs. A new
+aggregate proof does not replace their original actors: the completion identity
+must remain distinct from each original PLANNED reconciler for the same Recovery
+epoch even if roles have subsequently changed. The database remains the pre-dispatch authority; this
+check does not establish absence of effects for a previously dispatched Action.
+
+## Migration v14 — bounded provenance lookups
+
+`0014_external_operation_provenance_index.sql` adds the partial
+`audit_external_operation_provenance_idx` index for ExternalOperation provenance
+lookups. It changes neither Action states nor retained receipt/audit bytes and
+does not backfill, repair or reclassify historical records. Apply migrations
+with services quiesced under the existing bounded migration procedure before
+starting the v14 binary. Index construction needs the maintenance window; this
+is not an online concurrent-index rollout.
+
+Provenance counts share a single aggregate scan and correlated audit lookups use
+the index. All relevant historical operations are still validated; no newest-N
+window, evidence cache or history truncation is introduced. The growth regression
+records actual query plans, checks index validity, and runs
+500/2,000/5,000-operation histories under the existing five-second store budget,
+then corrupts the oldest retained evidence and requires
+rejection. Those sizes are measured regression fixtures, not a production
+capacity guarantee.
 
 ## P0 remote absence does not prove Publisher quiescence
 
@@ -148,6 +183,13 @@ Finally it uses the restored proof with a different completion identity and
 actually transitions the restored database from RECOVERY_RECONCILIATION to
 NORMAL.
 
+The required PLANNED restore scenario separately compares the original receipt,
+proof and audit head after a real dump/restore and deletion of the source schema.
+It completes the restored epoch, begins a later Recovery epoch, and verifies
+that corrupting the old operation binding blocks readback, status, authorization
+and completion. The event-stream verifier requires this scenario to execute
+and pass; a missing or skipped test cannot satisfy the restore gate.
+
 This proves logical authority restoration for the retained database state. It is
 not a production backup policy, storage durability SLA, PITR test, encryption-key
 recovery or cross-region disaster-recovery proof.
@@ -160,17 +202,17 @@ requires four upstream authority checks before it can be emitted:
 - go;
 - offline-container-integration;
 - postgres-authority-restore-drill;
-- codex-app-server-0.155.0-qualification.
+- codex-app-server-qualification.
 
 A restore drill that is merely logged but absent from the trusted envelope is not
 accepted as delivery evidence.
 
 ## Remaining boundary
 
-A real external Action provider is still intentionally not wired into the
-production entrypoint. UNKNOWN reconciliation semantics are durable, but a real
-provider-specific observer/reconciler must be introduced together with that
-provider. No generic stub is added here.
+The Publisher-specific paths accept only their exact retained completion or
+non-invocation proofs. Other unresolved external Action effects still require a
+qualified provider-specific observer/reconciler and original-dispatcher
+quiescence evidence. No generic terminal override is introduced here.
 
 Real WIF model-turn proof, workspace-write Codex, interactive Action approvals and
 retained Feature/Debug pilots remain separate gates.

@@ -42,7 +42,7 @@ func TestRelayQualificationKitCreatesCompleteOwnerPrivateBundle(t *testing.T) {
 	}
 	binaryBytes, _ := os.ReadFile(executable)
 	qualification := codexapp.QualificationReceipt{
-		SchemaVersion:                3,
+		SchemaVersion:                codexapp.QualificationSchemaVersion,
 		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -66,6 +66,7 @@ func TestRelayQualificationKitCreatesCompleteOwnerPrivateBundle(t *testing.T) {
 		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		IsolatedEngineeringStartup:   true,
 		NamespaceInitReaped:          true,
+		FilesystemReadBoundary:       codexapp.FilesystemReadBoundaryHostUID,
 	}
 	qualificationBytes, _ := json.Marshal(qualification)
 	qualificationPath := filepath.Join(root, "qualification.json")

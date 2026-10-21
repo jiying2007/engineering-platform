@@ -133,6 +133,11 @@ func (c *completedTransport) Call(_ context.Context, _, route string, in, out an
 }
 func completedSetup(t *testing.T, mode string) (*preparation.Preparer, preparation.Result, *completedTransport, codexexec.Start, workeragent.CodexRuntime) {
 	t.Helper()
+	return completedSetupWithQualification(t, mode, false)
+}
+
+func completedSetupWithQualification(t *testing.T, mode string, retainedV3 bool) (*preparation.Preparer, preparation.Result, *completedTransport, codexexec.Start, workeragent.CodexRuntime) {
+	t.Helper()
 	a, config := fixture(t)
 	python, err := exec.LookPath("python3")
 	mustCheckpoint(t, err)
@@ -153,11 +158,24 @@ func completedSetup(t *testing.T, mode string) (*preparation.Preparer, preparati
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(), EngineeringProfileChecked: true,
 		IsolationMechanism: processscope.Mechanism, IsolationEnvironmentDigest: "sha256:" + strings.Repeat("c", 64),
 		IsolatedEngineeringStartup: true, NamespaceInitReaped: true,
+		FilesystemReadBoundary: codexapp.FilesystemReadBoundaryHostUID,
 	}
 	qualificationDigest, err := qualification.Digest()
 	mustCheckpoint(t, err)
 	qualificationRaw, err := codexapp.MarshalQualification(qualification)
 	mustCheckpoint(t, err)
+	if retainedV3 {
+		// Recreate historical fixture identities before writing any producer
+		// record. This bypasses no production admission API: the fixture owns
+		// its synthetic Permit, binary and transport, as old retained evidence.
+		legacy, err := json.Marshal(qualification)
+		mustCheckpoint(t, err)
+		text := strings.Replace(string(legacy), `"schema_version":4`, `"schema_version":3`, 1)
+		text = strings.Replace(text, `,"filesystem_read_boundary":"host-uid-trust"`, "", 1)
+		text = strings.Replace(text, `,"filesystem_read_isolation_qualified":false`, "", 1)
+		qualificationRaw = []byte(text)
+		qualificationDigest = canonical.BytesDigest(qualificationRaw)
+	}
 	qualificationPath := filepath.Join(base, "qualification.json")
 	mustCheckpoint(t, os.WriteFile(qualificationPath, qualificationRaw, 0600))
 	profile := codexexec.Profile{Version: 3, Provider: provideridentity.OpenAIChatGPTTrustedSelfHosted(), CodexVersion: "0.157.1", BinaryDigest: canonical.BytesDigest(program), QualificationDigest: qualificationDigest, EngineeringConfigDigest: codexapp.EngineeringConfigDigest(), Model: "fixture-only", Sandbox: "workspace-write", ApprovalPolicy: "never"}

@@ -21,13 +21,13 @@ jobs:
           test "$GITHUB_REF_TYPE" = "branch"
           test "$GITHUB_REF_PROTECTED" = "true"
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
@@ -48,7 +48,7 @@ jobs:
 
       - name: Retain failing reproduction evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: retained-debug-firmware-identity-reproduction-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/retained-debug-firmware-identity-reproduction

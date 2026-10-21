@@ -253,18 +253,20 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	if err != nil {
 		return receipt, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	defer stdin.Close()
+	stdout, stdoutWriter, err := protocolOutput(cmd)
 	if err != nil {
 		return receipt, err
 	}
+	defer stdout.Close()
+	defer stdoutWriter.Close()
 	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		_ = stdin.Close()
-		_ = stdout.Close()
 		return receipt, err
 	}
+	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)
 	var proof processscope.Proof
 	controlStarted := false
@@ -367,18 +369,20 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	if err != nil {
 		return receipt, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	defer stdin.Close()
+	stdout, stdoutWriter, err := protocolOutput(cmd)
 	if err != nil {
 		return receipt, err
 	}
+	defer stdout.Close()
+	defer stdoutWriter.Close()
 	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		_ = stdin.Close()
-		_ = stdout.Close()
 		return receipt, err
 	}
+	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)
 	var proof processscope.Proof
 	controlStarted := false

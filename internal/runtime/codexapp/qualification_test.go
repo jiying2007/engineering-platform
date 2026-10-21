@@ -81,7 +81,7 @@ func TestPinnedProviderRejectsExecutableByteDrift(t *testing.T) {
 
 func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 	data, err := MarshalQualification(QualificationReceipt{
-		SchemaVersion:                3,
+		SchemaVersion:                QualificationSchemaVersion,
 		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -103,6 +103,7 @@ func TestQualificationReceiptMarshalHasNoHostLocator(t *testing.T) {
 		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		IsolatedEngineeringStartup:   true,
 		NamespaceInitReaped:          true,
+		FilesystemReadBoundary:       FilesystemReadBoundaryHostUID,
 	})
 	if err != nil {
 		t.Fatal(err)

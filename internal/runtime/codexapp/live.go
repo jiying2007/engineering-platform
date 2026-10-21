@@ -1,7 +1,6 @@
 package codexapp
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -168,15 +167,19 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err != nil {
 		return receipt, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	defer stdin.Close()
+	stdout, stdoutWriter, err := protocolOutput(cmd)
 	if err != nil {
 		return receipt, err
 	}
-	var stderr bytes.Buffer
+	defer stdout.Close()
+	defer stdoutWriter.Close()
+	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
 	if err := cmd.Start(); err != nil {
 		return receipt, err
 	}
+	_ = stdoutWriter.Close()
 	waitDone := make(chan error, 1)
 	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
@@ -285,15 +288,19 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	if err != nil {
 		return receipt, err
 	}
-	stdout, err := cmd.StdoutPipe()
+	defer stdin.Close()
+	stdout, stdoutWriter, err := protocolOutput(cmd)
 	if err != nil {
 		return receipt, err
 	}
-	var stderr bytes.Buffer
+	defer stdout.Close()
+	defer stdoutWriter.Close()
+	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
 	if err := cmd.Start(); err != nil {
 		return receipt, err
 	}
+	_ = stdoutWriter.Close()
 	waitDone := make(chan error, 1)
 	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)

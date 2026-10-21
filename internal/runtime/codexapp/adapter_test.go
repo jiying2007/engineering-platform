@@ -171,6 +171,9 @@ func helperServer() error {
 			} else if err := out.Encode(map[string]any{"id": "approval-1", "method": "item/commandExecution/requestApproval", "params": map[string]string{"threadId": "thread-1", "turnId": "turn-1"}}); err != nil {
 				return err
 			}
+			if _, err := os.Stat(filepath.Join(worktree, ".fixture-exit-after-completion")); err == nil && (engineering || credentialSafeReadOnly) {
+				return nil
+			}
 		case "turn/steer":
 			var p struct {
 				Expected string `json:"expectedTurnId"`

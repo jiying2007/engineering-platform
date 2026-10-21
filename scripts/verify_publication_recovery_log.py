@@ -48,7 +48,12 @@ PROOF_REQUIRED = {
     "TestPublisherWitnessIntegrityContextOriginalCompletionSettlement",
 }
 
-RESTORE_REQUIRED = {"TestPostgresAuthorityRestoreDrill", "TestPublicationRecoveryRestoreDrill", "TestNoInvocationRestoreDrill"}
+RESTORE_REQUIRED = {
+    "TestPostgresAuthorityRestoreDrill",
+    "TestPublicationRecoveryRestoreDrill",
+    "TestNoInvocationRestoreDrill",
+    "TestPlannedActionRestorePreservesBoundReceiptAndRejectsLaterCorruption",
+}
 
 PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"
 PUBLISHER_REQUIRED = {
