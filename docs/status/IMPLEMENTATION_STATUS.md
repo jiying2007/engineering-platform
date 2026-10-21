@@ -753,12 +753,17 @@ Preserve unchanged:
 credential/provider fallback is admitted. WIF #103 and relay #106 live
 qualification remain deferred; speculative relay tooling stays frozen.
 
-Qualification schema3/contract2 launches the native binary in the actual user/PID
-namespace, exact workspace-write config and fresh credential-free HOME. Only
-initialize/initialized/thread-start are sent, followed by confirmed init reap.
-The stable kernel/architecture/UID/GID digest excludes PID/inode/time. CI probes
-twice; each actual Worker CLI requalifies and compares the entire receipt. Old
-current-admission receipts fail, but historical M1 records are not rewritten.
+Qualification schema4/contract2 launches the native binary in the actual user/PID
+namespace, exact workspace-write config and fresh credential-free HOME. It records
+`filesystem_read_boundary=host-uid-trust` and
+`filesystem_read_isolation_qualified=false`; startup and process reaping do not
+qualify filesystem read isolation. Only initialize/initialized/thread-start are
+sent, followed by confirmed init reap. The stable kernel/architecture/UID/GID
+digest excludes PID/inode/time. CI probes twice; each actual Worker CLI
+requalifies and compares the entire receipt. Reissued qualifications and
+receipt-based Profile construction/preflight require v4. Existing frozen
+Profile/Permit identities have no schema discriminator and remain unchanged;
+historical M1 records are not rewritten.
 
 **Production #105 stays open.** Terminal plan v3 additionally freezes the
 single-maintenance-canary profile, selected-provider emergency disablement,
