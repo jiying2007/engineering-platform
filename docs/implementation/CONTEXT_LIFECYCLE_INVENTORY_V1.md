@@ -6,9 +6,15 @@ down from 133; no new lifetime is introduced. This closes the *enumeration* of t
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
 
+The 2026-10-21 comprehensive audit remediation was reviewed against
+`a8557646ca27eb4d7feb09144995478a20a0664c`. The direct constructor set and lifecycle
+categories remain at 58 sites; Publisher request authorization and qualification
+pipe ownership move two existing source locations without changing their bounded
+cleanup roles. The source digest and exact locations below include those repairs.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:a85a1d5b7be85ed364340ccdcc4f300ed032bb46f2f6d34cc71b6310d7e8f96d`
+`sha256:0149f3b6921afe9d1ef4c2e8b9ffc6204f8337fcc8a06d31c7a5ac236dbf8239`
 
 ## Reviewed categories
 
@@ -101,13 +107,13 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/action/service.go:126` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/armed_cancellation.go:31` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/githubpublish/service.go:187` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/githubpublish/service.go:211` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/controls.go:122` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/qualification_isolation.go:87` | `Background` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/qualification_isolation.go:86` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |
 | `internal/sandbox/testutil/image.go:82` | `Background` | Test support helper |
