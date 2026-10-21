@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -82,72 +79,22 @@ func buildCodexProfile(executable, model string, qualification codexapp.Qualific
 	if err != nil {
 		return output, fmt.Errorf("resolve Codex executable: %w", err)
 	}
-	info, err := os.Lstat(resolved)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o022 != 0 || info.Mode().Perm()&0o111 == 0 {
-		return output, fmt.Errorf("trusted regular executable Codex binary required")
-	}
-	file, err := os.Open(resolved)
-	if err != nil {
-		return output, err
-	}
-	opened, statErr := file.Stat()
-	if statErr != nil || !os.SameFile(info, opened) {
-		_ = file.Close()
-		return output, fmt.Errorf("Codex binary changed before hash read")
-	}
-	hash := sha256.New()
-	n, copyErr := io.Copy(hash, io.LimitReader(file, (1<<30)+1))
-	closeErr := file.Close()
-	after, afterErr := os.Lstat(resolved)
-	if copyErr != nil || closeErr != nil || afterErr != nil || !os.SameFile(info, after) ||
-		n <= 0 || n > 1<<30 || n != info.Size() || after.Size() != info.Size() {
-		return output, fmt.Errorf("Codex binary changed during hash read or exceeds limit")
-	}
-	binaryDigest := "sha256:" + hex.EncodeToString(hash.Sum(nil))
-	if binaryDigest != qualification.BinaryDigest ||
-		qualification.EngineeringConfigDigest != codexapp.EngineeringConfigDigest() {
-		return output, fmt.Errorf("Codex binary/engineering contract does not match compatibility qualification")
-	}
 	qualificationDigest, err := qualification.Digest()
 	if err != nil {
 		return output, err
 	}
 
-	home, err := os.MkdirTemp("", "engineering-platform-codex-profile-")
-	if err != nil {
-		return output, err
-	}
-	defer os.RemoveAll(home)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, resolved, "--version")
-	cmd.Env = []string{
-		"HOME=" + home,
-		"XDG_CONFIG_HOME=" + home,
-		"LANG=C",
-		"LC_ALL=C",
-		"PATH=" + filepath.Dir(resolved) + ":/usr/bin:/bin",
-	}
-	var stdout, stderr boundedProfileOutput
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	cmd.WaitDelay = time.Second
-	if err := cmd.Run(); err != nil {
-		return output, fmt.Errorf("Codex version probe failed: %w", err)
-	}
-	actualVersion, err := codexapp.ParseCodexVersionOutput(string(stdout.data))
-	if err != nil || actualVersion != qualification.Version {
-		return output, fmt.Errorf(
-			"Codex version drift after qualification: got %q want %q",
-			strings.TrimSpace(string(stdout.data)),
-			"codex-cli "+qualification.Version,
-		)
+	if err := codexapp.VerifyExecutableQualification(ctx, resolved, model, qualification); err != nil {
+		return output, fmt.Errorf("Codex executable qualification: %w", err)
 	}
 
 	profile := codexexec.Profile{
 		Version:                 3,
 		Provider:                provider,
-		CodexVersion:            actualVersion,
-		BinaryDigest:            binaryDigest,
+		CodexVersion:            qualification.Version,
+		BinaryDigest:            qualification.BinaryDigest,
 		QualificationDigest:     qualificationDigest,
 		EngineeringConfigDigest: codexapp.EngineeringConfigDigest(),
 		Model:                   model,
@@ -171,16 +118,4 @@ func buildCodexProfile(executable, model string, qualification codexapp.Qualific
 	output.ActionGrant.RiskClass = "CONTROLLED_MUTATION"
 	output.ActionGrant.Capability = digest
 	return output, nil
-}
-
-type boundedProfileOutput struct {
-	data []byte
-}
-
-func (b *boundedProfileOutput) Write(p []byte) (int, error) {
-	if len(b.data)+len(p) > 8<<10 {
-		return 0, fmt.Errorf("Codex version output exceeds limit")
-	}
-	b.data = append(b.data, p...)
-	return len(p), nil
 }

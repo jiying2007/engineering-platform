@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func runtimeQualificationFixture(t *testing.T, executable, version, model string) codexapp.QualificationReceipt {
@@ -46,6 +47,7 @@ func runtimeQualificationFixture(t *testing.T, executable, version, model string
 }
 
 func TestBuildRuntimeHandoffBindsLiveManifestAndExactCodexQualification(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	executable := filepath.Join(root, "codex")
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.157.1'\n"), 0o700); err != nil {

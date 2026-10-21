@@ -40,6 +40,34 @@ the one-Run reservation still prevents replay.
 The immutable proof binds the recovery epoch, reconciler identity, canonical facts
 digest, audit-journal head and creation time. One proof exists per epoch.
 
+### Retained Recovery Proof integrity
+
+Proof readback, completion authorization and the serializable completion
+transaction use the same strict projection. The requested epoch, complete proof
+JSON and independent SQL columns must agree on epoch, reconciler, facts digest,
+captured audit head and creation time. Every proof member and all four facts
+counters must be present and non-null; a missing counter or `facts: null` cannot
+be decoded into clear zero-valued facts. Unknown JSON members are rejected.
+
+The captured audit sequence locates the original
+`recovery.reconciliation_proved` event at the following sequence. Its type,
+aggregate, canonical proof payload digest, previous digest, event digest and
+creation time must match. When the captured sequence is nonzero, the head event
+at that sequence must still exist with the bound digest. Only that predecessor's
+sequence and digest are read; the proof does not introduce a new size limit on
+unrelated historical aggregate IDs or a full audit-chain verification contract.
+One SQL statement reads the proof and at most two audit rows by their sequence
+primary keys, so a
+standalone GET also observes a single snapshot. Later audit entries or Recovery
+epochs do not replace the original binding or prevent valid historical reads.
+
+Missing or inconsistent retained material blocks all three paths; completion
+keeps Recovery active and writes no completion event. The implementation does
+not regenerate proof JSON, rewrite audit history or synthesize missing evidence.
+These checks detect inconsistent restores and one-sided corruption. They do
+not establish an independent trust root against an administrator able to rewrite
+all authoritative records and audit history consistently.
+
 ## Migration v13 — Recovery of pre-dispatch PLANNED Actions only
 
 An Action may crash with a durable PLANNED reservation but before any
@@ -149,7 +177,7 @@ The authenticated API first requires a proof for the exact epoch and rejects the
 same identity that created it. PostgreSQL `CompleteRecovery` then opens a
 serializable transaction, locks `platform_state`, reloads and validates the
 proof, recomputes current facts, requires the same clear facts digest, appends the
-completion audit event, and only then changes mode to NORMAL.
+completion audit event and changes mode to NORMAL atomically.
 
 A stale proof therefore cannot authorize completion after new ambiguity appears.
 
@@ -181,7 +209,13 @@ audit-journal head, migrations and outbox state.
 
 Finally it uses the restored proof with a different completion identity and
 actually transitions the restored database from RECOVERY_RECONCILIATION to
-NORMAL.
+NORMAL. The original reconciler remains unable to authorize that completion.
+The drill then begins a later Recovery epoch and, only in its isolated restored
+database, transplants the genuine older proof JSON into the new proof row while
+retaining the new row's columns and all original audit events. Readback,
+authorization and completion must reject that cross-epoch mismatch without
+leaving Recovery or appending a completion event. The original restored proof
+must remain readable with its original digest.
 
 The required PLANNED restore scenario separately compares the original receipt,
 proof and audit head after a real dump/restore and deletion of the source schema.
@@ -216,3 +250,6 @@ quiescence evidence. No generic terminal override is introduced here.
 
 Real WIF model-turn proof, workspace-write Codex, interactive Action approvals and
 retained Feature/Debug pilots remain separate gates.
+
+Retained-proof consistency and successful local/CI restore fixtures do not close
+internal blockers #228/#229 or the real unattended qualification gate #105.

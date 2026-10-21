@@ -13,6 +13,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func liveAdapter(t *testing.T) (*Adapter, io.ReadWriter) {
@@ -229,6 +230,7 @@ func TestLiveReceiptAcceptsSavedLoginRemovalFence(t *testing.T) {
 }
 
 func TestLiveSavedLoginProbeDeletesBootstrapBeforeReadOnlyTurn(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	work := filepath.Join(root, "work")
 	home := filepath.Join(root, "home")

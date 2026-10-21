@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 )
 
 func executableQualificationFixture(t *testing.T, executable, version, model string) QualificationReceipt {
@@ -45,6 +46,7 @@ func executableQualificationFixture(t *testing.T, executable, version, model str
 }
 
 func TestVerifyExecutableQualificationRebindsExactBinaryVersionAndModel(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	executable := filepath.Join(root, "codex")
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.157.1'\n"), 0o700); err != nil {
@@ -68,6 +70,7 @@ func TestVerifyExecutableQualificationRebindsExactBinaryVersionAndModel(t *testi
 }
 
 func TestVerifyExecutableQualificationRejectsVersionMismatchEvenWithMatchingBytes(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
 	root := t.TempDir()
 	executable := filepath.Join(root, "codex")
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nprintf '%s\\n' 'codex-cli 0.158.0'\n"), 0o700); err != nil {

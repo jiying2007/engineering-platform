@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,9 +9,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jiying2007/engineering-platform/internal/audit"
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/recovery"
 	corestore "github.com/jiying2007/engineering-platform/internal/store"
+	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
 
 var ErrRecoveryFactsUnresolved = errors.New("recovery reconciliation facts are not clear")
@@ -143,21 +146,95 @@ func (s *Store) GetRecoveryProof(ctx context.Context, epoch uint64) (recovery.Pr
 }
 
 func readRecoveryProof(ctx context.Context, q publicationRowQuery, epoch uint64) (recovery.Proof, error) {
-	var raw []byte
-	if err := q.QueryRow(ctx, `SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=$1`, epoch).Scan(&raw); err != nil {
+	// Creation retains the head under the journal lock and appends the proof
+	// audit at head+1 in the same transaction. Read its independent row and
+	// original audit together, even when GET uses a pool without an outer tx.
+	// Both audit lookups use sequence primary keys; later history is irrelevant
+	// to the identity of this original proof and must not replace its audit.
+	const query = `SELECT p.proof_json,p.recovery_epoch,p.reconciler,p.facts_digest,
+ p.audit_sequence,COALESCE(p.audit_digest,''),p.created_at,
+ COALESCE(h.sequence,0),COALESCE(h.event_digest,''),
+ (SELECT to_jsonb(a) FROM (
+   SELECT sequence,event_type AS type,aggregate_type,aggregate_id,payload_digest,
+          COALESCE(previous_digest,'') AS previous_digest,event_digest AS digest,
+          COALESCE(correlation_id,'') AS correlation_id,
+          COALESCE(causation_id,'') AS causation_id,created_at
+   FROM audit_events WHERE sequence=p.audit_sequence+1
+ ) a)
+ FROM recovery_reconciliation_proofs p
+ LEFT JOIN audit_events h ON h.sequence=p.audit_sequence
+ WHERE p.recovery_epoch=$1`
+	var raw, auditRaw []byte
+	var rowEpoch, auditSequence, headSequence uint64
+	var reconciler, factsDigest, auditDigest, headDigest string
+	var createdAt time.Time
+	if err := q.QueryRow(ctx, query, epoch).Scan(&raw, &rowEpoch, &reconciler,
+		&factsDigest, &auditSequence, &auditDigest, &createdAt, &headSequence, &headDigest, &auditRaw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return recovery.Proof{}, corestore.ErrNotFound
 		}
 		return recovery.Proof{}, err
 	}
 	var proof recovery.Proof
-	if err := json.Unmarshal(raw, &proof); err != nil {
-		return recovery.Proof{}, fmt.Errorf("decode recovery proof: %w", err)
+	if len(raw) == 0 || len(raw) > 16<<10 || strictjson.Decode(raw, &proof) != nil ||
+		!completeRecoveryProofJSON(raw) || proof.Validate() != nil ||
+		proof.RecoveryEpoch != epoch || proof.RecoveryEpoch != rowEpoch ||
+		proof.Reconciler != reconciler || proof.FactsDigest != factsDigest ||
+		proof.AuditSequence != auditSequence || proof.AuditDigest != auditDigest ||
+		!proof.CreatedAt.Equal(createdAt) || headSequence != auditSequence || headDigest != auditDigest {
+		return recovery.Proof{}, invalidRecoveryProof()
 	}
-	if err := proof.Validate(); err != nil {
-		return recovery.Proof{}, err
+	// The proof binds only the preceding head's sequence and digest. Reading
+	// its full event here would impose a new JSON-size contract on unrelated
+	// historical aggregate IDs. The proof's own original event is fully checked.
+	var original audit.Event
+	if len(auditRaw) == 0 || len(auditRaw) > 16<<10 || strictjson.Decode(auditRaw, &original) != nil {
+		return recovery.Proof{}, invalidRecoveryProof()
+	}
+	rebuilt, err := audit.Build(original.Sequence, original.PreviousDigest, audit.Input{
+		Type: original.Type, AggregateType: original.AggregateType, AggregateID: original.AggregateID,
+		PayloadDigest: original.PayloadDigest, CausationID: original.CausationID, CorrelationID: original.CorrelationID,
+	}, original.CreatedAt)
+	if err != nil || rebuilt.Digest != original.Digest {
+		return recovery.Proof{}, invalidRecoveryProof()
+	}
+	digest, err := canonical.Digest(proof)
+	if err != nil || original.Sequence != auditSequence+1 || original.PreviousDigest != auditDigest ||
+		original.Type != "recovery.reconciliation_proved" || original.AggregateType != "PlatformState" ||
+		original.AggregateID != "singleton" || original.PayloadDigest != digest ||
+		original.CausationID != "" || original.CorrelationID != "" || !original.CreatedAt.Equal(createdAt) {
+		return recovery.Proof{}, invalidRecoveryProof()
 	}
 	return proof, nil
+}
+
+// A retained proof has no optional members. In particular, encoding/json would
+// otherwise turn missing/null facts or counters into the same all-zero Facts
+// that permit completion. Strict decoding alone does not reject those forms.
+func completeRecoveryProofJSON(raw []byte) bool {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil {
+		return false
+	}
+	for _, key := range []string{"kind", "recovery_epoch", "reconciler", "facts", "facts_digest", "audit_sequence", "audit_digest", "created_at"} {
+		if len(fields[key]) == 0 || bytes.Equal(bytes.TrimSpace(fields[key]), []byte("null")) {
+			return false
+		}
+	}
+	var facts map[string]json.RawMessage
+	if json.Unmarshal(fields["facts"], &facts) != nil {
+		return false
+	}
+	for _, key := range []string{"external_unresolved", "mutation_outbox_leases", "worker_leases", "offline_unresolved"} {
+		if len(facts[key]) == 0 || bytes.Equal(bytes.TrimSpace(facts[key]), []byte("null")) {
+			return false
+		}
+	}
+	return true
+}
+
+func invalidRecoveryProof() error {
+	return fmt.Errorf("%w: recovery proof requires its exact epoch, original row and bound audit", ErrRecoveryFactsUnresolved)
 }
 
 // AuthorizeCompletion is the authenticated API gate. The completion identity

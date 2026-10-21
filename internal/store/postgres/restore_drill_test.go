@@ -226,6 +226,9 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 	if gotDigest != wantDigest {
 		t.Fatalf("restored authority snapshot mismatch\nwant=%s\n got=%s\nwant=%#v\n got=%#v", wantDigest, gotDigest, want, got)
 	}
+	if err := restored.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:reconciler", 1); err == nil {
+		t.Fatal("restored proof lost its original reconciler separation")
+	}
 	if err := restored.AuthorizeCompletion(ctx, "urn:engineering-platform:operator:completer", 1); err != nil {
 		t.Fatal(err)
 	}
@@ -236,6 +239,31 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 	if state.Mode != recovery.Normal || state.Epoch != 1 {
 		t.Fatalf("restored recovery proof could not complete recovery: %#v", state)
 	}
+	if _, err := restored.BeginRecoveryContext(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	second, err := restored.CreateRecoveryProof(ctx, 2, "next-restored-reconciler")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a one-sided restore fault in the isolated restored database:
+	// transplant the genuine old proof JSON into the current row, retaining
+	// both independent row projections and every original audit event.
+	if _, err := restored.pool.Exec(ctx, `UPDATE recovery_reconciliation_proofs
+ SET proof_json=(SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=1)
+ WHERE recovery_epoch=2`); err != nil {
+		t.Fatal(err)
+	}
+	assertRecoveryProofIntegrityBlocked(t, restored, 2, second.Reconciler)
+	first, err := restored.GetRecoveryProof(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDigest, err := canonical.Digest(first)
+	if err != nil || firstDigest != want.ProofDigest {
+		t.Fatalf("original restored proof changed: digest=%s err=%v", firstDigest, err)
+	}
+	t.Log("restored proof completed its original epoch; cross-epoch JSON transplant blocked readback, authorization and completion")
 }
 
 func seedRestoreAuthority(t *testing.T, s *Store) {

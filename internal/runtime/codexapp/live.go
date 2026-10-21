@@ -3,6 +3,7 @@ package codexapp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
+	"github.com/jiying2007/engineering-platform/internal/processscope"
 	"github.com/jiying2007/engineering-platform/internal/provideridentity"
 	runtimeprovider "github.com/jiying2007/engineering-platform/internal/runtime"
 )
@@ -125,8 +127,7 @@ func ObserveTurn(ctx context.Context, adapter *Adapter, threadID, turnID string)
 // identity. It never accepts tool approvals and retains no token bytes or path.
 // The host prewarms the WIF exchange and removes the upstream assertion before
 // any thread/model turn starts. The caller still owns directory cleanup.
-func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, ruleID, tokenFile, auditContext, model string) (LiveReceipt, error) {
-	var receipt LiveReceipt
+func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, ruleID, tokenFile, auditContext, model string) (receipt LiveReceipt, runErr error) {
 	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
 		return receipt, fmt.Errorf("qualified binary digest and bounded model required")
 	}
@@ -144,10 +145,10 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		return receipt, err
 	}
 	defer os.RemoveAll(versionHome)
-	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
 	version, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
-		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: probe=%v parse=%v; stderr=%s", err, parseErr, strings.TrimSpace(diagnostics))
+		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -176,24 +177,19 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	defer stdoutWriter.Close()
 	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
-	if err := cmd.Start(); err != nil {
+	scope, err := processscope.Start(cmd)
+	if err != nil {
 		return receipt, err
 	}
 	_ = stdoutWriter.Close()
-	waitDone := make(chan error, 1)
-	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
-	processJoined := false
+	var proof processscope.Proof
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !processJoined {
-			select {
-			case <-waitDone:
-			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
-				<-waitDone
-			}
+		proof, runErr = settleProbeExit(ctx, scope.Stop, proof, runErr)
+		if runErr != nil {
+			receipt = LiveReceipt{}
 		}
 	}()
 	adapter, err := NewAdapter(client, work)
@@ -226,15 +222,14 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 		return receipt, err
 	}
 	_ = client.Close()
-	select {
-	case <-time.After(5 * time.Second):
-		cancel()
-		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
-	case waitErr := <-waitDone:
-		processJoined = true
-		if waitErr != nil {
-			return receipt, fmt.Errorf("app-server exited after live qualification: %w", waitErr)
-		}
+	joining, joinCancel := context.WithTimeout(probeCtx, probeStopTimeout)
+	proof, err = scope.Wait(joining)
+	joinCancel()
+	if !proof.Quiescent() {
+		return receipt, errors.Join(ErrProbeStopUnconfirmed, err)
+	}
+	if err != nil {
+		return receipt, fmt.Errorf("app-server exited after live qualification: %w", err)
 	}
 	receipt = LiveReceipt{
 		SchemaVersion:                        2,
@@ -259,8 +254,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	return receipt, receipt.Validate()
 }
 
-func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model string) (LiveReceipt, error) {
-	var receipt LiveReceipt
+func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, home, savedLoginFile, model string) (receipt LiveReceipt, runErr error) {
 	if !canonical.ValidDigest(binaryDigest) || strings.TrimSpace(model) == "" || len(model) > 128 {
 		return receipt, fmt.Errorf("qualified binary digest and bounded model required")
 	}
@@ -273,10 +267,10 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 		return receipt, err
 	}
 	defer os.RemoveAll(versionHome)
-	versionOut, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
 	version, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
-		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: probe=%v parse=%v; stderr=%s", err, parseErr, strings.TrimSpace(diagnostics))
+		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
 	}
 	probeCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
@@ -297,24 +291,19 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	defer stdoutWriter.Close()
 	var stderr diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
-	if err := cmd.Start(); err != nil {
+	scope, err := processscope.Start(cmd)
+	if err != nil {
 		return receipt, err
 	}
 	_ = stdoutWriter.Close()
-	waitDone := make(chan error, 1)
-	go func() { waitDone <- cmd.Wait() }()
 	client := NewClient(stdout, stdin)
-	processJoined := false
+	var proof processscope.Proof
 	defer func() {
 		_ = client.Close()
 		cancel()
-		if !processJoined {
-			select {
-			case <-waitDone:
-			case <-time.After(5 * time.Second):
-				_ = cmd.Process.Kill()
-				<-waitDone
-			}
+		proof, runErr = settleProbeExit(ctx, scope.Stop, proof, runErr)
+		if runErr != nil {
+			receipt = LiveReceipt{}
 		}
 	}()
 	adapter, err := NewAdapter(client, work)
@@ -347,15 +336,14 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 		return receipt, err
 	}
 	_ = client.Close()
-	select {
-	case <-time.After(5 * time.Second):
-		cancel()
-		return receipt, fmt.Errorf("app-server did not stop after completed live qualification")
-	case waitErr := <-waitDone:
-		processJoined = true
-		if waitErr != nil {
-			return receipt, fmt.Errorf("app-server exited after live qualification: %w", waitErr)
-		}
+	joining, joinCancel := context.WithTimeout(probeCtx, probeStopTimeout)
+	proof, err = scope.Wait(joining)
+	joinCancel()
+	if !proof.Quiescent() {
+		return receipt, errors.Join(ErrProbeStopUnconfirmed, err)
+	}
+	if err != nil {
+		return receipt, fmt.Errorf("app-server exited after live qualification: %w", err)
 	}
 	receipt = LiveReceipt{
 		SchemaVersion:                        2,

@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/processscope"
@@ -96,7 +96,7 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 	if err := os.Mkdir(versionHome, 0o700); err != nil {
 		return receipt, err
 	}
-	out, diagnostics, err := codexVersion(ctx, executable, versionHome)
+	out, diagnostics, err := codexVersion(ctx, executable, digest, versionHome)
 	if err != nil {
 		return receipt, fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
 	}
@@ -112,10 +112,10 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 			return receipt, err
 		}
 	}
-	if err := generateSchema(ctx, executable, filepath.Join(root, "stable-home"), stable, false); err != nil {
+	if err := generateSchema(ctx, executable, digest, filepath.Join(root, "stable-home"), stable, false); err != nil {
 		return receipt, err
 	}
-	if err := generateSchema(ctx, executable, filepath.Join(root, "experimental-home"), experimental, true); err != nil {
+	if err := generateSchema(ctx, executable, digest, filepath.Join(root, "experimental-home"), experimental, true); err != nil {
 		return receipt, err
 	}
 	stableDigest, err := validateSchemaTree(stable, false)
@@ -127,10 +127,10 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 		return receipt, fmt.Errorf("experimental schema: %w", err)
 	}
 
-	if err := qualifyCredentialSafeProfile(ctx, executable, filepath.Join(root, "credential-safe-home")); err != nil {
+	if err := qualifyCredentialSafeProfile(ctx, executable, digest, filepath.Join(root, "credential-safe-home")); err != nil {
 		return receipt, err
 	}
-	if err := qualifyEngineeringProfile(ctx, executable, filepath.Join(root, "engineering-home")); err != nil {
+	if err := qualifyEngineeringProfile(ctx, executable, digest, filepath.Join(root, "engineering-home")); err != nil {
 		return receipt, err
 	}
 
@@ -274,7 +274,7 @@ func VerifyExecutableQualification(ctx context.Context, executable, model string
 		return err
 	}
 	defer os.RemoveAll(home)
-	out, diagnostics, err := codexVersion(ctx, resolved, home)
+	out, diagnostics, err := codexVersion(ctx, resolved, receipt.BinaryDigest, home)
 	if err != nil {
 		return fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
 	}
@@ -292,7 +292,7 @@ func validTextModel(model string) bool {
 	return model != "" && len(model) <= 128 && strings.TrimSpace(model) == model && !strings.ContainsAny(model, "\r\n\x00")
 }
 
-func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) error {
+func qualifyCredentialSafeProfile(ctx context.Context, executable, digest, home string) error {
 	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
@@ -302,7 +302,7 @@ func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) 
 	if err := os.WriteFile(configPath, []byte(credentialSafeConfig), 0o600); err != nil {
 		return err
 	}
-	output, err := codexCommand(ctx, executable, home, "features", "list")
+	output, err := codexCommand(ctx, executable, digest, home, "features", "list")
 	if err != nil {
 		return fmt.Errorf("credential-safe feature probe: %w: %s", err, strings.TrimSpace(string(output)))
 	}
@@ -328,7 +328,7 @@ func qualifyCredentialSafeProfile(ctx context.Context, executable, home string) 
 	return nil
 }
 
-func qualifyEngineeringProfile(ctx context.Context, executable, home string) error {
+func qualifyEngineeringProfile(ctx context.Context, executable, digest, home string) error {
 	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
@@ -338,7 +338,7 @@ func qualifyEngineeringProfile(ctx context.Context, executable, home string) err
 	if err := os.WriteFile(configPath, []byte(engineeringConfig), 0o600); err != nil {
 		return err
 	}
-	output, err := codexCommand(ctx, executable, home, "features", "list")
+	output, err := codexCommand(ctx, executable, digest, home, "features", "list")
 	if err != nil {
 		return fmt.Errorf("engineering feature probe: %w: %s", err, strings.TrimSpace(string(output)))
 	}
@@ -362,29 +362,14 @@ func qualifyEngineeringProfile(ctx context.Context, executable, home string) err
 	return nil
 }
 
-func codexVersion(ctx context.Context, executable, home string) ([]byte, string, error) {
-	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return nil, "", err
-		}
-	}
-	cmd := exec.CommandContext(ctx, executable, "--version")
-	cmd.Env = []string{
-		"PATH=/usr/local/bin:/usr/bin:/bin",
-		"LANG=C.UTF-8",
-		"TZ=UTC",
-		"HOME=" + home,
-		"CODEX_HOME=" + filepath.Join(home, ".codex"),
-		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
-		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
-	stdout, err := cmd.Output()
-	return stdout, stderr.String(), err
+func codexVersion(ctx context.Context, executable, digest, home string) ([]byte, string, error) {
+	stdout, stderr, err := runCodexProbe(ctx, executable, digest, home, probeBudget{
+		timeout: 5 * time.Second, stdoutBytes: 8 << 10, stderrBytes: 64 << 10,
+	}, "--version")
+	return stdout, string(stderr), err
 }
 
-func generateSchema(ctx context.Context, executable, home, out string, experimental bool) error {
+func generateSchema(ctx context.Context, executable, digest, home, out string, experimental bool) error {
 	if err := os.Mkdir(home, 0o700); err != nil {
 		return err
 	}
@@ -392,30 +377,18 @@ func generateSchema(ctx context.Context, executable, home, out string, experimen
 	if experimental {
 		args = append(args, "--experimental")
 	}
-	output, err := codexCommand(ctx, executable, home, args...)
+	output, err := codexCommand(ctx, executable, digest, home, args...)
 	if err != nil {
 		return fmt.Errorf("generate app-server schema: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return nil
 }
 
-func codexCommand(ctx context.Context, executable, home string, args ...string) ([]byte, error) {
-	for _, dir := range []string{home, filepath.Join(home, ".codex"), filepath.Join(home, ".config"), filepath.Join(home, ".cache")} {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return nil, err
-		}
-	}
-	cmd := exec.CommandContext(ctx, executable, args...)
-	cmd.Env = []string{
-		"PATH=/usr/local/bin:/usr/bin:/bin",
-		"LANG=C.UTF-8",
-		"TZ=UTC",
-		"HOME=" + home,
-		"CODEX_HOME=" + filepath.Join(home, ".codex"),
-		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
-		"XDG_CACHE_HOME=" + filepath.Join(home, ".cache"),
-	}
-	return cmd.CombinedOutput()
+func codexCommand(ctx context.Context, executable, digest, home string, args ...string) ([]byte, error) {
+	output, _, err := runCodexProbe(ctx, executable, digest, home, probeBudget{
+		timeout: 25 * time.Second, stdoutBytes: 1 << 20,
+	}, args...)
+	return output, err
 }
 
 func validateSchemaTree(root string, experimental bool) (string, error) {

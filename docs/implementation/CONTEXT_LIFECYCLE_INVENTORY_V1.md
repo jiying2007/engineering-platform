@@ -1,20 +1,25 @@
 # Caller and maintenance Context inventory — current source slice
 
 Base: `2772d0d9c1122d004c7854993bae88ac53d3a138`, followed by removal of
-75 unreferenced context-free concrete wrappers. There are now 58 direct origins,
-down from 133; no new lifetime is introduced. This closes the *enumeration* of the current
+75 unreferenced context-free concrete wrappers, which reduced the inventory
+from 133 to 58 direct origins. The production audit below adds one independently
+bounded cleanup origin, bringing the current total to 59. This closes the
+*enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
 
 The 2026-10-21 comprehensive audit remediation was reviewed against
 `a8557646ca27eb4d7feb09144995478a20a0664c`. The direct constructor set and lifecycle
-categories remain at 58 sites; Publisher request authorization and qualification
+categories remained at 58 sites; Publisher request authorization and qualification
 pipe ownership move two existing source locations without changing their bounded
-cleanup roles. The source digest and exact locations below include those repairs.
+cleanup roles. The subsequent production audit against
+`a0628df29439b4980a9c93ba2d840fa9b8d8319a` adds the five-second, cancellation-independent
+Runtime probe stop context. The source digest and exact locations below include
+both audits: 59 direct origins, including 19 bounded cleanup/settlement sites.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:0149f3b6921afe9d1ef4c2e8b9ffc6204f8337fcc8a06d31c7a5ac236dbf8239`
+`sha256:9bf0b4fa11f3de8377627553dfdf649cb65fb80e2e19650c29dd1ffb9a7bf9e6`
 
 ## Reviewed categories
 
@@ -23,7 +28,7 @@ Production `cmd` / `internal` Go source digest from the existing scanner:
 | Explicitly timed command root | 25 |
 | Signal-owned command/service root | 10 |
 | Command with downstream budget | 2 |
-| Independent bounded cleanup/settlement | 18 |
+| Independent bounded cleanup/settlement | 19 |
 | Test support helper | 3 |
 
 Command roots either own a signal lifetime or have explicit operation budgets.
@@ -74,7 +79,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/artifact_offline_capture.go:47` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_retention.go:51` | `Background` | Signal-owned command/service root |
 | `cmd/eng/artifact_set.go:82` | `Background` | Explicitly timed command root |
-| `cmd/eng/codex_profile.go:121` | `Background` | Explicitly timed command root |
+| `cmd/eng/codex_profile.go:87` | `Background` | Explicitly timed command root |
 | `cmd/eng/distribution_install.go:63` | `Background` | Signal-owned command/service root |
 | `cmd/eng/execution_readback.go:52` | `Background` | Explicitly timed command root |
 | `cmd/eng/human_takeover.go:99` | `Background` | Explicitly timed command root |
@@ -113,6 +118,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/probe_process.go:73` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/qualification_isolation.go:86` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |
@@ -244,8 +250,9 @@ silently overriding or merging unrelated lifetimes. This is an in-process helper
 not a new service, queue, independent lifetime or recovery authority.
 
 The existing Control ten-second and Publisher fifteen-second shutdown budgets
-remain. Their two existing constructors are now correctly classified as bounded
-independent cleanup, not task-command roots; the total remains 58. Known original
+remain. Their two existing constructors were reclassified as bounded independent
+cleanup rather than task-command roots without changing the then-current total
+of 58. The subsequent Runtime probe cleanup brings the current total to 59. Known original
 post-effect settlement still uses its existing independent bounded Context.
 Cancellation alone never implies rollback, dispatcher quiescence or retry.
 
@@ -295,3 +302,15 @@ in one read-only repeatable transaction, under the same five-second deadline and
 existing independently bounded rollback. Recovery uses its existing serializable
 transaction and caller-derived budget. No new Context origin or timer is added.
 See ACTION_CONFIRMATION_AUTHORITY_V1.md; internal blockers [228,229] remain OPEN.
+
+
+## Bounded Runtime qualification and live-probe stop
+
+Every version/features/schema subprocess now owns a bounded execution Context
+and a proven process namespace. Its one new `WithoutCancel` origin gives stop
+and reap an independent five-second budget even after caller cancellation.
+Success requires namespace quiescence; unconfirmed cleanup remains an error.
+Live probes reuse this same stop path. They do not create a detached goroutine
+or another Context origin. The previous Context-aware caller and signal roots
+remain unchanged. These source budgets do not qualify the selected production
+host, remote Provider cancellation or filesystem read isolation.
