@@ -149,12 +149,13 @@ const recoveredPublicationSelect = `SELECT e.receipt_json,e.operation_id,e.run_i
  e.execution_epoch,e.recovery_epoch,e.action,e.risk_class,e.capability,
  e.idempotency_key,e.request_digest,e.state,COALESCE(e.external_ref,''),
  COALESCE(e.observed_state,''),e.updated_at,
- (SELECT count(*) FROM audit_events a WHERE a.event_type='recovery.github.publication.confirmed'
-   AND a.aggregate_type='ExternalOperation' AND a.aggregate_id=e.operation_id),
- COALESCE((SELECT min(a.payload_digest) FROM audit_events a
-   WHERE a.event_type='recovery.github.publication.confirmed'
-   AND a.aggregate_type='ExternalOperation' AND a.aggregate_id=e.operation_id),'')
- FROM external_operations e`
+ provenance.event_count,COALESCE(provenance.payload_digest,'')
+ FROM external_operations e
+ CROSS JOIN LATERAL (
+  SELECT count(*) AS event_count,min(a.payload_digest) AS payload_digest
+  FROM audit_events a WHERE a.event_type='recovery.github.publication.confirmed'
+   AND a.aggregate_type='ExternalOperation' AND a.aggregate_id=e.operation_id
+ ) provenance`
 
 type publicationRowQuery interface {
 	QueryRow(context.Context, string, ...any) pgx.Row

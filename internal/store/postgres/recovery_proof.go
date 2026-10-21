@@ -17,6 +17,9 @@ var ErrRecoveryFactsUnresolved = errors.New("recovery reconciliation facts are n
 
 func recoveryFacts(ctx context.Context, tx pgx.Tx) (recovery.Facts, error) {
 	var facts recovery.Facts
+	if err := validatePlannedActionAbandonments(ctx, tx); err != nil {
+		return facts, err
+	}
 	if err := validateRecoveredPublications(ctx, tx); err != nil {
 		return facts, fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
 	}
@@ -133,11 +136,15 @@ func (s *Store) GetRecoveryProof(ctx context.Context, epoch uint64) (recovery.Pr
 	ctx, cancel := authorityContext(ctx)
 	defer cancel()
 
-	var raw []byte
 	if s == nil || s.pool == nil || epoch == 0 {
 		return recovery.Proof{}, corestore.ErrNotFound
 	}
-	if err := s.pool.QueryRow(ctx, `SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=$1`, epoch).Scan(&raw); err != nil {
+	return readRecoveryProof(ctx, s.pool, epoch)
+}
+
+func readRecoveryProof(ctx context.Context, q publicationRowQuery, epoch uint64) (recovery.Proof, error) {
+	var raw []byte
+	if err := q.QueryRow(ctx, `SELECT proof_json FROM recovery_reconciliation_proofs WHERE recovery_epoch=$1`, epoch).Scan(&raw); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return recovery.Proof{}, corestore.ErrNotFound
 		}
@@ -159,27 +166,46 @@ func (s *Store) AuthorizeCompletion(ctx context.Context, subject string, epoch u
 	ctx, cancel := authorityContext(ctx)
 	defer cancel()
 
-	proof, err := s.GetRecoveryProof(ctx, epoch)
+	if s == nil || s.pool == nil || epoch == 0 {
+		return corestore.ErrNotFound
+	}
+	// Authorization is read-only, but the proof, abandonment provenance and
+	// participant identities must come from the same database snapshot.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return err
+	}
+	defer rollbackOutbox(tx)
+	proof, err := readRecoveryProof(ctx, tx, epoch)
 	if err != nil {
 		return err
 	}
 	if subject == "" || proof.Reconciler == subject {
 		return fmt.Errorf("recovery completion requires a different authenticated principal from reconciler")
 	}
-	// The principal that settled an original publication may not complete the
-	// same Recovery epoch by asking another principal to issue the aggregate proof.
+	if err := validatePlannedActionAbandonments(ctx, tx); err != nil {
+		return err
+	}
+	// A damaged PLANNED receipt cannot evade participant validation by losing
+	// both its kind and audit marker or impersonating the other terminal kind.
+	if err := validateUninvokedPublications(ctx, tx); err != nil {
+		return fmt.Errorf("%w: %w", ErrRecoveryFactsUnresolved, err)
+	}
+	// A principal that settled any original Action may not complete that
+	// Recovery epoch through another principal's aggregate proof, even if a
+	// later policy revision gives the old reconciler the completion role.
 	var participated bool
-	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM external_operations
-  WHERE receipt_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1'
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM external_operations
+  WHERE (receipt_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_CONFIRMED_V1'
     AND receipt_json->'request'->>'recovery_epoch'=$1
-    AND receipt_json->>'reconciler'=$2 OR
-    reconciliation_json->>'kind'='RECOVERY_GITHUB_PUBLICATION_NOT_INVOKED_V1'
+    AND receipt_json->>'reconciler'=$2) OR
+    (reconciliation_json->>'kind' IN ('RECOVERY_GITHUB_PUBLICATION_NOT_INVOKED_V1','RECOVERY_ACTION_PLANNED_ABANDONMENT_V1')
     AND reconciliation_json->'request'->>'recovery_epoch'=$1
-    AND reconciliation_json->>'reconciler'=$2)`, fmt.Sprint(epoch), subject).Scan(&participated); err != nil {
+    AND reconciliation_json->>'reconciler'=$2))`, fmt.Sprint(epoch), subject).Scan(&participated); err != nil {
 		return err
 	}
 	if participated {
-		return fmt.Errorf("publication reconciler cannot complete the same Recovery epoch")
+		return fmt.Errorf("Action reconciler cannot complete the same Recovery epoch")
 	}
 	return nil
 }

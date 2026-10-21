@@ -16,7 +16,7 @@ func executableQualificationFixture(t *testing.T, executable, version, model str
 		t.Fatal(err)
 	}
 	return QualificationReceipt{
-		SchemaVersion:                3,
+		SchemaVersion:                QualificationSchemaVersion,
 		CompatibilityContractVersion: CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      version,
@@ -40,6 +40,7 @@ func executableQualificationFixture(t *testing.T, executable, version, model str
 		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		IsolatedEngineeringStartup:   true,
 		NamespaceInitReaped:          true,
+		FilesystemReadBoundary:       FilesystemReadBoundaryHostUID,
 	}
 }
 

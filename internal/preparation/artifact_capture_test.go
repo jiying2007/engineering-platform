@@ -15,6 +15,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 	"github.com/jiying2007/engineering-platform/internal/sandbox"
+	"github.com/jiying2007/engineering-platform/internal/testsupport"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
 )
 
@@ -136,6 +137,65 @@ func TestFrozenExecutionCaptureRestoresContextAndProducerRecords(t *testing.T) {
 				t.Fatal("staging leaked on success")
 			}
 		})
+	}
+}
+
+func TestFrozenCompletedCapturePreservesHistoricalQualificationV3(t *testing.T) {
+	testsupport.RequireProcessNamespaces(t)
+	ctx := context.Background()
+	p, _, c, request, runtime := completedSetupWithQualification(t, "success", true)
+	_, err := workeragent.ExecuteCodex(ctx, c, p, request, runtime)
+	mustCheckpoint(t, err)
+	records := filepath.Dir(c.work)
+	permitRaw, err := os.ReadFile(filepath.Join(records, "codex-"+c.permit.Token.ID+".json"))
+	mustCheckpoint(t, err)
+	store := t.TempDir()
+	mustCheckpoint(t, os.Chmod(store, 0700))
+	q := workeragent.ExecutionCaptureRequest{
+		Readback: workeragent.PostTurnReadbackRequest{
+			Records: records, RunID: c.permit.Token.RunID, ExecutionID: c.permit.Token.ID,
+			PermitDigest: canonical.BytesDigest(permitRaw),
+			Bundle:       filepath.Join(c.root, "artifacts", c.permit.Token.ID+".bundle"),
+		},
+		ContextDirectory: filepath.Join(c.root, "bundles", strings.TrimPrefix(c.permit.Assignment.Intent.InputDigest, "sha256:")),
+		RuntimeBinary:    c.runtimeBinary, QualificationReceipt: filepath.Join(c.runtimeDir, "qualification.json"),
+		Destination: filepath.Join(store, "historical.tar"),
+	}
+	calls, err := canonical.Digest(c.calls)
+	mustCheckpoint(t, err)
+	report, err := workeragent.CaptureExecutionArtifacts(ctx, q)
+	mustCheckpoint(t, err)
+	if report.QualificationDigest != c.permit.Profile.QualificationDigest || report.ExecutionAuthorized || report.ProductionQualified {
+		t.Fatal("historical capture changed authority or frozen qualification", report)
+	}
+	into := filepath.Join(store, "restored")
+	_, err = artifactset.Restore(ctx, q.Destination, report.Archive.ArchiveDigest, q.Readback.RunID, into)
+	mustCheckpoint(t, err)
+	raw, err := os.ReadFile(filepath.Join(into, "files", "runtime-qualification.json"))
+	mustCheckpoint(t, err)
+	if string(raw) != string(c.qualificationRaw) {
+		t.Fatal("historical qualification bytes rewritten")
+	}
+	qualification, err := codexapp.VerifyRetainedQualification(raw, c.permit.Profile.QualificationDigest)
+	mustCheckpoint(t, err)
+	if qualification.SchemaVersion != 3 || qualification.FilesystemReadBoundary != "" || qualification.Validate() == nil {
+		t.Fatal("historical qualification acquired current admission")
+	}
+	afterCalls, err := canonical.Digest(c.calls)
+	mustCheckpoint(t, err)
+	if afterCalls != calls {
+		t.Fatal("historical capture called transport")
+	}
+
+	// A well-formed different v3 qualification cannot replace the frozen one.
+	changed := strings.Replace(string(raw), `"version":"0.157.1"`, `"version":"0.157.2"`, 1)
+	mustCheckpoint(t, os.WriteFile(q.QualificationReceipt, []byte(changed), 0600))
+	q.Destination = filepath.Join(store, "mismatch.tar")
+	if _, err := workeragent.CaptureExecutionArtifacts(ctx, q); err == nil {
+		t.Fatal("mismatched historical qualification accepted")
+	}
+	if _, err := os.Stat(q.Destination); !os.IsNotExist(err) {
+		t.Fatal("mismatched qualification published an archive")
 	}
 }
 

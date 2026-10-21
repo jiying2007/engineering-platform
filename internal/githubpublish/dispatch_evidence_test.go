@@ -294,7 +294,8 @@ func TestPublisherWitnessRootReplacementFailsClosed(t *testing.T) {
 	}
 }
 
-func TestProviderRecoveryBindsCoreIdentityThroughIndependentMTLSPublisher(t *testing.T) {
+func independentProviderFixture(t *testing.T) (*Provider, *publisherState, Configuration, *evidenceRemote, *RemoteService) {
+	t.Helper()
 	state, config := publisherFixture(t)
 	witness := t.TempDir()
 	if err := os.Chmod(witness, 0700); err != nil {
@@ -318,16 +319,22 @@ func TestProviderRecoveryBindsCoreIdentityThroughIndependentMTLSPublisher(t *tes
 	server := httptest.NewUnstartedServer(service.Handler())
 	server.TLS = pki.ServerTLS()
 	server.StartTLS()
-	defer server.Close()
+	t.Cleanup(server.Close)
 	remote, err := newRemoteClient(healthRemoteConfig(t, pki, server.URL, service.controlSubject))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer remote.client.CloseIdleConnections()
-	provider, err := New(config, state, remote)
+	t.Cleanup(remote.client.CloseIdleConnections)
+	provider, err := New(config, &state, remote)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return provider, &state, config, upstream, service
+}
+
+func publishedProviderFixture(t *testing.T) (*Provider, *publisherState, Configuration, *evidenceRemote, action.Request, action.Operation) {
+	t.Helper()
+	provider, state, config, upstream, _ := independentProviderFixture(t)
 	request := action.Request{ID: "original-action", RunID: state.run.ID, ExecutionEpoch: state.run.CurrentEpoch, Action: Action, Capability: Capability, RiskClass: action.ControlledMutation, IdempotencyKey: "original-reservation", ParametersDigest: state.status.Receipt.ResultDigest, RequestedBy: "runtime"}
 	receipt, err := provider.Dispatch(context.Background(), request)
 	if err != nil || receipt.Outcome != action.DispatchConfirmed {
@@ -339,11 +346,16 @@ func TestProviderRecoveryBindsCoreIdentityThroughIndependentMTLSPublisher(t *tes
 	}
 	op := *action.NewWithRequestDigest(request, digest, time.Now().UTC())
 	op.State = action.Dispatched // Model loss of Core settlement only, not live failure proof.
+	return provider, state, config, upstream, request, op
+}
+
+func TestProviderRecoveryBindsCoreIdentityThroughIndependentMTLSPublisher(t *testing.T) {
+	provider, state, config, upstream, _, op := publishedProviderFixture(t)
 	if err := os.Remove(filepath.Join(config.ArtifactRoot, state.status.Token.ID+".bundle")); err != nil {
 		t.Fatal(err)
 	}
 	evidence, err := provider.ObserveOriginalPublication(context.Background(), op)
-	if err != nil || evidence.Validate() != nil || evidence.Start.Identity.RequestDigest != digest {
+	if err != nil || evidence.ValidateForRecovery() != nil || evidence.Start.Identity.RequestDigest != op.RequestDigest {
 		t.Fatal(evidence, err)
 	}
 	// A caller cannot substitute another original reservation for the retained plan.

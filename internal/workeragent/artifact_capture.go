@@ -126,7 +126,15 @@ func CaptureExecutionArtifacts(ctx context.Context, q ExecutionCaptureRequest) (
 	if strictjson.Decode(qualificationRaw, &qualification) != nil {
 		return zero, fmt.Errorf("invalid qualification receipt")
 	}
-	qualificationDigest, err := qualification.Digest()
+	qualificationDigest := p.Profile.QualificationDigest
+	if before.result != nil && before.controlTranscript != nil && before.controlTranscript.AllowsDelivery() {
+		// Only immutable completed-result capture may read an old qualification.
+		// The original Permit digest is mandatory; this does not observe Core
+		// FINISHED or grant replay/new-execution authority.
+		qualification, err = codexapp.VerifyRetainedQualification(qualificationRaw, qualificationDigest)
+	} else {
+		qualificationDigest, err = qualification.Digest()
+	}
 	if err != nil || qualificationDigest != p.Profile.QualificationDigest ||
 		qualification.BinaryDigest != p.Profile.BinaryDigest ||
 		qualification.Version != p.Profile.CodexVersion ||

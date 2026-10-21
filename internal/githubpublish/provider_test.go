@@ -319,6 +319,10 @@ func publisherFixture(t *testing.T) (publisherState, Configuration) {
 		},
 		status: codexexec.Status{Token: tokenValue, State: codexexec.Finished, Receipt: &receipt, Runtime: &codexexec.ControlRuntime{Binding: transcript.Close.Binding, State: "SEALED", Transcript: &transcript, Digest: result.ControlTranscriptDigest}},
 	}
+	state.run.TaskContractDigest, err = state.task.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
 	config := Configuration{
 		Version: 1, ArtifactRoot: artifactRoot, GitExecutable: git, TokenFile: token,
 		Targets: []TargetPolicy{{

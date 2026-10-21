@@ -47,12 +47,12 @@ jobs:
             echo "::error::managed-workspace WIF is not provisioned; follow issue #103 / examples/pilots/wif/configure-admin-api.sh"
             exit 1
           fi
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '22'
           package-manager-cache: false
@@ -95,8 +95,10 @@ jobs:
             --model "$LIVE_MODEL" \
             > "$RUNNER_TEMP/codex-compatibility-qualification.json"
           jq -e --arg digest "$CODEX_DIGEST" '
-            .schema_version == 3 and
+            .schema_version == 4 and
             .compatibility_contract_version == 2 and
+            .filesystem_read_boundary == "host-uid-trust" and
+            .filesystem_read_isolation_qualified == false and
             .isolated_engineering_startup == true and
             .namespace_init_reaped == true and
             .model_turn_executed == false and
@@ -151,7 +153,7 @@ jobs:
             > "$RUNNER_TEMP/codex-wif-live-receipt.json"
           cat "$RUNNER_TEMP/codex-wif-live-receipt.json"
       - name: Retain real live-turn receipt
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: codex-wif-live-${{ github.sha }}-${{ github.run_id }}
           path: |

@@ -36,6 +36,30 @@ IDs, sizes and ZIP digests, downloads them, verifies exact executable bytes and
 emits `trusted-ci-evidence-<sha>`. Codex has a CI sentinel version, not a universal
 version pin: every execution must qualify its actual binary/provider identity.
 
+## Dependency identity and security maintenance
+
+Every external workflow `uses` reference is pinned to a full reviewed commit SHA
+(or an image digest for container actions). Readable version comments are update
+hints, not execution identities. `scripts/verify_workflow_pins.py` rejects mutable
+tags, branches, short hashes and dynamic references in the repository's direct
+single-line `uses` format. An update must review the upstream commit and run the
+same required gates; a fixed SHA proves identity, not the safety of its contents.
+
+The Go toolchain selected by `go-version-file: go.mod` is currently 1.26.10.
+The `go` job installs `govulncheck` v1.9.0 into a job-private directory, scans
+production source dependencies against the official Go vulnerability database,
+and retains its toolchain and text report as `go-vulnerability-scan-<sha>`.
+Text-mode reachable findings and scan failures fail the job. The new diagnostic
+artifact is not another Evidence authority or a replacement for the existing
+binary/Codex artifact chain. A clean result is bounded by the scanner, database
+and source analyzed; it does not attest to selected-host or Provider security.
+
+The toolchain and scanner versions are maintained dependencies, not indefinite
+team-wide CLI pins. Security updates require reviewed module checksums, module
+hygiene, regressions, the five exact-source jobs, and fresh-main readback. The
+2026-10-21 update includes `golang.org/x/text` v0.41.0 and `x/sync` v0.22.0;
+these changes do not choose a different model or Codex executable.
+
 ## Authority boundary
 
 GitHub run/artifact facts are delivery provenance, not engineering acceptance,

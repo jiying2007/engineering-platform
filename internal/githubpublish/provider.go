@@ -194,56 +194,108 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 }
 
 func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, parametersDigest string, requireBundle bool) (Plan, string, error) {
-	var empty Plan
+	value, err := p.publicationRun(ctx, runID, epoch)
+	if err != nil {
+		return Plan{}, "", err
+	}
+	// Dispatch and ordinary observation still require current live authority.
+	// Recovery has a separate readback path; it cannot reach Publish or a bundle.
+	if err := value.CheckEpoch(epoch); err != nil {
+		return Plan{}, "", err
+	}
+	plan, err := p.retainedPlan(ctx, value, epoch, parametersDigest)
+	if err != nil {
+		return Plan{}, "", err
+	}
+	if !requireBundle {
+		return plan, "", nil
+	}
+	bundle, err := p.verifyBundle(ctx, plan.ExecutionID, plan.BundleDigest, plan.BundleSize)
+	if err != nil {
+		return Plan{}, "", err
+	}
+	return plan, bundle, nil
+}
+
+// originalPlan reconstructs only a retained original invocation. A Run may have
+// completed, aborted, or advanced after that invocation. Its current epoch is
+// not historical execution authority: the sealed Runtime transcript must bind
+// the exact original epoch instead. The caller additionally matches the entire
+// plan and Action identity to the independent Publisher's immutable start.
+func (p *Provider) originalPlan(ctx context.Context, op action.Operation) (Plan, error) {
+	if _, err := IdentityForOperation(op); err != nil {
+		return Plan{}, err
+	}
+	value, err := p.publicationRun(ctx, op.RunID, op.ExecutionEpoch)
+	if err != nil {
+		return Plan{}, err
+	}
+	if op.ExecutionEpoch > value.CurrentEpoch {
+		return Plan{}, fmt.Errorf("%w: original publication epoch exceeds retained Run", run.ErrStaleEpoch)
+	}
+	return p.retainedPlan(ctx, value, op.ExecutionEpoch, "")
+}
+
+func (p *Provider) publicationRun(ctx context.Context, runID string, epoch uint64) (run.Run, error) {
 	if p == nil || p.state == nil || p.remote == nil || runID == "" || epoch == 0 {
-		return empty, "", fmt.Errorf("publisher is not fully configured")
+		return run.Run{}, fmt.Errorf("publisher is not fully configured")
 	}
 	if err := ctx.Err(); err != nil {
-		return empty, "", err
+		return run.Run{}, err
 	}
 	value, _, err := p.state.GetExecutionContext(ctx, runID)
 	if err != nil {
-		return empty, "", err
+		return run.Run{}, err
 	}
-	if err := value.CheckEpoch(epoch); err != nil {
-		return empty, "", err
+	if value.ID != runID {
+		return run.Run{}, fmt.Errorf("publication identity does not belong to retained Run")
 	}
+	return value, nil
+}
+
+func (p *Provider) retainedPlan(ctx context.Context, value run.Run, epoch uint64, parametersDigest string) (Plan, error) {
+	var empty Plan
 	task, err := p.state.GetTaskByDigestContext(ctx, value.TaskContractDigest)
 	if err != nil {
-		return empty, "", err
+		return empty, err
+	}
+	taskDigest, err := task.Digest()
+	if err != nil || taskDigest != value.TaskContractDigest {
+		return empty, fmt.Errorf("publication TaskContract does not bind frozen Run")
 	}
 	target, ok := p.targets[task.Repository]
 	if !ok {
-		return empty, "", fmt.Errorf("repository is not allowed by publisher policy")
+		return empty, fmt.Errorf("repository is not allowed by publisher policy")
 	}
-	status, err := p.state.GetCodex(ctx, runID)
+	status, err := p.state.GetCodex(ctx, value.ID)
 	if err != nil {
-		return empty, "", err
+		return empty, err
 	}
-	if status.VerifyFinishedControls() != nil || status.Token.RunID != runID {
-		return empty, "", fmt.Errorf("publication requires one FINISHED Core-bound Codex result")
+	if status.VerifyFinishedControls() != nil || status.Token.RunID != value.ID ||
+		status.Runtime.Binding.ExecutionEpoch != epoch {
+		return empty, fmt.Errorf("publication requires exact original FINISHED Runtime epoch")
 	}
 	receipt := *status.Receipt
 	if receipt.Token != status.Token || receipt.ResultDigest == "" {
-		return empty, "", fmt.Errorf("Codex publication identity mismatch")
+		return empty, fmt.Errorf("Codex publication identity mismatch")
 	}
 	if parametersDigest != "" && parametersDigest != receipt.ResultDigest {
-		return empty, "", fmt.Errorf("action parameters_digest does not bind the retained Codex result")
+		return empty, fmt.Errorf("action parameters_digest does not bind the retained Codex result")
 	}
 	receiptDigest, err := engineeringevidence.CodexReceiptDigest(receipt)
 	if err != nil {
-		return empty, "", err
+		return empty, err
 	}
 	change := receipt.Result.Change
 	if strings.ToLower(task.BaseCommit) != change.BaseCommit {
-		return empty, "", fmt.Errorf("Codex base commit does not match frozen TaskContract")
+		return empty, fmt.Errorf("Codex base commit does not match frozen TaskContract")
 	}
 	if len(status.Token.ID) < 24 {
-		return empty, "", fmt.Errorf("invalid Codex execution identity")
+		return empty, fmt.Errorf("invalid Codex execution identity")
 	}
 	plan := Plan{
 		Version:       1,
-		RunID:         runID,
+		RunID:         value.ID,
 		Repository:    target.Repository,
 		BaseRef:       target.BaseRef,
 		BaseCommit:    change.BaseCommit,
@@ -256,19 +308,11 @@ func (p *Provider) derive(ctx context.Context, runID string, epoch uint64, param
 		ExecutionID:   status.Token.ID,
 	}
 	if err := plan.Validate(); err != nil {
-		return empty, "", err
+		return empty, err
 	}
-	// Recovery observes the external operation using the immutable Core receipt.
-	// A local bundle is required to dispatch, but its later loss must not turn
-	// an externally completed UNKNOWN publication into an unreconcilable MANUAL.
-	if !requireBundle {
-		return plan, "", nil
-	}
-	bundle, err := p.verifyBundle(ctx, status.Token.ID, change.BundleDigest, change.BundleSize)
-	if err != nil {
-		return empty, "", err
-	}
-	return plan, bundle, nil
+	// Identity readback needs only retained Core bytes. Bundle loss must not
+	// authorize a retry or prevent observation of an original remote effect.
+	return plan, ctx.Err()
 }
 
 func (p Plan) Validate() error {

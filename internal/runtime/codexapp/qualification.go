@@ -21,37 +21,44 @@ import (
 
 const CompatibilityContractVersion = 2
 
-const QualificationSchemaVersion = 3
+const QualificationSchemaVersion = 4
+
+// FilesystemReadBoundaryHostUID states the limit of this no-model probe. The
+// launcher isolates configuration and process lifetime; it does not qualify a
+// deny-read boundary for other files readable by the same trusted host UID.
+const FilesystemReadBoundaryHostUID = "host-uid-trust"
 
 var codexVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
 
 type QualificationReceipt struct {
-	SchemaVersion                int    `json:"schema_version"`
-	CompatibilityContractVersion int    `json:"compatibility_contract_version"`
-	CLI                          string `json:"cli"`
-	Version                      string `json:"version"`
-	BinaryDigest                 string `json:"binary_digest"`
-	StableSchemaDigest           string `json:"stable_schema_digest"`
-	ExperimentalSchemaDigest     string `json:"experimental_schema_digest"`
-	Transport                    string `json:"transport"`
-	FreshProcess                 bool   `json:"fresh_process"`
-	ManagedDaemon                bool   `json:"managed_daemon"`
-	PerThreadConfigOverride      bool   `json:"per_thread_config_override"`
-	InitializePassed             bool   `json:"initialize_passed"`
-	ThreadStartPassed            bool   `json:"thread_start_passed"`
-	ThreadStartModel             string `json:"thread_start_model"`
-	StableSchemaContractChecked  bool   `json:"stable_schema_contract_checked"`
-	ExperimentalSurfaceChecked   bool   `json:"experimental_surface_checked"`
-	CredentialSafeConfigDigest   string `json:"credential_safe_config_digest"`
-	CredentialSafeProfileChecked bool   `json:"credential_safe_profile_checked"`
-	EngineeringConfigDigest      string `json:"engineering_config_digest"`
-	EngineeringProfileChecked    bool   `json:"engineering_profile_checked"`
-	IsolationMechanism           string `json:"isolation_mechanism"`
-	IsolationEnvironmentDigest   string `json:"isolation_environment_digest"`
-	IsolatedEngineeringStartup   bool   `json:"isolated_engineering_startup"`
-	NamespaceInitReaped          bool   `json:"namespace_init_reaped"`
-	ModelTurnExecuted            bool   `json:"model_turn_executed"`
-	CredentialUsed               bool   `json:"credential_used"`
+	SchemaVersion                    int    `json:"schema_version"`
+	CompatibilityContractVersion     int    `json:"compatibility_contract_version"`
+	CLI                              string `json:"cli"`
+	Version                          string `json:"version"`
+	BinaryDigest                     string `json:"binary_digest"`
+	StableSchemaDigest               string `json:"stable_schema_digest"`
+	ExperimentalSchemaDigest         string `json:"experimental_schema_digest"`
+	Transport                        string `json:"transport"`
+	FreshProcess                     bool   `json:"fresh_process"`
+	ManagedDaemon                    bool   `json:"managed_daemon"`
+	PerThreadConfigOverride          bool   `json:"per_thread_config_override"`
+	InitializePassed                 bool   `json:"initialize_passed"`
+	ThreadStartPassed                bool   `json:"thread_start_passed"`
+	ThreadStartModel                 string `json:"thread_start_model"`
+	StableSchemaContractChecked      bool   `json:"stable_schema_contract_checked"`
+	ExperimentalSurfaceChecked       bool   `json:"experimental_surface_checked"`
+	CredentialSafeConfigDigest       string `json:"credential_safe_config_digest"`
+	CredentialSafeProfileChecked     bool   `json:"credential_safe_profile_checked"`
+	EngineeringConfigDigest          string `json:"engineering_config_digest"`
+	EngineeringProfileChecked        bool   `json:"engineering_profile_checked"`
+	IsolationMechanism               string `json:"isolation_mechanism"`
+	IsolationEnvironmentDigest       string `json:"isolation_environment_digest"`
+	IsolatedEngineeringStartup       bool   `json:"isolated_engineering_startup"`
+	NamespaceInitReaped              bool   `json:"namespace_init_reaped"`
+	FilesystemReadBoundary           string `json:"filesystem_read_boundary"`
+	FilesystemReadIsolationQualified bool   `json:"filesystem_read_isolation_qualified"`
+	ModelTurnExecuted                bool   `json:"model_turn_executed"`
+	CredentialUsed                   bool   `json:"credential_used"`
 }
 
 // Qualify exercises the actual Codex binary without making a model turn.
@@ -148,30 +155,32 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 	}
 
 	receipt = QualificationReceipt{
-		SchemaVersion:                QualificationSchemaVersion,
-		CompatibilityContractVersion: CompatibilityContractVersion,
-		CLI:                          "codex-cli",
-		Version:                      version,
-		BinaryDigest:                 digest,
-		StableSchemaDigest:           stableDigest,
-		ExperimentalSchemaDigest:     experimentalDigest,
-		Transport:                    "stdio",
-		FreshProcess:                 true,
-		ManagedDaemon:                false,
-		PerThreadConfigOverride:      false,
-		InitializePassed:             true,
-		ThreadStartPassed:            true,
-		ThreadStartModel:             model,
-		StableSchemaContractChecked:  true,
-		ExperimentalSurfaceChecked:   true,
-		CredentialSafeConfigDigest:   canonical.BytesDigest([]byte(credentialSafeConfig)),
-		CredentialSafeProfileChecked: true,
-		EngineeringConfigDigest:      EngineeringConfigDigest(),
-		EngineeringProfileChecked:    true,
-		IsolationMechanism:           processscope.Mechanism,
-		IsolationEnvironmentDigest:   environment,
-		IsolatedEngineeringStartup:   true,
-		NamespaceInitReaped:          true,
+		SchemaVersion:                    QualificationSchemaVersion,
+		CompatibilityContractVersion:     CompatibilityContractVersion,
+		CLI:                              "codex-cli",
+		Version:                          version,
+		BinaryDigest:                     digest,
+		StableSchemaDigest:               stableDigest,
+		ExperimentalSchemaDigest:         experimentalDigest,
+		Transport:                        "stdio",
+		FreshProcess:                     true,
+		ManagedDaemon:                    false,
+		PerThreadConfigOverride:          false,
+		InitializePassed:                 true,
+		ThreadStartPassed:                true,
+		ThreadStartModel:                 model,
+		StableSchemaContractChecked:      true,
+		ExperimentalSurfaceChecked:       true,
+		CredentialSafeConfigDigest:       canonical.BytesDigest([]byte(credentialSafeConfig)),
+		CredentialSafeProfileChecked:     true,
+		EngineeringConfigDigest:          EngineeringConfigDigest(),
+		EngineeringProfileChecked:        true,
+		IsolationMechanism:               processscope.Mechanism,
+		IsolationEnvironmentDigest:       environment,
+		IsolatedEngineeringStartup:       true,
+		NamespaceInitReaped:              true,
+		FilesystemReadBoundary:           FilesystemReadBoundaryHostUID,
+		FilesystemReadIsolationQualified: false,
 	}
 	if err := receipt.Validate(); err != nil {
 		return QualificationReceipt{}, err
@@ -197,7 +206,18 @@ func ParseCodexVersionOutput(output string) (string, error) {
 }
 
 func (r QualificationReceipt) Validate() error {
-	if r.SchemaVersion != QualificationSchemaVersion || r.CompatibilityContractVersion != CompatibilityContractVersion ||
+	if r.SchemaVersion != QualificationSchemaVersion || r.FilesystemReadBoundary != FilesystemReadBoundaryHostUID ||
+		r.FilesystemReadIsolationQualified {
+		return fmt.Errorf("invalid Codex compatibility qualification receipt")
+	}
+	return r.validateCompatibilityEvidence()
+}
+
+// validateCompatibilityEvidence checks the unchanged compatibility contract.
+// Schema/read-boundary admission remains exclusively in Validate; the retained
+// v3 evidence reader uses this only after enforcing the original wire shape.
+func (r QualificationReceipt) validateCompatibilityEvidence() error {
+	if r.CompatibilityContractVersion != CompatibilityContractVersion ||
 		r.CLI != "codex-cli" || !ValidCodexVersion(r.Version) ||
 		!canonical.ValidDigest(r.BinaryDigest) || !canonical.ValidDigest(r.StableSchemaDigest) ||
 		!canonical.ValidDigest(r.ExperimentalSchemaDigest) || r.Transport != "stdio" ||

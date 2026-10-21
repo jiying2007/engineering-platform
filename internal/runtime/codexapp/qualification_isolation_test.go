@@ -32,12 +32,15 @@ func TestQualificationEnvironmentStableAndReceiptFailClosed(t *testing.T) {
 	}
 	good := executableQualificationFixture(t, bin, "0.157.1", "test-model")
 	for _, mutate := range []func(*QualificationReceipt){
-		func(r *QualificationReceipt) { r.SchemaVersion = 2 },
+		func(r *QualificationReceipt) { r.SchemaVersion = 3 },
 		func(r *QualificationReceipt) { r.CompatibilityContractVersion = 1 },
 		func(r *QualificationReceipt) { r.IsolationMechanism = "plain-process" },
 		func(r *QualificationReceipt) { r.IsolationEnvironmentDigest = "" },
 		func(r *QualificationReceipt) { r.IsolatedEngineeringStartup = false },
 		func(r *QualificationReceipt) { r.NamespaceInitReaped = false },
+		func(r *QualificationReceipt) { r.FilesystemReadBoundary = "" },
+		func(r *QualificationReceipt) { r.FilesystemReadBoundary = "workspace-only" },
+		func(r *QualificationReceipt) { r.FilesystemReadIsolationQualified = true },
 		func(r *QualificationReceipt) { r.ModelTurnExecuted = true },
 		func(r *QualificationReceipt) { r.CredentialUsed = true },
 	} {
@@ -183,7 +186,9 @@ for line in sys.stdin:
 	if err != nil || a != b {
 		t.Fatal("qualification identity drift", a, b, err)
 	}
-	if !a.IsolatedEngineeringStartup || !a.NamespaceInitReaped || a.ModelTurnExecuted || a.CredentialUsed {
+	if !a.IsolatedEngineeringStartup || !a.NamespaceInitReaped ||
+		a.FilesystemReadBoundary != FilesystemReadBoundaryHostUID || a.FilesystemReadIsolationQualified ||
+		a.ModelTurnExecuted || a.CredentialUsed {
 		t.Fatal(a)
 	}
 }

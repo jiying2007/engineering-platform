@@ -43,7 +43,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 	binaryDigest := digestFixtureFile(t, binaryZip)
 
 	qualification := codexapp.QualificationReceipt{
-		SchemaVersion:                3,
+		SchemaVersion:                codexapp.QualificationSchemaVersion,
 		CompatibilityContractVersion: codexapp.CompatibilityContractVersion,
 		CLI:                          "codex-cli",
 		Version:                      "0.157.1",
@@ -67,6 +67,7 @@ func fixtureImport(t *testing.T) ImportRequest {
 		IsolationEnvironmentDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		IsolatedEngineeringStartup:   true,
 		NamespaceInitReaped:          true,
+		FilesystemReadBoundary:       codexapp.FilesystemReadBoundaryHostUID,
 	}
 	qdata, err := json.Marshal(qualification)
 	if err != nil {

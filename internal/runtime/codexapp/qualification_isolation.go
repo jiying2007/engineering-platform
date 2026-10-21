@@ -64,14 +64,13 @@ func qualifyIsolatedEngineeringStartup(ctx context.Context, executable, digest, 
 	}
 	// Scope owns Wait. Use a separate pipe so Wait cannot close StdoutPipe while
 	// Client is reading a final response. Parent ends are explicitly owned here.
-	output, writer, err := os.Pipe()
+	output, writer, err := protocolOutput(cmd)
 	if err != nil {
 		_ = stdin.Close()
 		return err
 	}
 	defer output.Close()
 	defer writer.Close()
-	cmd.Stdout = writer
 	var diagnostics diagnosticBuffer
 	cmd.Stderr = &boundedWriter{writer: &diagnostics, remaining: 64 << 10}
 	scope, err := processscope.Start(cmd)

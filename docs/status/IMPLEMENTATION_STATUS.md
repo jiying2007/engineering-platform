@@ -20,7 +20,34 @@
 
 This is the single live implementation-status authority. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
-parallel live checklists. Audit baseline: `e4ca13e254c883d336ec990e1767f8cc85b8b98b`.
+parallel live checklists. Latest comprehensive audit baseline:
+`a8557646ca27eb4d7feb09144995478a20a0664c`.
+
+## Comprehensive audit remediation — 2026-10-21
+
+The source changes from the comprehensive audit address dependency advisories,
+request-time Publisher certificate validity, historical publication readback,
+PLANNED recovery receipt integrity, full-history provenance query cost, and
+runtime subprocess output ownership and diagnostics concurrency. Schema v14
+adds a provenance index without rewriting historical authority. The mandatory
+PostgreSQL restore gate now includes restored PLANNED receipt verification and
+later historical corruption rejection. External workflow actions are pinned to
+full commit identities and the Go gate retains a fail-closed vulnerability scan.
+
+New Codex qualification schema v4 explicitly records `host-uid-trust` and that
+filesystem read isolation is **unqualified**. Existing engineering configuration
+bytes and historical receipt digests remain unchanged. Strictly bound retained
+v3 evidence can be archived for completed results; this readback grants no new
+runtime authority. Reissued qualifications and receipt-based Profile construction
+require v4; existing frozen Permit identities remain unchanged.
+The implementation and regression mapping are recorded in
+[the audit remediation record](../reviews/AUDIT_REMEDIATION_2026-10-21.md).
+
+These repairs strengthen the existing evidence paths. The authoritative posture
+remains **BLOCKED**, with internal blockers **#228 and #229**, production
+qualification **#105**, and credential-dependent gates **#103 and #106** still
+open. Repository tests cannot establish original external-dispatcher quiescence,
+selected-host read isolation, long-run operation, or unattended acceptance.
 
 ## Maturity boundary
 
@@ -545,7 +572,7 @@ boundary. This deferral does not affect RC or production acceptance gates.
 | Offline build outputs | Frozen output names/budgets, guarded tmpfs collection after child reap, existing local/Core receipt and Evidence byte checks; actual native C compiler, freestanding host-ISA firmware and Cortex-M0 ARM EABI cross-toolchain ELF/map references all traverse the installed Worker/Core/private-restore chain | Writable host builds, large production firmware or target-board boot/timing/electrical qualification |
 | Raw artifact sets | Explicit plans or producer-derived execution/Context/offline-output selection, byte packing/verification and fresh-directory restore; successor execution capture also retains and verifies the exact upstream continuation checkpoint; execution capture requires the exact sealed ControlTranscript plus bounded raw Codex item/completion history; native PostgreSQL dump/restore drill; required ENOSPC pack/restore fail-closed test; externally pinned scheduled verification/copy into a second owner-private root; required real-systemd CI runs the maintenance oneshot as canonical `engineering-preparation:engineering-platform` and proves first-copy/idempotent readback/fail-closed missing config without installing production-named units | Provider credential/session bootstrap and internal streaming state, actual off-host/second-site or production-host retention qualification, encryption/key custody, destructive GC or automatic disk-exhaustion repair |
 | Provider | Profile v3 binds provider, credential, execution mode, binary and configuration identity | Admission mechanics equal live provider qualification |
-| Compatibility | Schema3/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity | Authentication, model/tool execution or production qualification |
+| Compatibility | Schema4/contract2 probes actual Codex under engineering namespace/config; repeatable environment identity; `host-uid-trust` with filesystem read isolation unqualified | Authentication, model/tool execution, filesystem read isolation or production qualification |
 | Publisher | Independent mTLS service; production startup rejects in-process publishing; bounded authenticated /healthz observation is bound to exact remote configuration digest | Endpoint health is upstream GitHub/provider health, capacity, publication authority or production readiness |
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
@@ -726,12 +753,17 @@ Preserve unchanged:
 credential/provider fallback is admitted. WIF #103 and relay #106 live
 qualification remain deferred; speculative relay tooling stays frozen.
 
-Qualification schema3/contract2 launches the native binary in the actual user/PID
-namespace, exact workspace-write config and fresh credential-free HOME. Only
-initialize/initialized/thread-start are sent, followed by confirmed init reap.
-The stable kernel/architecture/UID/GID digest excludes PID/inode/time. CI probes
-twice; each actual Worker CLI requalifies and compares the entire receipt. Old
-current-admission receipts fail, but historical M1 records are not rewritten.
+Qualification schema4/contract2 launches the native binary in the actual user/PID
+namespace, exact workspace-write config and fresh credential-free HOME. It records
+`filesystem_read_boundary=host-uid-trust` and
+`filesystem_read_isolation_qualified=false`; startup and process reaping do not
+qualify filesystem read isolation. Only initialize/initialized/thread-start are
+sent, followed by confirmed init reap. The stable kernel/architecture/UID/GID
+digest excludes PID/inode/time. CI probes twice; each actual Worker CLI
+requalifies and compares the entire receipt. Reissued qualifications and
+receipt-based Profile construction/preflight require v4. Existing frozen
+Profile/Permit identities have no schema discriminator and remain unchanged;
+historical M1 records are not rewritten.
 
 **Production #105 stays open.** Terminal plan v3 additionally freezes the
 single-maintenance-canary profile, selected-provider emergency disablement,

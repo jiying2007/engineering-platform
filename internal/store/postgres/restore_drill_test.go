@@ -123,7 +123,7 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 		t.Fatal(err)
 	}
 	dumpPath := filepath.Join(dumpDir, "authority.dump")
-	runPG17(t, base, []string{"pg_dump", "--format=custom", "--no-owner", "--no-privileges", "--file=/dump/authority.dump", sourceDB}, dumpDir)
+	publicationPGTool(t, ctx, base, 17, []string{"pg_dump", "--format=custom", "--no-owner", "--no-privileges", "--file=/dump/authority.dump", sourceDB}, dumpDir)
 	if info, err := os.Stat(dumpPath); err != nil || info.Size() == 0 {
 		t.Fatalf("pg_dump did not produce bytes: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestPostgresAuthorityRestoreDrill(t *testing.T) {
 	}
 	// The existing test authority explicitly invokes native PostgreSQL restore.
 	// artifact-set itself never executes SQL, launches a process or grants this.
-	runPG17(t, base, []string{"pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction", "--dbname=" + restoredDB, "/dump/authority.dump"}, files)
+	publicationPGTool(t, ctx, base, 17, []string{"pg_restore", "--no-owner", "--no-privileges", "--exit-on-error", "--single-transaction", "--dbname=" + restoredDB, "/dump/authority.dump"}, files)
 	t.Log("native pg_dump -> private set -> original DB/dump removed -> bytes restored -> pg_restore completed")
 
 	restored, err := Open(ctx, restoredURL)

@@ -21,13 +21,21 @@ working ChatGPT-authenticated Codex CLI whose exact executable/profile is
 compatibility-qualified and whose saved-login bootstrap is isolated and removed
 before model-reachable work.
 
-The model process receives:
+The launcher provides:
 
-- a fresh isolated Codex HOME, never the operator HOME;
-- only the frozen exact-base worktree and approved Context bundle;
-- no GitHub publisher token;
-- no `OPENAI_API_KEY`, `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN` or WIF input;
-- no tool network and approval policy `never`.
+- a fresh Codex HOME path and configuration, rather than the operator HOME;
+- the frozen exact-base worktree and approved Context bundle as the intended work;
+- no GitHub publisher token in the child environment;
+- no `OPENAI_API_KEY`, `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN` or WIF environment input;
+- the qualified no-tool-network configuration and approval policy `never`.
+
+These are launch/configuration controls. `workspace-write` and user/PID
+namespaces do not establish a filesystem deny-read boundary for other paths
+readable by the same host UID. The original saved login and host `gh` credential
+may remain readable under that trusted account; clearing environment variables
+or deleting the bootstrap copy does not change their host file permissions.
+Do not describe this lane as worktree-only visibility, separate-tenant secret
+isolation, or unattended production qualification.
 
 The operator `auth.json` is copied into the isolated HOME only for app-server
 authentication prewarm. The isolated copy is deleted and verified absent before
@@ -36,7 +44,53 @@ authentication prewarm. The isolated copy is deleted and verified absent before
 After the Core-bound Codex turn is FINISHED and the result bundle plus
 pre-publication PostgreSQL snapshot are retained, the Codex process is stopped.
 Only then may the independent Action Gateway publisher read the trusted host's
-`gh` credential.
+`gh` credential. This workflow ordering is not a filesystem access-control
+mechanism for the shared trusted account.
+
+## Filesystem read qualification
+
+Compatibility qualification schema v4 explicitly retains:
+
+```json
+{
+  "filesystem_read_boundary": "host-uid-trust",
+  "filesystem_read_isolation_qualified": false
+}
+```
+
+The receipt binds the actual executable, protocol/configuration and host-class
+digests and proves the no-account startup/process-reaping checks it records.
+It does not run a model/tool turn or test file-read isolation. A receipt claiming
+file-read isolation from this probe is rejected. Historical schema-v3 receipts
+remain historical evidence. Reissued qualifications and receipt-based Profile v3
+construction/preflight require a fresh v4 receipt/digest. Existing frozen
+Profile/Permit digests carry no schema discriminator and retain their original
+identity; this change does not rewrite or promote retained M1 records.
+
+Offline capture of an already completed result can retain its original v3
+qualification only when the sealed, quiescent control transcript and frozen
+Permit/result bindings agree. The readback compares the original qualification
+against the digest already frozen in that Permit, never a digest calculated
+from an otherwise untrusted supplied file. It preserves the v3 field shape,
+canonical digest and raw archive bytes, rejects unknown or injected v4 fields,
+and grants no current qualification, replay or execution authority. This local
+capture does not claim that Core FINISHED was independently observed.
+
+Where an intended deployment requires isolation from same-UID host credentials,
+the selected host must first enforce a real file-read boundary (for example,
+separate service identities and restricted mounts). Qualify the exact installed
+binary and policy with nonsecret canaries in the approved worktree and outside
+it, including equivalents of source-login, `gh` configuration, Publisher key
+and other preparation paths. Retain the expected and observed allow/deny results,
+exact binary/configuration/host identities and independent verification. An
+approved-worktree positive control must succeed; forbidden canaries must fail
+through the actual model-tool sandbox. A no-account protocol probe or a command
+run outside that sandbox cannot supply this evidence.
+
+These selected-host results belong to the existing
+[#229 qualification gate](https://github.com/jiying2007/engineering-platform/issues/229)
+and [terminal evidence contract](../../../docs/status/TERMINAL_BLOCKER_EVIDENCE_CONTRACT.md).
+They do not introduce another authority ledger or grant production use.
 
 ## When to use another lane
 
@@ -105,14 +159,15 @@ Logged in using ChatGPT
 
 The team does not need one common Codex version. The self-hosted engineering
 script runs `codex-qualifier` against the actual executable, freezes its
-QualificationReceipt/digest into Profile v2, and the Worker re-runs the same
+QualificationReceipt/digest into Profile v3, and the Worker re-runs the same
 non-model compatibility qualification immediately before execution. A binary
 that no longer satisfies the contract fails closed.
 
 Do not print or upload `auth.json`.
 
 The `gh` credential is the phase-1 publisher credential. It is never exported
-to the model process. A least-privilege GitHub App publisher remains preferable
+in the model process environment; the same-UID file-read limitation above still
+applies. A least-privilege GitHub App publisher remains preferable
 for longer-lived operation.
 
 ## Optional saved-login diagnostic

@@ -102,7 +102,9 @@ func authorizedPublisherRequest(t *testing.T, method, path string, body []byte) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	cert := &x509.Certificate{Raw: []byte{1}, URIs: []*url.URL{uri}}
+	cert := &x509.Certificate{Raw: []byte{1}, URIs: []*url.URL{uri},
+		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}
 	req.TLS = &tls.ConnectionState{
 		HandshakeComplete: true, Version: tls.VersionTLS13,
 		PeerCertificates: []*x509.Certificate{cert},

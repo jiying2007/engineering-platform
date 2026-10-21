@@ -187,7 +187,7 @@ type dispatchEvidenceRemote interface {
 
 func (p *Provider) ObserveOriginalPublication(ctx context.Context, op action.Operation) (PublicationEvidence, error) {
 	var zero PublicationEvidence
-	if p == nil {
+	if p == nil || !PositiveRecoveryState(op.State) {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
 	identity, err := IdentityForOperation(op)
@@ -198,7 +198,7 @@ func (p *Provider) ObserveOriginalPublication(ctx context.Context, op action.Ope
 	if !ok {
 		return zero, ErrDispatchEvidenceUnavailable
 	}
-	plan, _, err := p.derive(ctx, op.RunID, op.ExecutionEpoch, "", false)
+	plan, err := p.originalPlan(ctx, op)
 	if err != nil {
 		return zero, err
 	}
