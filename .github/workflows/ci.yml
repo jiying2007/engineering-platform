@@ -186,7 +186,10 @@ jobs:
           go test -race -count=20 -timeout 1m ./internal/outbox
           go test -race -shuffle=on -count=3 -timeout 2m ./internal/store/postgres -run 'TestPostgres(Outbox|EverySettlement|RecoveryAfterClaim|DispatchHolds|ConcurrentDispatch|MismatchedRisk|ExpiredAndCancelled|UnknownOutcome|RiskRejection|FaultInjectionSchemaIsolation)'
       - name: Prepared Runtime and Context repeated regression
-        run: go test -race -count=10 -timeout 2m ./internal/runtime/codexapp ./internal/contextbundle
+        # Each iteration includes four real immediate-exit subprocess lanes.
+        # The complete local race package takes about 19 s; retain all ten
+        # repetitions and allow their measured duration within the job ceiling.
+        run: go test -race -count=10 -timeout 4m ./internal/runtime/codexapp ./internal/contextbundle
       - name: Worker admission repeated regression
         shell: bash
         env:
