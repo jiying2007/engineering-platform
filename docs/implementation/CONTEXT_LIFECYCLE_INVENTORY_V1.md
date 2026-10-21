@@ -15,11 +15,13 @@ pipe ownership move two existing source locations without changing their bounded
 cleanup roles. The subsequent production audit against
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a` adds the five-second, cancellation-independent
 Runtime probe stop context. The source digest and exact locations below include
-both audits: 59 direct origins, including 19 bounded cleanup/settlement sites.
+both audits and the fresh-main startup-gate pipe ownership correction: 59 direct
+origins, including 19 bounded cleanup/settlement sites. The pipe correction
+changes no Context lifecycle category or deadline.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:9bf0b4fa11f3de8377627553dfdf649cb65fb80e2e19650c29dd1ffb9a7bf9e6`
+`sha256:c62b4f660dc56c74b5adfa43a39fe13ff3e91ac253e04cf418ae75c4aa0aa66e`
 
 ## Reviewed categories
 
@@ -84,12 +86,12 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/execution_readback.go:52` | `Background` | Explicitly timed command root |
 | `cmd/eng/human_takeover.go:99` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_ci.go:54` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:33` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:77` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:113` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:162` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:198` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:257` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:34` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:78` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:114` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:163` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:200` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:263` | `Background` | Explicitly timed command root |
 | `cmd/eng/installation_readback.go:49` | `Background` | Signal-owned command/service root |
 | `cmd/eng/installation_switch.go:56` | `Background` | Signal-owned command/service root |
 | `cmd/eng/pilot_preflight.go:486` | `Background` | Explicitly timed command root |
@@ -118,7 +120,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/probe_process.go:73` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/probe_process.go:85` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/qualification_isolation.go:86` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |

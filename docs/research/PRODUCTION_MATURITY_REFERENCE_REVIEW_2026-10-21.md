@@ -253,3 +253,18 @@ The specification distinguishes provenance completeness, authenticity,
 accuracy and build isolation. Retaining a report's raw input improves
 reproducibility; hashes alone do not establish a trusted origin or a compliant
 build platform. No SLSA level is awarded by this comparison.
+
+### R14 — Go subprocess stdin ownership
+
+https://pkg.go.dev/os/exec#Cmd.StdinPipe
+
+https://pkg.go.dev/os/exec#Cmd.Wait
+
+The documented `StdinPipe` contract gives `Wait` automatic closure after the
+command exits. The follow-up fresh-main failure exposed an extra caller close
+racing that lifecycle. The reviewed Go 1.26.10 source and a deterministic
+production-helper regression confirmed the same ownership rule. Caller-owned
+`os.Pipe` descriptors supplied as `*os.File` avoid that conflicting ownership;
+they also make the parent responsible for closing both of its descriptors.
+This supports the bounded repair recorded in the audit, not a claim that a
+subprocess exit or a pipe close proves external provider quiescence.

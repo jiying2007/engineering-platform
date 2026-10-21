@@ -34,6 +34,18 @@ const probeStopTimeout = 5 * time.Second
 // EOF on stdin and an explicit credential-free environment.
 const probeStartGate = `IFS= read -r probe_ready || exit 125; exec "$@"`
 
+// Both descriptors belong to the caller. In particular, StdinPipe would let
+// Cmd.Wait close the writer while a fast command races the startup handshake.
+// Passing the read end as *os.File avoids that extra os/exec ownership.
+func probeStdinPipe(cmd *exec.Cmd) (childInput, input *os.File, err error) {
+	childInput, input, err = os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	cmd.Stdin = childInput
+	return childInput, input, nil
+}
+
 // probeOutput is safe to inspect even when bounded cleanup cannot establish a
 // reap. Overflow cancels the owning scope immediately while keeping memory and
 // all returned diagnostics bounded; no caller accepts a truncated success.
@@ -117,10 +129,11 @@ func runCodexProbe(ctx context.Context, executable, expectedDigest, home string,
 		stderr = &probeOutput{limit: budget.stderrBytes, cancel: cancel}
 	}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	input, err := cmd.StdinPipe()
+	childInput, input, err := probeStdinPipe(cmd)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer childInput.Close()
 	defer input.Close()
 	scope, err := processscope.Start(cmd)
 	if err != nil {
@@ -141,11 +154,16 @@ func runCodexProbe(ctx context.Context, executable, expectedDigest, home string,
 			runErr = errors.Join(runErr, cause)
 		}
 	}()
+	// Start has duplicated this descriptor into the child. Close only the
+	// parent's copy; Wait has no ownership of either caller-held descriptor.
+	if err := childInput.Close(); err != nil {
+		return nil, nil, fmt.Errorf("close Codex probe parent stdin reader: %w", err)
+	}
 	if _, err := input.Write([]byte("\n")); err != nil {
 		return nil, nil, fmt.Errorf("release Codex probe startup gate: %w", err)
 	}
 	if err := input.Close(); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("close Codex probe startup gate: %w", err)
 	}
 	proof, runErr = scope.Wait(probing)
 	return nil, nil, runErr

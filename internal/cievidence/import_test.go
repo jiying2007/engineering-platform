@@ -13,6 +13,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/canonical"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/distribution"
+	"github.com/jiying2007/engineering-platform/internal/production"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -211,6 +212,77 @@ func TestVerifyTrustedImportAcceptsExactPRHead(t *testing.T) {
 	}
 	if got.Result != "PASS" || got.SubjectDigest != req.Delivery.SubjectDigest {
 		t.Fatalf("unexpected PR-head evidence: %#v", got)
+	}
+}
+
+func TestVerifyTrustedImportTerminalRequiresExactPRHead(t *testing.T) {
+	terminal, err := production.BuildTerminalPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name       string
+		fixture    func(*testing.T) ImportRequest
+		terminal   bool
+		repository string
+		wantError  bool
+	}{
+		{name: "terminal-main-push", fixture: fixtureImport, terminal: true, wantError: true},
+		{name: "terminal-pr-head", fixture: pullRequestFixture, terminal: true},
+		{name: "terminal-wrong-repository", fixture: pullRequestFixture, terminal: true, repository: "foreign/engineering-platform", wantError: true},
+		{name: "ordinary-main-push", fixture: fixtureImport},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := tc.fixture(t)
+			if tc.terminal {
+				req.Delivery.TargetID = terminal.Plan.TargetID
+			}
+			if tc.repository != "" {
+				// Keep the foreign receipt, live facts and archive digests internally
+				// consistent, so this case exercises repository authority itself.
+				envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
+				if err != nil {
+					t.Fatal(err)
+				}
+				envelope.Receipt.Repository = tc.repository
+				envelope, err = NewEnvelope(envelope.Receipt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				data, err := json.Marshal(envelope)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeFixtureZip(t, filepath.Dir(req.Files.EnvelopeZip), filepath.Base(req.Files.EnvelopeZip), map[string][]byte{"ci-evidence-envelope.json": data})
+				info, err := os.Stat(req.Files.EnvelopeZip)
+				if err != nil {
+					t.Fatal(err)
+				}
+				digest := digestFixtureFile(t, req.Files.EnvelopeZip)
+				for i := range req.Live.Artifacts {
+					if strings.HasPrefix(req.Live.Artifacts[i].Name, "trusted-ci-evidence-") {
+						req.Live.Artifacts[i].Digest = digest
+						req.Live.Artifacts[i].Size = info.Size()
+					}
+				}
+				req.Delivery.Artifacts[0].Digest = digest
+				req.Live.Run.Repository = tc.repository
+			}
+			req.Delivery.SubjectDigest, err = req.Delivery.CalculateSubjectDigest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := VerifyTrustedImport(req)
+			if tc.wantError {
+				if err == nil || got.ID != "" {
+					t.Fatalf("unqualified terminal CI produced Evidence: %+v, err=%v", got, err)
+				}
+				return
+			}
+			if err != nil || got.Result != "PASS" || !got.Applicable || got.SubjectDigest != req.Delivery.SubjectDigest {
+				t.Fatalf("valid CI rejected or changed subject: %+v, err=%v", got, err)
+			}
+		})
 	}
 }
 

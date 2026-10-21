@@ -16,6 +16,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/engineeringevidence"
 	"github.com/jiying2007/engineering-platform/internal/offline"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/production"
 )
 
 func offlineReceiptDigest(args []string) error {
@@ -187,8 +188,9 @@ func gitChangeManifest(args []string) error {
 	base := fs.String("base", "", "exact base commit SHA")
 	result := fs.String("result", "", "exact result commit SHA")
 	output := fs.String("output", "", "new manifest file")
+	terminal := fs.Bool("terminal", false, "require the frozen terminal marker to be the only Git change")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 {
-		return fmt.Errorf("usage: eng git-change-manifest --repository PATH --base SHA --result SHA --output FILE")
+		return fmt.Errorf("usage: eng git-change-manifest --repository PATH --base SHA --result SHA --output FILE [--terminal]")
 	}
 	for _, value := range []string{*repository, *base, *result, *output} {
 		if strings.TrimSpace(value) == "" {
@@ -197,7 +199,11 @@ func gitChangeManifest(args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
-	manifest, err := engineeringevidence.CaptureGitChange(ctx, *repository, strings.ToLower(*base), strings.ToLower(*result))
+	capture := engineeringevidence.CaptureGitChange
+	if *terminal {
+		capture = captureTerminalGitChange
+	}
+	manifest, err := capture(ctx, *repository, strings.ToLower(*base), strings.ToLower(*result))
 	if err != nil {
 		return err
 	}
@@ -260,7 +266,7 @@ func importGitChangeEvidence(args []string) error {
 	if err := control.Call(ctx, "GET", "/api/v1/deliveries/"+*deliveryID, nil, &delivery); err != nil {
 		return err
 	}
-	observed, err := engineeringevidence.CaptureGitChange(ctx, *repository, delivery.BaseCommit, delivery.ResultCommit)
+	observed, err := captureGitChangeForDelivery(ctx, *repository, delivery)
 	if err != nil {
 		return err
 	}
@@ -272,6 +278,29 @@ func importGitChangeEvidence(args []string) error {
 		return err
 	}
 	return registerEngineeringEvidence(ctx, control, delivery.ID, evidence)
+}
+
+func captureTerminalGitChange(ctx context.Context, repository, base, result string) (engineeringevidence.GitChangeManifest, error) {
+	plan, err := production.BuildTerminalPlan()
+	if err != nil {
+		return engineeringevidence.GitChangeManifest{}, err
+	}
+	return engineeringevidence.CaptureSingleFileGitChange(ctx, repository, base, result, engineeringevidence.GitFileChange{
+		Path: plan.Plan.MarkerPath, Before: plan.Plan.MarkerBefore, After: plan.Plan.MarkerAfter,
+	})
+}
+
+// The importer uses the authenticated Delivery target, never a caller's flag,
+// to select the frozen terminal constraint before it can register Evidence.
+func captureGitChangeForDelivery(ctx context.Context, repository string, delivery core.DeliveryReceipt) (engineeringevidence.GitChangeManifest, error) {
+	plan, err := production.BuildTerminalPlan()
+	if err != nil {
+		return engineeringevidence.GitChangeManifest{}, err
+	}
+	if delivery.TargetID != plan.Plan.TargetID {
+		return engineeringevidence.CaptureGitChange(ctx, repository, delivery.BaseCommit, delivery.ResultCommit)
+	}
+	return captureTerminalGitChange(ctx, repository, delivery.BaseCommit, delivery.ResultCommit)
 }
 
 func registerEngineeringEvidence(ctx context.Context, control *controlclient.Client, deliveryID string, evidence core.EvidenceRef) error {
