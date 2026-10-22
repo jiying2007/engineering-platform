@@ -349,6 +349,71 @@ single-snapshot readiness/authority gates. All results keep service readiness
 unobserved, capacity unobserved, ready/execution/production flags false. A local
 report and adjacent checksum are not independently authenticated SLO evidence.
 
+### Finite continuous observer diagnostics
+
+The same command can run a finite series of independent complete windows:
+
+```sh
+eng production-status --monitor-for 1h --observe-for 30s --interval 5s \
+  --max-pending-age 2m --stale-after 45s --require-no-alert
+```
+
+`--monitor-for` and `--stale-after` are explicit whole-second settings. The
+monitor budget is at most 24 hours and at least one cycle; one cycle is the
+window plus one request interval. At most 4096 cycles are attempted. The
+freshness threshold must be at least one cycle and at most 24 hours. These are
+bounded diagnostic controls, not calibrated SLOs. Only complete cycles that fit
+the selected budget are scheduled; the command stops after its final window,
+so the budget is a maximum rather than a promise to observe every instant.
+
+Monitor mode emits bounded JSONL records immediately: start, complete window,
+failed window, recovery and stop. Records carry a random observer session ID,
+the SHA-256 of the configured Control endpoint, monotonically ordered sequence,
+window counters, state start time, last successful complete-window time and
+expiry. Successful records retain the original complete `ProgressReport` and
+its bounded source observations. The endpoint digest identifies configuration;
+it is not an authenticated deployment identity or a new Evidence issuer.
+
+Every request still uses the same existing direct-mTLS client, endpoint and
+`core:read` permission. The first individually valid fresh snapshot pins the
+Recovery epoch/mode, even if its window later fails. Any subsequent change
+records `RECOVERY_IDENTITY_CHANGED` and terminates nonzero; selecting the new
+Recovery identity requires an explicit new invocation. No database, permission,
+status route, heartbeat authority, mutation or external notification is added.
+
+Unavailable or unauthorized reads, request timeout, invalid/incomplete windows
+and missed scheduled windows produce fixed diagnostic reason codes, without
+raw transport errors or response bodies. They remain failed observations. Only
+a later complete, validated window from the same client and pinned Recovery
+identity can record recovery. A failure is never retried within its window;
+the next attempt uses its independently scheduled future cycle. Missed cycles
+are recorded without catch-up GET bursts. Cancellation and total deadline
+expiry have distinct terminal reasons. Epoch drift is terminal, not a transient
+availability error. No cached success fills a missing sample.
+
+`--require-no-alert` checks the entire invocation: any failed or alerted window
+keeps its eventual exit nonzero even if a later window recovers. Without that
+flag, a completed schedule may exit zero while retaining diagnostic alerts.
+All records keep READY, capacity, execution and production qualification false.
+
+The pure `EvaluateObserverFreshness` reader requires the expected session and
+endpoint digest. It rejects contradictory fields and evaluates observer/source
+expiry; a stopped observer is not fresh. An unavailable source is not currently
+fresh even if an earlier successful timestamp remains recent. A missing or stale
+record must never be treated as healthy. This is shape/expiry checking of one
+diagnostic record, not producer authentication or proof of a complete journal.
+The observer cannot report its own sudden death: an independent consumer must
+check record expiry. No installed external watchdog or real notification
+delivery is claimed by this command.
+
+Records are limited to 8 MiB each and 128 MiB per invocation. A write error,
+short write or output limit aborts immediately without another source request;
+partially written output is not a complete record. Deadline/cancellation bounds
+cover collection and waits. They do not make arbitrary operating-system output
+I/O interruptible: a blocked stdout sink can block the synchronous writer.
+Use a supervised, drained output stream and detect absent/expired records
+independently; no detached writer goroutine hides that boundary.
+
 Actual compiled-CLI tests use the existing authenticated Core middleware and
 real ephemeral mTLS identities: `core:read` succeeds, another valid identity
 without that permission fails before reaching the Store. The Store's changing

@@ -94,6 +94,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/work-items/{id}", s.handleGetWork)
 	s.mux.HandleFunc("POST /api/v1/task-contracts", s.handleCreateTask)
 	s.mux.HandleFunc("GET /api/v1/task-contracts/{id}", s.handleGetTask)
+	s.mux.HandleFunc("GET /api/v1/task-contracts/by-digest/{digest}", s.handleGetFrozenTaskByDigest)
+	s.mux.HandleFunc("GET /api/v1/verification-plans/by-digest/{digest}", s.handleGetFrozenVerificationPlanByDigest)
 	s.mux.HandleFunc("POST /api/v1/runs", s.handleCreateRun)
 	s.mux.HandleFunc("GET /api/v1/runs/{id}", s.handleGetRun)
 	s.mux.HandleFunc("POST /api/v1/runs/{id}/steer", s.handleSteer)

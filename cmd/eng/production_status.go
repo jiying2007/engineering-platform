@@ -21,6 +21,8 @@ type productionStatusOptions struct {
 	requireReady, requireAuthority, requireNoAlert bool
 	observe                                        bool
 	policy                                         production.ProgressPolicy
+	monitor                                        bool
+	monitorPolicy                                  production.ObserverPolicy
 }
 
 func parseProductionStatus(args []string) (productionStatusOptions, error) {
@@ -33,6 +35,8 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 	window := fs.Duration("observe-for", 0, "bounded observation window (2s..5m)")
 	interval := fs.Duration("interval", 5*time.Second, "fixed sampling interval (1s..60s)")
 	maxAge := fs.Duration("max-pending-age", 0, "explicit diagnostic pending-age threshold (1s..24h), not a production SLO")
+	monitorFor := fs.Duration("monitor-for", 0, "finite observer budget (complete window cycle..24h), with JSONL diagnostic events")
+	staleAfter := fs.Duration("stale-after", 0, "explicit observer/source freshness threshold (window cycle..24h)")
 	seen := map[string]bool{}
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
@@ -47,8 +51,9 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 		return o, fmt.Errorf("invalid production-status arguments")
 	}
 	o.observe = seen["observe-for"]
+	o.monitor = seen["monitor-for"]
 	if !o.observe {
-		if seen["interval"] || seen["max-pending-age"] || seen["require-no-alert"] {
+		if seen["interval"] || seen["max-pending-age"] || seen["require-no-alert"] || o.monitor || seen["stale-after"] {
 			return o, fmt.Errorf("observation options require --observe-for")
 		}
 		return o, nil
@@ -62,7 +67,20 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 		}
 	}
 	o.policy = production.ProgressPolicy{WindowSeconds: int(*window / time.Second), IntervalSeconds: int(*interval / time.Second), MaxPendingAgeSeconds: int(*maxAge / time.Second)}
-	return o, o.policy.Validate()
+	if err := o.policy.Validate(); err != nil {
+		return o, err
+	}
+	if !o.monitor {
+		if seen["stale-after"] {
+			return o, fmt.Errorf("--stale-after requires --monitor-for")
+		}
+		return o, nil
+	}
+	if !seen["stale-after"] || *monitorFor <= 0 || *staleAfter <= 0 || *monitorFor%time.Second != 0 || *staleAfter%time.Second != 0 {
+		return o, fmt.Errorf("monitor requires explicit whole positive duration and stale threshold")
+	}
+	o.monitorPolicy = production.ObserverPolicy{Progress: o.policy, DurationSeconds: int(*monitorFor / time.Second), StaleAfterSeconds: int(*staleAfter / time.Second)}
+	return o, o.monitorPolicy.Validate()
 }
 
 func productionStatus(args []string) error {
@@ -77,6 +95,16 @@ func productionStatus(args []string) error {
 	defer client.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if o.monitor {
+		hadAlert, err := runProductionMonitor(ctx, client, o.monitorPolicy, os.Getenv("CONTROL_ENDPOINT"), os.Stdout)
+		if err != nil {
+			return err
+		}
+		if o.requireNoAlert && hadAlert {
+			return fmt.Errorf("observer recorded a failed or alerted window")
+		}
+		return nil
+	}
 	if o.observe {
 		report, err := collectProductionProgress(ctx, client, o.policy)
 		if err != nil {
