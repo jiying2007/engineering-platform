@@ -117,6 +117,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-terminal-readback":
+		if err := productionTerminalReadback(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-slo-report":
 		if err := productionSLOReport(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -275,10 +280,13 @@ func usage() {
 	fmt.Println("  import-offline-evidence <flags>          register requirement-bound Worker execution Evidence")
 	fmt.Println("  relay-prequalification-pack <flags>          build contract+assessment from non-secret relay policy inputs")
 	fmt.Println("  production-terminal-plan                        emit immutable terminal maintenance acceptance contract")
+	fmt.Println("  production-terminal-readback --closure ID --run ID --subject DIGEST  authenticated historical Core chain readback and 14-gate diagnostics; no qualification")
 	fmt.Println("  production-slo-report --observations FILE       summarize measured operational latency evidence without guessed targets")
+	fmt.Println("  production-slo-report --operational FILE --source-root DIR --run RUN --subject DIGEST --deployment DIGEST [--require-criteria-met]  compare source-bound SLI with explicit criteria; no qualification")
 	fmt.Println("  production-publisher-health --config FILE        one authenticated Publisher health GET; not capacity/upstream readiness")
 	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
 	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
+	fmt.Println("  production-status --monitor-for 1h --observe-for 30s --interval 5s --max-pending-age 2m --stale-after 45s [--require-no-alert]  finite JSONL failure/recovery observation")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
 	fmt.Println("  production-live-observe --config FILE          source-bind actual local service PIDs/UIDs/binaries and authenticated endpoints; NOT READY")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")

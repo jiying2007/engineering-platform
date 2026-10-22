@@ -3,7 +3,8 @@
 Base: `2772d0d9c1122d004c7854993bae88ac53d3a138`, followed by removal of
 75 unreferenced context-free concrete wrappers, which reduced the inventory
 from 133 to 58 direct origins. The production audit below adds one independently
-bounded cleanup origin, bringing the current total to 59. This closes the
+bounded cleanup origin; the 2026-10-22 terminal readback adds one signal-owned
+command root, bringing the current total to 60. This closes the
 *enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
@@ -14,21 +15,30 @@ categories remained at 58 sites; Publisher request authorization and qualificati
 pipe ownership move two existing source locations without changing their bounded
 cleanup roles. The subsequent production audit against
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a` adds the five-second, cancellation-independent
-Runtime probe stop context. The source digest and exact locations below include
-both audits and the fresh-main startup-gate pipe ownership correction: 59 direct
-origins, including 19 bounded cleanup/settlement sites. The pipe correction
+Runtime probe stop context. At that stage both audits and the fresh-main
+startup-gate pipe ownership correction had 59 direct origins, including 19
+bounded cleanup/settlement sites. The pipe correction
 changes no Context lifecycle category or deadline.
+
+The 2026-10-22 observation/readback source slice adds one signal-owned
+`production-terminal-readback` root with an inherited 30-second total budget.
+The finite `production-status` monitor inherits its existing signal root and
+adds an explicit total deadline without detaching work. The direct-origin
+scanner enumerates Background/TODO/WithoutCancel; these downstream timeout and
+deadline constructors are not new independent origins. SLI v3 adds no Context
+origin. The current source digest and rows include all three slices: 60 direct
+origins, 11 signal-owned roots, and the same 19 cleanup/settlement sites.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:c62b4f660dc56c74b5adfa43a39fe13ff3e91ac253e04cf418ae75c4aa0aa66e`
+`sha256:7749373b99e84cd3f1cb12f4ad53730a699e90f8742506a729b8777fb706a0c9`
 
 ## Reviewed categories
 
 | Category | Direct call sites |
 | --- | ---: |
 | Explicitly timed command root | 25 |
-| Signal-owned command/service root | 10 |
+| Signal-owned command/service root | 11 |
 | Command with downstream budget | 2 |
 | Independent bounded cleanup/settlement | 19 |
 | Test support helper | 3 |
@@ -98,7 +108,8 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/process_scope.go:13` | `Background` | Command with downstream budget |
 | `cmd/eng/production_live_observe.go:102` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_publisher_health.go:42` | `Background` | Signal-owned command/service root |
-| `cmd/eng/production_status.go:78` | `Background` | Signal-owned command/service root |
+| `cmd/eng/production_status.go:96` | `Background` | Signal-owned command/service root |
+| `cmd/eng/production_terminal_readback.go:35` | `Background` | Signal-owned command/service root |
 | `cmd/eng/relay_qualification_kit.go:40` | `Background` | Explicitly timed command root |
 | `cmd/eng/relay_runtime_handoff.go:34` | `Background` | Explicitly timed command root |
 | `cmd/eng/remote.go:41` | `Background` | Command with downstream budget |

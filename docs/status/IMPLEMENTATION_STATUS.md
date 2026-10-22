@@ -86,14 +86,49 @@ API projection is a supported inference, not a proved original response: the
 failed workflow did not upload that response. The correction preserves all
 success requirements and needs its own full delivery verification.
 
-**Production also has unfinished repository capabilities.** The v5 database
-snapshot deliberately returns `ServiceReadiness=NOT_OBSERVED` and `Ready=false`;
-`production-live-observe` does not supply a production health/capacity evaluator.
-The 14 frozen terminal gates have a plan emitter but no complete gate-by-gate
-evidence verifier. The proposed per-case receipt in the terminal blocker
-contract is documentation, not a deployed parser. Existing latency summaries
-do not implement failure denominators, p99/resource trend acceptance, sustained
-service monitoring or independently tested alert delivery.
+## Operational observation and historical Core readback — 2026-10-22
+
+Three bounded implementation slices now extend the existing commands and Core
+read paths. Their exact source, required CI and actual delivered bytes remain
+subject to the associated PR and fresh-main delivery records.
+
+- [Finite observer diagnostics](../implementation/PRODUCTION_OPERATIONS_V1.md)
+  add explicitly bounded `production-status --monitor-for` schedules, complete
+  source windows, fixed failure/recovery reasons, pinned Recovery epoch/mode,
+  session/source freshness and invocation-wide `--require-no-alert`. The
+  configured endpoint digest is not an authenticated deployment identity.
+- [Operational SLI v3](../implementation/PRODUCTION_SLI_OBSERVATION_V1.md)
+  adds content-addressed source readback and explicit criteria for all supplied
+  success/failure/cancelled/aborted/timeout/dropped outcomes, p99, successful
+  throughput, resource peaks and first-to-last net growth. Raw sources and
+  thresholds are bound to declared run/subject/deployment/workload/collector
+  identities; source-byte agreement does not authenticate the collector or
+  prior registration of those criteria. Historical latency-only v2 is unchanged.
+- [Terminal Core readback](../implementation/PRODUCTION_TERMINAL_READBACK_V1.md)
+  follows the original Closure, Delivery, frozen Task/VerificationPlan digests,
+  Run input, Verification, Evidence and Review through the authenticated API.
+  It retains exact response bytes and emits all fourteen diagnostic gate rows.
+  Only reproduced Core Verification and checked Closure relationships are
+  `OBSERVED`; the other twelve remain `NOT_OBSERVED`. Distinct stored reviewer
+  principals do not prove a real independent human's acceptance.
+
+**Production still has unfinished repository and deployment capabilities.**
+The v5 database snapshot deliberately keeps `ServiceReadiness=NOT_OBSERVED`
+and `Ready=false`; neither live wiring diagnostics nor the finite observer
+implements an authenticated same-deployment health/capacity readiness evaluator.
+The terminal reader checks existing Core relationships but is not a complete
+operational gate verifier or an acceptance parser for the proposed per-case
+receipt. New operational evidence requires an explicitly authorized, frozen,
+noncircular subject/procedure/issuer contract before it can be accepted.
+
+SLI v3 compares a bounded supplied event set; it cannot prove that an
+unauthenticated collector omitted no real requests. Peak/net-growth comparisons
+do not establish resource trends, absence of leaks, actual sustained load or
+selected-host soak acceptance. Those observations and targets must be independently
+bound and accepted. Observer expiry checking requires an independent consumer;
+no installed external watchdog, notification adapter or tested real alert
+delivery is supplied. Synchronous stdout I/O retains its stated operating-system
+blocking boundary. All three new slices keep production qualification false.
 
 These are implementation and selected-environment design tasks under #105 and
 the #229 host-acceptance boundary, not merely missing accounts or a final human
