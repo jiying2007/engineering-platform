@@ -77,6 +77,15 @@ their valid main-push support. The marker itself, terminal plan v3, three frozen
 Evidence procedures and Git manifest schema 1 remain unchanged. These are
 existing-contract enforcement repairs, not a complete terminal gate evaluator.
 
+The first PR #289 head passed its four upstream jobs but failed dependent
+[CI fact collection](https://github.com/jiying2007/engineering-platform/actions/runs/39620793853).
+That failure remains retained. The original one-shot facts read is replaced
+with bounded same-run/source/attempt observation, exact producer artifact IDs,
+and preservation of the original responses and failure diagnostics. A delayed
+API projection is a supported inference, not a proved original response: the
+failed workflow did not upload that response. The correction preserves all
+success requirements and needs its own full delivery verification.
+
 **Production also has unfinished repository capabilities.** The v5 database
 snapshot deliberately returns `ServiceReadiness=NOT_OBSERVED` and `Ready=false`;
 `production-live-observe` does not supply a production health/capacity evaluator.

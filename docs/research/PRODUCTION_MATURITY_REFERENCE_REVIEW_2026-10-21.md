@@ -42,6 +42,7 @@ production operating posture.
 | P1 | Current logical restore proof in `docs/implementation/RECOVERY_RESTORE_V1.md` does not establish the production backup policy, PITR, key custody or cross-failure-domain recovery. | Choose backup method from accepted RPO/RTO and recovery scope. If PITR is needed, retain a usable base backup, continuous WAL and configuration/key custody, and perform actual restore/data checks. Add upgrade rehearsal for the selected PG major and extensions. | [R06](#r06-postgresql-17-backup-methods), [R07](#r07-postgresql-17-pitr), [R08](#r08-postgresql-17-backup-verification), [R09](#r09-postgresql-17-major-upgrades). |
 | P1 | Qualification helpers and saved-login entry points in `internal/runtime/codexapp/{qualification,live,engineering,provider}.go` have reproduced subprocess/pin-order defects. | Bound the whole owned process lifetime and output, verify the expected executable before executing probes, and require existing process-scope quiescence before successful live receipt. Preserve the explicit unqualified filesystem read-isolation claim. | [R04](#r04-openhands-process-sandbox) supports the host-process trust distinction; the four concrete defects are proved by this audit's local fixtures. |
 | P1/P2 | Candidate `eng` verifies its own distribution in the baseline workflow; CI timing/admission reports retain hashes without their original input files. | Use the exact checked-out source verifier and expected commit; retain original inputs alongside existing reports, then reconstruct after download. Do not change the business Evidence authority or call this production qualification. | [R10](#r10-github-actions-secure-use), [R13](#r13-slsa-build-requirements-and-tracks). |
+| P2 | The dependent CI evidence job reads required-job facts once and immediately tests success; the first PR #289 run failed that collection step after four upstream successes. The missing failed response prevents proving the precise predicate. | Use bounded same-attempt observation, exact producer artifact IDs and independently read metadata, preserve the actual response bytes and reject timeout/failure/identity drift. Dependency scheduling alone must not supply fabricated API facts. | [R15](#r15-github-actions-dependencies-and-original-artifact-identities). |
 
 ## Existing controls to preserve
 
@@ -268,3 +269,24 @@ production-helper regression confirmed the same ownership rule. Caller-owned
 they also make the parent responsible for closing both of its descriptors.
 This supports the bounded repair recorded in the audit, not a claim that a
 subprocess exit or a pipe close proves external provider quiescence.
+
+### R15 — GitHub Actions dependencies and original artifact identities
+
+https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds
+
+https://docs.github.com/en/rest/actions/workflow-jobs#list-jobs-for-a-workflow-run-attempt
+
+https://docs.github.com/en/rest/actions/workflow-runs#get-a-workflow-run-attempt
+
+https://docs.github.com/en/rest/actions/artifacts#list-workflow-run-artifacts
+
+https://github.com/actions/upload-artifact/blob/b7c566a772e6b6bfb58ed0dc250532a479d7789f/action.yml
+
+The dependency contract determines which jobs must succeed before scheduling.
+Attempt-specific run/jobs endpoints support original execution binding. The
+artifact response supplies identity, run/source, digest, size and expiry; it
+does not provide a documented run-attempt field. The exact pinned upload action
+exposes the newly uploaded artifact ID, which can be passed between jobs and
+independently checked through the API. These sources do not promise a maximum
+status-visibility delay. A finite observation budget is a repository design
+choice, and failure to observe complete valid facts must remain a failed gate.

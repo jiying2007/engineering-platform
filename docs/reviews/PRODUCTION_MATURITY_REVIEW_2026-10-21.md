@@ -16,7 +16,7 @@ and actual delivered bytes. This record does not predict those results.
 
 The reviewed baseline contains substantial source-bound delivery, recovery,
 authorization and isolated-environment tests. It also contains reproducible
-Recovery proof and Runtime subprocess defects, two CI verification/retention
+Recovery proof and Runtime subprocess defects, CI verification/retention
 gaps, and unfinished production-observation and acceptance capabilities.
 Production qualification is therefore not merely waiting for credentials and
 a human signature.
@@ -194,9 +194,50 @@ the missing fourteen-gate operational mapping described below. Their final
 delivery requires the follow-up PR, fresh-main gates and actual artifact
 readback, with the failed first main run preserved separately.
 
+## Supplemental PM09 — P2 bounded CI fact visibility
+
+The first head of PR #289,
+`13645fc381c078714edd8752cc590bd0e80244b5`, passed all four upstream jobs in
+[CI 39620793853](https://github.com/jiying2007/engineering-platform/actions/runs/39620793853).
+Its dependent `trusted-ci-artifact-evidence` job failed the `Collect exact Git,
+CI and artifact facts` shell step with exit 1 in less than one second. The PR
+was not merged on those four successful jobs. The failed run and its decoded
+logs remain separate from any later successful delivery.
+
+The collection segment is byte-identical at the original `a0628df` baseline,
+PR #288's merged `e10a802`, and this first PR #289 head: it fetches jobs and
+artifacts once, then immediately requires four successful job conclusions.
+Independent API observations showed completed step lists while the job's
+overall state still read `in_progress`. Together with the short silent failure,
+this supports a visibility-delay hypothesis. The workflow did not retain the
+failed original `jobs.json`, and its log does not identify each executed shell
+command, so the precise failed predicate and original response are not proved.
+Do not rewrite this inference as an observed GitHub service defect or SLA.
+
+The correction uses a bounded read-only collector for the original run,
+source and attempt. A two-minute total budget and five-second retry interval
+apply only to incomplete/nonterminal facts; actual failed conclusions,
+identity drift, ambiguous duplicates and malformed input remain failures.
+The existing timing parser validates the completed jobs' original bytes.
+The two pinned producer upload steps pass their actual artifact IDs through
+job outputs; independently retrieved metadata must match those IDs, exact
+names, run, source, digest and size. Artifact metadata has no invented
+`run_attempt` field, and dependency results never substitute for observed
+successful job facts.
+
+Successful collection keeps the original `jobs.json`, `artifacts.json`,
+`run.json` and bounded collection diagnostic beside the timing report in its
+existing archive. A failure-only diagnostic archive retains the last available
+responses. The existing CI receipt schema, successful archive names, required
+jobs, token permissions and five-minute evidence-job ceiling remain unchanged.
+The wait budget is a local safety choice, not an assurance that an upstream
+service converges within that period. Missing facts at its deadline fail closed.
+This source correction requires a new exact-head run, protected merge,
+fresh-main run and actual retained-byte readback before delivery is claimed.
+
 ## Repository capabilities still missing
 
-These are capability findings, distinct from PM01–PM08 and from the evidence
+These are capability findings, distinct from PM01–PM09 and from the evidence
 that only a real selected deployment can provide. They remain within existing
 issues and contracts, not a parallel implementation roadmap.
 

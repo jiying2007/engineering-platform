@@ -8,8 +8,16 @@ exactly before changing coverage, isolation or runner topology.
 
 ## Producer and exact binding
 
-The existing `trusted-ci-artifact-evidence` job already retrieves GitHub
-Actions `jobs.json` from the **current** run using the read-only job token.
+The existing `trusted-ci-artifact-evidence` job retrieves GitHub Actions facts
+from the **current** run and attempt using the read-only job token. The bounded
+`scripts/ci_facts_readback.py` collector allows up to 120 seconds for incomplete
+or nonterminal facts, with five-second intervals and bounded requests. Explicit
+failed conclusions, malformed/duplicate facts and identity drift are rejected.
+It never turns a dependency's result into an API success fact. Producer upload
+steps supply the actual binary and Codex artifact IDs through job outputs;
+the collector independently checks their original API identities. This avoids
+inventing an attempt field that artifact metadata does not provide. The wait
+budget is a local limit, not a GitHub visibility SLA.
 After the canonical evidence collection step, the independent
 `scripts/ci_job_timing.py` parser consumes those same raw bytes. It requires
 exactly one completed/successful instance of each four upstream required jobs,
@@ -23,10 +31,19 @@ durations, SHA/Run identity and the SHA-256 of original read-only jobs JSON.
 No environment variables, logs, tokens, command arguments, arbitrary output,
 runner identity, or private source content are copied into the report.
 The artifact name is `ci-job-timing-<source-sha>`, retained for 90 days. It
-contains both `ci-job-timing.json` and the exact `jobs.json` consumed by the
-parser. The latter contains GitHub's job metadata, not job logs, environment
-variables or credentials. A later API response is not an interchangeable
-input: the dependent Evidence job's state may have changed after collection.
+contains exactly `ci-job-timing.json`, the exact `jobs.json` consumed by the
+parser, `artifacts.json`, `run.json`, and `ci-facts-readback.json`. The three
+raw responses contain GitHub metadata, not job logs, environment variables or
+credentials. The collection diagnostic binds their original byte digests and
+the same run/source/attempt and producer artifact IDs; it grants no production
+qualification. A later API response is not an interchangeable input: the
+dependent Evidence job and run may have changed after collection. Captured run
+metadata can therefore legitimately be in progress while final run readback
+must independently establish success.
+
+If collection fails, a separate failure-only artifact retains the available
+responses and diagnostic. It is not a successful CI receipt or an additional
+production gate. Successful main CI retains the same seven archive names.
 
 After authenticating the artifact's run/source identity and archive digest,
 use the parser from that exact source checkout to reproduce the report:
