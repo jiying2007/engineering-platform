@@ -291,7 +291,7 @@ func usage() {
 	fmt.Println("  pilot-preflight <flags>                   validate retained-pilot local/deployment readiness")
 	fmt.Println("  codex-receipt-digest --run ID            compute immutable Core-bound Codex receipt digest")
 	fmt.Println("  import-codex-evidence <flags>            verify Codex receipt/bundle and register Evidence")
-	fmt.Println("  git-change-manifest <flags>              capture exact base/result Git tree provenance")
+	fmt.Println("  git-change-manifest <flags> [--terminal] capture Git provenance; optionally enforce the frozen terminal change")
 	fmt.Println("  import-git-change-evidence <flags>       re-capture Git trees and register requirement-bound Evidence")
 	fmt.Println("  capabilities                         list embedded capabilities and skills")
 	fmt.Println("  route <task-type> <subsystem>       resolve explicit M1 capability/skill route")

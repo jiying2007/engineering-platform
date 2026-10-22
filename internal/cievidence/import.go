@@ -16,6 +16,7 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/access"
 	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/distribution"
+	"github.com/jiying2007/engineering-platform/internal/production"
 	"github.com/jiying2007/engineering-platform/internal/runtime/codexapp"
 )
 
@@ -123,6 +124,16 @@ func VerifyTrustedImport(req ImportRequest) (core.EvidenceRef, error) {
 	envelope, err := ReadEnvelopeZip(req.Files.EnvelopeZip)
 	if err != nil {
 		return empty, err
+	}
+	terminal, err := production.BuildTerminalPlan()
+	if err != nil {
+		return empty, err
+	}
+	// The terminal fixture requires PR-head CI; ordinary deliveries may still
+	// use exact protected-main push evidence under the existing checks below.
+	if req.Delivery.TargetID == terminal.Plan.TargetID &&
+		(terminal.Plan.Repository != TrustedRepository || envelope.Receipt.Event != "pull_request") {
+		return empty, fmt.Errorf("production terminal acceptance requires exact PR-head CI for the frozen repository")
 	}
 	if err := verifyLiveFacts(envelope, req.Live, req.Delivery.ResultCommit, req.Delivery.BaseCommit); err != nil {
 		return empty, err

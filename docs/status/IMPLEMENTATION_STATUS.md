@@ -60,6 +60,31 @@ the [official-source comparison](../research/PRODUCTION_MATURITY_REFERENCE_REVIE
 explains the production practices adopted and those that remain conditional on
 the selected deployment. Exact-head/main CI and actual delivered artifacts,
 not this status paragraph, establish delivery of each source slice.
+PR #288's exact-head five-job success was followed by fresh-main
+[CI 39615422618](https://github.com/jiying2007/engineering-platform/actions/runs/39615422618)
+failing a fast-exit Codex version probe: `StdinPipe` and `Wait` both owned the
+gate writer. The follow-up uses caller-owned pipe descriptors, preserves real
+I/O errors and adds deterministic Wait-before-Close and EOF regressions. The
+failed main run remains part of the delivery record; the correction requires
+new exact-head/main verification and does not qualify any production gate.
+
+Continued terminal-contract review also repairs the general template test's
+rejection of the legitimate final marker state, adds actual single-marker Git
+object checks selected by the authenticated Delivery target during import,
+and requires terminal CI Evidence to come from the exact PR event. The dedicated
+pre-live workflow still requires the initial marker; ordinary CI imports retain
+their valid main-push support. The marker itself, terminal plan v3, three frozen
+Evidence procedures and Git manifest schema 1 remain unchanged. These are
+existing-contract enforcement repairs, not a complete terminal gate evaluator.
+
+The first PR #289 head passed its four upstream jobs but failed dependent
+[CI fact collection](https://github.com/jiying2007/engineering-platform/actions/runs/39620793853).
+That failure remains retained. The original one-shot facts read is replaced
+with bounded same-run/source/attempt observation, exact producer artifact IDs,
+and preservation of the original responses and failure diagnostics. A delayed
+API projection is a supported inference, not a proved original response: the
+failed workflow did not upload that response. The correction preserves all
+success requirements and needs its own full delivery verification.
 
 **Production also has unfinished repository capabilities.** The v5 database
 snapshot deliberately returns `ServiceReadiness=NOT_OBSERVED` and `Ready=false`;

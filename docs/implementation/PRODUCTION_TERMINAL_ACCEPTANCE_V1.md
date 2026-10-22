@@ -52,6 +52,26 @@ The only authorized source mutation is:
 
 Any other changed file fails terminal acceptance.
 
+Use `eng git-change-manifest --terminal` when capturing the retained Git
+manifest for this fixture. It reads the exact base/result Git objects in the
+existing isolated snapshots, requires unchanged paths, modes and object IDs
+outside the marker, and checks the marker's exact initial/final bytes with an
+unchanged regular-file mode. It produces the existing schema-1 manifest; the
+check does not grant production qualification.
+
+`eng import-git-change-evidence` applies this constraint automatically when the
+authenticated Core Delivery has the frozen terminal TargetID. An ordinary
+manifest captured without the optional flag cannot bypass that import check.
+Terminal CI import likewise requires an original `pull_request` receipt and all
+existing exact live head/base, repository, workflow, job and archive checks;
+ordinary deliveries retain their valid protected-main push path.
+
+Canonical template tests accept both exact valid marker states so that the
+legitimate terminal result can pass CI. The dedicated pre-live workflow below
+still requires the initial marker. The repository marker is not changed by
+these checks, and source/CI conformance alone does not satisfy the fourteen
+operational gates or independent Review.
+
 The frozen requirement digest is:
 
 `sha256:01edbdf525937b5cbd5464fc1c3b9e6b4b677af14b5bb802a137fbd70bfd0445`.

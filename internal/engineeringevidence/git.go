@@ -53,6 +53,22 @@ func (m GitChangeManifest) Validate() error {
 }
 
 func CaptureGitChange(ctx context.Context, repository, baseCommit, resultCommit string) (GitChangeManifest, error) {
+	return captureGitChange(ctx, repository, baseCommit, resultCommit, nil)
+}
+
+// GitFileChange constrains the observed source bytes. It grants no execution,
+// review or production authority and does not add fields to the v1 manifest.
+type GitFileChange struct {
+	Path   string
+	Before string
+	After  string
+}
+
+func CaptureSingleFileGitChange(ctx context.Context, repository, baseCommit, resultCommit string, change GitFileChange) (GitChangeManifest, error) {
+	return captureGitChange(ctx, repository, baseCommit, resultCommit, &change)
+}
+
+func captureGitChange(ctx context.Context, repository, baseCommit, resultCommit string, change *GitFileChange) (GitChangeManifest, error) {
 	var manifest GitChangeManifest
 	if !filepath.IsAbs(repository) || !gitObjectPattern.MatchString(strings.ToLower(baseCommit)) ||
 		!gitObjectPattern.MatchString(strings.ToLower(resultCommit)) {
@@ -86,6 +102,11 @@ func CaptureGitChange(ctx context.Context, repository, baseCommit, resultCommit 
 	}
 	if err := manifest.Validate(); err != nil {
 		return GitChangeManifest{}, err
+	}
+	if change != nil {
+		if err := manager.VerifySingleFileChange(ctx, base, result, change.Path, change.Before, change.After); err != nil {
+			return GitChangeManifest{}, err
+		}
 	}
 	return manifest, nil
 }

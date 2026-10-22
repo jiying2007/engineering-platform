@@ -19,6 +19,8 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
+    outputs:
+      binary-artifact-id: ${{ steps.upload-binaries.outputs.artifact-id }}
     # The complete reviewed PR run 39530869925 took 828 s; exact-main
     # 39532457963 exceeded the 15-minute ceiling without a recorded test failure.
     # Keep every check and package deadline; allow measured runner variance.
@@ -266,6 +268,7 @@ jobs:
           cp -a "$dist/." "$install_root/"
           (cd "$install_root" && ./eng distribution-verify --dir "$install_root" && ./eng --help && ./eng capabilities >/dev/null)
       - name: Retain candidate binary bytes
+        id: upload-binaries
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: engineering-binaries-${{ github.event.pull_request.head.sha || github.sha }}
@@ -438,6 +441,8 @@ jobs:
   codex:
     name: codex-app-server-qualification
     runs-on: ubuntu-latest
+    outputs:
+      codex-artifact-id: ${{ steps.upload-codex.outputs.artifact-id }}
     timeout-minutes: 10
     env:
       CODEX_COMPATIBILITY_BASELINE_VERSION: '0.157.1'
@@ -516,6 +521,7 @@ jobs:
           cmp "$RUNNER_TEMP/codex-qualification.json" "$RUNNER_TEMP/codex-qualification-repeat.json"
           cat "$RUNNER_TEMP/codex-qualification.json"
       - name: Retain Codex qualification receipt
+        id: upload-codex
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: codex-compatibility-qualification-${{ github.event.pull_request.head.sha || github.sha }}
@@ -554,22 +560,31 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
+      - name: Verify bounded CI facts and required-job timing parsers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/test_ci_facts_readback.py
+          python3 -B scripts/test_ci_job_timing.py
       - name: Collect exact Git, CI and artifact facts
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          BINARY_ARTIFACT_ID: ${{ needs.go.outputs.binary-artifact-id }}
+          CODEX_ARTIFACT_ID: ${{ needs.codex.outputs.codex-artifact-id }}
         run: |
           set -euo pipefail
           api="https://api.github.com/repos/$GITHUB_REPOSITORY"
           auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-          curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/jobs.json"
-          curl -fsSL "${auth[@]}" "$api/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
-
-          jq -e '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | length==4 and all(.[]; .conclusion=="success")' "$RUNNER_TEMP/jobs.json" >/dev/null
-          binary_id="$(jq -er '.artifacts[] | select(.name|startswith("engineering-binaries-")) | .id' "$RUNNER_TEMP/artifacts.json")"
-          codex_id="$(jq -er '.artifacts[] | select(.name|startswith("codex-compatibility-qualification-")) | .id' "$RUNNER_TEMP/artifacts.json")"
+          python3 -B scripts/ci_facts_readback.py \
+            --repository "$GITHUB_REPOSITORY" --source-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --event "$GITHUB_EVENT_NAME" \
+            --binary-artifact-id "$BINARY_ARTIFACT_ID" --codex-artifact-id "$CODEX_ARTIFACT_ID" \
+            --out "$RUNNER_TEMP"
+          binary_id="$(jq -er --arg name "engineering-binaries-$SOURCE_SHA" '.artifacts[] | select(.name==$name) | .id' "$RUNNER_TEMP/artifacts.json")"
+          codex_id="$(jq -er --arg name "codex-compatibility-qualification-$SOURCE_SHA" '.artifacts[] | select(.name==$name) | .id' "$RUNNER_TEMP/artifacts.json")"
           test -n "$binary_id" -a -n "$codex_id"
 
           curl -fsSL -L "${auth[@]}" "$api/actions/artifacts/$binary_id/zip" -o "$RUNNER_TEMP/binaries.zip"
@@ -585,7 +600,7 @@ jobs:
             jq -e --arg sha "$SOURCE_SHA" '.status=="BYTES_VERIFIED" and .source_commit==$sha and .binary_count==6' >/dev/null
 
           jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
-          artifacts="$(jq -c '[.artifacts[] | select((.name|startswith("engineering-binaries-")) or (.name|startswith("codex-compatibility-qualification-"))) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
+          artifacts="$(jq -c --arg binary "engineering-binaries-$SOURCE_SHA" --arg codex "codex-compatibility-qualification-$SOURCE_SHA" '[.artifacts[] | select(.name==$binary or .name==$codex) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
           files="$(jq -c '.' "$manifest")"
           tested_sha="$(git rev-parse HEAD)"
           event="$GITHUB_EVENT_NAME"
@@ -611,9 +626,6 @@ jobs:
           fi
           go run ./cmd/ci-evidence --input "$RUNNER_TEMP/ci-evidence-receipt.json" > "$RUNNER_TEMP/ci-evidence-envelope.json"
           cat "$RUNNER_TEMP/ci-evidence-envelope.json"
-      - name: Verify fail-closed required-job timing parser
-        shell: bash
-        run: python3 -B scripts/test_ci_job_timing.py
       - name: Build exact required-job timing characterization
         shell: bash
         env:
@@ -633,6 +645,9 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-job-timing.json
             ${{ runner.temp }}/jobs.json
+            ${{ runner.temp }}/run.json
+            ${{ runner.temp }}/artifacts.json
+            ${{ runner.temp }}/ci-facts-readback.json
           if-no-files-found: error
           retention-days: 90
       - name: Retain verified CI evidence envelope
@@ -679,4 +694,16 @@ jobs:
           name: internal-rc-delivery-${{ github.sha }}
           path: ${{ runner.temp }}/internal-rc-delivery-envelope.json
           if-no-files-found: error
+          retention-days: 90
+      - name: Retain failed CI facts readback diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ci-facts-readback-failure-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/run.json
+            ${{ runner.temp }}/jobs.json
+            ${{ runner.temp }}/artifacts.json
+            ${{ runner.temp }}/ci-facts-readback.json
+          if-no-files-found: warn
           retention-days: 90

@@ -16,7 +16,7 @@ and actual delivered bytes. This record does not predict those results.
 
 The reviewed baseline contains substantial source-bound delivery, recovery,
 authorization and isolated-environment tests. It also contains reproducible
-Recovery proof and Runtime subprocess defects, two CI verification/retention
+Recovery proof and Runtime subprocess defects, CI verification/retention
 gaps, and unfinished production-observation and acceptance capabilities.
 Production qualification is therefore not merely waiting for credentials and
 a human signature.
@@ -103,6 +103,39 @@ unrelated host process control and remote provider cancellation remain outside
 the guarantee. The Context inventory includes the one new bounded cleanup
 origin and continues to declare that #229 is not closed.
 
+### Follow-up: fresh-main startup-gate ownership regression
+
+The seven baseline findings PM01–PM07 were integrated by
+[PR #288](https://github.com/jiying2007/engineering-platform/pull/288).
+Its exact head `70d99f74738e458a91a389f18efdf7088275600a` passed all five
+required jobs in [CI 39612489812](https://github.com/jiying2007/engineering-platform/actions/runs/39612489812).
+The protected squash merge produced
+`e10a8025d0c78ba404b2b16822fec60822cda90b`, but its fresh-main
+[CI 39615422618](https://github.com/jiying2007/engineering-platform/actions/runs/39615422618)
+failed `TestBuildCodexProfileBindsExactBinaryModelAndPolicyGrant` with
+`codex version: close |1: file already closed`. That failed run is retained;
+the earlier PR success did not establish completed main delivery.
+
+This was a regression introduced in the startup gate repair, not an eighth
+finding against the original `a0628df` baseline. `exec.Cmd.StdinPipe` registers
+its writer for automatic closure by `Wait`. A valid fast-exit target can finish
+before the caller explicitly closes the gate writer, so those two owners race
+and reject a successful version probe. A deterministic regression uses the
+same production `probeStdinPipe` helper and requires process `Wait` to finish
+before writer `Close`; the original helper fails with the same closed-file
+error without sleeps or a global scheduling hook.
+
+The correction creates a caller-owned `os.Pipe` and passes its read end as
+`cmd.Stdin`. After `Start`, the parent closes its read copy, releases the gate
+and explicitly closes its write end. `exec.Cmd.Wait` owns neither caller-held
+descriptor. Deferred closure covers failed starts and early returns; real
+write/close errors remain failures, and existing bounded namespace stop/reap
+handling remains in force. A second regression runs the production probe with
+a target that waits for EOF, detecting a leaked writer or retained gate input.
+The final follow-up change still requires its own exact-head and fresh-main
+gates and actual artifact readback; this source description predicts none of
+those results and changes no production qualification state.
+
 ### Investigation record identities
 
 These hashes identify the local investigation records inspected during this
@@ -134,9 +167,77 @@ No additional blocking defect was found in this small diff by read-only review.
 That conclusion does not replace execution of the changed workflow and
 independent archive-member/readback verification.
 
+## Supplemental PM08 — P1 terminal fixture contract enforcement
+
+Continued review at `e10a8025d0c78ba404b2b16822fec60822cda90b` found three
+bounded enforcement gaps in the already frozen terminal maintenance contract.
+The relevant API test, Git importer, CI importer and Task-template Git blobs
+are unchanged from the original `a0628df` audit baseline.
+
+| Existing contract | Counterexample or source gap | Bounded correction |
+| --- | --- | --- |
+| The only terminal source mutation changes the exact marker from `PRE_LIVE_READY\n` to `TERMINAL_QUALIFIED\n`, followed by exact PR-head CI. | `TestProductionTerminalMaintenanceTemplatesDryRunToRunning` only accepts the initial marker. A private fixture with the legitimate final bytes fails that original test, making canonical CI reject the intended terminal result. | The general template test accepts both exact valid source states; permanent private-fixture regressions run the full template dry run in each state. The dedicated pre-live workflow still requires the initial state. |
+| The result changes no other file and preserves the exact marker bytes. | The generic Git manifest binds whole base/result snapshots but its import entry did not enforce the terminal-only change constraint. It cannot establish that constraint merely by naming `git.changed-tree.v1`. | Reuse the existing isolated Git snapshots, compare every NUL-delimited leaf's path/mode/type/object ID, and read the marker blobs through controlled Git. The existing CLI offers `git-change-manifest --terminal`, while import selects the constraint automatically from the authenticated Delivery's terminal TargetID. Omitting the optional capture flag cannot bypass import checks. |
+| Terminal evidence must be for the exact PR head. | A valid retained main-push CI fixture with the terminal Delivery TargetID produced PASS Evidence in the baseline importer. | Terminal imports require the original receipt's PR event, then retain all existing live repository, event, head/base, workflow, job and archive checks. Ordinary deliveries continue to support valid main-push evidence. |
+
+The authoritative Delivery inherits its TargetID from the frozen Task in Core;
+the delivery-create request does not choose a replacement target. The Git
+checker does not treat a caller-supplied flag or local remote URL as authority.
+It does not independently authenticate repository ownership: the original
+frozen Task/Core chain and trusted CI repository checks retain that role.
+The manifest stays schema 1, the terminal plan stays v3, and the actual repository
+marker remains at its initial bytes. No model turn, publication, terminal
+qualification, new Evidence procedure or new authority ledger is performed.
+
+These corrections enforce existing source/CI constraints. They do not complete
+the missing fourteen-gate operational mapping described below. Their final
+delivery requires the follow-up PR, fresh-main gates and actual artifact
+readback, with the failed first main run preserved separately.
+
+## Supplemental PM09 — P2 bounded CI fact visibility
+
+The first head of PR #289,
+`13645fc381c078714edd8752cc590bd0e80244b5`, passed all four upstream jobs in
+[CI 39620793853](https://github.com/jiying2007/engineering-platform/actions/runs/39620793853).
+Its dependent `trusted-ci-artifact-evidence` job failed the `Collect exact Git,
+CI and artifact facts` shell step with exit 1 in less than one second. The PR
+was not merged on those four successful jobs. The failed run and its decoded
+logs remain separate from any later successful delivery.
+
+The collection segment is byte-identical at the original `a0628df` baseline,
+PR #288's merged `e10a802`, and this first PR #289 head: it fetches jobs and
+artifacts once, then immediately requires four successful job conclusions.
+Independent API observations showed completed step lists while the job's
+overall state still read `in_progress`. Together with the short silent failure,
+this supports a visibility-delay hypothesis. The workflow did not retain the
+failed original `jobs.json`, and its log does not identify each executed shell
+command, so the precise failed predicate and original response are not proved.
+Do not rewrite this inference as an observed GitHub service defect or SLA.
+
+The correction uses a bounded read-only collector for the original run,
+source and attempt. A two-minute total budget and five-second retry interval
+apply only to incomplete/nonterminal facts; actual failed conclusions,
+identity drift, ambiguous duplicates and malformed input remain failures.
+The existing timing parser validates the completed jobs' original bytes.
+The two pinned producer upload steps pass their actual artifact IDs through
+job outputs; independently retrieved metadata must match those IDs, exact
+names, run, source, digest and size. Artifact metadata has no invented
+`run_attempt` field, and dependency results never substitute for observed
+successful job facts.
+
+Successful collection keeps the original `jobs.json`, `artifacts.json`,
+`run.json` and bounded collection diagnostic beside the timing report in its
+existing archive. A failure-only diagnostic archive retains the last available
+responses. The existing CI receipt schema, successful archive names, required
+jobs, token permissions and five-minute evidence-job ceiling remain unchanged.
+The wait budget is a local safety choice, not an assurance that an upstream
+service converges within that period. Missing facts at its deadline fail closed.
+This source correction requires a new exact-head run, protected merge,
+fresh-main run and actual retained-byte readback before delivery is claimed.
+
 ## Repository capabilities still missing
 
-These are capability findings, distinct from PM01–PM07 and from the evidence
+These are capability findings, distinct from PM01–PM09 and from the evidence
 that only a real selected deployment can provide. They remain within existing
 issues and contracts, not a parallel implementation roadmap.
 
@@ -183,6 +284,36 @@ relationship to the independently reviewed subject. Preserve already frozen
 Delivery/Task/Plan bytes; any future contract change requires the existing
 explicit freeze/version process and cannot rewrite historical qualification.
 This design constraint is not an implemented checker or a production PASS.
+
+The terminal v3 gate inventory is not a complete gate-to-evidence mapping.
+The frozen maintenance Task contains only `terminal-ci`, `terminal-codex` and
+`terminal-git`; Core rejects requirements outside that frozen Verification Plan.
+Existing authenticated importers, Core Verification/Review/Closure checks and
+retained M1 archive readback already cover substantial parts of that chain and
+must be reused. The archive reader is limited to historical Feature/Debug
+subjects. These checks do not define the missing operational gate procedures,
+issuers, deployment bindings or per-case acceptance rules. The PM08 follow-up
+adds the terminal PR-event restriction to the existing CI importer; a future
+coverage readback must still inspect its bound original event facts, rather
+than infer the event from an Evidence procedure name alone.
+
+The fixture already retains operational and recovery/SLO evidence outside the
+product Delivery subject. An SLO source contains its measured `subject_digest`;
+putting that source's hash into the same Delivery whose digest it names would
+create a digest cycle. This is a constraint on future integration, not an
+observed execution defect. Preserve the original product subject and freeze a
+non-circular relationship to the operational subject and its existing Core
+Verification/Review records. Source-byte verification alone cannot supply an
+authenticated operational requirement or accepted operating targets.
+
+The documented live sequence places lifecycle and SLO acceptance after the
+maintenance Closure, while Core requires Work to be `VERIFYING` before Review
+and atomically moves it through `REVIEWING` to `CLOSED`. A completed maintenance
+Closure cannot retroactively attest later observations. The operational
+evidence and its independent acceptance need an explicit frozen subject and
+sequence before final read-only aggregation can establish complete coverage.
+This remaining contract and implementation work belongs to #105, with #228/#229
+boundaries intact; credentials alone do not resolve it.
 
 ## External evidence and release disposition
 
