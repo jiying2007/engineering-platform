@@ -38,3 +38,40 @@ func TestProductionStatusReadbackRejectsContradictoryEnvelope(t *testing.T) {
 		t.Fatal("ambiguous status scope")
 	}
 }
+
+func TestProductionStatusReadbackRejectsIncompleteV6Counters(t *testing.T) {
+	now := time.Now().UTC()
+	status, err := production.EvaluateSnapshot(production.Snapshot{
+		Version: production.OperationalStatusVersion, CapturedAt: now,
+		RecoveryMode: "NORMAL", WorkerPolls: []production.WorkerPollObservation{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"unknown_offline_executions", "expired_offline_executions", "expired_codex_executions", "expired_outbox_leases"} {
+		var envelope map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			t.Fatal(err)
+		}
+		var snapshot map[string]json.RawMessage
+		if err := json.Unmarshal(envelope["snapshot"], &snapshot); err != nil {
+			t.Fatal(err)
+		}
+		delete(snapshot, field)
+		envelope["snapshot"], err = json.Marshal(snapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bad, err := json.Marshal(envelope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := decodeProductionStatus(bad, now); err == nil {
+			t.Fatalf("CLI accepted incomplete v6 snapshot without %s", field)
+		}
+	}
+}

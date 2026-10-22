@@ -22,7 +22,7 @@ func TestNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T) {
 	forNoInvocationVersions(t, testNoInvocationDatabaseCorruptionBlocksProofAndReadback)
 }
 func testNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T, version int) {
-	for _, mode := range []string{"external-ref", "observation", "missing-receipt", "self-consistent-receipt", "missing-operation", "missing-audit", "changed-time", "unknown-field"} {
+	for _, mode := range []string{"external-ref", "observation", "missing-receipt", "restored-pre-disposition-row", "self-consistent-receipt", "missing-operation", "missing-audit", "changed-time", "unknown-field"} {
 		t.Run(mode, func(t *testing.T) {
 			s, req, e := noInvocationDatabaseFixture(t, action.Manual, version)
 			ctx := context.Background()
@@ -37,6 +37,10 @@ func testNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T, vers
 				_, err = s.pool.Exec(ctx, "UPDATE external_operations SET observed_state='{}' WHERE operation_id=$1", req.Identity.OperationID)
 			case "missing-receipt":
 				_, err = s.pool.Exec(ctx, "UPDATE external_operations SET reconciliation_json='{}'::jsonb WHERE operation_id=$1", req.Identity.OperationID)
+			case "restored-pre-disposition-row":
+				// A partial restore may retain the original audit while restoring an
+				// older operation row. Its empty receipt is not a fresh reservation.
+				_, err = s.pool.Exec(ctx, "UPDATE external_operations SET state='MANUAL',reconciliation_json=NULL,updated_at=updated_at-interval '1 second' WHERE operation_id=$1", req.Identity.OperationID)
 			case "missing-operation":
 				_, err = s.pool.Exec(ctx, "DELETE FROM external_operations WHERE operation_id=$1", req.Identity.OperationID)
 			case "missing-audit":
@@ -58,6 +62,14 @@ func testNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T, vers
 			if err != nil {
 				t.Fatal(err)
 			}
+			var restoredRow string
+			var restoredAuditCount int
+			if mode == "restored-pre-disposition-row" {
+				if err := s.pool.QueryRow(ctx, "SELECT to_jsonb(e)::text FROM external_operations e WHERE operation_id=$1", req.Identity.OperationID).Scan(&restoredRow); err != nil {
+					t.Fatal(err)
+				}
+				restoredAuditCount = actionIdentityAuditCount(t, s, req.Identity.OperationID)
+			}
 			if _, err = s.GetUninvokedPublication(ctx, req.Identity.OperationID); err == nil {
 				t.Error("corrupt recovery readback accepted")
 			}
@@ -66,6 +78,15 @@ func testNoInvocationDatabaseCorruptionBlocksProofAndReadback(t *testing.T, vers
 			}
 			if _, err = s.AbandonUninvokedPublication(ctx, plannedReconciler, req, e); err == nil {
 				t.Error("corrupt exact repeat accepted")
+			}
+			if mode == "restored-pre-disposition-row" {
+				var after string
+				if err := s.pool.QueryRow(ctx, "SELECT to_jsonb(e)::text FROM external_operations e WHERE operation_id=$1", req.Identity.OperationID).Scan(&after); err != nil {
+					t.Fatal(err)
+				}
+				if after != restoredRow || actionIdentityAuditCount(t, s, req.Identity.OperationID) != restoredAuditCount {
+					t.Error("rejected partial restore changed the original ledger or appended another audit")
+				}
 			}
 		})
 	}

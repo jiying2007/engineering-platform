@@ -2,11 +2,13 @@ package postgres
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/action"
+	"github.com/jiying2007/engineering-platform/internal/production"
 )
 
 func TestReadOperationalStatusTracksRecoveryAndUnknownAction(t *testing.T) {
@@ -114,5 +116,119 @@ func TestReadOperationalStatusExposesIdleWorkerPollFactsWithoutReadiness(t *test
 		polls[1].WorkerProfile != "worker/codex-production" || polls[1].KnownIdentities != 1 ||
 		polls[0].LatestPollAt.After(status.Snapshot.CapturedAt) || polls[1].LatestPollAt.After(status.Snapshot.CapturedAt) {
 		t.Fatal("worker poll observation drift", status)
+	}
+}
+
+func TestReadOperationalStatusReportsExecutionReservationsWithoutMutation(t *testing.T) {
+	for _, lane := range []string{"offline", "codex"} {
+		for _, unknown := range []bool{false, true} {
+			name := lane + "/expired-authorized"
+			if unknown {
+				name = lane + "/unknown"
+			}
+			t.Run(name, func(t *testing.T) {
+				s := newIsolatedIntegrationStore(t)
+				ctx := context.Background()
+				var table, runID string
+				var fail, retry func() error
+				if lane == "offline" {
+					start := offlineFixture(t, s)
+					permit, err := s.StartOffline(ctx, "offline-worker", start)
+					workerOK(t, err)
+					table, runID = "worker_offline_executions", start.RunID
+					fail = func() error { return s.FailOffline(ctx, "offline-worker", permit.Token) }
+					retry = func() error { _, err := s.StartOffline(ctx, "offline-worker", start); return err }
+				} else {
+					start := codexFixture(t, s)
+					permit, err := s.StartCodex(ctx, codexTestWorker, start)
+					workerOK(t, err)
+					table, runID = "worker_codex_executions", start.RunID
+					fail = func() error { return s.FailCodex(ctx, codexTestWorker, permit.Token) }
+					retry = func() error { _, err := s.StartCodex(ctx, codexTestWorker, start); return err }
+				}
+				status, err := s.ReadOperationalStatus(ctx)
+				workerOK(t, err)
+				if !status.AuthorityClear || status.Ready || status.ProductionQualified {
+					t.Fatalf("live execution incorrectly classified: %#v", status)
+				}
+				wantState, wantReason := "AUTHORIZED", "expired_"+lane+"_executions"
+				if unknown {
+					workerOK(t, fail())
+					wantState, wantReason = "UNKNOWN", "unknown_"+lane+"_executions"
+					// UNKNOWN must block even before its reservation lease expires.
+					status, err = s.ReadOperationalStatus(ctx)
+					workerOK(t, err)
+					if status.AuthorityClear || !slices.Contains(status.Reasons, wantReason) {
+						t.Fatalf("live UNKNOWN hidden: %#v", status)
+					}
+				}
+				workerSQL(t, s, "UPDATE "+table+" SET lease_until=clock_timestamp()-interval '1 second' WHERE run_id=$1", runID)
+				var auditsBefore int64
+				workerOK(t, s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events").Scan(&auditsBefore))
+				for n := 0; n < 2; n++ {
+					status, err = s.ReadOperationalStatus(ctx)
+					workerOK(t, err)
+					if status.AuthorityClear || status.Ready || status.ProductionQualified || status.State != production.OperationalDegraded || !slices.Contains(status.Reasons, wantReason) {
+						t.Fatalf("unresolved execution concealed: %#v", status)
+					}
+					counts := map[string]int64{
+						"unknown_offline_executions": status.Snapshot.UnknownOfflineExecutions,
+						"unknown_codex_executions":   status.Snapshot.UnknownCodexExecutions,
+						"expired_offline_executions": status.Snapshot.ExpiredOfflineExecutions,
+						"expired_codex_executions":   status.Snapshot.ExpiredCodexExecutions,
+					}
+					for reason, count := range counts {
+						want := int64(0)
+						if reason == wantReason {
+							want = 1
+						}
+						if count != want {
+							t.Fatalf("execution counted in wrong lane/state: %s=%d, want %d", reason, count, want)
+						}
+					}
+				}
+				var storedState string
+				var hasReceipt bool
+				workerOK(t, s.pool.QueryRow(ctx, "SELECT state,receipt_json IS NOT NULL FROM "+table+" WHERE run_id=$1", runID).Scan(&storedState, &hasReceipt))
+				if storedState != wantState || hasReceipt {
+					t.Fatalf("diagnostic mutated execution disposition: state=%s receipt=%v", storedState, hasReceipt)
+				}
+				var auditsAfter int64
+				workerOK(t, s.pool.QueryRow(ctx, "SELECT count(*) FROM audit_events").Scan(&auditsAfter))
+				if auditsAfter != auditsBefore {
+					t.Fatal("read-only status wrote an authority event")
+				}
+				if retry() == nil {
+					t.Fatal("observing expired/unknown execution authorized replay")
+				}
+			})
+		}
+	}
+}
+
+func TestReadOperationalStatusReportsExpiredOutboxWithoutReclaim(t *testing.T) {
+	s := newIsolatedIntegrationStore(t)
+	ctx := context.Background()
+	queueMessage(t, s, "status-outbox-expiry", action.Observe)
+	message := claimOne(t, s, "dispatcher")
+	status, err := s.ReadOperationalStatus(ctx)
+	workerOK(t, err)
+	if !status.AuthorityClear || status.Snapshot.LeasedOutbox != 1 || status.Snapshot.ExpiredOutboxLeases != 0 {
+		t.Fatalf("live outbox lease incorrectly classified: %#v", status)
+	}
+	expireLease(t, s, message.ID)
+	for n := 0; n < 2; n++ {
+		status, err = s.ReadOperationalStatus(ctx)
+		workerOK(t, err)
+		if status.AuthorityClear || status.Ready || status.ProductionQualified ||
+			status.Snapshot.LeasedOutbox != 1 || status.Snapshot.ExpiredOutboxLeases != 1 ||
+			!slices.Contains(status.Reasons, "expired_outbox_leases") {
+			t.Fatalf("expired leased outbox hidden: %#v", status)
+		}
+	}
+	stored, err := s.GetOutbox(ctx, message.Key)
+	workerOK(t, err)
+	if stored.State != message.State || stored.AttemptCount != message.AttemptCount || stored.LeaseOwner != message.LeaseOwner || !stored.DispatchedAt.IsZero() {
+		t.Fatalf("read-only diagnostic changed outbox generation/disposition: %#v", stored)
 	}
 }

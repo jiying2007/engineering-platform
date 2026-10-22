@@ -113,7 +113,7 @@ subject to the associated PR and fresh-main delivery records.
   principals do not prove a real independent human's acceptance.
 
 **Production still has unfinished repository and deployment capabilities.**
-The v5 database snapshot deliberately keeps `ServiceReadiness=NOT_OBSERVED`
+The v6 database snapshot deliberately keeps `ServiceReadiness=NOT_OBSERVED`
 and `Ready=false`; neither live wiring diagnostics nor the finite observer
 implements an authenticated same-deployment health/capacity readiness evaluator.
 The terminal reader checks existing Core relationships but is not a complete
@@ -127,8 +127,11 @@ do not establish resource trends, absence of leaks, actual sustained load or
 selected-host soak acceptance. Those observations and targets must be independently
 bound and accepted. Observer expiry checking requires an independent consumer;
 no installed external watchdog, notification adapter or tested real alert
-delivery is supplied. Synchronous stdout I/O retains its stated operating-system
-blocking boundary. All three new slices keep production qualification false.
+delivery is supplied. Linux pipe stdout now uses an independently opened,
+deadline-aware descriptor so backpressure cannot indefinitely hold a finite
+monitor or SIGTERM cancellation. Other synchronous output retains its stated
+operating-system blocking boundary. All three slices keep production
+qualification false.
 
 These are implementation and selected-environment design tasks under #105 and
 the #229 host-acceptance boundary, not merely missing accounts or a final human
@@ -140,6 +143,17 @@ second authority ledger or turn self-reported PASS fields into READY. Operationa
 and fault evidence must be available to the independent review; post-closure
 readback must not make a Closure its own prerequisite. Historical W01-W10
 acceptance remains limited to its declared repository slices.
+
+The follow-up integrity repair closes four database-observation omissions:
+UNKNOWN offline executions, expired AUTHORIZED offline/Codex executions, and
+expired Outbox leases now block the narrower authority-clear diagnostic. The
+v6 wire format requires every counter and explicit nullable timestamp field;
+missing or null counters cannot become false zero observations. Reads retain
+the original state, receipt, audit and retry authority. Non-invocation Recovery
+settlement also checks retained row/audit consistency before its first-write
+decision, rejecting a partially restored unresolved row beside an existing
+disposition audit without writing a second disposition. Neither repair closes
+the remaining effectful Recovery or selected-host qualification gates.
 
 ## Maturity boundary
 
@@ -670,7 +684,7 @@ boundary. This deferral does not affect RC or production acceptance gates.
 | Distribution | One six-role list; source-matched immutable install/readback; previous-version readback by retained source+manifest identity; explicit stopped-release switch/rollback keeps replaced bytes; real cross-version upgrade/rollback drill | Service activation, database downgrade/migration rollback, restricted-/proc bypass, in-flight external-effect recovery or checksum-only authenticity |
 | Service manager | Explicit restart/cgroup stop policy; installed-service lifecycle under real systemd; transient four-role Publisher -> Control -> admission/preparation graph uses distinct DynamicUser identities and exact Wants/Requires/After readiness ordering; required CI also creates the canonical four named Unix users + shared group on a disposable runner, executes one constrained transient unit per identity, then proves full account/group cleanup | Actual production-host account provisioning/unit installation, active publication/model crash recovery or replay safety |
 | Production preflight | v2 checks configuration and actual host facts with expected source SHA, service-user primary/supplementary groups, parent traversal/read-write mode access and hard-link rejection | CONFIG_VALIDATED or HOST_VALIDATED means operational READY; ACL-only grants are not inferred |
-| Operational status | v5 separates database authority from unobserved readiness; reports PLANNED, DISPATCHED and unqualified historical SAFE_TO_RETRY external reservations as degraded, plus bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
+| Operational status | v6 separates database authority from unobserved readiness; reports unresolved external reservations, UNKNOWN offline/Codex executions and expired execution/Worker/Outbox leases as degraded; requires complete snapshot fields, plus bounded per-profile Worker poll facts from existing last_seen_at, exact freshness checks and queue-progress windows; Publisher endpoint health is a separate authenticated observation; required Go/PostgreSQL CI runs five consecutive bounded 96-Run/8-Worker concurrent admission/security characterizations, each with three interleaved security rounds (48 rejected unauthorized/profile-mismatch probes; aggregate 480 Runs / 240 denied probes) | Worker identity count/recent poll, measured CI latency or Publisher endpoint reachability proves calibrated capacity, upstream health or production readiness |
 | SLO | v2 separates unverified summaries from subject-bound source readback | Calibrated targets or production qualification |
 | Pre-live | Event SHA/tree, terminal plan v3 with frozen single-canary, emergency-stop, no-provider-fallback and no-automatic-DB-downgrade gates, exact nonempty no-skip test inventory, and an internal RC delivery envelope bound to exact successful main-push CI/source tree/governance bytes; main-only CI emits it as a separate retained artifact | Passing the frozen external canary/provider-revoke/Publisher-revoke/DB-restore gates, independent human Review or production qualification |
 | Operator CLI | Run controls, stopped-source restore/continuation, private readback/artifact storage, authenticated Work -> Task -> Run intake and exact-epoch Human Takeover | A WorkBuddy-specific backend/authority, automatic model execution, or a completed end-user WorkBuddy UX |

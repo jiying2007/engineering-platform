@@ -184,10 +184,25 @@ func observerJSONEmitter(writer io.Writer) func(production.ObserverEvent) error 
 }
 
 func runProductionMonitor(ctx context.Context, reader operationalReader, policy production.ObserverPolicy, endpoint string, writer io.Writer) (bool, error) {
+	if err := policy.Validate(); err != nil {
+		return false, err
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	// Include initial/output writes in the invocation budget for Linux pipes.
+	// The collector inherits this earlier deadline rather than extending it.
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(policy.DurationSeconds)*time.Second)
+	defer cancel()
+	output, closeOutput, err := prepareProductionMonitorOutput(ctx, writer)
+	if err != nil {
+		return false, err
+	}
+	defer closeOutput()
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return false, fmt.Errorf("observer session identity unavailable")
 	}
 	digest := sha256.Sum256([]byte(endpoint))
-	return collectProductionMonitorWithClock(ctx, reader, policy, hex.EncodeToString(id[:]), "sha256:"+hex.EncodeToString(digest[:]), time.Now, waitObservation, observerJSONEmitter(writer))
+	return collectProductionMonitorWithClock(ctx, reader, policy, hex.EncodeToString(id[:]), "sha256:"+hex.EncodeToString(digest[:]), time.Now, waitObservation, observerJSONEmitter(output))
 }

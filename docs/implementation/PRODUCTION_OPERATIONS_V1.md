@@ -274,12 +274,13 @@ PostgreSQL-backed operational snapshot containing:
 - active Runs;
 - pending Worker intents;
 - active and expired Worker leases;
-- pending/leased/dead-letter outbox counts;
+- pending/leased/expired-leased/dead-letter outbox counts;
 - PLANNED/DISPATCHED/UNKNOWN/RECONCILING/MANUAL/SAFE_TO_RETRY external Action counts;
-- UNKNOWN Core-bound Codex execution count.
+- UNKNOWN Core-bound offline and Codex execution counts;
+- expired AUTHORIZED offline and Codex execution counts.
 
 `eng production-status` reads this endpoint through the existing direct-mTLS
-Control client. Snapshot v5 deliberately separates `authority_state=CLEAR` from
+Control client. Snapshot v6 deliberately separates `authority_state=CLEAR` from
 `service_readiness=NOT_OBSERVED`. It also exposes bounded per-worker-profile
 poll history from the existing `workers.last_seen_at` rows: the latest poll
 timestamp and number of known identities for that profile. Claim attempts update
@@ -291,7 +292,7 @@ and `production_qualified=false` remain explicit. `--require-ready` therefore
 fails closed without an implemented service-readiness observation. The separate
 `--require-authority-clear` checks only the narrower database authority condition.
 
-Snapshot v5 counts PLANNED/DISPATCHED and historical unqualified SAFE_TO_RETRY reservations, so a crashed
+The snapshot counts PLANNED/DISPATCHED and historical unqualified SAFE_TO_RETRY reservations, so a crashed
 process cannot leave an apparently CLEAR database while its action ledger still
 blocks Recovery Proof. An in-flight reservation may transiently cause
 `authority_state=DEGRADED` even when no fault is yet established; this is a
@@ -299,11 +300,22 @@ conservative quiescence signal, not proof of an incident, timeout, provider
 effect or permission to replay. No automatic state change or operator authority
 is created.
 
-Authority blockers include Recovery/Reconciliation, expired Worker leases,
-dead-letter Outbox records, UNKNOWN/RECONCILING/MANUAL and unqualified
-SAFE_TO_RETRY external operations, plus
-UNKNOWN Codex execution. No snapshot or diagnostic may resolve these conditions,
-authorize a retry or replay a model/publication.
+Authority blockers include Recovery/Reconciliation, expired Worker and Outbox
+leases, dead-letter Outbox records, UNKNOWN/RECONCILING/MANUAL and unqualified
+SAFE_TO_RETRY external operations, UNKNOWN offline/Codex executions, and expired
+AUTHORIZED offline/Codex reservations. Expired Outbox leases are a subset of
+the existing leased count; UNKNOWN executions are counted independently of
+their expiry and are not counted twice as expired AUTHORIZED reservations.
+An unexpired execution authorization is not an expiry alert. Expiry never
+proves process exit, non-invocation or absence of an external effect.
+
+Every v6 snapshot counter must be present and non-null, including explicit
+zeros. The four nullable timestamp observations must also be present. Older,
+truncated or null-valued snapshots fail decoding rather than turning missing
+facts into a CLEAR result. This rule also applies to snapshots retained inside
+progress and observer reports. Control and client versions must be upgraded
+together. No snapshot or diagnostic may resolve these conditions, mutate the
+ledger, authorize a retry or replay a model/publication.
 
 ### Bounded queue-progress observation
 
@@ -408,11 +420,18 @@ delivery is claimed by this command.
 
 Records are limited to 8 MiB each and 128 MiB per invocation. A write error,
 short write or output limit aborts immediately without another source request;
-partially written output is not a complete record. Deadline/cancellation bounds
-cover collection and waits. They do not make arbitrary operating-system output
-I/O interruptible: a blocked stdout sink can block the synchronous writer.
-Use a supervised, drained output stream and detect absent/expired records
-independently; no detached writer goroutine hides that boundary.
+partially written output is not a complete record. On Linux, FIFO/pipe stdout
+uses a separately opened, identity-checked descriptor with the same total
+monitor deadline. Cancellation interrupts a blocked pipe write. The original
+shared descriptor flags are unchanged; no detached writer goroutine is used.
+After cancellation or expiry, each remaining terminal event gets at most one
+nonblocking write attempt. A full or closed pipe therefore causes nonzero exit,
+and a missing/partial stop record never proves a completed observation.
+
+Regular files, devices, sockets, arbitrary writers and other platforms retain
+their synchronous operating-system I/O boundary. The monitor does not claim to
+interrupt an arbitrary blocked storage or device syscall. Use a supervised,
+drained output stream and detect absent/expired records independently.
 
 Actual compiled-CLI tests use the existing authenticated Core middleware and
 real ephemeral mTLS identities: `core:read` succeeds, another valid identity
