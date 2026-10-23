@@ -58,15 +58,18 @@ func (s *Store) AbandonUninvokedPublication(ctx context.Context, reconciler stri
 		return zero, corestore.ErrConflict
 	}
 	requestDigest, _ := request.Digest()
-	if state == string(action.AbandonedReconciled) && len(reconciliation) > 0 {
-		retained, err := readUninvokedPublication(ctx, tx, identity.OperationID)
-		if err != nil {
-			return zero, err
-		}
-		if retained.RequestDigest != requestDigest || retained.Reconciler != reconciler {
+	// A partial restore may leave the original audit beside an older operation
+	// row with an empty receipt. Check both before considering a new disposition;
+	// never repair that mismatch by writing another non-invocation result.
+	retainedPrior, priorErr := readUninvokedPublication(ctx, tx, identity.OperationID)
+	if priorErr == nil {
+		if retainedPrior.RequestDigest != requestDigest || retainedPrior.Reconciler != reconciler {
 			return zero, corestore.ErrConflict
 		}
-		return retained, nil // Read-only exact repeat. Deferred rollback releases locks.
+		return retainedPrior, nil // Read-only exact repeat. Deferred rollback releases locks.
+	}
+	if !errors.Is(priorErr, corestore.ErrNotFound) {
+		return zero, priorErr
 	}
 	if !githubpublish.RecoverablePublicationState(action.State(state)) || len(raw) != 0 || len(reconciliation) != 0 || externalRef != "" {
 		return zero, corestore.ErrConflict

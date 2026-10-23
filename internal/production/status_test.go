@@ -1,6 +1,8 @@
 package production
 
 import (
+	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 )
@@ -143,10 +145,7 @@ func TestEvaluateSnapshotValidatesWorkerPollFactsWithoutInferringReadiness(t *te
 	}
 }
 
-func TestOperationalStatusV5NeverHidesUnqualifiedActionStates(t *testing.T) {
-	if OperationalStatusVersion != 5 {
-		t.Fatal("SAFE_TO_RETRY needs explicit v5 fail-closed accounting")
-	}
+func TestOperationalStatusNeverHidesUnqualifiedActionStates(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		mutate func(*Snapshot)
@@ -192,5 +191,95 @@ func TestOperationalStatusV5NeverHidesUnqualifiedActionStates(t *testing.T) {
 		if _, err := EvaluateSnapshot(s); err == nil {
 			t.Fatal("negative pre-effect or in-flight Action count accepted")
 		}
+	}
+}
+
+func TestOperationalStatusV6BlocksUnresolvedExecutionsAndExpiredOutbox(t *testing.T) {
+	if OperationalStatusVersion != 6 {
+		t.Fatal("execution and outbox expiry accounting requires snapshot v6")
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*Snapshot)
+		reason string
+	}{
+		{"unknown-offline", func(s *Snapshot) { s.UnknownOfflineExecutions = 1 }, "unknown_offline_executions"},
+		{"expired-offline", func(s *Snapshot) { s.ExpiredOfflineExecutions = 1 }, "expired_offline_executions"},
+		{"expired-codex", func(s *Snapshot) { s.ExpiredCodexExecutions = 1 }, "expired_codex_executions"},
+		{"expired-outbox", func(s *Snapshot) { s.LeasedOutbox, s.ExpiredOutboxLeases = 2, 1 }, "expired_outbox_leases"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := cleanSnapshot()
+			tc.mutate(&s)
+			status, err := EvaluateSnapshot(s)
+			if err != nil || status.AuthorityClear || status.Ready || status.ProductionQualified ||
+				status.State != OperationalDegraded || !slices.Contains(status.Reasons, tc.reason) {
+				t.Fatalf("unresolved reservation hidden: %#v err=%v", status, err)
+			}
+			if err := status.ValidateAt(s.CapturedAt); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	// Existing live leases remain facts; they neither establish READY nor count
+	// as expiry. ExpiredOutboxLeases is a subset of the existing leased total.
+	s := cleanSnapshot()
+	s.ActiveWorkerLeases, s.LeasedOutbox = 3, 4
+	status, err := EvaluateSnapshot(s)
+	if err != nil || !status.AuthorityClear || status.Ready || status.ProductionQualified {
+		t.Fatalf("live leases incorrectly classified: %#v err=%v", status, err)
+	}
+	for _, mutate := range []func(*Snapshot){
+		func(s *Snapshot) { s.UnknownOfflineExecutions = -1 },
+		func(s *Snapshot) { s.ExpiredOfflineExecutions = -1 },
+		func(s *Snapshot) { s.ExpiredCodexExecutions = -1 },
+		func(s *Snapshot) { s.ExpiredOutboxLeases = -1 },
+		func(s *Snapshot) { s.ExpiredOutboxLeases = s.LeasedOutbox + 1 },
+	} {
+		bad := s
+		mutate(&bad)
+		if _, err := EvaluateSnapshot(bad); err == nil {
+			t.Fatal("invalid execution/lease accounting accepted", bad)
+		}
+	}
+}
+
+func TestOperationalSnapshotRequiresExplicitWireFacts(t *testing.T) {
+	raw, err := json.Marshal(cleanSnapshot())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var complete Snapshot
+	if err := json.Unmarshal(raw, &complete); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{
+		"recovery_epoch", "expired_worker_leases", "unknown_operations",
+		"unknown_codex_executions", "unknown_offline_executions", "expired_offline_executions",
+		"expired_codex_executions", "expired_outbox_leases",
+	} {
+		for _, omit := range []bool{false, true} {
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(raw, &fields); err != nil {
+				t.Fatal(err)
+			}
+			if omit {
+				delete(fields, key)
+			} else {
+				fields[key] = json.RawMessage("null")
+			}
+			bad, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var snapshot Snapshot
+			if json.Unmarshal(bad, &snapshot) == nil {
+				t.Fatalf("missing/null %s decoded as a zero fact (omit=%v)", key, omit)
+			}
+		}
+	}
+	complete.Version = 5
+	if _, err := EvaluateSnapshot(complete); err == nil {
+		t.Fatal("historical v5 without complete expiry accounting accepted as current")
 	}
 }

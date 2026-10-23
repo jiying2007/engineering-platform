@@ -29,9 +29,14 @@ deadline constructors are not new independent origins. SLI v3 adds no Context
 origin. The current source digest and rows include all three slices: 60 direct
 origins, 11 signal-owned roots, and the same 19 cleanup/settlement sites.
 
+The subsequent operational-integrity repair retains these 60 origins. Linux
+pipe output inherits the monitor context, joins its deadline callback and closes
+only its separately opened descriptor. Status projection and Recovery row/audit
+checks reuse their existing transaction budgets; no independent origin is added.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:7749373b99e84cd3f1cb12f4ad53730a699e90f8742506a729b8777fb706a0c9`
+`sha256:80ffb3e1fea453c29fbd95ebe9cc63da369052a3a173de1436ec233ba479b623`
 
 ## Reviewed categories
 

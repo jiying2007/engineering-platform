@@ -101,6 +101,14 @@ needs no Publisher call, works after Recovery completion, and adds no audit.
 COMMIT acknowledgement loss stays unknown until exact readback. The publication
 reconciler cannot complete that Recovery epoch through another person's proof.
 
+The settlement transaction performs this retained row/audit check before
+deciding that an operation has no existing disposition. A partially restored
+operation row cannot erase the meaning of a retained non-invocation audit event:
+an unresolved state with a NULL reconciliation receipt and an existing audit is
+a conflict. The transaction leaves both the row and audit count unchanged;
+it does not append a second disposition and report success before later
+readback discovers the contradiction.
+
 The existing PLANNED-only abandonment endpoint remains narrower and unchanged;
 it does not gain permission to abandon a DISPATCHED operation without this proof.
 
