@@ -253,6 +253,123 @@ func TestReadOperationalCapacityLocalPoolHeadroomAndCancelledWait(t *testing.T) 
 	}
 }
 
+type capacityRollbackTraceKey struct{}
+type capacityRollbackProbe struct {
+	stopCaller       context.CancelFunc
+	closeConnection  bool
+	cleanupContext   context.Context
+	cleanupRemaining time.Duration
+	contextAfterStop error
+	closeErr         error
+	rollbackErr      error
+	connectionPID    uint32
+	starts, ends     int
+}
+
+func (p *capacityRollbackProbe) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if strings.ToLower(strings.TrimSpace(data.SQL)) != "rollback" {
+		return ctx
+	}
+	p.starts++
+	p.cleanupContext = ctx
+	if deadline, ok := ctx.Deadline(); ok {
+		p.cleanupRemaining = time.Until(deadline)
+	}
+	p.connectionPID = conn.PgConn().PID()
+	if p.stopCaller != nil {
+		p.stopCaller()
+	}
+	p.contextAfterStop = ctx.Err()
+	if p.closeConnection {
+		// Drop this test pool's actual connection immediately before ROLLBACK,
+		// so the capacity reader must handle a real cleanup transport error.
+		p.closeErr = conn.PgConn().Conn().Close()
+	}
+	return context.WithValue(ctx, capacityRollbackTraceKey{}, p)
+}
+
+func (p *capacityRollbackProbe) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
+	if ctx.Value(capacityRollbackTraceKey{}) == p {
+		p.ends++
+		p.rollbackErr = data.Err
+	}
+}
+
+func TestReadOperationalCapacityRollbackUsesIndependentBoundedCleanup(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		cancelCaller    bool
+		closeConnection bool
+	}{
+		{"caller-cancelled-at-rollback", true, false},
+		{"rollback-connection-failure", false, true},
+		{"cancelled-caller-and-connection-failure", true, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			original := newIsolatedIntegrationStore(t)
+			caller, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			probe := &capacityRollbackProbe{closeConnection: tc.closeConnection}
+			if tc.cancelCaller {
+				probe.stopCaller = cancel
+			}
+			config := original.pool.Config()
+			config.MaxConns, config.MinConns = 1, 0
+			config.ConnConfig.Tracer = probe
+			pool, err := pgxpool.NewWithConfig(caller, config)
+			workerOK(t, err)
+			defer pool.Close()
+			before := capacityLedger(t, original)
+			facts, err := New(pool).ReadOperationalCapacity(caller, capacityGrants())
+			if err == nil || !reflect.DeepEqual(facts, production.CapacityFacts{}) {
+				t.Fatal("cancelled or failed cleanup retained a capacity observation", facts, err)
+			}
+			if probe.starts != 1 || probe.ends != 1 || probe.cleanupContext == nil || probe.contextAfterStop != nil || probe.cleanupRemaining <= 0 || probe.cleanupRemaining > 5*time.Second {
+				t.Fatalf("ROLLBACK did not use its existing independent 5s cleanup: starts=%d ends=%d remaining=%s context=%v", probe.starts, probe.ends, probe.cleanupRemaining, probe.contextAfterStop)
+			}
+			if probe.cleanupContext.Err() != context.Canceled {
+				t.Fatal("completed rollback retained its cleanup context")
+			}
+			if tc.cancelCaller && !errors.Is(err, context.Canceled) {
+				t.Fatal("capacity cleanup hid original caller cancellation", err)
+			}
+			if !tc.cancelCaller && caller.Err() != nil {
+				t.Fatal("cleanup transport failure cancelled its caller", caller.Err())
+			}
+			if tc.closeConnection {
+				workerOK(t, probe.closeErr)
+				if probe.rollbackErr == nil || !errors.Is(err, probe.rollbackErr) {
+					t.Fatal("capacity hid the actual rollback transport error", err, probe.rollbackErr)
+				}
+			} else if probe.rollbackErr != nil {
+				t.Fatal("cancelled caller poisoned an independently scoped rollback", probe.rollbackErr)
+			}
+			if !tc.closeConnection && pool.Stat().AcquiredConns() != 0 {
+				t.Fatal("capacity returned before transaction connection release")
+			}
+			// pgxpool destroys failed connections asynchronously. A bounded
+			// acquisition of a different idle PID proves that cleanup completed;
+			// failed cleanup never permits sampling or returning capacity facts.
+			verify, stop := context.WithTimeout(context.Background(), 2*time.Second)
+			defer stop()
+			connection, acquireErr := pool.Acquire(verify)
+			workerOK(t, acquireErr)
+			defer connection.Release()
+			if connection.Conn().PgConn().TxStatus() != 'I' {
+				t.Fatal("pool returned an active transaction after capacity cleanup")
+			}
+			if same := connection.Conn().PgConn().PID() == probe.connectionPID; same == tc.closeConnection {
+				t.Fatal("healthy connection was discarded or failed connection was reused", tc.closeConnection)
+			}
+			var one int
+			workerOK(t, connection.QueryRow(verify, "SELECT 1").Scan(&one))
+			if one != 1 || !bytes.Equal(before, capacityLedger(t, original)) {
+				t.Fatal("cleanup poisoned the reusable pool or changed authority")
+			}
+		})
+	}
+}
+
 func TestReadOperationalCapacityRejectsMalformedRetainedLeaseFacts(t *testing.T) {
 	for _, mode := range []string{"empty-owner", "nonleased-until", "null-until", "duplicate-owner", "nonstring-profile"} {
 		t.Run(mode, func(t *testing.T) {

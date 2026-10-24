@@ -76,6 +76,11 @@ separate timestamp. This local pool snapshot is not atomic with the database
 snapshot and is not PostgreSQL server-wide capacity. A changing workload may
 change the facts immediately after either observation.
 
+Transaction release uses the existing independent five-second rollback budget.
+Cleanup failure prevents a pool sample or successful facts. Successful cleanup
+does not erase caller cancellation: the original Context is checked again before
+sampling. Existing deferred cleanup remains responsible for every early return.
+
 | Output | Exact meaning |
 | --- | --- |
 | Original `authority` | Existing v6 authority diagnostic, including UNKNOWN operations, expired leases and Recovery blockers |

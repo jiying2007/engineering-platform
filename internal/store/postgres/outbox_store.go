@@ -181,10 +181,10 @@ func (s *Store) Dispatch(ctx context.Context, lease outbox.Lease, risk action.Ri
 	return resolution.State, nil
 }
 
-func rollbackOutbox(tx pgx.Tx) {
+func rollbackOutbox(tx pgx.Tx) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = tx.Rollback(ctx)
+	return tx.Rollback(ctx)
 }
 
 type outboxExecer interface {

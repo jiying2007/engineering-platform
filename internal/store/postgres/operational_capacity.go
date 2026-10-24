@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -129,8 +130,8 @@ FROM worker_inbox WHERE worker_profile=ANY($1::text[]) GROUP BY worker_profile O
 	}
 	// End the read-only transaction before sampling the separate local pool;
 	// the observer's own connection is not deliberately counted as busy.
-	if err := tx.Rollback(ctx); err != nil {
-		return zero, err
+	if err := rollbackOutbox(tx); err != nil {
+		return zero, errors.Join(err, ctx.Err())
 	}
 	if err := ctx.Err(); err != nil {
 		return zero, err

@@ -177,6 +177,16 @@ The provider-free pre-live workflow now retains exact-source artifacts on every
 protected-main push. These are bounded implementation improvements; #228, #229
 and the selected-deployment acceptance work under #105 remain open.
 
+The initial PR #292 head's
+[CI 40087899569](https://github.com/jiying2007/engineering-platform/actions/runs/40087899569)
+failed the existing direct-transaction-cleanup source guard: capacity's explicit
+rollback reused the caller Context. The correction reuses the original independent
+five-second rollback helper and checks its returned error before sampling the
+pool. Caller cancellation remains a failed observation after successful cleanup.
+Actual rollback cancellation and connection-failure regressions cover this
+boundary. The original failure is retained; the corrected source requires its
+own exact-head and fresh-main delivery verification.
+
 **Trusted self-hosted M1 phase 1 has historical proof. Current repository
 implementation and automated tests are not production/unattended qualification.**
 

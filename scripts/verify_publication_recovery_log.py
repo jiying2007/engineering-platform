@@ -60,6 +60,7 @@ CAPACITY_REQUIRED = {
     "TestReadOperationalCapacityUsesOneReadOnlyRepeatableSnapshot",
     "TestReadOperationalCapacityLocalPoolHeadroomAndCancelledWait",
     "TestReadOperationalCapacityRejectsMalformedRetainedLeaseFacts",
+    "TestReadOperationalCapacityRollbackUsesIndependentBoundedCleanup",
 }
 
 PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"

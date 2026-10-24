@@ -41,7 +41,7 @@ checks reuse their existing transaction budgets; no independent origin is added.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:ecbe3e7fbd5d4c30fe28c609191993dc3464a4b8cf159d2054ddd64bc4a30ea6`
+`sha256:9ac0ea7cc92774886c01af00b5861ebe1922e5a5eaf45f3b67059d901a3f6f3a`
 
 ## Reviewed categories
 
