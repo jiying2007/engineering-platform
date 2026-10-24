@@ -10,7 +10,7 @@ import unittest
 import verify_service_lifecycle_log as gate
 
 ROOT = Path(__file__).resolve().parents[1]
-LOGS = ("service-control-tests.jsonl", "service-publisher-tests.jsonl", "service-helper-tests.jsonl")
+LOGS = ("service-control-tests.jsonl", "service-publisher-tests.jsonl", "service-helper-tests.jsonl", "service-worker-tests.jsonl", "service-runtime-tests.jsonl")
 
 
 def complete(package, names):
@@ -38,12 +38,12 @@ class ServiceLifecycleGateTests(unittest.TestCase):
         for path, events in zip(self.paths, self.events):
             path.write_text("".join(json.dumps(e) + "\n" for e in events))
 
-    def test_all_three_exact_streams_required(self):
+    def test_all_five_exact_streams_required(self):
         gate.verify_logs(self.paths)
-        for paths in ([], self.paths[:2], self.paths + self.paths[:1], self.paths[::-1]):
+        for paths in ([], self.paths[:2], self.paths[:3], self.paths[:4], self.paths + self.paths[:1], self.paths[::-1]):
             with self.assertRaises(ValueError):
                 gate.verify_logs(paths)
-        for i in range(3):
+        for i in range(len(gate.GROUPS)):
             original = self.events[i]
             for replacement in ([], original[1:], original[:-1],
                                 [e for e in original if e["Action"] == "pass"],
@@ -76,12 +76,30 @@ class ServiceLifecycleGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gate.verify_logs(self.paths)
 
+    def test_worker_unknown_post_and_semantic_failures_cannot_be_skipped(self):
+        for index, name in ((2, "TestOnlyStopErrorPreservesUnwrappedSemanticFailure"),
+                            (3, "TestWorkerLoopPreservesAuthorityAmbiguityAfterCancel"),
+                            (3, "TestWorkerCLIStoppedAfterUnobservedClaimRequiresReadback"),
+                            (4, "TestScopeStartFailurePreservesUnknownProcess"),
+                            (4, "TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs")):
+            original = self.events[index]
+            for replacement in (
+                [e for e in original if e.get("Test") != name],
+                [dict(e, Action="skip") if e.get("Test") == name and e["Action"] == "pass" else e for e in original],
+            ):
+                self.events[index] = replacement
+                self.write()
+                with self.assertRaises(ValueError):
+                    gate.verify_logs(self.paths)
+            self.events[index] = original
+        self.write()
+
     def test_exact_required_tests_exist_and_are_selected_in_canonical_ci(self):
         workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertIn('test -n "$POSTGRES_TEST_URL"', workflow)
         self.assertIn("python3 -B scripts/test_verify_service_lifecycle_log.py", workflow)
         self.assertIn("python3 -B scripts/verify_service_lifecycle_log.py", workflow)
-        self.assertEqual([len(names) for _, names in gate.GROUPS], [9, 4, 1])
+        self.assertEqual([len(names) for _, names in gate.GROUPS], [9, 4, 2, 5, 2])
         for (pkg, names), log in zip(gate.GROUPS, LOGS):
             existing = {name for p in (ROOT / pkg).glob("*_test.go")
                         for name in re.findall(r"^func (Test\w+)\(", p.read_text(), re.M)}

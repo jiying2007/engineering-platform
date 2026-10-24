@@ -13,6 +13,7 @@ import (
 
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
 	"github.com/jiying2007/engineering-platform/internal/preparation"
+	"github.com/jiying2007/engineering-platform/internal/servicelifecycle"
 	"github.com/jiying2007/engineering-platform/internal/workeragent"
 	"github.com/jiying2007/engineering-platform/internal/workerloop"
 )
@@ -113,14 +114,34 @@ func serveWorker() error {
 	if *once {
 		return step(ctx)
 	}
-	err = workerloop.Run(ctx, time.Second, func(ctx context.Context) error {
+	return runWorkerLoop(ctx, time.Second, step)
+}
+
+// A service stop is successful only when its owning context was cancelled and
+// the entire returned error is ordinary cancellation. A cancelled POST can
+// still have an unobserved committed result; shutdown must retain that verdict.
+func runWorkerLoop(ctx context.Context, interval time.Duration, step func(context.Context) error) error {
+	err := workerloop.Run(ctx, interval, func(ctx context.Context) error {
 		err := step(ctx)
 		if controlclient.IsCompleteHTTPStatus(err, 409) {
 			return nil
 		}
 		return err
 	})
-	if errors.Is(err, context.Canceled) {
+	if ctx.Err() == context.Canceled && servicelifecycle.OnlyStopError(err, context.Canceled) {
+		// Keep the existing exact-readback labels explicit if stop classification
+		// later changes. The strict tree check above also bounds malformed trees
+		// before errors.Is traverses them; no authority result is discarded.
+		for _, unresolved := range []error{
+			controlclient.ErrPostOutcomeUnobserved,
+			controlclient.ErrCommitOutcomeUnknown,
+			controlclient.ErrExternalEffectUnresolved,
+			workeragent.ErrFailureReportUnobserved,
+		} {
+			if errors.Is(err, unresolved) {
+				return err
+			}
+		}
 		return nil
 	}
 	return err

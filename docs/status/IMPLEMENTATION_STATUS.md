@@ -157,6 +157,26 @@ the remaining effectful Recovery or selected-host qualification gates.
 
 ## Maturity boundary
 
+The 2026-10-24 continuation adds an
+[authenticated Core instance capacity observation](../implementation/PRODUCTION_CAPACITY_OBSERVATION_V1.md),
+bound to the actual TLS peer, loaded policy bytes, clean executable source and
+an externally expected startup nonce. Its original authority, current-policy
+Worker reservations and queues share one read-only transaction; local pgx pool
+facts have their own later timestamp. Subset counts cannot contradict global
+authority, and damaged lease facts fail closed. Reservation headroom is not
+Worker/Publisher process capacity; service readiness remains NOT_OBSERVED and
+all execution/READY/production-qualification flags remain false.
+
+The same source slice preserves uncertain Worker POST outcomes through service
+cancellation, rejects observation-only receipts at Publish boundaries, and
+quarantines inputs when process startup fails after launch without a confirmed
+namespace/reap. Mandatory lifecycle and publication tests reject missing or
+skipped coverage. The unused generic Supervisor/LocalProcessProvider path is
+removed while the actual Runtime interfaces and Codex namespace path remain.
+The provider-free pre-live workflow now retains exact-source artifacts on every
+protected-main push. These are bounded implementation improvements; #228, #229
+and the selected-deployment acceptance work under #105 remain open.
+
 **Trusted self-hosted M1 phase 1 has historical proof. Current repository
 implementation and automated tests are not production/unattended qualification.**
 
@@ -580,7 +600,8 @@ budgets and the other37 existing bounded policies are preserved. The deadline is
 shared through nested Store/transaction phases rather than refreshed per query.
 A saturated-pool regression holds the only connection until seven real authority
 paths return deadline errors, with no Provider dispatch or record/audit residue.
-The 84-entry source guard, SQL Context-provenance guard and six required tests run in ordinary CI; database
+The source guard now covers 85 entries including the new five-second capacity
+read. The SQL Context-provenance guard and six required tests run in ordinary CI; database
 execution cannot silently skip. This is a finite fallback, not a production SLO
 or a new external-effect disposition. See
 [PostgreSQL authority budgets](../implementation/POSTGRES_AUTHORITY_BUDGET_V1.md).

@@ -118,7 +118,7 @@ func (p *Provider) Dispatch(ctx context.Context, req action.Request) (action.Dis
 	// The independent Publisher is a separate trust boundary. Never
 	// authorize CONFIRMED from a remote receipt without binding every
 	// externally observed identity back to the frozen Core plan.
-	if err := receipt.Validate(plan); err != nil {
+	if err := receipt.validateForPublish(plan); err != nil {
 		return action.DispatchResult{}, fmt.Errorf("publisher returned an unbound publication receipt: %w", err)
 	}
 	observed, err := encodeReceipt(receipt)
@@ -160,7 +160,7 @@ func (p *Provider) Reconcile(ctx context.Context, op action.Operation) (action.R
 	case ObservedConfirmed:
 		// Readback is not authority by itself: malformed or retargeted
 		// remote observations cannot settle an UNKNOWN effect as CONFIRMED.
-		if err := result.Receipt.Validate(plan); err != nil {
+		if err := result.Receipt.validateForObservation(plan); err != nil {
 			return action.ReconcileResult{
 				Outcome: action.ReconcileManual, ObservedState: "publication receipt does not bind frozen plan",
 			}, nil
@@ -340,6 +340,31 @@ func (r PublicationReceipt) Validate(plan Plan) error {
 	default:
 		return fmt.Errorf("invalid publication outcome")
 	}
+}
+
+// Validate preserves the structural contract shared by retained publication and
+// observation receipts. A new response must also bind its purpose: an OBSERVED
+// readback cannot stand in for the original synchronous Publish result.
+func (r PublicationReceipt) validateForPublish(plan Plan) error {
+	if err := r.Validate(plan); err != nil {
+		return err
+	}
+	switch r.PublicationOutcome {
+	case "CREATED", "UPDATED", "EXISTING":
+		return nil
+	default:
+		return fmt.Errorf("GitHub observation is not an original publication result")
+	}
+}
+
+func (r PublicationReceipt) validateForObservation(plan Plan) error {
+	if err := r.Validate(plan); err != nil {
+		return err
+	}
+	if r.PublicationOutcome != "OBSERVED" {
+		return fmt.Errorf("GitHub publication result is not a fresh observation")
+	}
+	return nil
 }
 
 func encodeReceipt(receipt PublicationReceipt) (string, error) {

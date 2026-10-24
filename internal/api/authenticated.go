@@ -26,6 +26,7 @@ type RecoveryCompletionGate interface {
 type AuthenticatedOptions struct {
 	RecoveryCompletion  RecoveryCompletionGate
 	PublicationRecovery githubpublish.PublicationRecoveryObserver
+	OperationalCapacity *OperationalCapacityOptions
 }
 type identityKey struct{}
 
@@ -44,6 +45,7 @@ var routeCapabilities = map[string]string{
 	"GET /api/v1/capabilities":                          access.Read,
 	"GET /api/v1/recovery":                              access.Read,
 	"GET /api/v1/operations/status":                     access.Read,
+	"GET /api/v1/operations/capacity":                   access.Read,
 	"POST /api/v1/recovery/begin":                       access.RecoveryBegin,
 	"POST /api/v1/recovery/complete":                    access.RecoveryComplete,
 	"POST /api/v1/recovery/proofs":                      access.RecoveryReconcile,
@@ -92,6 +94,11 @@ func NewAuthenticatedHandler(backend store.Store, actions ActionGateway, policy 
 	}
 	s := NewServerWithActionGateway(backend, actions)
 	s.publicationRecovery = options.PublicationRecovery
+	var err error
+	s.operationalCapacity, err = copyOperationalCapacity(options.OperationalCapacity, policy)
+	if err != nil {
+		return nil, err
+	}
 	s.workerRoutes()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := s.mux.Handler(r)

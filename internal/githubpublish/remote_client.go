@@ -196,7 +196,7 @@ func (c *remoteClient) Publish(ctx context.Context, plan Plan, bundlePath string
 	if err := c.call(ctx, "/v1/publish", publishRequest{Plan: plan, Identity: identity}, &receipt); err != nil {
 		return receipt, err
 	}
-	if err := receipt.Validate(plan); err != nil {
+	if err := receipt.validateForPublish(plan); err != nil {
 		return PublicationReceipt{}, err
 	}
 	return receipt, nil
@@ -215,7 +215,7 @@ func (c *remoteClient) Observe(ctx context.Context, plan Plan) (ObserveResult, e
 	default:
 		return ObserveResult{}, fmt.Errorf("publisher remote returned invalid observation")
 	}
-	if result.Outcome == ObservedConfirmed && result.Receipt.Validate(plan) != nil {
+	if result.Outcome == ObservedConfirmed && result.Receipt.validateForObservation(plan) != nil {
 		return ObserveResult{}, fmt.Errorf("publisher remote returned invalid receipt")
 	}
 	return result, nil

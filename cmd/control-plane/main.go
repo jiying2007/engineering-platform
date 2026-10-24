@@ -90,6 +90,7 @@ func serve() error {
 		return err
 	}
 	defer listener.Close()
+	logCapacitySource(config.capacity)
 	var relay func(context.Context) error
 	if persistent != nil {
 		var nonce [16]byte

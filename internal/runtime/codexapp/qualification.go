@@ -65,8 +65,7 @@ type QualificationReceipt struct {
 // Admission is compatibility-based rather than version-pinned: the binary must
 // expose the protocol/schema/profile semantics required by this contract. The
 // observed version and exact binary digest are retained for provenance.
-func Qualify(ctx context.Context, executable, model string) (QualificationReceipt, error) {
-	var receipt QualificationReceipt
+func Qualify(ctx context.Context, executable, model string) (receipt QualificationReceipt, runErr error) {
 	if strings.TrimSpace(model) == "" || len(model) > 128 {
 		return receipt, fmt.Errorf("qualification requires a bounded model")
 	}
@@ -90,7 +89,7 @@ func Qualify(ctx context.Context, executable, model string) (QualificationReceip
 	if err != nil {
 		return receipt, err
 	}
-	defer os.RemoveAll(root)
+	defer func() { cleanupProbeDirectory(root, runErr) }()
 
 	versionHome := filepath.Join(root, "version-home")
 	if err := os.Mkdir(versionHome, 0o700); err != nil {
@@ -273,8 +272,8 @@ func VerifyExecutableQualification(ctx context.Context, executable, model string
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(home)
 	out, diagnostics, err := codexVersion(ctx, resolved, receipt.BinaryDigest, home)
+	defer cleanupProbeDirectory(home, err)
 	if err != nil {
 		return fmt.Errorf("codex version: %w; stderr=%s", err, strings.TrimSpace(diagnostics))
 	}

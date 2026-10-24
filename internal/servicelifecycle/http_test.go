@@ -3,11 +3,47 @@ package servicelifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"testing"
 	"time"
 )
+
+type semanticStopError struct {
+	cause   error
+	meaning error
+}
+
+func (e *semanticStopError) Error() string        { return "unresolved operation" }
+func (e *semanticStopError) Unwrap() error        { return e.cause }
+func (e *semanticStopError) Is(target error) bool { return target == e.meaning }
+
+func TestOnlyStopErrorPreservesUnwrappedSemanticFailure(t *testing.T) {
+	unobserved := errors.New("operation outcome requires exact readback")
+	semantic := &semanticStopError{cause: context.Canceled, meaning: unobserved}
+	for _, err := range []error{
+		semantic,
+		fmt.Errorf("outer: %w", semantic),
+		errors.Join(context.Canceled, semantic),
+		fmt.Errorf("outer: %w", errors.Join(semantic, fmt.Errorf("stop: %w", context.Canceled))),
+	} {
+		if !errors.Is(err, context.Canceled) || !errors.Is(err, unobserved) {
+			t.Fatal("fixture lost its simultaneous stop and authority semantics")
+		}
+		if OnlyStopError(err, context.Canceled) {
+			t.Fatal("semantic wrapper was flattened into successful cancellation", err)
+		}
+	}
+	for _, err := range []error{context.Canceled, fmt.Errorf("stop: %w", context.Canceled), errors.Join(context.Canceled, fmt.Errorf("stop: %w", context.Canceled))} {
+		if !OnlyStopError(err, context.Canceled) {
+			t.Fatal("ordinary complete stop tree rejected", err)
+		}
+	}
+	if !OnlyStopError(semantic, semantic) {
+		t.Fatal("the exact caller-selected sentinel was not recognized")
+	}
+}
 
 func TestBindHTTPPreservesRootAndRejectsDetachedHooks(t *testing.T) {
 	type key struct{}

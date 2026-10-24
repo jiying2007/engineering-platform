@@ -20,6 +20,7 @@ MODES = (
     (gate.NO_INVOCATION_PUBLISHER_REQUIRED, gate.PUBLISHER_PACKAGE, 3, "--no-invocation-publisher"),
     (gate.PROOF_REQUIRED, gate.PUBLISHER_PACKAGE, 3, "--publisher-proof"),
     (gate.CONTROL_REQUIRED, gate.CONTROL_PACKAGE, 20, "--control-response"),
+    (gate.CAPACITY_REQUIRED, gate.PACKAGE, 3, "--capacity-db"),
 )
 
 
@@ -95,6 +96,26 @@ class GateTests(unittest.TestCase):
         existing = {name for path in (root / "internal/store/postgres").glob("*_test.go")
                     for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
         self.assertTrue(gate.RESTORE_REQUIRED <= existing)
+
+    def test_capacity_database_cannot_be_missing_or_skipped(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text()
+        commands = [line for line in workflow.splitlines()
+                    if "go test -json" in line and "capacity-database-tests.jsonl" in line]
+        self.assertEqual(len(commands), 1)
+        self.assertIn("-race -count=3 -timeout 2m ./internal/store/postgres", commands[0])
+        match = re.search(r"-run '([^']+)'", commands[0])
+        self.assertIsNotNone(match)
+        self.assertFalse([name for name in gate.CAPACITY_REQUIRED if not re.search(match.group(1), name)])
+        source = root / "internal/store/postgres/operational_capacity_test.go"
+        existing = set(re.findall(r"^func (TestReadOperationalCapacity\w+)\(", source.read_text(), re.M))
+        self.assertEqual(existing, gate.CAPACITY_REQUIRED)
+        self.assertIn('"$RUNNER_TEMP/capacity-database-tests.jsonl" --capacity-db', workflow)
+        good = complete(gate.CAPACITY_REQUIRED)
+        for name in gate.CAPACITY_REQUIRED:
+            self.reject([e for e in good if e.get("Test") != name], required=gate.CAPACITY_REQUIRED)
+            self.reject([dict(e, Action="skip") if e.get("Test") == name and e["Action"] == "pass" else e
+                         for e in good], required=gate.CAPACITY_REQUIRED)
 
     def test_confirmation_boundary_is_permanently_selected(self):
         import re

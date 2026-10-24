@@ -30,23 +30,35 @@ GROUPS = (
     })),
     ("internal/servicelifecycle", frozenset({
         "TestBindHTTPPreservesRootAndRejectsDetachedHooks",
+        "TestOnlyStopErrorPreservesUnwrappedSemanticFailure",
+    })),
+    ("cmd/worker", frozenset({
+        "TestWorkerLoopPreservesMixedAndUnrequestedStopErrors",
+        "TestWorkerLoopPreservesAuthorityAmbiguityAfterCancel",
+        "TestWorkerLoopRetainsOnlyCompleteConflictDeferral",
+        "TestWorkerLoopPreCancelledOwnerDoesNotCallStep",
+        "TestWorkerCLIStoppedAfterUnobservedClaimRequiresReadback",
+    })),
+    ("internal/runtime/codexapp", frozenset({
+        "TestScopeStartFailurePreservesUnknownProcess",
+        "TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs",
     })),
 )
 
 
 def verify_logs(paths, repeats=3):
     if len(paths) != len(GROUPS):
-        raise ValueError("all three service lifecycle event streams required")
+        raise ValueError("all five service lifecycle event streams required")
     for path, (package, names) in zip(paths, GROUPS):
         verify(Path(path), repeats=repeats, required=names, package=PREFIX + package)
 
 
 def main(argv=None):
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 3:
-        raise ValueError("usage: verify_service_lifecycle_log.py control.jsonl publisher.jsonl helper.jsonl")
+    if len(args) != len(GROUPS):
+        raise ValueError("usage: verify_service_lifecycle_log.py control.jsonl publisher.jsonl helper.jsonl worker.jsonl runtime.jsonl")
     verify_logs(args)
-    print("Service lifecycle: 14 required tests x3, complete event streams, zero skips")
+    print("Service lifecycle: 22 required tests x3, complete event streams, zero skips")
 
 
 if __name__ == "__main__":

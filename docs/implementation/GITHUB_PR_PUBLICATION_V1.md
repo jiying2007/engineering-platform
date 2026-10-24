@@ -150,6 +150,14 @@ GitHub publication receipt in `observed_state` containing repository, base
 ref/commit, publication branch/result commit, PR number/URL/state and whether
 the PR was created, updated or already exact.
 
+The receipt's purpose is checked at the Provider, independent Publisher client
+and service boundaries. Publish accepts only `CREATED`, `UPDATED` or `EXISTING`;
+Observe accepts only `OBSERVED`. A structurally valid observation-only receipt
+cannot turn the original Dispatch into CONFIRMED, and a mutation receipt cannot
+stand in for a fresh observation. Generic historical receipt decoding remains
+unchanged. An invalid Publish result keeps the original outcome UNKNOWN and
+invocation occupied; it provides no completion, no-invocation or replay proof.
+
 A deterministic local precondition failure is retained as
 `PRECONDITION_FAILED` and reconciles to MANUAL. A transport error after
 dispatch becomes UNKNOWN. Reconciliation is observation-only:

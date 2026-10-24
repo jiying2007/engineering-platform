@@ -144,8 +144,8 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	if err != nil {
 		return receipt, err
 	}
-	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
+	defer cleanupProbeDirectory(versionHome, err)
 	version, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
 		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
@@ -179,7 +179,7 @@ func LiveWIFProbe(ctx context.Context, executable, binaryDigest, work, home, rul
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return receipt, err
+		return receipt, scopeStartError(cmd, err, ErrProbeStopUnconfirmed)
 	}
 	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)
@@ -266,8 +266,8 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	if err != nil {
 		return receipt, err
 	}
-	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
+	defer cleanupProbeDirectory(versionHome, err)
 	version, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
 		return receipt, fmt.Errorf("live qualification requires a compatible codex-cli version: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
@@ -293,7 +293,7 @@ func LiveSavedLoginProbe(ctx context.Context, executable, binaryDigest, work, ho
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 64 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return receipt, err
+		return receipt, scopeStartError(cmd, err, ErrProbeStopUnconfirmed)
 	}
 	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)
