@@ -197,7 +197,7 @@ func (s *RemoteService) handlePublish(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication failed")
 		return
 	}
-	if err := receipt.Validate(req.Plan); err != nil {
+	if err := receipt.validateForPublish(req.Plan); err != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub publication receipt invalid")
 		return
 	}
@@ -241,7 +241,7 @@ func (s *RemoteService) handleObserve(w http.ResponseWriter, r *http.Request) {
 		writePublisherError(w, http.StatusBadGateway, "GitHub observation invalid")
 		return
 	}
-	if result.Outcome == ObservedConfirmed && result.Receipt.Validate(req.Plan) != nil {
+	if result.Outcome == ObservedConfirmed && result.Receipt.validateForObservation(req.Plan) != nil {
 		writePublisherError(w, http.StatusBadGateway, "GitHub observation receipt invalid")
 		return
 	}

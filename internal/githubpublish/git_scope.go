@@ -26,6 +26,18 @@ func publisherGitQuiescent(ctx context.Context) bool {
 	return state == nil || !state.uncertain
 }
 
+func publisherGitStartError(ctx context.Context, cmd *exec.Cmd, err error) error {
+	// Start can fail after launching the namespace init. Its original goroutine
+	// still owns Wait; a process handle alone supplies no scope or reap proof.
+	if err != nil && cmd.Process != nil {
+		if state, _ := ctx.Value(gitProofKey{}).(*gitProofLog); state != nil {
+			state.uncertain = true
+		}
+		return errors.Join(ErrPublisherGitQuiescenceUnknown, err)
+	}
+	return err
+}
+
 // The small stdin gate keeps even a fast Git process alive until the existing
 // kernel-scope launcher has recorded its dedicated PID namespace. No untrusted
 // text is interpolated into shell syntax and no descriptor is inherited except
@@ -47,7 +59,7 @@ func runPublisherGit(ctx context.Context, git string, args []string, env []strin
 	defer gate.Close()
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return err
+		return publisherGitStartError(ctx, cmd, err)
 	}
 	_, gateErr := gate.Write([]byte("go\n"))
 	closeErr := gate.Close()

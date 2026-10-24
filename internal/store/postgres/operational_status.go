@@ -25,6 +25,12 @@ func (s *Store) ReadOperationalStatus(ctx context.Context) (production.Operation
 		return production.OperationalStatus{}, err
 	}
 	defer rollbackOutbox(tx)
+	return readOperationalStatus(ctx, tx)
+}
+
+// The capacity reader reuses these exact v6 facts and integrity checks inside
+// its own read-only repeatable transaction; no second authority is evaluated.
+func readOperationalStatus(ctx context.Context, tx pgx.Tx) (production.OperationalStatus, error) {
 	if err := validatePlannedActionAbandonments(ctx, tx); err != nil {
 		return production.OperationalStatus{}, err
 	}

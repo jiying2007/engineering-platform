@@ -26,6 +26,12 @@ not the parent's cancel function.
 | Missing-deadline fallback | 47 | Core/Action reads and mutations, recovery proof, Outbox single operations, continuation reads, Open and migration; preserve explicit caller deadlines |
 | Existing caller-derived operation timeout | 36 | Worker/Offline/Codex/recovery5s and Outbox30s policies remain unchanged |
 | Existing finite relay batch | 1 | At most64 steps, each under the original5s child and cancelled immediately; existing independently bounded rollback remains |
+| Authenticated Core capacity read | 1 | Inherits the same authority fallback, then a caller-derived 5s budget spanning pool acquisition and the complete read-only transaction |
+
+The capacity observation adds one entry to the original 84, bringing the current
+public Context surface to 85. The same AST guard enumerates the new entry without
+an exception or a weaker policy; original v6 status and capacity share the
+private transaction helper under their respective original caller budgets.
 
 The fallback uses an existing safety constant rather than introducing a new
 configuration flag or selecting a short timeout for every operation. Explicit

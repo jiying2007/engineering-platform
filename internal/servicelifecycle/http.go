@@ -28,14 +28,22 @@ func BindHTTP(ctx context.Context, server *http.Server) error {
 }
 
 // Normalize only error trees whose EVERY leaf is the exact expected sentinel.
-// Opaque Is implementations, empty unwraps, cycles and oversized error trees
-// remain failures; do not discard useful error details to simplify exit status.
+// Custom Is implementations can add authority/cleanup semantics beside their
+// unwrapped cause. Unless the node is the exact expected sentinel, retain it as
+// a failure even when every unwrapped leaf is cancellation. Empty unwraps,
+// cycles and oversized trees also remain failures.
 func OnlyStopError(err, expected error) bool {
 	budget := 128
 	var visit func(error) bool
 	visit = func(current error) bool {
 		budget--
 		if current == nil || budget < 0 {
+			return false
+		}
+		if current == expected {
+			return true
+		}
+		if _, semantic := current.(interface{ Is(error) bool }); semantic {
 			return false
 		}
 		switch wrapped := current.(type) {
@@ -55,7 +63,7 @@ func OnlyStopError(err, expected error) bool {
 		case interface{ Unwrap() error }:
 			return visit(wrapped.Unwrap())
 		default:
-			return current == expected
+			return false
 		}
 	}
 	return visit(err)

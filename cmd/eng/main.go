@@ -137,6 +137,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-capacity":
+		if err := productionCapacity(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-preflight":
 		if err := productionPreflight(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -285,6 +290,7 @@ func usage() {
 	fmt.Println("  production-slo-report --operational FILE --source-root DIR --run RUN --subject DIGEST --deployment DIGEST [--require-criteria-met]  compare source-bound SLI with explicit criteria; no qualification")
 	fmt.Println("  production-publisher-health --config FILE        one authenticated Publisher health GET; not capacity/upstream readiness")
 	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
+	fmt.Println("  production-capacity --server-cert-digest DIGEST --access-policy-digest DIGEST --source-commit SHA --instance NONCE  read one pinned Core's pool/lease facts; not readiness")
 	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
 	fmt.Println("  production-status --monitor-for 1h --observe-for 30s --interval 5s --max-pending-age 2m --stale-after 45s [--require-no-alert]  finite JSONL failure/recovery observation")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")

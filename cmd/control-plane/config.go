@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/access"
@@ -27,6 +28,7 @@ type configuration struct {
 	development           bool
 	tls                   *tls.Config
 	policy                *access.Policy
+	capacity              *api.OperationalCapacityOptions
 	publisherConfig       string
 	publisherPlanConfig   string
 	publisherRemoteConfig string
@@ -95,7 +97,14 @@ func loadConfiguration(env func(string) string) (configuration, error) {
 		return c, err
 	}
 	c.tls, err = access.LoadServerTLS(cert, key, ca)
-	return c, err
+	if err != nil {
+		return c, err
+	}
+	info, _ := debug.ReadBuildInfo()
+	// Capacity requires an exact build/source proof. Failure disables only this
+	// read-only diagnostic, never otherwise valid existing Control operations.
+	c.capacity, _ = capacityFromLoaded(c.policy, data, c.tls, info)
+	return c, nil
 }
 
 func assembleServer(c configuration, backend corestore.Store) (*http.Server, error) {
@@ -110,7 +119,7 @@ func assembleServer(c configuration, backend corestore.Store) (*http.Server, err
 			return nil, fmt.Errorf("verified TLS transport required")
 		}
 		var err error
-		options := api.AuthenticatedOptions{}
+		options := api.AuthenticatedOptions{OperationalCapacity: c.capacity}
 		if gate, ok := backend.(api.RecoveryCompletionGate); ok {
 			options.RecoveryCompletion = gate
 		}

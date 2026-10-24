@@ -27,6 +27,22 @@ type probeBudget struct {
 
 const probeStopTimeout = 5 * time.Second
 
+func scopeStartError(cmd *exec.Cmd, err, unconfirmed error) error {
+	// Every caller owns a fresh command. A non-nil process after Start fails
+	// means launch happened, but neither its scope nor its reap is confirmed.
+	// The launcher retains the sole Wait; do not infer proof from this handle.
+	if err != nil && cmd.Process != nil {
+		return errors.Join(err, unconfirmed)
+	}
+	return err
+}
+
+func cleanupProbeDirectory(path string, probeErr error) {
+	if !errors.Is(probeErr, ErrProbeStopUnconfirmed) {
+		_ = os.RemoveAll(path)
+	}
+}
+
 // A short-lived --version command can exit before Start reads its namespace
 // identity from /proc. The fixed shell waits for one parent-owned stdin byte
 // before exec; positional arguments never become shell source. After this
@@ -137,7 +153,7 @@ func runCodexProbe(ctx context.Context, executable, expectedDigest, home string,
 	defer input.Close()
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, scopeStartError(cmd, err, ErrProbeStopUnconfirmed)
 	}
 	var proof processscope.Proof
 	defer func() {

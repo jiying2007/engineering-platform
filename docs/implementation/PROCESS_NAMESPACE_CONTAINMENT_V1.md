@@ -32,6 +32,21 @@ fallback. Failed/interrupt/transport paths close the protocol and terminate the
 same namespace before recording outcomes. Diagnostic stderr uses a synchronized
 bounded buffer while the process is live.
 
+Startup can also fail after the child has launched, while its namespace
+identity is being read. A non-nil process handle after that error is not a reap
+proof. Engineering and probe callers preserve their existing stop-unconfirmed
+classification; Publisher additionally marks its original Git proof collection
+uncertain. The original locked launcher goroutine remains the sole owner of
+Wait. No second Wait, unbounded join, inferred proof or ordinary retry is added.
+Affected qualification/version-probe inputs and Publisher staging are retained
+instead of being deleted beneath an unconfirmed process. Cleanup decisions for
+a version probe use that probe's own outcome, not a later app-server outcome.
+
+The unreferenced generic Supervisor and LocalProcessProvider implementations
+have been removed. Existing Runtime interfaces and the actual Codex/processscope
+path remain. Removing an unused alternate lifecycle does not qualify #229 or
+prove selected-host blocking-storage and stop latency.
+
 New engineering receipts are schema **4** and control transcripts are version
 **2**. Both bind the exact same process-scope proof. Core Finish, publication
 and Evidence reject missing, unconfirmed, foreign or mismatched proofs. An

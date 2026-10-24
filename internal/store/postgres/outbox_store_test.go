@@ -47,6 +47,45 @@ func succeed(context.Context, outbox.Message) outbox.Resolution {
 	return outbox.Resolution{State: outbox.Dispatched}
 }
 
+type rollbackCleanupProbe struct {
+	pgx.Tx
+	rollback func(context.Context) error
+}
+
+func (p *rollbackCleanupProbe) Rollback(ctx context.Context) error { return p.rollback(ctx) }
+
+func TestRollbackOutboxPreservesCleanupErrorAndReleasesContext(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"success", nil},
+		{"failure", errors.New("rollback transport failure")},
+		{"already-closed", pgx.ErrTxClosed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var observed context.Context
+			calls := 0
+			started := time.Now()
+			tx := &rollbackCleanupProbe{rollback: func(ctx context.Context) error {
+				observed = ctx
+				calls++
+				deadline, ok := ctx.Deadline()
+				if !ok || !deadline.After(started) || time.Until(deadline) > 5*time.Second || ctx.Err() != nil {
+					t.Fatal("rollback lacks a live bounded cleanup context")
+				}
+				return tc.err
+			}}
+			if got := rollbackOutbox(tx); got != tc.err {
+				t.Fatalf("cleanup error changed: got %v want %v", got, tc.err)
+			}
+			if calls != 1 || observed == nil || observed.Err() != context.Canceled {
+				t.Fatal("rollback did not release its cleanup context", calls)
+			}
+		})
+	}
+}
+
 func TestPostgresOutboxRecoveryGateAndLeaseRecovery(t *testing.T) {
 	s := integrationStore(t)
 	ctx := context.Background()

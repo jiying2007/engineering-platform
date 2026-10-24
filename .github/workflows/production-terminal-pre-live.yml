@@ -5,18 +5,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - .github/workflows/production-terminal-pre-live.yml
-      - scripts/prelive_provenance.py
-      - scripts/test_prelive_provenance.py
-      - cmd/eng/prelive_provenance_test.go
-      - examples/production/terminal-maintenance/**
-      - internal/production/acceptance.go
-      - internal/production/acceptance_test.go
-      - internal/api/production_terminal_examples_test.go
-      - cmd/eng/production_acceptance.go
-      - cmd/eng/production_acceptance_test.go
-      - docs/implementation/PRODUCTION_TERMINAL_ACCEPTANCE_V1.md
+    # Provenance binds the complete source SHA/tree, not only fixture paths.
+    # Retain a fresh provider-free contract artifact for every protected main.
 
 permissions:
   contents: read

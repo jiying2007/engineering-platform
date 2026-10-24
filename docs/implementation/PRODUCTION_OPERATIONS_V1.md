@@ -487,10 +487,21 @@ responses fail closed. This probe makes no GitHub upstream request and grants no
 publication or execution authority. A successful endpoint observation still
 sets capacity/upstream/production claims false.
 
-Publisher endpoint reachability, Worker poll history and database queue progress
-are deliberately separate facts; component capacity and selected-provider
-qualification remain unfinished observations. Measured operating SLOs require
-their own frozen workload, provenance and acceptance.
+`eng production-capacity` adds an
+[authenticated Core instance observation](PRODUCTION_CAPACITY_OBSERVATION_V1.md).
+It requires externally expected server-certificate, loaded-policy, clean-source
+and startup-instance identities, and verifies the actual direct-mTLS peer. One
+read-only transaction combines the original v6 authority with current-policy
+Worker reservation/queue facts; Core's local pgx pool is sampled afterward with
+a separate timestamp. Headroom describes unoccupied reservation limits, not
+live Worker processes, Publisher capacity or a production SLO. All READY,
+execution and production-qualification flags remain false.
+
+Publisher endpoint reachability, Worker poll history, database queue progress
+and Core reservation limits are separate facts. Whole-deployment component
+capacity and selected-provider qualification remain unfinished observations.
+Measured operating SLOs require their own frozen workload, provenance and
+acceptance.
 
 ## 6. Restart and UNKNOWN policy
 
@@ -619,8 +630,11 @@ collector digest, time window and exact samples. Source files alone can still be
 synthetic; provenance and operational acceptance belong to the existing
 Evidence/Verification/Review chain. No latency target is guessed in code.
 
-The manual `Production terminal pre-live dry run` workflow must retain one
-protected-main artifact before the live terminal qualification.
+The `Production terminal pre-live dry run` workflow runs on every protected-main
+push, with manual dispatch also available. It must retain an artifact for the
+exact selected source before live terminal qualification; a previous source's
+artifact cannot supply that provenance. Its provider-free contract tests grant
+no live provider or production qualification.
 
 Final acceptance still requires:
 

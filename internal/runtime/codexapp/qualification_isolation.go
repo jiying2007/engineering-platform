@@ -76,19 +76,14 @@ func qualifyIsolatedEngineeringStartup(ctx context.Context, executable, digest, 
 	scope, err := processscope.Start(cmd)
 	if err != nil {
 		_ = stdin.Close()
-		return err
+		return scopeStartError(cmd, err, ErrProbeStopUnconfirmed)
 	}
 	_ = writer.Close()
 	client := NewClient(output, stdin)
 	defer client.Close()
 	defer func() {
 		_ = client.Close()
-		stopCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-		defer stop()
-		proof, stopErr := scope.Stop(stopCtx)
-		if stopErr != nil || !proof.Quiescent() {
-			err = fmt.Errorf("isolated qualification stop unconfirmed (prior error: %v): %v", err, stopErr)
-		}
+		_, err = settleProbeExit(ctx, scope.Stop, processscope.Proof{}, err)
 	}()
 	adapter, err := NewAdapter(client, work)
 	if err != nil {

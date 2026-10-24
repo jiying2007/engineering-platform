@@ -55,8 +55,21 @@ RESTORE_REQUIRED = {
     "TestPlannedActionRestorePreservesBoundReceiptAndRejectsLaterCorruption",
 }
 
+CAPACITY_REQUIRED = {
+    "TestReadOperationalCapacityPreservesAuthorityAndExcludesUnauthorizedHistory",
+    "TestReadOperationalCapacityUsesOneReadOnlyRepeatableSnapshot",
+    "TestReadOperationalCapacityLocalPoolHeadroomAndCancelledWait",
+    "TestReadOperationalCapacityRejectsMalformedRetainedLeaseFacts",
+    "TestReadOperationalCapacityRollbackUsesIndependentBoundedCleanup",
+}
+
 PUBLISHER_PACKAGE = "github.com/jiying2007/engineering-platform/internal/githubpublish"
 PUBLISHER_REQUIRED = {
+    "TestPublisherGitStartFailurePreservesUnknownScope",
+    "TestPublisherGitStartFailureKeepsVerifiedSource",
+    "TestProviderDispatchRejectsObservationOnlyReceipt",
+    "TestPublisherRemoteClientBindsReceiptToResponsePurpose",
+    "TestPublisherServiceBindsReceiptToResponsePurpose",
     "TestPublisherRemoteResponseRejectsIncompleteBody",
     "TestPublisherRemoteResponseAtomicDecode",
     "TestPublisherRemoteResponseCancelledBeforeExchange",
@@ -103,6 +116,10 @@ NO_INVOCATION_PUBLISHER_REQUIRED = {
 
 CONTROL_PACKAGE = "github.com/jiying2007/engineering-platform/internal/controlclient"
 CONTROL_REQUIRED = {
+    "TestCapacityClientReadsActualPinnedTLSCertificate",
+    "TestCapacityClientRejectsPartialEncodedAmbiguousAndRedirectedReads",
+    "TestCapacityPeerRechecksCurrentEntireChainOnReusedConnection",
+    "TestCapacityClientCancellationRetainsNoPartialObservation",
     "TestControlResponseLifecycleOnlyCompleteConflictIsIgnorable",
     "TestBroken503RetainsHTTPStatusUncertaintyAndReadCause",
     "TestControlResponseLifecycleCancelledBeforeExchange",
@@ -262,10 +279,12 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         raise ValueError("missing complete targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof", "--control-response")):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof|--control-response]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof", "--control-response", "--capacity-db")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof|--control-response|--capacity-db]")
     try:
-        if len(sys.argv)==3 and sys.argv[2]=="--control-response":
+        if len(sys.argv)==3 and sys.argv[2]=="--capacity-db":
+            verify(Path(sys.argv[1]), required=CAPACITY_REQUIRED)
+        elif len(sys.argv)==3 and sys.argv[2]=="--control-response":
             verify(Path(sys.argv[1]), repeats=20, required=CONTROL_REQUIRED, package=CONTROL_PACKAGE)
         elif len(sys.argv)==3 and sys.argv[2]=="--publisher-proof":
             verify(Path(sys.argv[1]), required=PROOF_REQUIRED, package=PUBLISHER_PACKAGE)

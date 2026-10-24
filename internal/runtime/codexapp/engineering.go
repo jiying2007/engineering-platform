@@ -221,8 +221,8 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	if err != nil {
 		return receipt, err
 	}
-	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
+	defer cleanupProbeDirectory(versionHome, err)
 	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
 		return receipt, fmt.Errorf("engineering execution version probe: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
@@ -267,7 +267,7 @@ func EngineeringWIFTurn(ctx context.Context, executable, qualifiedVersion, binar
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return receipt, err
+		return receipt, scopeStartError(cmd, err, ErrEngineeringStopUnconfirmed)
 	}
 	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)
@@ -356,8 +356,8 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	if err != nil {
 		return receipt, err
 	}
-	defer os.RemoveAll(versionHome)
 	versionOut, diagnostics, err := codexVersion(ctx, executable, binaryDigest, versionHome)
+	defer cleanupProbeDirectory(versionHome, err)
 	actualVersion, parseErr := ParseCodexVersionOutput(string(versionOut))
 	if err != nil || parseErr != nil {
 		return receipt, fmt.Errorf("engineering execution version probe: %w; stderr=%s", errors.Join(err, parseErr), strings.TrimSpace(diagnostics))
@@ -386,7 +386,7 @@ func EngineeringSavedLoginTurn(ctx context.Context, executable, qualifiedVersion
 	cmd.Stderr = &boundedWriter{writer: &stderr, remaining: 128 << 10}
 	scope, err := processscope.Start(cmd)
 	if err != nil {
-		return receipt, err
+		return receipt, scopeStartError(cmd, err, ErrEngineeringStopUnconfirmed)
 	}
 	_ = stdoutWriter.Close()
 	client := NewClient(stdout, stdin)

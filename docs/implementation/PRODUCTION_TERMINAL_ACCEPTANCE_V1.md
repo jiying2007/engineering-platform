@@ -83,8 +83,12 @@ Feature/Debug M1 pilots.
 ## Pre-live dry run
 
 `.github/workflows/production-terminal-pre-live.yml` uses no provider secret. It
-runs automatically on protected-main changes to the terminal contract/fixture
-and also supports explicit `workflow_dispatch`.
+runs automatically on every protected-main push and also supports explicit
+`workflow_dispatch`. The retained provenance binds the complete source commit
+and tree, so filtering only terminal fixture paths could leave the current main
+without its own artifact. Every run remains limited to provider-free contract
+tests; this trigger does not perform live qualification or grant production
+readiness.
 
 On protected main it:
 

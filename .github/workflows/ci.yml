@@ -165,7 +165,15 @@ jobs:
           python3 -B scripts/test_verify_authority_budget_log.py
           go test -json -race -count=1 -timeout 2m ./internal/store/postgres -run '^TestPostgresAuthorityBudget' | tee "$RUNNER_TEMP/authority-budget-tests.jsonl"
           python3 -B scripts/verify_authority_budget_log.py "$RUNNER_TEMP/authority-budget-tests.jsonl"
-      - name: Service-owned HTTP request no-skip regression
+      - name: Authenticated Core capacity database no-skip regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$POSTGRES_TEST_URL"
+          python3 -B scripts/test_verify_publication_recovery_log.py
+          go test -json -race -count=3 -timeout 2m ./internal/store/postgres -run '^TestReadOperationalCapacity' | tee "$RUNNER_TEMP/capacity-database-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/capacity-database-tests.jsonl" --capacity-db
+      - name: Service-owned request and Worker stop no-skip regression
         shell: bash
         run: |
           set -euo pipefail
@@ -174,14 +182,16 @@ jobs:
           go test -json -race -count=3 -timeout 2m ./cmd/control-plane -run '^(TestControlLifecycle|TestControlStopError)' | tee "$RUNNER_TEMP/service-control-tests.jsonl"
           go test -json -race -count=3 -timeout 2m ./cmd/publisher-service -run '^TestPublisherLifecycle' | tee "$RUNNER_TEMP/service-publisher-tests.jsonl"
           go test -json -race -count=3 -timeout 2m ./internal/servicelifecycle | tee "$RUNNER_TEMP/service-helper-tests.jsonl"
-          python3 -B scripts/verify_service_lifecycle_log.py "$RUNNER_TEMP/service-control-tests.jsonl" "$RUNNER_TEMP/service-publisher-tests.jsonl" "$RUNNER_TEMP/service-helper-tests.jsonl"
+          go test -json -race -count=3 -timeout 2m ./cmd/worker -run '^TestWorker(Loop|CLIStoppedAfterUnobservedClaimRequiresReadback)' | tee "$RUNNER_TEMP/service-worker-tests.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/runtime/codexapp -run '^(TestScopeStartFailurePreservesUnknownProcess|TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs)$' | tee "$RUNNER_TEMP/service-runtime-tests.jsonl"
+          python3 -B scripts/verify_service_lifecycle_log.py "$RUNNER_TEMP/service-control-tests.jsonl" "$RUNNER_TEMP/service-publisher-tests.jsonl" "$RUNNER_TEMP/service-helper-tests.jsonl" "$RUNNER_TEMP/service-worker-tests.jsonl" "$RUNNER_TEMP/service-runtime-tests.jsonl"
       - name: Kernel process-tree regression
         run: go test -race -count=10 -timeout 1m ./internal/processscope
-      - name: Publisher kernel quiescence and no-skip regression
+      - name: Publisher quiescence and receipt-purpose no-skip regression
         shell: bash
         run: |
           set -euo pipefail
-          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
+          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|ProviderDispatchRejectsObservationOnlyReceipt|PublisherRemoteClientBindsReceiptToResponsePurpose|PublisherServiceBindsReceiptToResponsePurpose|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publisher-kernel-tests.jsonl" --publisher-kernel
       - name: Outbox authority repeated regression
         run: |

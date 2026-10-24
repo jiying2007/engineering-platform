@@ -4,7 +4,10 @@ Base: `2772d0d9c1122d004c7854993bae88ac53d3a138`, followed by removal of
 75 unreferenced context-free concrete wrappers, which reduced the inventory
 from 133 to 58 direct origins. The production audit below adds one independently
 bounded cleanup origin; the 2026-10-22 terminal readback adds one signal-owned
-command root, bringing the current total to 60. This closes the
+command root, bringing that source slice to 60. The 2026-10-24 capacity command
+adds one signal root while isolated qualification reuses the existing bounded
+probe stop helper, removing one duplicate cleanup origin. The current total
+remains 60. This closes the
 *enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
@@ -26,8 +29,10 @@ The finite `production-status` monitor inherits its existing signal root and
 adds an explicit total deadline without detaching work. The direct-origin
 scanner enumerates Background/TODO/WithoutCancel; these downstream timeout and
 deadline constructors are not new independent origins. SLI v3 adds no Context
-origin. The current source digest and rows include all three slices: 60 direct
-origins, 11 signal-owned roots, and the same 19 cleanup/settlement sites.
+origin. That source slice contained 60 direct origins, 11 signal-owned roots and 19
+cleanup/settlement sites. The current rows below also include the subsequent
+capacity and process-start corrections: 60 origins, 12 signal-owned roots and
+18 cleanup/settlement sites.
 
 The subsequent operational-integrity repair retains these 60 origins. Linux
 pipe output inherits the monitor context, joins its deadline callback and closes
@@ -36,16 +41,16 @@ checks reuse their existing transaction budgets; no independent origin is added.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:80ffb3e1fea453c29fbd95ebe9cc63da369052a3a173de1436ec233ba479b623`
+`sha256:9ac0ea7cc92774886c01af00b5861ebe1922e5a5eaf45f3b67059d901a3f6f3a`
 
 ## Reviewed categories
 
 | Category | Direct call sites |
 | --- | ---: |
 | Explicitly timed command root | 25 |
-| Signal-owned command/service root | 11 |
+| Signal-owned command/service root | 12 |
 | Command with downstream budget | 2 |
-| Independent bounded cleanup/settlement | 19 |
+| Independent bounded cleanup/settlement | 18 |
 | Test support helper | 3 |
 
 Command roots either own a signal lifetime or have explicit operation budgets.
@@ -91,7 +96,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/codex-saved-login-live/main.go:25` | `Background` | Explicitly timed command root |
 | `cmd/codex-wif-live/main.go:27` | `Background` | Explicitly timed command root |
 | `cmd/control-plane/main.go:58` | `Background` | Signal-owned command/service root |
-| `cmd/control-plane/main.go:144` | `Background` | Independent bounded cleanup/settlement |
+| `cmd/control-plane/main.go:145` | `Background` | Independent bounded cleanup/settlement |
 | `cmd/eng/artifact_capture.go:63` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_offline_capture.go:47` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_retention.go:51` | `Background` | Signal-owned command/service root |
@@ -111,6 +116,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/installation_switch.go:56` | `Background` | Signal-owned command/service root |
 | `cmd/eng/pilot_preflight.go:486` | `Background` | Explicitly timed command root |
 | `cmd/eng/process_scope.go:13` | `Background` | Command with downstream budget |
+| `cmd/eng/production_capacity.go:78` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_live_observe.go:102` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_publisher_health.go:42` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_status.go:96` | `Background` | Signal-owned command/service root |
@@ -126,18 +132,17 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/publisher-service/main.go:104` | `Background` | Independent bounded cleanup/settlement |
 | `cmd/sandbox-guard/build_outputs.go:27` | `Background` | Explicitly timed command root |
 | `cmd/sandbox-guard/main.go:33` | `Background` | Explicitly timed command root |
-| `cmd/worker/main.go:85` | `Background` | Signal-owned command/service root |
+| `cmd/worker/main.go:86` | `Background` | Signal-owned command/service root |
 | `internal/action/service.go:126` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/armed_cancellation.go:31` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/githubpublish/git_scope.go:59` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/githubpublish/git_scope.go:71` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/service.go:211` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/controls.go:122` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/probe_process.go:85` | `WithoutCancel` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/qualification_isolation.go:86` | `Background` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/probe_process.go:101` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/sandbox/engine.go:160` | `Background` | Independent bounded cleanup/settlement |
 | `internal/sandbox/testutil/image.go:33` | `Background` | Test support helper |
 | `internal/sandbox/testutil/image.go:82` | `Background` | Test support helper |
@@ -270,13 +275,15 @@ not a new service, queue, independent lifetime or recovery authority.
 The existing Control ten-second and Publisher fifteen-second shutdown budgets
 remain. Their two existing constructors were reclassified as bounded independent
 cleanup rather than task-command roots without changing the then-current total
-of 58. The subsequent Runtime probe cleanup brings the current total to 59. Known original
+of 58. The subsequent Runtime probe cleanup brought that slice to 59. Known original
 post-effect settlement still uses its existing independent bounded Context.
 Cancellation alone never implies rollback, dispatcher quiescence or retry.
 
 Publisher listener failure follows the same cancel-and-drain path instead of
-returning while active handlers remain. Both commands share the unchanged
-all-leaf stop-error classifier; a mixed sentinel plus real failure is retained.
+returning while active handlers remain. Both commands share the all-leaf stop-error classifier; a mixed sentinel plus
+real failure is retained. The Worker now uses the same conservative rule: custom
+error semantics and unobserved/unknown POST or external effects survive caller
+cancellation instead of becoming a successful daemon stop.
 Shutdown/forced-close errors are joined. Graceful drain still waits for handlers;
 these changes do not forcibly interrupt blocked kernel I/O or a misbehaving
 callback. Existing supervisor deadlines remain the outer process boundary.
@@ -292,19 +299,21 @@ Internal blockers [228,229] remain OPEN/BLOCKED; no selected-host qualification.
 
 ## No-deadline PostgreSQL authority callers
 
-All 84 public PostgreSQL Context entry points now have an explicit finite
+All 85 public PostgreSQL Context entry points now have an explicit finite
 operation policy. Forty-seven previously unbounded entries use the existing
 20-second database statement safety ceiling as a fallback **only when the caller
 has no deadline**. Thirty-six existing caller-derived timers (including 5-second
 settlement and 30-second Outbox work) are unchanged. The original finite relay
 batch keeps its at-most-64 individually bounded 5-second steps, with immediate
-per-step cancellation; its reviewed implementation is unchanged.
+per-step cancellation; its reviewed implementation is unchanged. The new Core
+capacity read inherits the same fallback and one five-second child budget across
+pool acquisition and the shared read-only authority snapshot.
 
 This closes the gap before SQL begins: server-side statement/lock settings cannot
 bound pool acquisition. Nested public calls inherit the first deadline rather
 than starting another full budget. Explicit caller/maintenance deadlines are
-not shortened or widened. No independent Context origin was added; the same58
-origins above remain. An expired attempted COMMIT remains unknown, and existing
+not shortened or widened. That authority-budget correction added no independent Context origin; its
+then-current 58 origins were unchanged. An expired attempted COMMIT remains unknown, and existing
 independent rollback/settlement and immutable reservations are retained.
 
 See POSTGRES_AUTHORITY_BUDGET_V1.md for the public-boundary guard and measured
@@ -313,7 +322,8 @@ hard real-time kernel interruption or selected-host latency/soak qualification.
 
 ## Confirmation authority and shared snapshot
 
-The original Action settlement Context and all58 origin classifications remain.
+The confirmation correction preserved the original Action settlement Context
+and all 58 origin classifications present at that stage.
 Ordinary mutating reconciliation cannot mint confirmation from observation.
 Operational readback validates bound original-confirmation provenance and counts
 in one read-only repeatable transaction, under the same five-second deadline and
@@ -332,3 +342,22 @@ Live probes reuse this same stop path. They do not create a detached goroutine
 or another Context origin. The previous Context-aware caller and signal roots
 remain unchanged. These source budgets do not qualify the selected production
 host, remote Provider cancellation or filesystem read isolation.
+
+## Core capacity and startup-failure ownership
+
+The new capacity CLI owns one signal Context with a 15-second child budget.
+Its direct-mTLS GET, complete-response validation and deadline-aware Linux pipe
+output inherit that caller. The server reads original v6 authority and selected
+Worker/queue facts in one read-only repeatable transaction under its existing
+five-second Store budget; sampling the local pool afterward adds no Context
+origin. These cooperative budgets do not force interruption of arbitrary kernel
+I/O or establish current Worker/Publisher capacity.
+
+Isolated Codex qualification now reuses the existing five-second
+`settleProbeExit` cleanup origin instead of constructing another independent
+Background root. A startup error after launch retains the appropriate
+stop-unconfirmed category and owned inputs; the original launcher still owns
+Wait. Publisher marks its original proof collection uncertain, without minting
+a proof or opening a retry lane. Version-probe directory cleanup uses the
+outcome of that exact probe. Removing the unused Supervisor/LocalProcessProvider
+implementation removes no authorized Context origin and does not close #229.
