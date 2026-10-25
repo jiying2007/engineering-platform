@@ -32,7 +32,8 @@ func observeControlledEngineering(ctx context.Context, a *Adapter, threadID, tur
 	running, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Turn completion stops polling, but must not discard the bounded response
-	// to a control already dispatched. The original parent still cancels both.
+	// to a Claim POST or control already dispatched. The original parent still
+	// cancels both; a protocol/approval/transport failure also cancels in-flight.
 	inFlight, stopCall := context.WithCancel(ctx)
 	defer stopCall()
 	type observed struct {
@@ -70,7 +71,10 @@ func pumpControls(ctx, inFlight context.Context, a *Adapter, threadID, turnID st
 		if ctx.Err() != nil {
 			return nil
 		}
-		polling, stop := context.WithTimeout(ctx, 5*time.Second)
+		// Claim may durably dispatch a command even before its response arrives.
+		// Keep that response under the same bounded owner as provider replies;
+		// a valid terminal event stops new polls without cutting off this POST.
+		polling, stop := context.WithTimeout(inFlight, 5*time.Second)
 		command, err := c.Claim(polling)
 		stop()
 		if err != nil {

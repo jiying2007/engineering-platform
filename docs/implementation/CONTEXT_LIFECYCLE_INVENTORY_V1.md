@@ -42,7 +42,7 @@ checks reuse their existing transaction budgets; no independent origin is added.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:3402309972ceb015c3ebd751012ce3522ae2cdacbb133fe8dd43c7806a415ccd`
+`sha256:b2aeb3f99bd77e986d98a7e4faa1b6615c5bffa09036e2643ee8b6da63caa08c`
 
 ## Reviewed categories
 
@@ -81,6 +81,12 @@ For every filesystem or RWMutex operation, cancellation is cooperative: a
 blocking kernel syscall or lock acquisition is not made forcibly interruptible
 by this inventory or by a numerical deadline. Tests need to preserve exact
 unknown-result and cleanup errors, not merely return quickly.
+
+The 2026-10-25 Claim lifetime correction changes the parent of an existing
+five-second deadline to the existing in-flight Context. A valid terminal event
+stops further polls without actively cutting off a pending Claim response; the
+original caller and invalid terminal observations still cancel it. No new direct
+origin, independent deadline, retry or unknown-result exception is introduced.
 
 The existing CI now verifies this exact source digest, ordered path/line/constructor
 rows and category counts with `scripts/verify_context_inventory.py`. That gate
@@ -140,7 +146,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/githubpublish/git_scope.go:71` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/service.go:211` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/controls.go:126` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/controls.go:130` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |

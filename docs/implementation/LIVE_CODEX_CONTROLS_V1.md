@@ -63,8 +63,15 @@ silently admitted as current control evidence.
 ### Claim failure concurrent with terminal completion
 
 The control pump may be waiting for the Core Claim response when a legitimate
-terminal Runtime event ends observation and cancels polling. That cancellation
-does not erase the Claim result: only a pure error tree caused by the owned
+terminal Runtime event ends observation and cancels polling. An already started
+Claim uses the existing parent-bound, five-second in-flight Context so normal
+completion stops new polls without cutting off that POST response. Original
+caller cancellation, an earlier deadline or an invalid terminal observation
+still cancels the call. A complete empty Claim can finish normally; a command
+returned after completion cannot be dispatched and remains non-successful.
+
+Cancellation does not erase a failing Claim result: only a pure error tree
+caused by the owned
 `context.Canceled` stop is normalized. Typed uncertain POST/COMMIT outcomes,
 independent deadlines, HTTP errors and mixed error trees retain their original
 cause. Control Close is still attempted through its existing settlement path;
@@ -74,8 +81,11 @@ Core Claim and Close retain their original durable row-lock serialization.
 DISPATCHING without an observed outcome becomes UNKNOWN and prevents delivery;
 this error-preservation repair is not evidence that prior code bypassed that
 authority. Regressions include actual mTLS Claim response loss, typed 503 and
-409 responses, malformed success, cancellation races and pure-cancel positive
-controls. They use a synthetic endpoint and do not invoke a model provider.
+409 responses, malformed success, cancellation races, pure-cancel controls and a
+complete empty response retained after normal completion. They use a synthetic
+endpoint and do not invoke a model provider. The existing PostgreSQL continuation
+and post-turn retention regressions retain their full successful-delivery and
+failure-preservation expectations.
 
 ## Operator CLI
 

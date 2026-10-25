@@ -77,6 +77,19 @@ merge and fresh-main artifact readback remain the delivery evidence for this
 slice. No READY, execution or production qualification field is promoted:
 **internal blockers #228/#229 and production qualification #105 remain open.**
 
+The initial PR #294 head's
+[CI 40174612932](https://github.com/jiying2007/engineering-platform/actions/runs/40174612932)
+failed the existing real-PostgreSQL immediate-completion, two-execution
+continuation and post-turn retention tests. Preserving Claim errors exposed a
+lifetime mismatch: a valid terminal event actively canceled the in-flight Claim
+POST, manufacturing an unobserved outcome even for a complete empty response.
+The correction gives that already-started Claim the existing parent-bound
+five-second in-flight budget while stopping further polls. It does not reinterpret
+unknown results through Close or weaken HTTP/schema/error classification. The
+original failure is retained, and the original PostgreSQL expectations remain
+unchanged; the corrected source requires its own complete exact-head and
+fresh-main delivery verification.
+
 ## Comprehensive audit remediation — 2026-10-21
 
 The source changes from the comprehensive audit address dependency advisories,
