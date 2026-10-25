@@ -25,8 +25,7 @@ func relayVerifyQualificationKit(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(verification)
-	return nil
+	return printJSON(verification)
 }
 
 func readRelayQualificationKitDir(dir string) (relayqualification.QualificationKit, error) {

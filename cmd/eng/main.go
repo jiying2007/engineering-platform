@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/jiying2007/engineering-platform/internal/embedded"
@@ -142,6 +143,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "production-observer-check":
+		if err := productionObserverCheck(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "production-preflight":
 		if err := productionPreflight(os.Args[2:]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -213,10 +219,13 @@ func main() {
 			os.Exit(1)
 		}
 	case "capabilities":
-		printJSON(map[string]any{
+		if err := printJSON(map[string]any{
 			"capabilities": embedded.Capabilities(),
 			"skills":       embedded.Skills(),
-		})
+		}); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "route":
 		if len(os.Args) < 4 {
 			fmt.Fprintln(os.Stderr, "usage: eng route <task-type> <subsystem>")
@@ -227,7 +236,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)
 		}
-		printJSON(route)
+		if err := printJSON(route); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "material-check":
 		if len(os.Args) != 3 {
 			fmt.Fprintln(os.Stderr, "usage: eng material-check <manifest.json>")
@@ -244,7 +256,10 @@ func main() {
 			os.Exit(2)
 		}
 		result := material.Evaluate(manifest)
-		printJSON(result)
+		if err := printJSON(result); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 		if result.Status == material.Blocked {
 			os.Exit(3)
 		}
@@ -255,12 +270,24 @@ func main() {
 	}
 }
 
-func printJSON(value any) {
+func printJSON(value any) error {
+	return writeJSON(os.Stdout, value)
+}
+
+func writeJSON(writer io.Writer, value any) error {
 	b, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("encode JSON output: %w", err)
 	}
-	fmt.Println(string(b))
+	b = append(b, '\n')
+	n, err := writer.Write(b)
+	if err != nil {
+		return fmt.Errorf("write JSON output: %w", err)
+	}
+	if n != len(b) {
+		return fmt.Errorf("write JSON output: %w", io.ErrShortWrite)
+	}
+	return nil
 }
 
 func usage() {
@@ -292,7 +319,8 @@ func usage() {
 	fmt.Println("  production-status [--require-ready | --require-authority-clear]  read authenticated database status")
 	fmt.Println("  production-capacity --server-cert-digest DIGEST --access-policy-digest DIGEST --source-commit SHA --instance NONCE  read one pinned Core's pool/lease facts; not readiness")
 	fmt.Println("  production-status --observe-for 30s --interval 5s --max-pending-age 2m [--require-no-alert]  bounded read-only queue diagnostics; not readiness")
-	fmt.Println("  production-status --monitor-for 1h --observe-for 30s --interval 5s --max-pending-age 2m --stale-after 45s [--require-no-alert]  finite JSONL failure/recovery observation")
+	fmt.Println("  production-status --monitor-for 1h --observe-for 30s --interval 5s --max-pending-age 2m --stale-after 45s [--session NONCE] [--require-no-alert]  finite JSONL failure/recovery observation")
+	fmt.Println("  production-observer-check --journal FILE --session NONCE --endpoint-digest DIGEST [--require-current-clear]  independently check a private observer journal and expiry; no READY authority")
 	fmt.Println("  production-preflight --config FILE             verify Ubuntu production runtime baseline and external blockers")
 	fmt.Println("  production-live-observe --config FILE          source-bind actual local service PIDs/UIDs/binaries and authenticated endpoints; NOT READY")
 	fmt.Println("  relay-verify-qualification-kit --dir DIR       independently verify exact immutable relay qualification bundle")

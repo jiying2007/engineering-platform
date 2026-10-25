@@ -37,8 +37,7 @@ func relayRuntimeHandoff(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(handoff)
-	return nil
+	return printJSON(handoff)
 }
 
 func readRelayQualification(path string) (codexapp.QualificationReceipt, error) {

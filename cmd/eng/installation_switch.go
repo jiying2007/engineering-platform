@@ -65,6 +65,5 @@ func installationSwitch(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(result)
-	return nil
+	return printJSON(result)
 }

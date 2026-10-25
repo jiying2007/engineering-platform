@@ -33,6 +33,11 @@ type refRecord struct {
 	} `json:"object"`
 }
 
+type pullRepositoryRecord struct {
+	ID       int64  `json:"id"`
+	FullName string `json:"full_name"`
+}
+
 type pullRecord struct {
 	Number  int    `json:"number"`
 	HTMLURL string `json:"html_url"`
@@ -40,12 +45,14 @@ type pullRecord struct {
 	Title   string `json:"title"`
 	Body    string `json:"body"`
 	Head    struct {
-		Ref string `json:"ref"`
-		SHA string `json:"sha"`
+		Ref  string                `json:"ref"`
+		SHA  string                `json:"sha"`
+		Repo *pullRepositoryRecord `json:"repo"`
 	} `json:"head"`
 	Base struct {
-		Ref string `json:"ref"`
-		SHA string `json:"sha"`
+		Ref  string                `json:"ref"`
+		SHA  string                `json:"sha"`
+		Repo *pullRepositoryRecord `json:"repo"`
 	} `json:"base"`
 }
 
@@ -350,8 +357,15 @@ func (g *githubRemote) updatePull(ctx context.Context, token string, plan Plan, 
 }
 
 func pullMatches(pr pullRecord, plan Plan) bool {
+	// GitHub's head query binds owner/organization and branch. A same-owner
+	// fork can share both, so bind the returned head and base to the configured
+	// repository and require their repository IDs to agree before any update or
+	// positive observation. Missing/deleted repository data remains unresolved.
 	return pr.Number > 0 && pr.State == "open" &&
 		pr.HTMLURL == fmt.Sprintf("https://github.com/%s/pull/%d", plan.Repository, pr.Number) &&
+		pr.Head.Repo != nil && pr.Base.Repo != nil &&
+		pr.Head.Repo.ID > 0 && pr.Head.Repo.ID == pr.Base.Repo.ID &&
+		pr.Head.Repo.FullName == plan.Repository && pr.Base.Repo.FullName == plan.Repository &&
 		pr.Head.Ref == plan.Branch && strings.ToLower(pr.Head.SHA) == plan.ResultCommit &&
 		pr.Base.Ref == plan.BaseRef && strings.ToLower(pr.Base.SHA) == plan.BaseCommit
 }

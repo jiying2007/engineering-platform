@@ -61,7 +61,7 @@ func relayRenderCodexConfig(args []string) error {
 		_ = os.Remove(*outPath)
 		return fmt.Errorf("rendered relay Codex config is not an exact owner-private regular file")
 	}
-	printJSON(relayRenderedConfigOutput{
+	return printJSON(relayRenderedConfigOutput{
 		SchemaVersion:           relayqualification.SchemaVersion,
 		RendererContractVersion: relayqualification.RendererContractVersion,
 		ContractDigest:          contractDigest,
@@ -69,5 +69,4 @@ func relayRenderCodexConfig(args []string) error {
 		CodexConfigDigest:       configDigest,
 		OutputPath:              *outPath,
 	})
-	return nil
 }

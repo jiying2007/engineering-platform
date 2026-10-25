@@ -73,6 +73,5 @@ func distributionInstall(args []string, verify bool) error {
 	if err != nil {
 		return err
 	}
-	printJSON(r)
-	return nil
+	return printJSON(r)
 }

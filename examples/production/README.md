@@ -163,6 +163,43 @@ configuration digest and never calls publish/observe upstream. A successful
 endpoint probe still does not establish upstream GitHub health, capacity,
 publication authority or production readiness.
 
+## Independent observer expiry checks
+
+The finite `production-status --monitor-for` producer may use an explicitly
+selected `--session` (a fresh 32-character lowercase hex value). Run it with
+its existing read-only mTLS configuration and write a new owner-private 0600
+journal under `/var/lib/engineering-platform/observer`. Do not reuse a session
+or journal after a restart or Recovery identity change.
+
+The separately scheduled consumer requires the same externally selected
+session and the SHA-256 of the exact configured Control endpoint:
+
+```sh
+eng production-observer-check \
+  --journal /var/lib/engineering-platform/observer/SELECTED_SESSION.jsonl \
+  --session EXPECTED_32_LOWERCASE_HEX \
+  --endpoint-digest sha256:EXPECTED_CONTROL_ENDPOINT_DIGEST \
+  --require-current-clear
+```
+
+Configure `observer-watchdog.env.example` and the maintenance
+`engineering-observer-watchdog.service`/`.timer` using the accepted deployment
+procedure. Placeholders deliberately fail until the actual inputs are selected.
+The example checks as `engineering-observer`, reads no Core client environment,
+and reports failures through its unit exit status and journal. It requires that
+identity and a private journal directory to exist; installation does not create
+them or enable the units. Because input is owner-only, producer and checker
+normally share that UID: independent scheduling is not credential isolation.
+
+The checker verifies a complete supplied prefix and current source/record
+freshness, including after output. STOPPED is no longer fresh. A new finite
+monitor invocation requires new explicit checker configuration; no failed
+producer is automatically restarted. Connect unit failures to the accepted
+monitoring channel and test real notification receipt separately. A whole-host
+failure needs a separately hosted monitor. These checks keep all readiness and
+execution-authorization flags false. The full input, timer and evidence contract
+is in `docs/implementation/PRODUCTION_OBSERVER_WATCHDOG_V1.md` in the source tree.
+
 ## Restart semantics
 
 systemd may restart admission/preparation/control processes after a crash.
@@ -191,7 +228,8 @@ sender; no wrapper, Worker, model or subprocess is granted notification rights.
 This signal proves endpoint initialization, not authenticated client access,
 upstream provider health, queue capacity, production readiness or replay
 permission. Existing mTLS health checks and Core authority remain independent.
-There is no watchdog, heartbeat, READY polling API or new execution authority.
+This startup notification adds no watchdog heartbeat, READY polling API or
+execution authority.
 Required CI now also proves the canonical Publisher -> Control ->
 admission/preparation dependency ordering with distinct transient identities,
 the exact four named service identities on a disposable host, and immutable

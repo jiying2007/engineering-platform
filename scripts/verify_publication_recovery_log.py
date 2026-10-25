@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject skipped/missing targeted publication recovery and kernel tests."""
+"""Reject skipped/missing targeted publication, lifecycle and observer tests."""
 import json
 import math
 import os
@@ -92,6 +92,36 @@ PUBLISHER_REQUIRED = {
     "TestPublisherGitCredentialNeverFollowsRemoteRedirect",
     "TestGitHubPublishNeverReopensClosedDeterministicBranch",
     "TestGitHubNullOpenPullReadbackNeverAuthorizesCreate",
+    "TestGitHubObserveRequiresExactPullRepositoryIdentity",
+    "TestGitHubPublishRequiresExactPullRepositoryBeforeUpdate",
+    "TestGitHubPublishRequiresExactPullRepositoryAfterMutation",
+}
+
+OBSERVER_MODEL_PACKAGE = "github.com/jiying2007/engineering-platform/internal/production"
+OBSERVER_MODEL_REQUIRED = {
+    "TestObserverJournalReplaysPrefixesAndRefreshesFreshness",
+    "TestObserverJournalSourceFreshnessAndEOFTiming",
+    "TestObserverJournalWireAndSchemaAreComplete",
+    "TestObserverJournalRejectsHistoryIdentityAndStateChanges",
+    "TestObserverJournalBoundsReadersErrorsAndCancellation",
+    "TestObserverJournalFormattingAndExplicitIdentity",
+}
+
+OBSERVER_CLI_PACKAGE = "github.com/jiying2007/engineering-platform/cmd/eng"
+OBSERVER_CLI_REQUIRED = {
+    "TestProductionObserverCheckRequiresExplicitIdentity",
+    "TestProductionMonitorExplicitSessionIsScoped",
+    "TestProductionObserverCheckCancellationPreventsRead",
+    "TestProductionObserverJournalLinuxPrivateFileReadback",
+    "TestProductionObserverJournalLinuxRejectsUnsafeFiles",
+    "TestProductionObserverJournalLinuxRejectsChangedFiles",
+    "TestProductionObserverJournalLinuxCancellation",
+    "TestProductionObserverCheckRejectsExpiryDuringOutput",
+    "TestProductionObserverCheckCLIThroughAuthenticatedMonitor",
+    "TestJSONOutputPreservesEncodedBytes",
+    "TestJSONOutputRejectsShortWritesAndPreservesErrors",
+    "TestJSONOutputEncodingFailureWritesNothing",
+    "TestJSONOutputCLIRejectsUnwritableSink",
 }
 
 NO_INVOCATION_REQUIRED = {name.replace("TestPublicationRecoveryDatabase", "TestNoInvocationDatabase") for name in TRANSACTION_REQUIRED}
@@ -191,6 +221,8 @@ def _events(path):
             count += 1
             if len(raw) > MAX_LINE_BYTES or total > MAX_LOG_BYTES or count > MAX_EVENTS:
                 raise ValueError("test log resource budget exceeded")
+            if not raw.endswith(b"\n"):
+                raise ValueError("incomplete test event line")
             try:
                 event = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object,
                                    parse_constant=_invalid_constant, parse_float=_finite_float)
@@ -279,8 +311,8 @@ def verify(path: Path, repeats: int = 3, required=REQUIRED, package=PACKAGE) -> 
         raise ValueError("missing complete targeted success events")
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof", "--control-response", "--capacity-db")):
-        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof|--control-response|--capacity-db]")
+    if len(sys.argv) not in (2, 3) or (len(sys.argv)==3 and sys.argv[2] not in ("--restore", "--publisher-kernel", "--no-invocation-db", "--no-invocation-publisher", "--publisher-proof", "--control-response", "--capacity-db", "--observer-model", "--observer-cli")):
+        raise SystemExit("usage: verify_publication_recovery_log.py test-events.jsonl [--restore|--publisher-kernel|--no-invocation-db|--no-invocation-publisher|--publisher-proof|--control-response|--capacity-db|--observer-model|--observer-cli]")
     try:
         if len(sys.argv)==3 and sys.argv[2]=="--capacity-db":
             verify(Path(sys.argv[1]), required=CAPACITY_REQUIRED)
@@ -294,6 +326,10 @@ if __name__ == "__main__":
             verify(Path(sys.argv[1]), required=NO_INVOCATION_PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)
         elif len(sys.argv)==3 and sys.argv[2]=="--publisher-kernel":
             verify(Path(sys.argv[1]), required=PUBLISHER_REQUIRED, package=PUBLISHER_PACKAGE)
+        elif len(sys.argv)==3 and sys.argv[2]=="--observer-model":
+            verify(Path(sys.argv[1]), required=OBSERVER_MODEL_REQUIRED, package=OBSERVER_MODEL_PACKAGE)
+        elif len(sys.argv)==3 and sys.argv[2]=="--observer-cli":
+            verify(Path(sys.argv[1]), required=OBSERVER_CLI_REQUIRED, package=OBSERVER_CLI_PACKAGE)
         elif len(sys.argv)==3:
             verify(Path(sys.argv[1]), repeats=1, required=RESTORE_REQUIRED)
         else:

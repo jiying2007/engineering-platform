@@ -99,8 +99,7 @@ func importCIEvidence(args []string) error {
 		!stored.Applicable || len(stored.ArtifactRefs) != 1 || stored.ArtifactRefs[0] != evidence.ArtifactRefs[0] {
 		return fmt.Errorf("control plane returned a different evidence identity")
 	}
-	printJSON(stored)
-	return nil
+	return printJSON(stored)
 }
 
 func optionalPrivateToken(path string) (string, error) {

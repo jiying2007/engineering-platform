@@ -22,8 +22,7 @@ func productionTerminalPlan(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(envelope)
-	return nil
+	return printJSON(envelope)
 }
 
 type productionSLOInput struct {
@@ -100,7 +99,9 @@ func productionSLOReport(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(envelope)
+	if err := printJSON(envelope); err != nil {
+		return err
+	}
 	if *requireVerified && !envelope.Report.SourceBytesVerified {
 		return fmt.Errorf("SLO report is unverified; no qualification is granted")
 	}

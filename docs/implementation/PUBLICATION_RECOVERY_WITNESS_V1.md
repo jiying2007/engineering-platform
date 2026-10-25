@@ -48,6 +48,24 @@ same positive PR number, URL, branch, base and result. ABSENT, PARTIAL, CONFLICT
 replacement/closed PRs, malformed responses and unavailable upstream all fail
 closed. The endpoint never calls Publish or accepts caller-supplied stop flags.
 
+### Exact pull repository identity
+
+Publish and Observe check both `head.repo` and `base.repo` in every selected
+GitHub PR response. Both objects must exist, both `full_name` fields must equal
+the frozen plan repository, and their positive numeric repository IDs must
+agree. Matching branch names, commit SHAs and PR URLs alone cannot satisfy this
+boundary. Null, deleted, foreign or inconsistent repository data remains
+unresolved. An Observe mismatch is CONFLICT; parse/transport errors remain errors
+and never become ABSENT.
+
+Publish checks this identity before PATCH and again on the returned POST/PATCH
+record, before producing a receipt. A failed final response does not undo a
+possible mutation or authorize replay. The preexisting completion witness and
+independent Recovery requirements still apply. Local HTTP regressions cover
+same-owner foreign head/base repositories, missing/null objects, inconsistent
+IDs, changed names with unchanged IDs and identity drift after mutation; they
+do not claim a live GitHub failure or qualify an external provider.
+
 ## Core transaction and capabilities
 
 `POST /api/v1/recovery/actions/confirm-publication` requires the existing

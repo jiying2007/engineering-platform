@@ -70,8 +70,7 @@ func relayPrequalificationPack(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(pack)
-	return nil
+	return printJSON(pack)
 }
 
 func readRelayPolicyFile(path string) ([]byte, error) {

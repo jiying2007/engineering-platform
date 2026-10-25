@@ -52,6 +52,8 @@ func TestPullMatchRejectsInvalidURLBeforeAnyUpdate(t *testing.T) {
 	}
 	pr.Head.Ref, pr.Head.SHA = plan.Branch, plan.ResultCommit
 	pr.Base.Ref, pr.Base.SHA = plan.BaseRef, plan.BaseCommit
+	pr.Head.Repo = &pullRepositoryRecord{ID: 123, FullName: plan.Repository}
+	pr.Base.Repo = &pullRepositoryRecord{ID: 123, FullName: plan.Repository}
 	if !pullMatches(pr, plan) {
 		t.Fatal("canonical existing PR rejected")
 	}

@@ -61,8 +61,7 @@ func codexProfile(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(output)
-	return nil
+	return printJSON(output)
 }
 
 func buildCodexProfile(executable, model string, qualification codexapp.QualificationReceipt, provider provideridentity.Identity) (codexProfileOutput, error) {

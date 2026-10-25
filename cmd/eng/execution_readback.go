@@ -66,6 +66,5 @@ func executionReadback(args []string) error {
 			return err
 		}
 	}
-	printJSON(result)
-	return nil
+	return printJSON(result)
 }

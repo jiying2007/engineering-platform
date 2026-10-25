@@ -3,6 +3,7 @@
 import configparser
 from pathlib import Path
 import os
+import shlex
 import tempfile
 import unittest
 from unittest import mock
@@ -152,6 +153,67 @@ class LifecycleContracts(unittest.TestCase):
         self.assertEqual(timer['Install']['WantedBy'], 'timers.target')
         self.assertNotIn('OnUnitActiveSec', timer['Timer'])
         self.assertNotIn('OnBootSec', timer['Timer'])
+
+
+    def test_observer_watchdog_uses_strict_independent_consumer(self):
+        def parse(path):
+            parser = configparser.ConfigParser(interpolation=None, strict=True)
+            parser.optionxform = str
+            parser.read_string(path.read_text())
+            return parser
+
+        service_path = TEMPLATES/'maintenance'/'engineering-observer-watchdog.service'
+        service = parse(service_path)
+        timer = parse(service_path.with_suffix('.timer'))
+        command = shlex.split(service['Service']['ExecStart'])
+        self.assertEqual(command, [
+            '/opt/engineering-platform/bin/eng', 'production-observer-check',
+            '--journal', '${OBSERVER_JOURNAL}',
+            '--session', '${OBSERVER_SESSION}',
+            '--endpoint-digest', '${CONTROL_ENDPOINT_DIGEST}',
+            '--require-current-clear',
+        ])
+        self.assertEqual(service['Service']['Type'], 'oneshot')
+        self.assertEqual(service['Service']['TimeoutStartSec'], '20s')
+        self.assertEqual(service['Service']['KillMode'], 'control-group')
+        self.assertEqual(service['Service']['User'], 'engineering-observer')
+        self.assertEqual(service['Service']['Group'], 'engineering-observer')
+        self.assertEqual(service['Service']['EnvironmentFile'], '/etc/engineering-platform/observer-watchdog.env')
+        self.assertEqual(service['Service']['ReadOnlyPaths'], '/var/lib/engineering-platform/observer')
+        self.assertEqual(service['Service']['ProtectSystem'], 'strict')
+        self.assertEqual(service['Service']['PrivateNetwork'], 'true')
+        self.assertEqual(service['Service']['RestrictAddressFamilies'], 'AF_UNIX')
+        self.assertEqual(service['Unit']['After'], 'local-fs.target')
+        for forbidden in ('Restart', 'RestartSec', 'RemainAfterExit', 'SuccessExitStatus',
+                          'ExecStartPre', 'ExecStartPost', 'Environment', 'PassEnvironment',
+                          'LoadCredential', 'LoadCredentialEncrypted', 'ImportCredential',
+                          'SetCredential', 'SetCredentialEncrypted'):
+            self.assertNotIn(forbidden, service['Service'])
+        # A missing or unreadable journal must make the check fail, never make
+        # systemd silently skip its invocation through a Condition directive.
+        for unit in (service, timer):
+            for section in unit.sections():
+                self.assertFalse(any(key.startswith('Condition') for key in unit[section]))
+        self.assertNotIn('Install', service.sections())
+
+        environment = {}
+        for line in (ROOT/'examples/production/observer-watchdog.env.example').read_text().splitlines():
+            if not line.strip() or line.lstrip().startswith('#'):
+                continue
+            key, separator, value = line.partition('=')
+            self.assertTrue(separator and value)
+            self.assertNotIn(key, environment)
+            environment[key] = value
+        # The endpoint digest is an expected identifier, not an API endpoint
+        # or credential. The consumer needs only these three external pins.
+        self.assertEqual(set(environment), {'OBSERVER_JOURNAL', 'OBSERVER_SESSION', 'CONTROL_ENDPOINT_DIGEST'})
+
+        self.assertEqual(timer['Timer']['Unit'], service_path.name)
+        self.assertEqual(timer['Timer']['OnUnitInactiveSec'], '15s')
+        self.assertEqual(timer['Timer']['OnBootSec'], '30s')
+        self.assertEqual(timer['Timer']['AccuracySec'], '1s')
+        self.assertEqual(timer['Install']['WantedBy'], 'timers.target')
+        self.assertNotIn('OnUnitActiveSec', timer['Timer'])
 
 
     def test_transient_role_graph_is_ephemeral_and_never_provisions_accounts(self):

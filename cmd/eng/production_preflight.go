@@ -31,8 +31,7 @@ func productionPreflight(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(result)
-	return nil
+	return printJSON(result)
 }
 
 func loadProductionConfig(path string) (production.Config, error) {
