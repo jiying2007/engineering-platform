@@ -1,0 +1,9 @@
+[Unit]
+Description=Periodically Check Engineering Platform Observer Freshness
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=engineering-observer-watchdog.service
+[Install]
+WantedBy=timers.target

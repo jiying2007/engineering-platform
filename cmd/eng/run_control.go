@@ -110,8 +110,7 @@ func runControl(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(result)
-	return nil
+	return printJSON(result)
 }
 func executeRunControl(ctx context.Context, c *controlclient.Client, o runControlOptions) (any, error) {
 	if o.action == "inspect" {

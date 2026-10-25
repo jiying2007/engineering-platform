@@ -77,12 +77,11 @@ func relayQualificationKit(args []string) error {
 		return fmt.Errorf("qualification kit directory is not owner-private")
 	}
 	keep = true
-	printJSON(relayQualificationKitOutput{
+	return printJSON(relayQualificationKitOutput{
 		SchemaVersion:   relayqualification.QualificationKitSchemaVersion,
 		ManifestDigest:  kit.ManifestDigest,
 		OutputDirectory: *outDir,
 	})
-	return nil
 }
 
 func writeRelayKitFile(path string, data []byte) error {

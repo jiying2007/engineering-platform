@@ -44,12 +44,11 @@ func offlineReceiptDigest(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(map[string]any{
+	return printJSON(map[string]any{
 		"run_id":          *runID,
 		"artifact_digest": digest,
 		"media_type":      engineeringevidence.OfflineArtifactType,
 	})
-	return nil
 }
 
 func importOfflineEvidence(args []string) error {
@@ -124,7 +123,7 @@ func codexReceiptDigest(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(map[string]any{
+	return printJSON(map[string]any{
 		"run_id":            *runID,
 		"artifact_digest":   digest,
 		"media_type":        engineeringevidence.CodexReceiptArtifactType,
@@ -132,7 +131,6 @@ func codexReceiptDigest(args []string) error {
 		"bundle_size":       status.Receipt.Result.Change.BundleSize,
 		"bundle_media_type": engineeringevidence.CodexBundleArtifactType,
 	})
-	return nil
 }
 
 func importCodexEvidence(args []string) error {
@@ -223,12 +221,11 @@ func gitChangeManifest(args []string) error {
 		return err
 	}
 	digest := canonical.BytesDigest(append(data, '\n'))
-	printJSON(map[string]any{
+	return printJSON(map[string]any{
 		"artifact_digest": digest,
 		"media_type":      engineeringevidence.GitArtifactType,
 		"manifest":        manifest,
 	})
-	return nil
 }
 
 func importGitChangeEvidence(args []string) error {
@@ -323,8 +320,7 @@ func registerEngineeringEvidence(ctx context.Context, control *controlclient.Cli
 			return fmt.Errorf("control plane returned different evidence artifacts")
 		}
 	}
-	printJSON(stored)
-	return nil
+	return printJSON(stored)
 }
 
 func firstError(errs ...error) error {

@@ -14,10 +14,9 @@ func runtimeIsolationProbe(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(struct {
+	return printJSON(struct {
 		Status              string             `json:"status"`
 		Proof               processscope.Proof `json:"proof"`
 		ProductionQualified bool               `json:"production_qualified"`
 	}{"LOCAL_PROCESS_SCOPE_VERIFIED", proof, false})
-	return nil
 }

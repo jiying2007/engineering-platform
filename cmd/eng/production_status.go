@@ -23,6 +23,7 @@ type productionStatusOptions struct {
 	policy                                         production.ProgressPolicy
 	monitor                                        bool
 	monitorPolicy                                  production.ObserverPolicy
+	session                                        string
 }
 
 func parseProductionStatus(args []string) (productionStatusOptions, error) {
@@ -37,6 +38,7 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 	maxAge := fs.Duration("max-pending-age", 0, "explicit diagnostic pending-age threshold (1s..24h), not a production SLO")
 	monitorFor := fs.Duration("monitor-for", 0, "finite observer budget (complete window cycle..24h), with JSONL diagnostic events")
 	staleAfter := fs.Duration("stale-after", 0, "explicit observer/source freshness threshold (window cycle..24h)")
+	fs.StringVar(&o.session, "session", "", "externally selected fresh observer session, only with --monitor-for")
 	seen := map[string]bool{}
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
@@ -53,7 +55,7 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 	o.observe = seen["observe-for"]
 	o.monitor = seen["monitor-for"]
 	if !o.observe {
-		if seen["interval"] || seen["max-pending-age"] || seen["require-no-alert"] || o.monitor || seen["stale-after"] {
+		if seen["interval"] || seen["max-pending-age"] || seen["require-no-alert"] || o.monitor || seen["stale-after"] || seen["session"] {
 			return o, fmt.Errorf("observation options require --observe-for")
 		}
 		return o, nil
@@ -71,10 +73,13 @@ func parseProductionStatus(args []string) (productionStatusOptions, error) {
 		return o, err
 	}
 	if !o.monitor {
-		if seen["stale-after"] {
-			return o, fmt.Errorf("--stale-after requires --monitor-for")
+		if seen["stale-after"] || seen["session"] {
+			return o, fmt.Errorf("--stale-after and --session require --monitor-for")
 		}
 		return o, nil
+	}
+	if seen["session"] && !validProductionObserverSession(o.session) {
+		return o, fmt.Errorf("observer session requires 32 lowercase hexadecimal characters")
 	}
 	if !seen["stale-after"] || *monitorFor <= 0 || *staleAfter <= 0 || *monitorFor%time.Second != 0 || *staleAfter%time.Second != 0 {
 		return o, fmt.Errorf("monitor requires explicit whole positive duration and stale threshold")
@@ -96,7 +101,7 @@ func productionStatus(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if o.monitor {
-		hadAlert, err := runProductionMonitor(ctx, client, o.monitorPolicy, os.Getenv("CONTROL_ENDPOINT"), os.Stdout)
+		hadAlert, err := runProductionMonitor(ctx, client, o.monitorPolicy, os.Getenv("CONTROL_ENDPOINT"), o.session, os.Stdout)
 		if err != nil {
 			return err
 		}
@@ -110,7 +115,9 @@ func productionStatus(args []string) error {
 		if err != nil {
 			return err
 		}
-		printJSON(report)
+		if err := printJSON(report); err != nil {
+			return err
+		}
 		if o.requireNoAlert && report.DiagnosticAlert {
 			return fmt.Errorf("operational diagnostic: %s", report.State)
 		}
@@ -126,7 +133,9 @@ func productionStatus(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(status)
+	if err := printJSON(status); err != nil {
+		return err
+	}
 	if o.requireReady && !status.Ready {
 		return fmt.Errorf("production operational status is %s", status.State)
 	}

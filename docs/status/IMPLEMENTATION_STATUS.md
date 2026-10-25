@@ -23,6 +23,60 @@ linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
 
+## Independent observation and response-integrity repairs — 2026-10-25
+
+The existing finite monitor now has an independently invoked journal consumer:
+`eng production-observer-check`. The producer can accept an explicitly selected
+monitor-only session; the consumer requires that external session, the configured
+endpoint digest and a private absolute journal path. It checks the complete
+provided JSONL prefix by replaying the original Observer state machine, rechecks
+file/path identity after reading and reevaluates freshness after output. With
+`--require-current-clear`, a missing, malformed, stopped or expired observation
+cannot yield a successful exit. The distribution embeds a bounded systemd
+oneshot/timer and environment example; installation still only delivers bytes.
+See [the observer watchdog contract](../implementation/PRODUCTION_OBSERVER_WATCHDOG_V1.md).
+
+Actual compiled-CLI tests use real mTLS Core middleware with an explicitly
+synthetic Store. They kill the finite producer after its first complete clear
+window, verify there is no STOPPED record, remove the producer's temporary
+credentials, then run the checker independently with only PATH in its environment.
+The current prefix succeeds before its real expiry and fails afterwards without
+another Core request. Private-file tests exercise links, FIFO opening, permissions,
+size bounds, replacement, mutation and ancestor-directory changes. This proves
+the tested local process/file/expiry boundary; it does not establish journal
+authenticity, cross-check rollback protection, selected-host installation, a
+separate security principal or actual notification delivery. Full deployment
+health/capacity and operational qualification remain implementation and host work.
+
+Three reproducible integrity gaps are repaired in the existing paths:
+
+- GitHub Publish and Observe now bind both PR head/base repository names to the
+  frozen repository and require matching positive repository IDs. Missing or
+  foreign repository data cannot authorize PATCH or a positive receipt; mutation
+  responses are checked again before returning success. The regressions use
+  real local HTTP responses and synthetic upstream identities, not a claimed
+  incident against live GitHub.
+- A terminal Codex event no longer causes a concurrently failing control Claim
+  to disappear merely because the polling Context was canceled. Only pure owned
+  cancellation is normalized. Typed unknown outcomes, HTTP failures and mixed
+  error trees retain the original cause through control settlement. The existing
+  durable Claim/Close fencing remains authoritative; this repair does not claim
+  that the prior error-reporting gap bypassed Core delivery admission.
+- The common CLI JSON writer now returns encoding, write and short-write errors
+  through every caller. An actual unwritable sink no longer gives exit zero;
+  successful JSON bytes and existing domain-failure exit semantics are retained.
+  Synchronous storage I/O keeps its operating-system interruption boundary.
+
+Required CI selects the added Publisher and Runtime regressions, six journal
+model tests, nine observer CLI/file tests and four JSON-output tests explicitly,
+with repeated race runs and missing/failed/skipped-log rejection. The refreshed
+[Context inventory](../implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md) binds
+61 direct origins, including the new signal-owned checker invocation; the
+85-entry PostgreSQL budget boundary is unchanged. Exact-source CI, protected
+merge and fresh-main artifact readback remain the delivery evidence for this
+slice. No READY, execution or production qualification field is promoted:
+**internal blockers #228/#229 and production qualification #105 remain open.**
+
 ## Comprehensive audit remediation — 2026-10-21
 
 The source changes from the comprehensive audit address dependency advisories,
@@ -125,9 +179,9 @@ SLI v3 compares a bounded supplied event set; it cannot prove that an
 unauthenticated collector omitted no real requests. Peak/net-growth comparisons
 do not establish resource trends, absence of leaks, actual sustained load or
 selected-host soak acceptance. Those observations and targets must be independently
-bound and accepted. Observer expiry checking requires an independent consumer;
-no installed external watchdog, notification adapter or tested real alert
-delivery is supplied. Linux pipe stdout now uses an independently opened,
+bound and accepted. Observer expiry checking now has the independent CLI consumer
+and deployment templates described above; no actual host installation,
+notification adapter or tested real alert delivery is supplied. Linux pipe stdout now uses an independently opened,
 deadline-aware descriptor so backpressure cannot indefinitely hold a finite
 monitor or SIGTERM cancellation. Other synchronous output retains its stated
 operating-system blocking boundary. All three slices keep production

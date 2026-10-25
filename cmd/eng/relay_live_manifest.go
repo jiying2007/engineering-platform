@@ -23,6 +23,5 @@ func relayLiveManifest(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(envelope)
-	return nil
+	return printJSON(envelope)
 }

@@ -42,6 +42,8 @@ GROUPS = (
     ("internal/runtime/codexapp", frozenset({
         "TestScopeStartFailurePreservesUnknownProcess",
         "TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs",
+        "TestEngineeringTerminalPreservesClaimFailure",
+        "TestEngineeringTerminalPreservesMTLSClaimOutcome",
     })),
 )
 
@@ -58,7 +60,7 @@ def main(argv=None):
     if len(args) != len(GROUPS):
         raise ValueError("usage: verify_service_lifecycle_log.py control.jsonl publisher.jsonl helper.jsonl worker.jsonl runtime.jsonl")
     verify_logs(args)
-    print("Service lifecycle: 22 required tests x3, complete event streams, zero skips")
+    print("Service lifecycle: 24 required tests x3, complete event streams, zero skips")
 
 
 if __name__ == "__main__":

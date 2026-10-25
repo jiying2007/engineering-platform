@@ -6,8 +6,9 @@ from 133 to 58 direct origins. The production audit below adds one independently
 bounded cleanup origin; the 2026-10-22 terminal readback adds one signal-owned
 command root, bringing that source slice to 60. The 2026-10-24 capacity command
 adds one signal root while isolated qualification reuses the existing bounded
-probe stop helper, removing one duplicate cleanup origin. The current total
-remains 60. This closes the
+probe stop helper, removing one duplicate cleanup origin. The total
+at that stage remained 60. The 2026-10-25 independent observer-journal check adds
+one signal-owned command root, bringing the current total to 61. This closes the
 *enumeration* of the current
 direct constructor candidates; it does not close #229, infer selected-host
 capacity, or prove all indirect/aliased Context propagation.
@@ -31,24 +32,24 @@ scanner enumerates Background/TODO/WithoutCancel; these downstream timeout and
 deadline constructors are not new independent origins. SLI v3 adds no Context
 origin. That source slice contained 60 direct origins, 11 signal-owned roots and 19
 cleanup/settlement sites. The current rows below also include the subsequent
-capacity and process-start corrections: 60 origins, 12 signal-owned roots and
-18 cleanup/settlement sites.
+capacity, process-start and observer-consumer corrections: 61 origins,
+13 signal-owned roots and 18 cleanup/settlement sites.
 
-The subsequent operational-integrity repair retains these 60 origins. Linux
+The preceding operational-integrity repair retained its 60 origins. Linux
 pipe output inherits the monitor context, joins its deadline callback and closes
 only its separately opened descriptor. Status projection and Recovery row/audit
 checks reuse their existing transaction budgets; no independent origin is added.
 
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:9ac0ea7cc92774886c01af00b5861ebe1922e5a5eaf45f3b67059d901a3f6f3a`
+`sha256:3402309972ceb015c3ebd751012ce3522ae2cdacbb133fe8dd43c7806a415ccd`
 
 ## Reviewed categories
 
 | Category | Direct call sites |
 | --- | ---: |
 | Explicitly timed command root | 25 |
-| Signal-owned command/service root | 12 |
+| Signal-owned command/service root | 13 |
 | Command with downstream budget | 2 |
 | Independent bounded cleanup/settlement | 18 |
 | Test support helper | 3 |
@@ -101,25 +102,26 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/artifact_offline_capture.go:47` | `Background` | Explicitly timed command root |
 | `cmd/eng/artifact_retention.go:51` | `Background` | Signal-owned command/service root |
 | `cmd/eng/artifact_set.go:82` | `Background` | Explicitly timed command root |
-| `cmd/eng/codex_profile.go:87` | `Background` | Explicitly timed command root |
+| `cmd/eng/codex_profile.go:86` | `Background` | Explicitly timed command root |
 | `cmd/eng/distribution_install.go:63` | `Background` | Signal-owned command/service root |
 | `cmd/eng/execution_readback.go:52` | `Background` | Explicitly timed command root |
 | `cmd/eng/human_takeover.go:99` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_ci.go:54` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_engineering.go:34` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:78` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:114` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:163` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:200` | `Background` | Explicitly timed command root |
-| `cmd/eng/import_engineering.go:263` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:77` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:113` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:161` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:198` | `Background` | Explicitly timed command root |
+| `cmd/eng/import_engineering.go:260` | `Background` | Explicitly timed command root |
 | `cmd/eng/installation_readback.go:49` | `Background` | Signal-owned command/service root |
 | `cmd/eng/installation_switch.go:56` | `Background` | Signal-owned command/service root |
-| `cmd/eng/pilot_preflight.go:486` | `Background` | Explicitly timed command root |
+| `cmd/eng/pilot_preflight.go:485` | `Background` | Explicitly timed command root |
 | `cmd/eng/process_scope.go:13` | `Background` | Command with downstream budget |
 | `cmd/eng/production_capacity.go:78` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_live_observe.go:102` | `Background` | Signal-owned command/service root |
+| `cmd/eng/production_observer_check.go:121` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_publisher_health.go:42` | `Background` | Signal-owned command/service root |
-| `cmd/eng/production_status.go:96` | `Background` | Signal-owned command/service root |
+| `cmd/eng/production_status.go:101` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_terminal_readback.go:35` | `Background` | Signal-owned command/service root |
 | `cmd/eng/relay_qualification_kit.go:40` | `Background` | Explicitly timed command root |
 | `cmd/eng/relay_runtime_handoff.go:34` | `Background` | Explicitly timed command root |
@@ -138,7 +140,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `internal/githubpublish/git_scope.go:71` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/githubpublish/service.go:211` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/processscope/probe.go:32` | `Background` | Independent bounded cleanup/settlement |
-| `internal/runtime/codexapp/controls.go:122` | `WithoutCancel` | Independent bounded cleanup/settlement |
+| `internal/runtime/codexapp/controls.go:126` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering.go:196` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:22` | `WithoutCancel` | Independent bounded cleanup/settlement |
 | `internal/runtime/codexapp/engineering_exit.go:34` | `WithoutCancel` | Independent bounded cleanup/settlement |
@@ -361,3 +363,31 @@ Wait. Publisher marks its original proof collection uncertain, without minting
 a proof or opening a retry lane. Version-probe directory cleanup uses the
 outcome of that exact probe. Removing the unused Supervisor/LocalProcessProvider
 implementation removes no authorized Context origin and does not close #229.
+
+## Independent observer-journal consumer
+
+`production-observer-check` owns one signal Context and derives its 15-second
+operation budget from that Context. The command releases both lifetimes and its
+separately owned Linux pipe-output descriptor before returning. It makes no Core
+request, starts no monitor, and creates no independent cleanup or reader lifetime.
+The monitor's optional externally selected session changes no Context origin.
+The existing 60 constructors retain their lifecycle classifications; the one new
+command brings the inventory to 61 origins and 13 signal-owned roots. All 85
+public PostgreSQL Context entry points and their operation policies are unchanged.
+
+The initiating Context reaches the Linux no-follow path traversal, metadata
+checks and bounded JSONL reader. Path traversal is limited to 4096 bytes and 128
+components. The consumer checks cancellation during replay, after final file
+identity verification and closure, before output, and before granting a successful
+strict-mode exit. Freshness is evaluated after readback and again after output
+for that strict exit; a slow successful write cannot preserve an expired clear
+result. The emitted snapshot keeps its original check time.
+
+Regular-file reads, metadata operations and descriptor closure remain synchronous.
+Cancellation checkpoints and a numerical Context budget do not forcibly interrupt
+an arbitrary blocked kernel syscall. Linux pipe output reuses the existing bounded
+descriptor mechanism; ordinary file output retains its OS I/O semantics. The
+shared JSON printer now propagates encoding and write failures without adding a
+Context origin or an automatic retry. These bounds establish neither producer
+authentication nor selected-host latency, notification delivery or production
+qualification. Internal blockers [228,229] remain OPEN/BLOCKED.

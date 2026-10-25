@@ -11,8 +11,17 @@ func TestEmbeddedTemplatesAreOriginalSourceFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 25 {
+	if len(all) != 28 {
 		t.Fatal("explicit deployment template inventory changed", len(all))
+	}
+	for _, path := range []string{
+		"observer-watchdog.env.example",
+		"systemd/maintenance/engineering-observer-watchdog.service",
+		"systemd/maintenance/engineering-observer-watchdog.timer",
+	} {
+		if _, ok := all[path]; !ok {
+			t.Fatal("required observer template missing", path)
+		}
 	}
 	for path, raw := range all {
 		original, e := os.ReadFile(path)

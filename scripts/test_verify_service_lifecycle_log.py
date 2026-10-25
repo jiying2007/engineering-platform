@@ -81,7 +81,9 @@ class ServiceLifecycleGateTests(unittest.TestCase):
                             (3, "TestWorkerLoopPreservesAuthorityAmbiguityAfterCancel"),
                             (3, "TestWorkerCLIStoppedAfterUnobservedClaimRequiresReadback"),
                             (4, "TestScopeStartFailurePreservesUnknownProcess"),
-                            (4, "TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs")):
+                            (4, "TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs"),
+                            (4, "TestEngineeringTerminalPreservesClaimFailure"),
+                            (4, "TestEngineeringTerminalPreservesMTLSClaimOutcome")):
             original = self.events[index]
             for replacement in (
                 [e for e in original if e.get("Test") != name],
@@ -99,7 +101,8 @@ class ServiceLifecycleGateTests(unittest.TestCase):
         self.assertIn('test -n "$POSTGRES_TEST_URL"', workflow)
         self.assertIn("python3 -B scripts/test_verify_service_lifecycle_log.py", workflow)
         self.assertIn("python3 -B scripts/verify_service_lifecycle_log.py", workflow)
-        self.assertEqual([len(names) for _, names in gate.GROUPS], [9, 4, 2, 5, 2])
+        self.assertEqual([len(names) for _, names in gate.GROUPS], [9, 4, 2, 5, 4])
+        self.assertEqual(sum(len(names) for _, names in gate.GROUPS), 24)
         for (pkg, names), log in zip(gate.GROUPS, LOGS):
             existing = {name for p in (ROOT / pkg).glob("*_test.go")
                         for name in re.findall(r"^func (Test\w+)\(", p.read_text(), re.M)}
@@ -109,9 +112,10 @@ class ServiceLifecycleGateTests(unittest.TestCase):
             self.assertIn("-race -count=3 -timeout 2m ./" + pkg, commands[0])
             selected = re.search(r"-run '([^']+)'", commands[0])
             if selected:
-                self.assertFalse([name for name in names if not re.search(selected.group(1), name)])
+                self.assertEqual({name for name in existing if re.search(selected.group(1), name)}, names)
             else:
                 self.assertEqual(pkg, "internal/servicelifecycle")
+                self.assertEqual(existing, names)
             self.assertIn('"$RUNNER_TEMP/' + log + '"', workflow)
 
     def test_cli_rejects_incomplete_stream_and_missing_argument(self):

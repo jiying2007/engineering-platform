@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jiying2007/engineering-platform/internal/processscope"
+	"github.com/jiying2007/engineering-platform/internal/servicelifecycle"
 	"time"
 )
 
@@ -73,7 +74,10 @@ func pumpControls(ctx, inFlight context.Context, a *Adapter, threadID, turnID st
 		command, err := c.Claim(polling)
 		stop()
 		if err != nil {
-			if ctx.Err() != nil {
+			// Stopping polling can race a Core POST result. Cancellation alone
+			// is expected, but must not erase unknown authority, an HTTP failure
+			// or another error merely because the turn has already completed.
+			if ctx.Err() == context.Canceled && servicelifecycle.OnlyStopError(err, context.Canceled) {
 				return nil
 			}
 			return err

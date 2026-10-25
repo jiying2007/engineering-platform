@@ -56,6 +56,5 @@ func artifactRetention(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(report)
-	return nil
+	return printJSON(report)
 }

@@ -41,11 +41,10 @@ func sourceCheckpoint(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(struct {
+	return printJSON(struct {
 		DescriptorDigest    string                     `json:"descriptor_digest"`
 		Status              string                     `json:"status"`
 		Facts               codexexec.SourceCheckpoint `json:"facts"`
 		ExecutionAuthorized bool                       `json:"execution_authorized"`
 	}{DescriptorDigest: descriptorDigest, Status: status, Facts: facts})
-	return nil
 }

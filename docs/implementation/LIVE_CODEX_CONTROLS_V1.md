@@ -60,6 +60,23 @@ import independently check that same binding. A transcript is not Verification
 or independent Review. Historical receipt fields/bytes are not rewritten or
 silently admitted as current control evidence.
 
+### Claim failure concurrent with terminal completion
+
+The control pump may be waiting for the Core Claim response when a legitimate
+terminal Runtime event ends observation and cancels polling. That cancellation
+does not erase the Claim result: only a pure error tree caused by the owned
+`context.Canceled` stop is normalized. Typed uncertain POST/COMMIT outcomes,
+independent deadlines, HTTP errors and mixed error trees retain their original
+cause. Control Close is still attempted through its existing settlement path;
+an unavailable or unsuccessful close cannot manufacture successful delivery.
+
+Core Claim and Close retain their original durable row-lock serialization.
+DISPATCHING without an observed outcome becomes UNKNOWN and prevents delivery;
+this error-preservation repair is not evidence that prior code bypassed that
+authority. Regressions include actual mTLS Claim response loss, typed 503 and
+409 responses, malformed success, cancellation races and pure-cancel positive
+controls. They use a synthetic endpoint and do not invoke a model provider.
+
 ## Operator CLI
 
 Use the existing direct-mTLS client environment. Actor comes from its certificate;

@@ -1,0 +1,30 @@
+[Unit]
+Description=Engineering Platform Observer Journal Freshness Check
+After=local-fs.target
+[Service]
+Type=oneshot
+User=engineering-observer
+Group=engineering-observer
+EnvironmentFile=/etc/engineering-platform/observer-watchdog.env
+ExecStart=/opt/engineering-platform/bin/eng production-observer-check --journal ${OBSERVER_JOURNAL} --session ${OBSERVER_SESSION} --endpoint-digest ${CONTROL_ENDPOINT_DIGEST} --require-current-clear
+TimeoutStartSec=20s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ReadOnlyPaths=/var/lib/engineering-platform/observer
+SystemCallArchitectures=native

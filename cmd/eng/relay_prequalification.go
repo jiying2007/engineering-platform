@@ -25,8 +25,7 @@ func relayPrequalification(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(assessment)
-	return nil
+	return printJSON(assessment)
 }
 
 func readRelayContract(path string) (relayqualification.Contract, error) {

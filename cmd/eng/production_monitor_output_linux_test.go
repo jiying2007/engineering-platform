@@ -99,7 +99,7 @@ func TestProductionMonitorPipeOutputEndsBlockedInitialWrite(t *testing.T) {
 			})
 			p := production.ObserverPolicy{Progress: production.ProgressPolicy{WindowSeconds: 2, IntervalSeconds: 1, MaxPendingAgeSeconds: 60}, DurationSeconds: 3, StaleAfterSeconds: 4}
 			start := time.Now()
-			hadAlert, err := runProductionMonitor(ctx, reader, p, "https://synthetic.invalid", writer)
+			hadAlert, err := runProductionMonitor(ctx, reader, p, "https://synthetic.invalid", "", writer)
 			if err == nil || hadAlert || calls != 0 || time.Since(start) > 2*time.Second {
 				t.Fatalf("blocked output did not end promptly: calls=%d alert=%v err=%v elapsed=%s", calls, hadAlert, err, time.Since(start))
 			}

@@ -1,6 +1,7 @@
 # Production Operations v1
 
 Date: 2026-10-04
+Updated: 2026-10-25
 
 Status: **STATIC BASELINE IMPLEMENTED — LIVE OPERATING QUALIFICATION PENDING**
 
@@ -141,11 +142,11 @@ authority, not a second Work/Task service.
 
 A lost or canceled HTTP response, especially around COMMIT, does not prove
 that the write rolled back. Check the exact Work ID/version and immutable
-Task digest before attempting any new revision. Run and
-Checkpoint/Delivery request-scoped slices are described separately below;
-Steering and Evidence/Verification/Review/Closure interfaces still require
-request-scoped migration under P1 #229. These changes do not authorize model execution,
-Publisher mutations or automatic retry.
+Task digest before attempting any new revision. Run, Checkpoint/Delivery,
+Steering and Evidence/Verification/Review/Closure request-scoped slices are
+described separately below. Their implemented caller propagation does not close
+the remaining lifecycle and selected-host qualification work under P1 #229 or
+authorize model execution, Publisher mutations or automatic retry.
 
 ### Core Run start/read cancellation and one-transaction authority
 
@@ -170,11 +171,10 @@ a completed Run nor a verifying Work nor a completion audit may be
 partially persisted. Independent readback is required when COMMIT may have
 succeeded before a response was lost.
 
-Steering, Evidence/Verification/Review/Closure and several internal
-Core/CLI calls remain independent later slices. Checkpoint and Delivery are
-covered below; the existing
-no-replay / fail-closed Core and Action gates remain authoritative; P1 #229
-is not fully qualified or closed.
+Checkpoint/Delivery, Steering, Evidence/Verification/Review/Closure and the
+remaining Core caller boundaries have their own contracts below and in the
+source-bound Context inventory. The existing no-replay / fail-closed Core and
+Action gates remain authoritative; P1 #229 is not fully qualified or closed.
 
 ### Checkpoint and Delivery request-scoped records
 
@@ -379,7 +379,8 @@ the selected budget are scheduled; the command stops after its final window,
 so the budget is a maximum rather than a promise to observe every instant.
 
 Monitor mode emits bounded JSONL records immediately: start, complete window,
-failed window, recovery and stop. Records carry a random observer session ID,
+failed window, recovery and stop. Records carry a random observer session ID
+(or the explicitly selected monitor-only `--session` value),
 the SHA-256 of the configured Control endpoint, monotonically ordered sequence,
 window counters, state start time, last successful complete-window time and
 expiry. Successful records retain the original complete `ProgressReport` and
@@ -415,8 +416,17 @@ fresh even if an earlier successful timestamp remains recent. A missing or stale
 record must never be treated as healthy. This is shape/expiry checking of one
 diagnostic record, not producer authentication or proof of a complete journal.
 The observer cannot report its own sudden death: an independent consumer must
-check record expiry. No installed external watchdog or real notification
-delivery is claimed by this command.
+check record expiry. The independently invoked `eng production-observer-check`
+now supplies that consumer. It requires an externally selected session, endpoint
+digest and private journal, validates the complete supplied JSONL prefix, and
+returns nonzero under `--require-current-clear` for waiting, failed, stopped or
+expired observations. Its Linux input boundary checks the actual opened file,
+every directory identity and the final path again after reading. Strict freshness
+is checked after output as well, so a slow sink cannot preserve a stale success
+exit. See [the observer watchdog contract](PRODUCTION_OBSERVER_WATCHDOG_V1.md)
+for session selection, exact bounds and the delivered oneshot/timer templates.
+Those templates are not automatically installed or enabled; real notification
+delivery and whole-host failure detection remain deployment acceptance work.
 
 Records are limited to 8 MiB each and 128 MiB per invocation. A write error,
 short write or output limit aborts immediately without another source request;

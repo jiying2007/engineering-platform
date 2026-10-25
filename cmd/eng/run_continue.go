@@ -72,8 +72,7 @@ func runContinue(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(receipt)
-	return nil
+	return printJSON(receipt)
 }
 func executeContinue(ctx context.Context, c *controlclient.Client, o continueOptions) (codexexec.ContinuationReceipt, error) {
 	var r codexexec.ContinuationReceipt

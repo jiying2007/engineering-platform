@@ -183,15 +183,23 @@ jobs:
           go test -json -race -count=3 -timeout 2m ./cmd/publisher-service -run '^TestPublisherLifecycle' | tee "$RUNNER_TEMP/service-publisher-tests.jsonl"
           go test -json -race -count=3 -timeout 2m ./internal/servicelifecycle | tee "$RUNNER_TEMP/service-helper-tests.jsonl"
           go test -json -race -count=3 -timeout 2m ./cmd/worker -run '^TestWorker(Loop|CLIStoppedAfterUnobservedClaimRequiresReadback)' | tee "$RUNNER_TEMP/service-worker-tests.jsonl"
-          go test -json -race -count=3 -timeout 2m ./internal/runtime/codexapp -run '^(TestScopeStartFailurePreservesUnknownProcess|TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs)$' | tee "$RUNNER_TEMP/service-runtime-tests.jsonl"
+          go test -json -race -count=3 -timeout 2m ./internal/runtime/codexapp -run '^(TestScopeStartFailurePreservesUnknownProcess|TestProbeDirectoryCleanupKeepsUnconfirmedProcessInputs|TestEngineeringTerminalPreservesClaimFailure|TestEngineeringTerminalPreservesMTLSClaimOutcome)$' | tee "$RUNNER_TEMP/service-runtime-tests.jsonl"
           python3 -B scripts/verify_service_lifecycle_log.py "$RUNNER_TEMP/service-control-tests.jsonl" "$RUNNER_TEMP/service-publisher-tests.jsonl" "$RUNNER_TEMP/service-helper-tests.jsonl" "$RUNNER_TEMP/service-worker-tests.jsonl" "$RUNNER_TEMP/service-runtime-tests.jsonl"
+      - name: Observer journal replay and checked readback no-skip regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -json -race -count=3 -timeout 2m ./internal/production -run '^TestObserverJournal(ReplaysPrefixesAndRefreshesFreshness|SourceFreshnessAndEOFTiming|WireAndSchemaAreComplete|RejectsHistoryIdentityAndStateChanges|BoundsReadersErrorsAndCancellation|FormattingAndExplicitIdentity)$' | tee "$RUNNER_TEMP/observer-model-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/observer-model-tests.jsonl" --observer-model
+          go test -json -race -count=3 -timeout 2m ./cmd/eng -run '^Test(ProductionObserver(Check(RequiresExplicitIdentity|CancellationPreventsRead|RejectsExpiryDuringOutput|CLIThroughAuthenticatedMonitor)|JournalLinux(PrivateFileReadback|RejectsUnsafeFiles|RejectsChangedFiles|Cancellation))|ProductionMonitorExplicitSessionIsScoped|JSONOutput(PreservesEncodedBytes|RejectsShortWritesAndPreservesErrors|EncodingFailureWritesNothing|CLIRejectsUnwritableSink))$' | tee "$RUNNER_TEMP/observer-cli-tests.jsonl"
+          python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/observer-cli-tests.jsonl" --observer-cli
       - name: Kernel process-tree regression
         run: go test -race -count=10 -timeout 1m ./internal/processscope
       - name: Publisher quiescence and receipt-purpose no-skip regression
         shell: bash
         run: |
           set -euo pipefail
-          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|ProviderDispatchRejectsObservationOnlyReceipt|PublisherRemoteClientBindsReceiptToResponsePurpose|PublisherServiceBindsReceiptToResponsePurpose|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
+          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|ProviderDispatchRejectsObservationOnlyReceipt|PublisherRemoteClientBindsReceiptToResponsePurpose|PublisherServiceBindsReceiptToResponsePurpose|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate|GitHubObserveRequiresExactPullRepositoryIdentity|GitHubPublishRequiresExactPullRepositoryBeforeUpdate|GitHubPublishRequiresExactPullRepositoryAfterMutation)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publisher-kernel-tests.jsonl" --publisher-kernel
       - name: Outbox authority repeated regression
         run: |

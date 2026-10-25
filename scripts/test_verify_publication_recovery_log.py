@@ -21,6 +21,8 @@ MODES = (
     (gate.PROOF_REQUIRED, gate.PUBLISHER_PACKAGE, 3, "--publisher-proof"),
     (gate.CONTROL_REQUIRED, gate.CONTROL_PACKAGE, 20, "--control-response"),
     (gate.CAPACITY_REQUIRED, gate.PACKAGE, 3, "--capacity-db"),
+    (gate.OBSERVER_MODEL_REQUIRED, gate.OBSERVER_MODEL_PACKAGE, 3, "--observer-model"),
+    (gate.OBSERVER_CLI_REQUIRED, gate.OBSERVER_CLI_PACKAGE, 3, "--observer-cli"),
 )
 
 
@@ -55,7 +57,8 @@ class GateTests(unittest.TestCase):
             gate.verify(self.path, **kwargs)
 
     def test_canonical_publisher_selector_includes_every_required_test(self):
-        workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/ci.yml").read_text()
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text()
         commands = [line for line in workflow.splitlines()
                     if "go test -json" in line and "publisher-kernel-tests.jsonl" in line]
         self.assertEqual(len(commands), 1, "one canonical Publisher event stream required")
@@ -65,6 +68,48 @@ class GateTests(unittest.TestCase):
         missing = sorted(name for name in gate.PUBLISHER_REQUIRED
                          if re.search(match.group(1), name) is None)
         self.assertEqual(missing, [], "required tests must actually be selected by CI")
+        existing = {name for path in (root / "internal/githubpublish").glob("*_test.go")
+                    for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
+        self.assertEqual(len(gate.PUBLISHER_REQUIRED), 30)
+        self.assertEqual({name for name in existing if re.search(match.group(1), name)},
+                         gate.PUBLISHER_REQUIRED, "every selected Publisher test must remain mandatory")
+
+    def test_observer_modes_bind_exact_source_names_selectors_and_streams(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text()
+        modes = (
+            (gate.OBSERVER_MODEL_REQUIRED, "internal/production", "observer-model-tests.jsonl", "--observer-model",
+             ("observer_journal_test.go",), 6),
+            (gate.OBSERVER_CLI_REQUIRED, "cmd/eng", "observer-cli-tests.jsonl", "--observer-cli",
+             ("production_observer_check_test.go", "production_observer_journal_linux_test.go", "json_output_test.go"), 13),
+        )
+        for required, package, log, option, files, count in modes:
+            with self.subTest(mode=option):
+                declared = {name for filename in files
+                            for name in re.findall(r"^func (Test\w+)\(", (root / package / filename).read_text(), re.M)}
+                self.assertEqual(len(required), count)
+                self.assertEqual(declared, required, "new source tests cannot silently escape their gate")
+                commands = [line for line in workflow.splitlines() if "go test -json" in line and log in line]
+                self.assertEqual(len(commands), 1)
+                self.assertIn("-race -count=3 -timeout 2m ./" + package, commands[0])
+                selector = re.search(r"-run '([^']+)'", commands[0])
+                self.assertIsNotNone(selector)
+                self.assertTrue(selector.group(1).startswith("^") and selector.group(1).endswith("$"))
+                existing = {name for path in (root / package).glob("*_test.go")
+                            for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
+                self.assertEqual({name for name in existing if re.search(selector.group(1), name)}, required)
+                verifier = 'python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/' + log + '" ' + option
+                self.assertEqual(workflow.count(verifier), 1, "verify the same exact emitted stream")
+
+    def test_every_observer_test_is_required_and_cannot_be_skipped(self):
+        for required, package in ((gate.OBSERVER_MODEL_REQUIRED, gate.OBSERVER_MODEL_PACKAGE),
+                                  (gate.OBSERVER_CLI_REQUIRED, gate.OBSERVER_CLI_PACKAGE)):
+            good = complete(required, package)
+            for name in required:
+                with self.subTest(package=package, test=name):
+                    self.reject([e for e in good if e.get("Test") != name], required=required, package=package)
+                    self.reject([dict(e, Action="skip") if e.get("Test") == name and e["Action"] == "pass" else e
+                                 for e in good], required=required, package=package)
 
     def test_control_gate_runs_the_full_existing_package(self):
         root = Path(__file__).resolve().parents[1]
@@ -142,6 +187,18 @@ class GateTests(unittest.TestCase):
                     self.reject(bad, **kwargs)
                 for action in ("skip", "fail", "build-fail"):
                     self.reject(good[:-1] + [event(action, "unknown/nested", package)] + good[-1:], **kwargs)
+
+    def test_all_modes_reject_truncated_final_event_bytes(self):
+        for required, package, repeats, option in MODES:
+            self.write(complete(required, package, repeats))
+            raw = self.path.read_bytes()
+            # Losing only the final newline must not look like a finished Go
+            # JSONL stream; losing part of the package result also rejects.
+            for removed in (1, 8):
+                with self.subTest(mode=option, removed=removed):
+                    self.path.write_bytes(raw[:-removed])
+                    with self.assertRaises(ValueError):
+                        gate.verify(self.path, required=required, package=package, repeats=repeats)
 
     def test_realistic_output_parallel_subtests_and_repeated_names(self):
         events = [event("start")]

@@ -16,8 +16,8 @@ import (
 	"github.com/jiying2007/engineering-platform/internal/production"
 )
 
-const maxObserverEventBytes = 8 << 20
-const maxObserverOutputBytes = 128 << 20
+const maxObserverEventBytes = production.ObserverMaxEventBytes
+const maxObserverOutputBytes = production.ObserverMaxJournalBytes
 
 type observerWindowReader struct {
 	reader   operationalReader
@@ -183,12 +183,15 @@ func observerJSONEmitter(writer io.Writer) func(production.ObserverEvent) error 
 	}
 }
 
-func runProductionMonitor(ctx context.Context, reader operationalReader, policy production.ObserverPolicy, endpoint string, writer io.Writer) (bool, error) {
+func runProductionMonitor(ctx context.Context, reader operationalReader, policy production.ObserverPolicy, endpoint, session string, writer io.Writer) (bool, error) {
 	if err := policy.Validate(); err != nil {
 		return false, err
 	}
 	if err := ctx.Err(); err != nil {
 		return false, err
+	}
+	if session != "" && !validProductionObserverSession(session) {
+		return false, fmt.Errorf("invalid externally selected observer session")
 	}
 	// Include initial/output writes in the invocation budget for Linux pipes.
 	// The collector inherits this earlier deadline rather than extending it.
@@ -199,10 +202,13 @@ func runProductionMonitor(ctx context.Context, reader operationalReader, policy 
 		return false, err
 	}
 	defer closeOutput()
-	var id [16]byte
-	if _, err := rand.Read(id[:]); err != nil {
-		return false, fmt.Errorf("observer session identity unavailable")
+	if session == "" {
+		var id [16]byte
+		if _, err := rand.Read(id[:]); err != nil {
+			return false, fmt.Errorf("observer session identity unavailable")
+		}
+		session = hex.EncodeToString(id[:])
 	}
 	digest := sha256.Sum256([]byte(endpoint))
-	return collectProductionMonitorWithClock(ctx, reader, policy, hex.EncodeToString(id[:]), "sha256:"+hex.EncodeToString(digest[:]), time.Now, waitObservation, observerJSONEmitter(output))
+	return collectProductionMonitorWithClock(ctx, reader, policy, session, "sha256:"+hex.EncodeToString(digest[:]), time.Now, waitObservation, observerJSONEmitter(output))
 }

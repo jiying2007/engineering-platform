@@ -301,6 +301,5 @@ func workIntake(args []string) error {
 	if err != nil {
 		return err
 	}
-	printJSON(receipt)
-	return nil
+	return printJSON(receipt)
 }
