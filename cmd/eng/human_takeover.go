@@ -76,8 +76,8 @@ func executeHumanTakeover(ctx context.Context, c *controlclient.Client, options 
 	// Bind the mutation acknowledgement to the authoritative Run/Session state.
 	// A failed readback never retries the effectful POST.
 	var readback struct {
-		Run     run.Run         `json:"run"`
-		Session session.Session `json:"session"`
+		Run      run.Run               `json:"run"`
+		Session  session.Session       `json:"session"`
 		RunInput core.RunInputManifest `json:"run_input"`
 	}
 	if err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+options.runID, nil, &readback); err != nil {
