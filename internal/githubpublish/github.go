@@ -163,9 +163,13 @@ func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string
 			return empty, fmt.Errorf("existing pull request does not bind publication plan")
 		}
 		if pr.Title != title || pr.Body != body {
-			pr, err = g.updatePull(ctx, token, plan, pr.Number, title, body)
+			originalPRNumber := pr.Number
+			pr, err = g.updatePull(ctx, token, plan, originalPRNumber, title, body)
 			if err != nil {
 				return empty, err
+			}
+			if pr.Number != originalPRNumber {
+				return empty, fmt.Errorf("updated pull request identity mismatch; reconcile exact original PR")
 			}
 			outcome = "UPDATED"
 		}
