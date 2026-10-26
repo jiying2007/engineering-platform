@@ -24,12 +24,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gofmt -l cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
-          gofmt -w cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
-          git diff -- cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
+          gofmt -l cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go cmd/eng/production_slo_v2_linux_test.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go internal/githubpublish/branch_absent_lease_test.go
+          gofmt -w cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go cmd/eng/production_slo_v2_linux_test.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go internal/githubpublish/branch_absent_lease_test.go
+          git diff -- cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go cmd/eng/production_slo_v2_linux_test.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go internal/githubpublish/branch_absent_lease_test.go
       - name: CLI bounded regressions
-        run: go test -count=1 -race -timeout 8m ./cmd/eng -run 'Test(HumanTakeover|WorkIntake|RunControl|ProductionSLOReport)'
+        run: go test -count=1 -race -timeout 8m ./cmd/eng -run 'Test(HumanTakeover|WorkIntake|RunControl|ProductionSLOReport|ProductionSLOV2)'
       - name: Publisher identity regression
-        run: go test -count=1 -race -timeout 8m ./internal/githubpublish -run 'TestPublisherPRUpdateRejectsChangedPRNumber'
+        run: go test -count=1 -race -timeout 8m ./internal/githubpublish -run 'Test(PublisherPRUpdateRejectsChangedPRNumber|PublisherNewBranchPushHasAtomicAbsentLease|PublisherGitLeaseRejectsConcurrentBranchCreation)'
       - name: Static Go vet
         run: go vet ./cmd/eng ./internal/githubpublish ./internal/production
