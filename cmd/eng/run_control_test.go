@@ -114,10 +114,14 @@ func TestRunControlActualMTLSNoPOSTReplay(t *testing.T) {
 func TestRunControlInspectBindsExactRun(t *testing.T) {
 	for _, tc := range []struct {
 		name, returnedRun string
+		nested            string
 		wantError         bool
 	}{
 		{name: "matching", returnedRun: "requested-run"},
 		{name: "wrong-run", returnedRun: "different-run", wantError: true},
+		{name: "wrong-runtime", returnedRun: "requested-run", nested: "runtime", wantError: true},
+		{name: "wrong-checkpoint", returnedRun: "requested-run", nested: "checkpoint", wantError: true},
+		{name: "wrong-receipt", returnedRun: "requested-run", nested: "receipt", wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			pki := testsupport.NewPKI(t)
@@ -128,13 +132,22 @@ func TestRunControlInspectBindsExactRun(t *testing.T) {
 					return
 				}
 				w.Header().Set("Content-Type", "application/json")
-				_ = json.NewEncoder(w).Encode(codexexec.Status{
-					Token: codexexec.Token{
-						ID: strings.Repeat("a", 64), RunID: tc.returnedRun,
-						WorkerProfile: "worker/codex", ProfileDigest: canonical.BytesDigest([]byte("profile")),
-					},
-					State: "RUNNING",
-				})
+				token := codexexec.Token{
+					ID: strings.Repeat("a", 64), RunID: tc.returnedRun,
+					WorkerProfile: "worker/codex", ProfileDigest: canonical.BytesDigest([]byte("profile")),
+				}
+				status := codexexec.Status{Token: token, State: "RUNNING"}
+				badToken := token
+				badToken.RunID = "different-run"
+				switch tc.nested {
+				case "runtime":
+					status.Runtime = &codexexec.ControlRuntime{Binding: codexexec.ControlBinding{Token: badToken}}
+				case "checkpoint":
+					status.SourceCheckpoint = &codexexec.SourceCheckpoint{Binding: codexexec.ControlBinding{Token: badToken}}
+				case "receipt":
+					status.Receipt = &codexexec.Receipt{Token: badToken}
+				}
+				_ = json.NewEncoder(w).Encode(status)
 			}))
 			server.TLS = pki.ServerTLS()
 			server.StartTLS()
