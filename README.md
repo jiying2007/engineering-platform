@@ -296,7 +296,11 @@ operational qualification. The systemd Control Plane launches with
 conflicting EnvironmentFile.
 
 SLO report v2 distinguishes `UNVERIFIED_SUMMARY` from `SOURCE_BYTES_VERIFIED`.
-Neither grants production qualification. WorkBuddy integration and the complete
+Neither grants production qualification. On Linux its observations file is now
+opened through the same bounded descriptor-bound/nonblocking/no-follow reader
+as operational SLI v3; without a supported safe opener, non-Linux v2 observation
+file input and v3 manifest input fail closed rather than accepting an unsafe
+replacement race. WorkBuddy integration and the complete
 interactive Worker control path must not be inferred from adapter methods alone.
 See [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) for the current
 remaining gates.
@@ -312,7 +316,11 @@ delivery and are never replayed. See
 The `run-control` surface intentionally covers live Codex steer/interrupt only.
 Core persists pause/resume separately, and exact-epoch Human Takeover is exposed
 by `eng human-takeover`; takeover increments the execution epoch and transfers
-control to HUMAN without replaying the model turn.
+control to HUMAN without replaying the model turn. The CLI checks the actual
+Core acknowledgement and performs a separate exact Run/Session GET. Failed
+readback is an uncertain user-visible result, **not** authority for another
+POST. `run-control inspect` rejects returned statuses for another Run, including
+nested Runtime/checkpoint/receipt identities.
 
 ### Stopped source recovery
 
