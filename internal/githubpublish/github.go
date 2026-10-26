@@ -504,6 +504,7 @@ func (g *githubRemote) push(ctx context.Context, token, staged string, plan Plan
 	home := filepath.Join(filepath.Dir(staged), "home")
 	remoteURL := "https://github.com/" + plan.Repository + ".git"
 	_, err := g.gitOutput(ctx, token, staged, home, "push", "--porcelain", "--no-verify",
+		"--force-with-lease=refs/heads/"+plan.Branch+":",
 		remoteURL, "refs/ep/result:refs/heads/"+plan.Branch)
 	return err
 }
