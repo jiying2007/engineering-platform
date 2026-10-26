@@ -143,13 +143,17 @@ func TestRunControlInspectBindsExactRun(t *testing.T) {
 				MinVersion: tls.VersionTLS13, RootCAs: pki.Roots,
 				Certificates: []tls.Certificate{pki.ClientCertificate(t, "urn:engineering-platform:operator:inspect")},
 			})
-			if err != nil { t.Fatal(err) }
+			if err != nil {
+				t.Fatal(err)
+			}
 			defer client.Close()
 			result, err := executeRunControl(context.Background(), client, runControlOptions{
 				action: "inspect", runID: "requested-run",
 			})
 			if tc.wantError {
-				if err == nil || result != nil { t.Fatalf("cross-run status accepted: %#v, %v", result, err) }
+				if err == nil || result != nil {
+					t.Fatalf("cross-run status accepted: %#v, %v", result, err)
+				}
 			} else if err != nil || result.(codexexec.Status).Token.RunID != "requested-run" {
 				t.Fatalf("matching status rejected: %#v, %v", result, err)
 			}
