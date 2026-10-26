@@ -199,7 +199,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|ProviderDispatchRejectsObservationOnlyReceipt|PublisherRemoteClientBindsReceiptToResponsePurpose|PublisherServiceBindsReceiptToResponsePurpose|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate|GitHubObserveRequiresExactPullRepositoryIdentity|GitHubPublishRequiresExactPullRepositoryBeforeUpdate|GitHubPublishRequiresExactPullRepositoryAfterMutation)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
+          go test -json -race -count=3 -timeout 90s ./internal/githubpublish -run '^Test(PublisherGit|PublisherNewBranchPushHasAtomicAbsentLease|PublisherPRUpdateRejectsChangedPRNumber|PublisherRemoteResponse|PublisherRemoteHealthCompleteObservation|ProviderDispatchRejectsObservationOnlyReceipt|PublisherRemoteClientBindsReceiptToResponsePurpose|PublisherServiceBindsReceiptToResponsePurpose|GitHubPublishNeverReopensClosedDeterministicBranch|GitHubNullOpenPullReadbackNeverAuthorizesCreate|GitHubObserveRequiresExactPullRepositoryIdentity|GitHubPublishRequiresExactPullRepositoryBeforeUpdate|GitHubPublishRequiresExactPullRepositoryAfterMutation)' | tee "$RUNNER_TEMP/publisher-kernel-tests.jsonl"
           python3 -B scripts/verify_publication_recovery_log.py "$RUNNER_TEMP/publisher-kernel-tests.jsonl" --publisher-kernel
       - name: Outbox authority repeated regression
         run: |

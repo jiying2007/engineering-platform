@@ -71,14 +71,11 @@ func productionSLOReport(args []string) error {
 	if *deployment != "" || *requireCriteriaMet {
 		return fmt.Errorf("deployment and criteria comparison flags require --operational")
 	}
-	info, err := os.Lstat(*inputFile)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o022 != 0 ||
-		info.Size() <= 0 || info.Size() > 1<<20 {
+	// Reuse the descriptor-bound, nonblocking, no-follow reader used by v3.
+	// The former Lstat/ReadFile pair allowed FIFO replacement to block here.
+	data, err := production.ReadOperationalSLOManifest(*inputFile)
+	if err != nil || len(data) == 0 || len(data) > 1<<20 {
 		return fmt.Errorf("bounded non-group/world-writable SLO observation file required")
-	}
-	data, err := os.ReadFile(*inputFile)
-	if err != nil {
-		return err
 	}
 	var input productionSLOInput
 	if err := strictjson.Decode(data, &input); err != nil {

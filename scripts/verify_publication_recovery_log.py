@@ -95,6 +95,9 @@ PUBLISHER_REQUIRED = {
     "TestGitHubObserveRequiresExactPullRepositoryIdentity",
     "TestGitHubPublishRequiresExactPullRepositoryBeforeUpdate",
     "TestGitHubPublishRequiresExactPullRepositoryAfterMutation",
+    "TestPublisherGitLeaseRejectsConcurrentBranchCreation",
+    "TestPublisherNewBranchPushHasAtomicAbsentLease",
+    "TestPublisherPRUpdateRejectsChangedPRNumber",
 }
 
 OBSERVER_MODEL_PACKAGE = "github.com/jiying2007/engineering-platform/internal/production"

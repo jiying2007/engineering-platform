@@ -110,3 +110,66 @@ func TestRunControlActualMTLSNoPOSTReplay(t *testing.T) {
 	default:
 	}
 }
+
+func TestRunControlInspectBindsExactRun(t *testing.T) {
+	for _, tc := range []struct {
+		name, returnedRun string
+		nested            string
+		wantError         bool
+	}{
+		{name: "matching", returnedRun: "requested-run"},
+		{name: "wrong-run", returnedRun: "different-run", wantError: true},
+		{name: "wrong-runtime", returnedRun: "requested-run", nested: "runtime", wantError: true},
+		{name: "wrong-checkpoint", returnedRun: "requested-run", nested: "checkpoint", wantError: true},
+		{name: "wrong-receipt", returnedRun: "requested-run", nested: "receipt", wantError: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pki := testsupport.NewPKI(t)
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/api/v1/runs/requested-run/codex" {
+					t.Errorf("unexpected inspect request %s %s", r.Method, r.URL.Path)
+					http.Error(w, "bad request", http.StatusNotFound)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				token := codexexec.Token{
+					ID: strings.Repeat("a", 64), RunID: tc.returnedRun,
+					WorkerProfile: "worker/codex", ProfileDigest: canonical.BytesDigest([]byte("profile")),
+				}
+				status := codexexec.Status{Token: token, State: "RUNNING"}
+				badToken := token
+				badToken.RunID = "different-run"
+				switch tc.nested {
+				case "runtime":
+					status.Runtime = &codexexec.ControlRuntime{Binding: codexexec.ControlBinding{Token: badToken}}
+				case "checkpoint":
+					status.SourceCheckpoint = &codexexec.SourceCheckpoint{Binding: codexexec.ControlBinding{Token: badToken}}
+				case "receipt":
+					status.Receipt = &codexexec.Receipt{Token: badToken}
+				}
+				_ = json.NewEncoder(w).Encode(status)
+			}))
+			server.TLS = pki.ServerTLS()
+			server.StartTLS()
+			defer server.Close()
+			client, err := controlclient.New(server.URL, &tls.Config{
+				MinVersion: tls.VersionTLS13, RootCAs: pki.Roots,
+				Certificates: []tls.Certificate{pki.ClientCertificate(t, "urn:engineering-platform:operator:inspect")},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			result, err := executeRunControl(context.Background(), client, runControlOptions{
+				action: "inspect", runID: "requested-run",
+			})
+			if tc.wantError {
+				if err == nil || result != nil {
+					t.Fatalf("cross-run status accepted: %#v, %v", result, err)
+				}
+			} else if err != nil || result.(codexexec.Status).Token.RunID != "requested-run" {
+				t.Fatalf("matching status rejected: %#v, %v", result, err)
+			}
+		})
+	}
+}

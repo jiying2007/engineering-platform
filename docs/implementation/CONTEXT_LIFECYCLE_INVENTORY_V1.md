@@ -40,9 +40,16 @@ pipe output inherits the monitor context, joins its deadline callback and closes
 only its separately opened descriptor. Status projection and Recovery row/audit
 checks reuse their existing transaction budgets; no independent origin is added.
 
+The 2026-10-26 CLI/Publisher identity and SLO input repair retains the same
+61 direct Context origins and all reviewed lifecycle categories. The source
+content digest and the two shifted CLI line references below were regenerated
+from the exact branch checkout using the unchanged Go AST scanner. This is a
+source-inventory refresh only; #229 remains open and no production qualification
+is implied.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:b2aeb3f99bd77e986d98a7e4faa1b6615c5bffa09036e2643ee8b6da63caa08c`
+`sha256:424af826ed82a243da8972905302a999b88ca97dfa2c2cbba5b35c2da4049549`
 
 ## Reviewed categories
 
@@ -111,7 +118,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/codex_profile.go:86` | `Background` | Explicitly timed command root |
 | `cmd/eng/distribution_install.go:63` | `Background` | Signal-owned command/service root |
 | `cmd/eng/execution_readback.go:52` | `Background` | Explicitly timed command root |
-| `cmd/eng/human_takeover.go:99` | `Background` | Explicitly timed command root |
+| `cmd/eng/human_takeover.go:113` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_ci.go:54` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_engineering.go:34` | `Background` | Explicitly timed command root |
 | `cmd/eng/import_engineering.go:77` | `Background` | Explicitly timed command root |
@@ -135,7 +142,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/run_continue.go:69` | `Background` | Explicitly timed command root |
 | `cmd/eng/run_control.go:107` | `Background` | Explicitly timed command root |
 | `cmd/eng/source_checkpoint.go:26` | `Background` | Explicitly timed command root |
-| `cmd/eng/work_intake.go:298` | `Background` | Explicitly timed command root |
+| `cmd/eng/work_intake.go:308` | `Background` | Explicitly timed command root |
 | `cmd/publisher-service/main.go:74` | `Background` | Signal-owned command/service root |
 | `cmd/publisher-service/main.go:104` | `Background` | Independent bounded cleanup/settlement |
 | `cmd/sandbox-guard/build_outputs.go:27` | `Background` | Explicitly timed command root |

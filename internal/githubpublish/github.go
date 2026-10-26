@@ -163,9 +163,13 @@ func (g *githubRemote) Publish(ctx context.Context, plan Plan, bundlePath string
 			return empty, fmt.Errorf("existing pull request does not bind publication plan")
 		}
 		if pr.Title != title || pr.Body != body {
-			pr, err = g.updatePull(ctx, token, plan, pr.Number, title, body)
+			originalPRNumber := pr.Number
+			pr, err = g.updatePull(ctx, token, plan, originalPRNumber, title, body)
 			if err != nil {
 				return empty, err
+			}
+			if pr.Number != originalPRNumber {
+				return empty, fmt.Errorf("updated pull request identity mismatch; reconcile exact original PR")
 			}
 			outcome = "UPDATED"
 		}
@@ -500,6 +504,7 @@ func (g *githubRemote) push(ctx context.Context, token, staged string, plan Plan
 	home := filepath.Join(filepath.Dir(staged), "home")
 	remoteURL := "https://github.com/" + plan.Repository + ".git"
 	_, err := g.gitOutput(ctx, token, staged, home, "push", "--porcelain", "--no-verify",
+		"--force-with-lease=refs/heads/"+plan.Branch+":",
 		remoteURL, "refs/ep/result:refs/heads/"+plan.Branch)
 	return err
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
+	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 )
@@ -61,28 +62,41 @@ func executeHumanTakeover(ctx context.Context, c *controlclient.Client, options 
 		return zero, fmt.Errorf("authenticated takeover request required")
 	}
 	var response struct {
-		Run     run.Run         `json:"run"`
-		Session session.Session `json:"session"`
+		ControlOwner   string `json:"control_owner"`
+		ExecutionEpoch uint64 `json:"execution_epoch"`
 	}
 	if err := c.Call(ctx, http.MethodPost, "/api/v1/runs/"+options.runID+"/takeover", struct {
 		ExecutionEpoch uint64 `json:"execution_epoch"`
 	}{ExecutionEpoch: options.epoch}, &response); err != nil {
 		return zero, err
 	}
-	if response.Run.ID != options.runID ||
-		response.Run.State != run.HumanControlled ||
-		response.Run.ControlOwner != "HUMAN" ||
-		response.Run.CurrentEpoch != options.epoch+1 ||
-		response.Session.RunID != options.runID ||
-		response.Session.Owner != session.Human ||
-		response.Session.ExecutionEpoch != response.Run.CurrentEpoch {
-		return zero, fmt.Errorf("human takeover readback mismatch")
+	if response.ControlOwner != "HUMAN" || response.ExecutionEpoch != options.epoch+1 {
+		return zero, fmt.Errorf("human takeover response mismatch; inspect exact Run before retry")
+	}
+	// Bind the mutation acknowledgement to the authoritative Run/Session state.
+	// A failed readback never retries the effectful POST.
+	var readback struct {
+		Run      run.Run               `json:"run"`
+		Session  session.Session       `json:"session"`
+		RunInput core.RunInputManifest `json:"run_input"`
+	}
+	if err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+options.runID, nil, &readback); err != nil {
+		return zero, fmt.Errorf("human takeover readback unavailable; inspect exact Run before retry: %w", err)
+	}
+	if readback.Run.ID != options.runID ||
+		readback.Run.State != run.HumanControlled ||
+		readback.Run.ControlOwner != "HUMAN" ||
+		readback.Run.CurrentEpoch != response.ExecutionEpoch ||
+		readback.Session.RunID != options.runID ||
+		readback.Session.Owner != session.Human ||
+		readback.Session.ExecutionEpoch != response.ExecutionEpoch {
+		return zero, fmt.Errorf("human takeover readback mismatch; inspect exact Run before retry")
 	}
 	return humanTakeoverReceipt{
 		Version: 1, Status: "HUMAN_CONTROL_ACQUIRED",
 		RunID: options.runID, Actor: c.Subject(),
-		PreviousEpoch: options.epoch, ExecutionEpoch: response.Run.CurrentEpoch,
-		ControlOwner: string(response.Session.Owner),
+		PreviousEpoch: options.epoch, ExecutionEpoch: response.ExecutionEpoch,
+		ControlOwner: string(readback.Session.Owner),
 	}, nil
 }
 
