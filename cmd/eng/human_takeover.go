@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
+	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 )
@@ -77,6 +78,7 @@ func executeHumanTakeover(ctx context.Context, c *controlclient.Client, options 
 	var readback struct {
 		Run     run.Run         `json:"run"`
 		Session session.Session `json:"session"`
+		RunInput core.RunInputManifest `json:"run_input"`
 	}
 	if err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+options.runID, nil, &readback); err != nil {
 		return zero, fmt.Errorf("human takeover readback unavailable; inspect exact Run before retry: %w", err)
