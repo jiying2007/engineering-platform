@@ -1,0 +1,35 @@
+name: Temporary branch Go regression (no Codex)
+
+on:
+  push:
+    branches: [fix/request-identity-20261026]
+    paths: [.github/workflows/branch-go-regression.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  go-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Fetch public Go dependencies
+        run: go mod download
+      - name: Inspect formatting without changing repository history
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -l cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
+          gofmt -w cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
+          git diff -- cmd/eng/human_takeover.go cmd/eng/human_takeover_test.go cmd/eng/work_intake.go cmd/eng/work_intake_identity_test.go cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/production_acceptance.go internal/githubpublish/github.go internal/githubpublish/pr_update_identity_test.go
+      - name: CLI bounded regressions
+        run: go test -count=1 -race -timeout 8m ./cmd/eng -run 'Test(HumanTakeover|WorkIntake|RunControl|ProductionSLOReport)'
+      - name: Publisher identity regression
+        run: go test -count=1 -race -timeout 8m ./internal/githubpublish -run 'TestPublisherPRUpdateRejectsChangedPRNumber'
+      - name: Static Go vet
+        run: go vet ./cmd/eng ./internal/githubpublish ./internal/production
