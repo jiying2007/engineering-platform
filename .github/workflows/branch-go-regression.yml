@@ -1,4 +1,5 @@
 name: Temporary branch Go regression (no Codex)
+# Last bounded branch-only validation for nested Run identity and retained tests.
 
 on:
   push:
