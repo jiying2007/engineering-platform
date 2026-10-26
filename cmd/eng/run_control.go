@@ -115,8 +115,13 @@ func runControl(args []string) error {
 func executeRunControl(ctx context.Context, c *controlclient.Client, o runControlOptions) (any, error) {
 	if o.action == "inspect" {
 		var s codexexec.Status
-		err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+o.runID+"/codex", nil, &s)
-		return s, err
+		if err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+o.runID+"/codex", nil, &s); err != nil {
+			return nil, err
+		}
+		if s.Token.RunID != o.runID || !s.Token.Valid() {
+			return nil, fmt.Errorf("codex inspection Run identity mismatch")
+		}
+		return s, nil
 	}
 	var d codexexec.ControlDelivery
 	if o.action == "status" {
