@@ -118,7 +118,10 @@ func executeRunControl(ctx context.Context, c *controlclient.Client, o runContro
 		if err := c.Call(ctx, http.MethodGet, "/api/v1/runs/"+o.runID+"/codex", nil, &s); err != nil {
 			return nil, err
 		}
-		if s.Token.RunID != o.runID || !s.Token.Valid() {
+		if s.Token.RunID != o.runID || !s.Token.Valid() ||
+			(s.Runtime != nil && s.Runtime.Binding.Token.RunID != o.runID) ||
+			(s.SourceCheckpoint != nil && s.SourceCheckpoint.Binding.Token.RunID != o.runID) ||
+			(s.Receipt != nil && s.Receipt.Token.RunID != o.runID) {
 			return nil, fmt.Errorf("codex inspection Run identity mismatch")
 		}
 		return s, nil
