@@ -18,25 +18,32 @@ func TestHumanTakeoverUsesCertificateActorAndEpochFence(t *testing.T) {
 	actor := "urn:engineering-platform:operator:takeover"
 	pki := testsupport.NewPKI(t)
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/runs/run-1/takeover" {
-			t.Errorf("unexpected takeover request %s %s", r.Method, r.URL.Path)
-		}
-		var body struct {
-			ExecutionEpoch uint64 `json:"execution_epoch"`
-		}
-		if json.NewDecoder(r.Body).Decode(&body) != nil || body.ExecutionEpoch != 7 {
-			t.Error("takeover epoch drift", body)
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"run": run.Run{
-				ID: "run-1", State: run.HumanControlled,
-				CurrentEpoch: 8, ControlOwner: "HUMAN",
-			},
-			"session": session.Session{
-				RunID: "run-1", ExecutionEpoch: 8, Owner: session.Human,
-			},
-		})
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/runs/run-1/takeover":
+			var body struct {
+				ExecutionEpoch uint64 `json:"execution_epoch"`
+			}
+			if json.NewDecoder(r.Body).Decode(&body) != nil || body.ExecutionEpoch != 7 {
+				t.Error("takeover epoch drift", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"control_owner": "HUMAN", "execution_epoch": uint64(8),
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/run-1":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run": run.Run{
+					ID: "run-1", State: run.HumanControlled,
+					CurrentEpoch: 8, ControlOwner: "HUMAN",
+				},
+				"session": session.Session{
+					RunID: "run-1", ExecutionEpoch: 8, Owner: session.Human,
+				},
+			})
+		default:
+			t.Errorf("unexpected takeover request %s %s", r.Method, r.URL.Path)
+			http.Error(w, "unexpected request", http.StatusNotFound)
+		}
 	}))
 	server.TLS = pki.ServerTLS()
 	server.StartTLS()
