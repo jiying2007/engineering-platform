@@ -1,0 +1,35 @@
+name: Temporary Context inventory regeneration (no Codex)
+
+on:
+  push:
+    branches: [fix/request-identity-20261026]
+    paths: [.github/workflows/branch-context-review.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  context-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Calculate source-bound Context inventory without any Codex or model use
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/context-candidates.json"
+          python3 - "$RUNNER_TEMP/context-candidates.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          print("SOURCE_DIGEST="+data["source_files_digest"])
+          print("DIRECT_ORIGINS="+str(len([x for x in data["context_or_call_candidates"] if x["kind"]=="context_constructor"])))
+          for finding in data["context_or_call_candidates"]:
+              if finding["kind"]=="context_constructor" and finding["path"] in (
+                  "cmd/eng/human_takeover.go", "cmd/eng/run_control.go", "cmd/eng/work_intake.go"):
+                  print("REVIEW_ROW="+finding["path"]+":"+str(finding["line"])+":"+finding["name"])
+          PY
