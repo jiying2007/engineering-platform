@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jiying2007/engineering-platform/internal/controlclient"
+	"github.com/jiying2007/engineering-platform/internal/core"
 	"github.com/jiying2007/engineering-platform/internal/run"
 	"github.com/jiying2007/engineering-platform/internal/session"
 	"github.com/jiying2007/engineering-platform/internal/testsupport"
@@ -39,6 +40,7 @@ func TestHumanTakeoverUsesCertificateActorAndEpochFence(t *testing.T) {
 				"session": session.Session{
 					RunID: "run-1", ExecutionEpoch: 8, Owner: session.Human,
 				},
+				"run_input": core.RunInputManifest{},
 			})
 		default:
 			t.Errorf("unexpected takeover request %s %s", r.Method, r.URL.Path)
