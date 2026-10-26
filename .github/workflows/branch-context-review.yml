@@ -1,0 +1,28 @@
+name: Temporary source-inventory digest (no model)
+on:
+  push:
+    branches: [docs/ep-post295-closure-20261027]
+    paths: [.github/workflows/branch-context-review.yml]
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Recompute exact source inventory without Codex, secrets or model turns
+        run: |
+          set -euo pipefail
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/source-inventory.json"
+          python3 - "$RUNNER_TEMP/source-inventory.json" <<'PY'
+          import json, sys
+          report = json.load(open(sys.argv[1], encoding="utf-8"))
+          rows = [x for x in report["context_or_call_candidates"] if x["kind"] == "context_constructor"]
+          print("SOURCE_FILES_DIGEST=" + report["source_files_digest"])
+          print("DIRECT_CONTEXT_ORIGINS=" + str(len(rows)))
+          PY
