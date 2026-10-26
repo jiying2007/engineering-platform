@@ -70,7 +70,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual(missing, [], "required tests must actually be selected by CI")
         existing = {name for path in (root / "internal/githubpublish").glob("*_test.go")
                     for name in re.findall(r"^func (Test\w+)\(", path.read_text(), re.M)}
-        self.assertEqual(len(gate.PUBLISHER_REQUIRED), 30)
+        self.assertEqual(len(gate.PUBLISHER_REQUIRED), 33)
         self.assertEqual({name for name in existing if re.search(match.group(1), name)},
                          gate.PUBLISHER_REQUIRED, "every selected Publisher test must remain mandatory")
 
