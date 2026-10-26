@@ -208,7 +208,11 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 		return zero, &workIntakeError{Phase: "WORK", Cause: err}
 	}
 	if workResponse.ID != work.ID || workResponse.Title != work.Title ||
-		workResponse.HumanOwner != client.Subject() || workResponse.State != core.WorkDraft ||
+		workResponse.HumanOwner != client.Subject() ||
+		workResponse.SourceRef != work.SourceRef ||
+		workResponse.TargetID != work.TargetID ||
+		workResponse.AssuranceClass != work.AssuranceClass ||
+		workResponse.State != core.WorkDraft ||
 		workResponse.Version != 1 || workResponse.CreatedAt.IsZero() {
 		return zero, &workIntakeError{Phase: "WORK_READBACK", WorkCreated: true, Cause: fmt.Errorf("work readback mismatch")}
 	}
@@ -227,14 +231,20 @@ func executeWorkIntake(ctx context.Context, client *controlclient.Client, spec w
 	if err := client.Call(ctx, http.MethodPost, "/api/v1/task-contracts", request, &taskResponse); err != nil {
 		return zero, &workIntakeError{Phase: "TASK", WorkCreated: true, Cause: err}
 	}
+	expectedPlanDigest, planErr := spec.VerificationPlan.Digest()
 	taskDigest, digestErr := taskResponse.Contract.Digest()
-	if digestErr != nil || taskDigest != taskResponse.Digest ||
+	if planErr != nil || digestErr != nil || taskDigest != taskResponse.Digest ||
+		taskResponse.Contract.VerificationPlanDigest != expectedPlanDigest ||
 		taskResponse.Contract.ID != spec.TaskContractID ||
 		taskResponse.Contract.WorkItemID != spec.WorkItemID ||
+		taskResponse.Contract.TaskType != spec.TaskType ||
+		!reflect.DeepEqual(taskResponse.Contract.AllowedActions, request.Contract.AllowedActions) ||
+		!reflect.DeepEqual(taskResponse.Contract.ExpectedOutputs, request.Contract.ExpectedOutputs) ||
 		taskResponse.Contract.Repository != m.Repository ||
 		taskResponse.Contract.BaseCommit != m.BaseCommit ||
 		taskResponse.Contract.TargetID != m.TargetID ||
 		taskResponse.Contract.TargetPlatform != targetPlatform(spec.TargetContext) ||
+		taskResponse.Contract.VerificationPlanID != spec.VerificationPlan.ID ||
 		taskResponse.Contract.SkillContractDigest != expectedSkillContractDigest ||
 		taskResponse.Contract.SkillGuidanceVersion != expectedGuidanceVersion ||
 		!reflect.DeepEqual(taskResponse.Contract.AcceptanceCriteria, m.AcceptanceCriteria) ||
