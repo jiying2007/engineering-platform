@@ -1,0 +1,50 @@
+name: Temporary Control oracle Go verification (no Codex)
+
+on:
+  push:
+    branches: [fix/control-nested-response-alias-20261027]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/fix/control-nested-response-alias-20261027'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate bytes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ad99098148ec1fc6750cfdc92c40cebab50b8ca9
+          persist-credentials: false
+      - name: Install repository Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Source-bound Go 1.26.10 package qualification without models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/oracle-proof"
+          test "$(git rev-parse HEAD)" = 'ad99098148ec1fc6750cfdc92c40cebab50b8ca9'
+          git rev-parse HEAD | tee "$RUNNER_TEMP/oracle-proof/checked-source-sha.txt"
+          go version | tee "$RUNNER_TEMP/oracle-proof/go-version.txt"
+          test "$(go version | awk '{print $3}')" = 'go1.26.10'
+          test "$(git hash-object internal/controlclient/response.go)" = 'd78953580ab93dd0e508e498e4e3d67a4a5a8a9d'
+          test "$(git hash-object internal/controlclient/response_alias_oracle_test.go)" = 'a9230eb34649dd0d3adb1c6e211e94ed4949efad'
+          test "$(git hash-object internal/controlclient/response_alias_top_level_test.go)" = '3a1f22f51a174c50c9a7209dc92653c664d5ddf1'
+          test -z "$(gofmt -l internal/controlclient/*.go)"
+          timeout 240s go mod download
+          timeout 420s go test -race -count=5 -timeout=6m ./internal/controlclient ./internal/strictjson 2>&1 | tee "$RUNNER_TEMP/oracle-proof/go-race.txt"
+          timeout 180s go vet ./... 2>&1 | tee "$RUNNER_TEMP/oracle-proof/go-vet-all.txt"
+          echo 'SOURCE_ONLY: no Codex, ChatGPT Work, Provider, or production qualification' | tee "$RUNNER_TEMP/oracle-proof/scope.txt"
+      - name: Retain source-bound proof on success or failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: temporary-control-oracle-${{ github.sha }}
+          path: ${{ runner.temp }}/oracle-proof/
+          if-no-files-found: warn
+          retention-days: 30
