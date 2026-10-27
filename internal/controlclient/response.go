@@ -105,6 +105,8 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 	return rejectTypedResponseAliases(data, typ)
 }
 
+var responseJSONUnmarshaler = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+
 func responseUsesJSONUnmarshaler(t reflect.Type) bool {
 	if t.Implements(responseJSONUnmarshaler) {
 		return true
