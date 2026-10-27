@@ -53,9 +53,16 @@ An independent no-model Go AST inventory run 40421716673 confirms that the
 direct constructor set and all 61 classifications remain unchanged; only
 the source byte digest below advances. This is not a runtime or #229 qualification.
 
+The 2026-10-27 Linux steering-input race fix adds a separate bounded
+file-reader and a nonblocking, no-follow opener; the original run-control
+Context root now appears at line 90. Exact branch-only no-model Go AST review
+[40431244403](https://github.com/jiying2007/engineering-platform/actions/runs/40431244403)
+confirmed **61 unchanged direct origins**. This static enumeration remains
+independent of selected-host execution/stop and does not resolve #229.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:1d4c97700146f57e08657e03473178f0e0d97df70a14006d4645e5f5b4ab6adb`
+`sha256:defcd971f1bc2c09caf7abf79af088959443216f0b44a0fe0e7dd94317336c7b`
 
 ## Reviewed categories
 
@@ -146,7 +153,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/relay_runtime_handoff.go:34` | `Background` | Explicitly timed command root |
 | `cmd/eng/remote.go:41` | `Background` | Command with downstream budget |
 | `cmd/eng/run_continue.go:69` | `Background` | Explicitly timed command root |
-| `cmd/eng/run_control.go:107` | `Background` | Explicitly timed command root |
+| `cmd/eng/run_control.go:90` | `Background` | Explicitly timed command root |
 | `cmd/eng/source_checkpoint.go:26` | `Background` | Explicitly timed command root |
 | `cmd/eng/work_intake.go:308` | `Background` | Explicitly timed command root |
 | `cmd/publisher-service/main.go:74` | `Background` | Signal-owned command/service root |
