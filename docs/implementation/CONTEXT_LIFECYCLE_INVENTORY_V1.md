@@ -47,9 +47,15 @@ from the exact branch checkout using the unchanged Go AST scanner. This is a
 source-inventory refresh only; #229 remains open and no production qualification
 is implied.
 
+A 2026-10-27 documentation-only correction to the non-Linux SLO source
+opener comment clarifies the existing fail-closed v2/v3 platform boundary.
+An independent no-model Go AST inventory run 40421716673 confirms that the
+direct constructor set and all 61 classifications remain unchanged; only
+the source byte digest below advances. This is not a runtime or #229 qualification.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:424af826ed82a243da8972905302a999b88ca97dfa2c2cbba5b35c2da4049549`
+`sha256:1d4c97700146f57e08657e03473178f0e0d97df70a14006d4645e5f5b4ab6adb`
 
 ## Reviewed categories
 

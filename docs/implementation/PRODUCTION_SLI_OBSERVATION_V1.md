@@ -4,8 +4,10 @@ This is the version-3 operational mode of the existing `production-slo-report`
 command. It verifies retained bytes, computes deterministic operating statistics,
 and compares them with explicit criteria. It is not a new Core Evidence
 procedure, collector trust authority, production READY evaluator or acceptance
-receipt. Terminal plan v3 and the historical latency-only SLO report/input v2
-remain unchanged.
+receipt. Terminal plan v3 and the historical latency-only SLO v2 report
+schema, source-v1 verification and non-qualification outcome remain unchanged.
+The v2 *observation-input file opening* was hardened with the same descriptor-
+bound safety checks in protected PR #295; this is not an SLO schema migration.
 
 ```sh
 eng production-slo-report \
@@ -23,8 +25,10 @@ credential access or Core state transition occurs in this command.
 
 ## Separate versioned mode
 
-`--observations FILE` retains its exact v2 behavior and source-v1 readback. The
-new `--operational FILE` input is mutually exclusive with it. Operational mode
+`--observations FILE` retains its exact v2 reporting semantics and source-v1
+readback. Its local observation input is now opened through the shared bounded,
+nonblocking and no-follow reader. The `--operational FILE` input is mutually
+exclusive with it. Operational mode
 requires `--source-root`, `--run`, `--subject` and `--deployment`. The deployment
 and criteria-comparison flags cannot be used to reinterpret a v2 report.
 
@@ -48,7 +52,12 @@ source paths are confined to the existing `os.Root`, with no final-file symlink.
 The root and the resolved manifest parent must be normalized non-symlink safe
 directories. Linux uses a directory-anchored `O_NONBLOCK | O_NOFOLLOW` opener,
 so replacing a checked regular file with a FIFO cannot block the open operation.
-Other platforms explicitly reject v3 source readback; legacy v2 is unchanged.
+Other platforms have no equivalent approved nonblocking, no-follow opener:
+**both v3 manifest reading and the v2 observations-file input fail closed** on
+those hosts. Previously accepted v2 inputs must therefore run on a supported
+Linux host; do not substitute an unsafe Lstat/ReadFile fallback or infer that
+v2 report semantics or evidence qualification changed. A portable implementation
+requires its own no-follow/nonblocking file contract and race regressions.
 Reads are bounded before allocation and compare both path and opened descriptor
 identity, size, mode and modification time before and after reading, plus the
 actual original byte digest for referenced objects. Sources are never

@@ -23,6 +23,64 @@ linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
 
+## Request-identity and safe-source engineering closure — 2026-10-27
+
+[PR #295](https://github.com/jiying2007/engineering-platform/pull/295)
+landed as protected-main squash commit
+`85322a6b64caf5c85a60e0ca45e493824983db29`.
+The exact PR head `58e041548a7a3c1eba295602b7639cbdebde7dd0`
+passed all five canonical required jobs in
+[40353395248](https://github.com/jiying2007/engineering-platform/actions/runs/40353395248).
+The new protected main separately passed all five jobs in
+[40356370823](https://github.com/jiying2007/engineering-platform/actions/runs/40356370823),
+the provider-free [pre-live 40356371063](https://github.com/jiying2007/engineering-platform/actions/runs/40356371063)
+and [branch retirement 40359594959](https://github.com/jiying2007/engineering-platform/actions/runs/40359594959).
+The work branch is absent and open PR count was zero after the merge.
+Seven exact-main CI archives (binaries, trusted CI, Codex compatibility,
+RC delivery, admission, vulnerability scan and timing), one pre-live
+archive and one branch-retirement archive are retained. This establishes
+software/CI delivery, not real-provider or production acceptance.
+
+The bounded changes preserve the existing Core/Worker/Publisher and
+Recovery authorities. The actual Core takeover acknowledgement is bound to
+the requested epoch and then checked by a separate exact Run/Session GET;
+an ambiguous effectful POST is never silently retried. Initial Publisher Git
+branch creation requires an atomic absent-ref lease and an updated PR response
+must name the original PR. Work Intake checks the submitted Work source,
+target, assurance and Task type/actions/outputs/frozen verification plan
+before creating a Run. Codex inspect checks the requested Run identity in the
+top-level and optional nested Runtime/checkpoint/receipt fields.
+
+The v2 SLO observation **input file** now reuses v3's bounded,
+descriptor-bound, nonblocking/no-follow opening on Linux. V2 report and
+source-v1 evidence semantics, including non-qualification, are unchanged.
+On non-Linux hosts both v2 observation-input reading and v3 manifest
+reading now fail closed because no equivalent safe opener is implemented;
+this is an explicit platform compatibility limitation, not a silent
+unsafe fallback. See
+[the operational SLI contract](../implementation/PRODUCTION_SLI_OBSERVATION_V1.md).
+
+Actual mTLS and local Git fixtures retain negative tests for takeover
+uncertainty, seven Intake field changes, nested cross-Run identities,
+wrong PR update identity, racing branch creation, and v2 FIFO/symlink.
+The required Publisher safety selector includes 33 repeated tests rather
+than 30, with the existing no-skip validation retained. The source-bound
+Context inventory still has 61 reviewed direct origins; it is not an
+interprocedural proof or a declaration that #229 is complete.
+
+Earlier CI failures are retained separately: the PR-body closing-keyword
+guard rejected negated metadata, the Context source digest needed a reviewed
+refresh, and the Publisher selector had to include the newly added tests.
+No production threshold, permission, replay, independent review, or
+required-check bypass was used. Compatibility qualification initialized
+an isolated app-server without credential or model turn.
+
+**Authoritative readiness remains `BLOCKED` with internal #228/#229,
+production acceptance #105, and selectable unattended lane #103 or #106
+still pending.** No genuine selected-host service READY, continuous alert
+delivery, full fourteen-gate operational evidence, measured soak/SLO or
+production-qualified result follows from these CI runs.
+
 ## Independent observation and response-integrity repairs — 2026-10-25
 
 The existing finite monitor now has an independently invoked journal consumer:
