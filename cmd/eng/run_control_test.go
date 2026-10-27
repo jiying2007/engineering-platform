@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -26,8 +27,12 @@ func TestRunControlInputAndForbiddenFallbacks(t *testing.T) {
 	}
 	valid := []string{"steer", "--run", "run", "--id", "cmd", "--epoch", "1", "--sequence", "1", "--thread", "thread", "--turn", "turn", "--text-file", text}
 	got, err := parseRunControl(valid)
-	if err != nil || got.input.Text != "只修复故障。" {
-		t.Fatal(got, err)
+	if runtime.GOOS == "linux" {
+		if err != nil || got.input.Text != "只修复故障。" {
+			t.Fatal(got, err)
+		}
+	} else if err == nil {
+		t.Fatal("unqualified steering file opener accepted outside Linux")
 	}
 	for _, args := range [][]string{nil, {"pause"}, {"takeover"}, {"resume"}, {"status", "--id", "../x"}, {"inspect", "--run", "run", "--id", "x"}, {"steer", "--run", "run"}, append(append([]string{}, valid...), "--actor", "spoof"), append([]string{"interrupt"}, valid[1:]...)} {
 		if _, err := parseRunControl(args); err == nil {
