@@ -111,17 +111,21 @@ func productionStatus(args []string) error {
 		return nil
 	}
 	if o.observe {
+		// Keep the complete sampling window plus its final JSON output inside
+		// an outer bounded lifetime; the inner sampling policy remains intact.
+		ctx, cancel := context.WithTimeout(ctx, time.Duration(o.policy.WindowSeconds)*time.Second+15*time.Second)
+		defer cancel()
 		report, err := collectProductionProgress(ctx, client, o.policy)
 		if err != nil {
 			return err
 		}
-		if err := printJSON(report); err != nil {
+		if err := writeProductionDiagnostic(ctx, os.Stdout, report); err != nil {
 			return err
 		}
 		if o.requireNoAlert && report.DiagnosticAlert {
 			return fmt.Errorf("operational diagnostic: %s", report.State)
 		}
-		return nil
+		return ctx.Err()
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -133,7 +137,10 @@ func productionStatus(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := printJSON(status); err != nil {
+	if err := writeProductionDiagnostic(ctx, os.Stdout, status); err != nil {
+		return err
+	}
+	if err := status.ValidateAt(time.Now().UTC()); err != nil {
 		return err
 	}
 	if o.requireReady && !status.Ready {
