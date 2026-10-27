@@ -4,9 +4,9 @@ package main
 
 import (
 	"context"
+	"syscall"
 	"testing"
 	"time"
-	"syscall"
 )
 
 func TestProductionDiagnosticBlockedPipeExitsWithinDeadline(t *testing.T) {
