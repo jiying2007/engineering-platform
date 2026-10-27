@@ -23,6 +23,28 @@ linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
 
+## Linux host configuration FIFO safety — 2026-10-27 candidate
+
+The common `access.ReadConfiguration` is now opened through a Linux
+`O_NONBLOCK | O_CLOEXEC` descriptor before its existing regular-file and
+secret/public permission checks. This eliminates indefinite FIFO writer waits
+at the initial configuration open, while retaining host-controlled
+regular-file and symlink-to-regular-file behavior for existing TLS/policy
+layouts. It does not make mutable ancestors trusted, protect against
+indefinitely blocked remote storage, guarantee atomic multi-file
+configuration snapshots or qualify a safe non-Linux opener.
+
+The branch-only [Go race/config check 40435460366](https://github.com/jiying2007/engineering-platform/actions/runs/40435460366)
+completed successfully after the first attempt retained a compile-only
+unused-import error. Its Linux checks exercise a FIFO without a writer,
+a symlink to FIFO, valid regular host-owned aliases, and secret permission
+rejection; `go vet` and the production Go AST source inventory completed.
+The source inventory remains at 61 direct Context origins with no category
+change. The candidate still requires its own exact PR-head, protected
+merge, fresh-main CI and retained artifact checks before counting this as
+repository delivery. It grants no new provider, authority, operational
+READY, execution, SLO or production acceptance.
+
 ## Request-identity and safe-source engineering closure — 2026-10-27
 
 [PR #295](https://github.com/jiying2007/engineering-platform/pull/295)
