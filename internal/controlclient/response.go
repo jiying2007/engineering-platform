@@ -64,6 +64,7 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 	if err := json.Unmarshal(data, &members); err != nil || members == nil {
 		return fmt.Errorf("response object required")
 	}
+	canonical := responseTypedFields(typ)
 	for i := 0; i < typ.NumField(); i++ {
 		field := typ.Field(i)
 		if !field.IsExported() || field.Anonymous {
@@ -88,7 +89,9 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 		}
 		for key := range members {
 			if key != name && strings.EqualFold(key, name) {
-				return fmt.Errorf("response member case alias rejected")
+				if _, exact := canonical[key]; !exact {
+					return fmt.Errorf("response member case alias rejected")
+				}
 			}
 		}
 		if present && bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
@@ -102,75 +105,162 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 	return rejectTypedResponseAliases(data, typ)
 }
 
-// rejectTypedResponseAliases rejects JSON spellings which encoding/json would
-// case-fold onto a typed struct member. A differently cased nested identity may
-// otherwise overwrite an earlier value even after strict duplicate-key checks.
-// Opaque map keys and types with their own UnmarshalJSON contract remain intact;
-// nested field presence and domain authority are validated by their consumers.
-var responseJSONUnmarshaler = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+func responseUsesJSONUnmarshaler(t reflect.Type) bool {
+	if t.Implements(responseJSONUnmarshaler) {
+		return true
+	}
+	return t.Kind() != reflect.Pointer && reflect.PointerTo(t).Implements(responseJSONUnmarshaler)
+}
 
-func rejectTypedResponseAliases(data []byte, typ reflect.Type) error {
-	for typ.Kind() == reflect.Pointer {
-		typ = typ.Elem()
-	}
-	if typ.Implements(responseJSONUnmarshaler) || reflect.PointerTo(typ).Implements(responseJSONUnmarshaler) {
-		return nil
-	}
-	switch typ.Kind() {
-	case reflect.Slice, reflect.Array:
-		element := typ.Elem()
-		for element.Kind() == reflect.Pointer || element.Kind() == reflect.Slice || element.Kind() == reflect.Array {
-			element = element.Elem()
+// responseTypedFields tracks exact JSON spellings, with direct fields taking
+// priority over anonymously embedded fields. We only need the canonical field
+// names for rejecting case-fold aliases; the decoder retains final field
+// selection/ambiguity authority.
+func responseTypedFields(t reflect.Type) map[string]reflect.Type {
+	fields := make(map[string]reflect.Type)
+	visiting := make(map[reflect.Type]bool)
+	var collect func(reflect.Type)
+	collect = func(current reflect.Type) {
+		for current.Kind() == reflect.Pointer {
+			current = current.Elem()
 		}
-		if element.Kind() != reflect.Struct {
-			return nil
+		if current.Kind() != reflect.Struct || visiting[current] {
+			return
 		}
-		trimmed := bytes.TrimSpace(data)
-		if len(trimmed) == 0 || trimmed[0] != '[' {
-			return nil
-		}
-		var items []json.RawMessage
-		if err := json.Unmarshal(data, &items); err != nil {
-			return err
-		}
-		for _, item := range items {
-			if err := rejectTypedResponseAliases(item, typ.Elem()); err != nil {
-				return err
-			}
-		}
-	case reflect.Struct:
-		trimmed := bytes.TrimSpace(data)
-		if len(trimmed) == 0 || trimmed[0] != '{' {
-			return nil
-		}
-		var members map[string]json.RawMessage
-		if err := json.Unmarshal(data, &members); err != nil {
-			return err
-		}
-		for i := 0; i < typ.NumField(); i++ {
-			field := typ.Field(i)
-			if !field.IsExported() {
+		visiting[current] = true
+		defer delete(visiting, current)
+		var promoted []reflect.Type
+		for i := 0; i < current.NumField(); i++ {
+			field := current.Field(i)
+			tag := field.Tag.Get("json")
+			if tag == "-" {
 				continue
 			}
-			tag := field.Tag.Get("json")
 			name := strings.Split(tag, ",")[0]
-			if name == "-" || field.Anonymous && name == "" {
+			if field.Anonymous && name == "" && !responseUsesJSONUnmarshaler(field.Type) {
+				embedded := field.Type
+				for embedded.Kind() == reflect.Pointer {
+					embedded = embedded.Elem()
+				}
+				if embedded.Kind() == reflect.Struct {
+					promoted = append(promoted, embedded)
+					continue
+				}
+			}
+			if !field.IsExported() {
 				continue
 			}
 			if name == "" {
 				name = field.Name
 			}
-			for key := range members {
-				if key != name && strings.EqualFold(key, name) {
-					return fmt.Errorf("typed response member case alias rejected")
-				}
-			}
-			if value, present := members[name]; present {
-				if err := rejectTypedResponseAliases(value, field.Type); err != nil {
-					return err
-				}
+			if _, present := fields[name]; !present {
+				fields[name] = field.Type
 			}
 		}
+		for _, embedded := range promoted {
+			collect(embedded)
+		}
+	}
+	collect(t)
+	return fields
+}
+
+// Case-folded keys may overwrite typed JSON fields. Walk the already-bounded
+// JSON only once, preserving case-sensitive map keys and custom decoder types.
+func rejectTypedResponseAliases(data []byte, typ reflect.Type) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	cache := make(map[reflect.Type]map[string]reflect.Type)
+	if err := walkTypedResponseAliases(decoder, typ, cache, 0); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return fmt.Errorf("trailing typed response JSON")
+	}
+	return nil
+}
+
+func walkTypedResponseAliases(d *json.Decoder, typ reflect.Type, cache map[reflect.Type]map[string]reflect.Type, depth int) error {
+	if depth > 64 {
+		return fmt.Errorf("typed response nesting limit exceeded")
+	}
+	for typ != nil {
+		if responseUsesJSONUnmarshaler(typ) {
+			typ = nil // caller-owned custom JSON representation, not typed fields
+			break
+		}
+		if typ.Kind() != reflect.Pointer {
+			break
+		}
+		typ = typ.Elem()
+	}
+	token, err := d.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := token.(json.Delim)
+	if !ok {
+		return nil
+	}
+	switch delimiter {
+	case '{':
+		var fields map[string]reflect.Type
+		var element reflect.Type
+		if typ != nil {
+			switch typ.Kind() {
+			case reflect.Struct:
+				fields = cache[typ]
+				if fields == nil {
+					fields = responseTypedFields(typ)
+					cache[typ] = fields
+				}
+			case reflect.Map:
+				element = typ.Elem()
+			}
+		}
+		for d.More() {
+			keyToken, err := d.Token()
+			if err != nil {
+				return err
+			}
+			key, ok := keyToken.(string)
+			if !ok {
+				return fmt.Errorf("typed response object key required")
+			}
+			child := element
+			if fields != nil {
+				child = fields[key]
+				if child == nil {
+					for canonical := range fields {
+						if strings.EqualFold(key, canonical) {
+							return fmt.Errorf("typed response member case alias rejected")
+						}
+					}
+				}
+			}
+			if err := walkTypedResponseAliases(d, child, cache, depth+1); err != nil {
+				return err
+			}
+		}
+		end, err := d.Token()
+		if err != nil || end != json.Delim('}') {
+			return fmt.Errorf("invalid typed response object")
+		}
+	case '[':
+		var element reflect.Type
+		if typ != nil && (typ.Kind() == reflect.Slice || typ.Kind() == reflect.Array) {
+			element = typ.Elem()
+		}
+		for d.More() {
+			if err := walkTypedResponseAliases(d, element, cache, depth+1); err != nil {
+				return err
+			}
+		}
+		end, err := d.Token()
+		if err != nil || end != json.Delim(']') {
+			return fmt.Errorf("invalid typed response array")
+		}
+	default:
+		return fmt.Errorf("unexpected typed response delimiter")
 	}
 	return nil
 }
