@@ -14,9 +14,15 @@ import (
 // noncanonical spelling actually assigns a typed field, the transport guard
 // must reject it. A canonical spelling must remain admissible.
 func TestTypedResponseAliasStdlibOracle(t *testing.T) {
-	tags := []string{
-		"id", "ID", "Id", "user_id", "HTTPURL", "foo", "Foo", "Key",
-		"Kelvin", "k", "K", "İd", "Σ", "σ", "ς", "🐈", "a.b", "a b", "X-Y", "", "-", "x,invalid",
+	// Expected canonical spellings are fixture facts, deliberately independent
+	// of responseTypedFields and of the implementation under test.
+	tags := []struct{ tag, canonical string }{
+		{"id", "id"}, {"ID", "ID"}, {"Id", "Id"}, {"user_id", "user_id"},
+		{"HTTPURL", "HTTPURL"}, {"foo", "foo"}, {"Foo", "Foo"}, {"Key", "Key"},
+		{"Kelvin", "Kelvin"}, {"k", "k"}, {"K", "K"}, {"İd", "İd"},
+		{"Σ", "Σ"}, {"σ", "σ"}, {"ς", "ς"}, {"🐈", "Field"},
+		{"a.b", "a.b"}, {"a b", "a b"}, {"X-Y", "X-Y"},
+		{"", "Field"}, {"-", ""}, {"x,invalid", "x"},
 	}
 	wrappers := []func(reflect.Type) reflect.Type{
 		func(t reflect.Type) reflect.Type { return t },
@@ -27,11 +33,11 @@ func TestTypedResponseAliasStdlibOracle(t *testing.T) {
 		},
 	}
 	count := 0
-	for _, tag := range tags {
+	for _, fixture := range tags {
+		tag := fixture.tag
 		base := reflect.StructOf([]reflect.StructField{{
 			Name: "Field", Type: reflect.TypeOf(""), Tag: reflect.StructTag(fmt.Sprintf("json:%q", tag)),
 		}})
-		canonical := responseTypedFields(base)
 		for shape, wrap := range wrappers {
 			typ := wrap(base)
 			keys := []string{"Field", "field", "FIELD", "FiElD", tag, strings.ToLower(tag), strings.ToUpper(tag), strings.ToTitle(tag)}
@@ -61,7 +67,7 @@ func TestTypedResponseAliasStdlibOracle(t *testing.T) {
 					t.Fatal(err)
 				}
 				assigned := bytes.Contains(decoded, []byte("MARKER"))
-				_, exact := canonical[key]
+				exact := fixture.canonical != "" && key == fixture.canonical
 				guardErr := rejectTypedResponseAliases(wire, typ)
 				count++
 				if assigned && !exact && guardErr == nil {
@@ -90,7 +96,6 @@ func TestTypedResponseAliasExactTagCollisionOracle(t *testing.T) {
 			{Name: "First", Type: reflect.TypeOf(""), Tag: reflect.StructTag(fmt.Sprintf("json:%q", pair[0]))},
 			{Name: "Second", Type: reflect.TypeOf(""), Tag: reflect.StructTag(fmt.Sprintf("json:%q", pair[1]))},
 		})
-		fields := responseTypedFields(typ)
 		keys := []string{pair[0], pair[1], strings.ToUpper(pair[0]), strings.ToLower(pair[0]),
 			strings.ToTitle(pair[0]), strings.ToUpper(pair[1]), strings.ToLower(pair[1]), strings.ToTitle(pair[1])}
 		for _, key := range keys {
@@ -107,7 +112,7 @@ func TestTypedResponseAliasExactTagCollisionOracle(t *testing.T) {
 				t.Fatal(err)
 			}
 			assigned := bytes.Contains(decoded, []byte("MARKER"))
-			_, exact := fields[key]
+			exact := key == pair[0] || key == pair[1]
 			guardErr := rejectTypedResponseAliases(wire, typ)
 			if assigned && !exact && guardErr == nil {
 				t.Errorf("accepted alias: tags=%v key=%q", pair, key)
