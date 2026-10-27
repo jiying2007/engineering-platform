@@ -23,6 +23,35 @@ linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
 
+## Bounded operational diagnostic output — 2026-10-27
+
+The existing Linux deadline-aware stdout pipe writer now handles the
+one-shot `production-status`, explicit progress-window reports,
+`production-live-observe`, `production-publisher-health` and the historical
+`production-terminal-readback` report. Their original authenticated
+queries/process identity checks are unchanged. The status snapshot and
+live-host diagnostic additionally revalidate the same Core snapshot after
+writing. Readback and output of the terminal Core chain share one 30-second
+invocation budget; the existing one-shot/Publisher budgets remain 15 seconds,
+and a finite progress window gains a bounded 15-second output reserve.
+A blocked Linux pipe, canceled invocation, stale source, partial write or
+closed stdout cannot produce a successful diagnostic exit.
+
+Go-only blocked-pipe and cancellation regressions passed in
+[40442030878](https://github.com/jiying2007/engineering-platform/actions/runs/40442030878).
+The exact Context inventory remains 61 direct origins, with no new
+background service or detached writer. The temporary branch-only test
+does not replace canonical required PR-head CI, fresh-main verification,
+retained artifacts or independent host acceptance.
+
+This is an output reliability and diagnostic integrity improvement, **not**
+a service-ready decision, complete watchdog/notification delivery, a
+selected unattended Provider, or a live operational capacity observation.
+The authoritative readiness annotation remains `BLOCKED` with internal
+blockers #228 and #229; external acceptance #105 and optional credential
+routes #103/#106 are unchanged. On non-Linux and for arbitrary files/devices,
+the synchronous output limitation is still documented.
+
 ## Linux host configuration FIFO safety — 2026-10-27 candidate
 
 The common `access.ReadConfiguration` is now opened through a Linux
