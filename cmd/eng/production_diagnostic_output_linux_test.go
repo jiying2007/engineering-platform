@@ -6,8 +6,7 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"golang.org/x/sys/unix"
+	"syscall"
 )
 
 func TestProductionDiagnosticBlockedPipeExitsWithinDeadline(t *testing.T) {
@@ -33,7 +32,7 @@ func TestProductionDiagnosticBlockedPipeExitsWithinDeadline(t *testing.T) {
 				t.Fatalf("blocked production JSON output was incorrectly successful/long: elapsed=%v err=%v", time.Since(started), err)
 			}
 			after := monitorPipeFlags(t, output)
-			if before != after || after&unix.O_NONBLOCK != 0 {
+			if before != after || after&syscall.O_NONBLOCK != 0 {
 				t.Fatal("stdout shared file flags were changed")
 			}
 		})
