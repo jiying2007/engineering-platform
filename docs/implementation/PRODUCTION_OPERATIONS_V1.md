@@ -457,6 +457,21 @@ their synchronous operating-system I/O boundary. The monitor does not claim to
 interrupt an arbitrary blocked storage or device syscall. Use a supervised,
 drained output stream and detect absent/expired records independently.
 
+The same existing Linux pipe writer now covers four finite, read-only diagnostics:
+`production-status` snapshots/windows, `production-live-observe`,
+`production-publisher-health` and `production-terminal-readback`. Its original
+descriptor flags remain unchanged. The existing 15-second status snapshot and
+Publisher health budgets, 30-second live-host budget, and a single 30-second
+terminal Core-readback budget now include JSON output; a progress observation
+gets its explicit window plus a bounded 15-second output reserve. A full/closed
+pipe or expired Context fails nonzero even after upstream data was read.
+One-shot status and live-host readers also recheck their original database
+snapshot freshness after output. A partial JSON stream is not an accepted
+observation. Non-Linux, regular files, devices, sockets and arbitrary writers
+continue to have the documented synchronous I/O limitation. None of these
+changes provides real Worker/Provider capacity, notification delivery, or
+the production `Ready` verdict.
+
 Actual compiled-CLI tests use the existing authenticated Core middleware and
 real ephemeral mTLS identities: `core:read` succeeds, another valid identity
 without that permission fails before reaching the Store. The Store's changing
