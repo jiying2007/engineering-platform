@@ -57,28 +57,11 @@ func parseRunControl(args []string) (runControlOptions, error) {
 			if o.textFile == "" {
 				return o, fmt.Errorf("steer requires --text-file")
 			}
-			before, err := os.Lstat(o.textFile)
-			if err != nil || !before.Mode().IsRegular() || before.Size() <= 0 || before.Size() > 8192 {
-				return o, fmt.Errorf("bounded regular text file required")
-			}
-			f, err := os.Open(o.textFile)
+			text, err := readSteeringText(o.textFile)
 			if err != nil {
 				return o, err
 			}
-			defer f.Close()
-			opened, err := f.Stat()
-			if err != nil || !os.SameFile(before, opened) {
-				return o, fmt.Errorf("input changed before read")
-			}
-			raw, err := io.ReadAll(io.LimitReader(f, 8193))
-			if err != nil {
-				return o, err
-			}
-			after, err := os.Lstat(o.textFile)
-			if err != nil || !os.SameFile(before, after) || before.Size() != int64(len(raw)) || !before.ModTime().Equal(after.ModTime()) {
-				return o, fmt.Errorf("input changed during read")
-			}
-			o.input.Text = string(raw)
+			o.input.Text = text
 		} else if o.textFile != "" {
 			return o, fmt.Errorf("interrupt must not carry text")
 		}
