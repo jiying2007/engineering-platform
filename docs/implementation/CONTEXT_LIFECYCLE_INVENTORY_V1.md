@@ -69,9 +69,18 @@ confirm exactly 61 existing Context constructors and unchanged lifecycle
 categories. This source digest update does **not** close issue 229 or
 establish cross-platform/production lifecycle evidence.
 
+On 2026-10-27 the four finite read-only operational diagnostics reused
+the existing Linux pipe writer and one scoped output budget, with post-output
+cancellation/freshness checks where applicable. Independent
+[Go-only race/source review 40442030878](https://github.com/jiying2007/engineering-platform/actions/runs/40442030878)
+confirmed that these output changes retain **61 directly enumerated Context
+origins**, the existing lifetime classifications, and a one-line move of the
+terminal Core-readback signal root. This is source provenance and a local
+blocked-pipe regression, not selected-host or #229 production acceptance.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:baba177c8479a6d8a7ea975b17b0f4102e4b15df48123a9ff58fcb9cae9c3516`
+`sha256:7a8f747dfd90b099785c8b1de459a9982cc7556eaad97a194e154ee35d4f50e7`
 
 ## Reviewed categories
 
@@ -157,7 +166,7 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/production_observer_check.go:121` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_publisher_health.go:42` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_status.go:101` | `Background` | Signal-owned command/service root |
-| `cmd/eng/production_terminal_readback.go:35` | `Background` | Signal-owned command/service root |
+| `cmd/eng/production_terminal_readback.go:34` | `Background` | Signal-owned command/service root |
 | `cmd/eng/relay_qualification_kit.go:40` | `Background` | Explicitly timed command root |
 | `cmd/eng/relay_runtime_handoff.go:34` | `Background` | Explicitly timed command root |
 | `cmd/eng/remote.go:41` | `Background` | Command with downstream budget |

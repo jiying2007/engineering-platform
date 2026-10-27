@@ -143,12 +143,18 @@ func productionLiveObserve(args []string) error {
 	}
 	// Endpoint/process availability is not capacity or a qualified model lane.
 	// No caller-controlled flag can promote this report to production READY.
-	return printJSON(productionLiveReport{
+	report := productionLiveReport{
 		Version: 1, Scope: "bounded-host-live-service-observations",
 		SourceCommit: host.SourceCommit, ObservedAt: time.Now().UTC(),
 		RecoveryEpoch: status.Snapshot.RecoveryEpoch, DatabaseAuthorityClear: true,
 		PublisherConfigDigest:     publisher.ConfigurationDigest,
 		PublisherEndpointObserved: true, LocalServiceProcessesObserved: true,
 		Services: after, State: "LOCAL_COMPONENTS_OBSERVED_PROVIDER_CAPACITY_PENDING",
-	})
+	}
+	if err := writeProductionDiagnostic(ctx, os.Stdout, report); err != nil {
+		return err
+	}
+	// A blocked output must not turn an expired upstream snapshot into a
+	// successful observation after the original network read has finished.
+	return status.ValidateAt(time.Now().UTC())
 }

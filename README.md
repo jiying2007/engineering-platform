@@ -305,6 +305,17 @@ interactive Worker control path must not be inferred from adapter methods alone.
 See [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) for the current
 remaining gates.
 
+The bounded read-only production diagnostic commands reuse the existing Linux
+deadline-aware pipe output when stdout is a pipe. This covers a one-shot
+`production-status` read, explicit progress-window report,
+`production-live-observe`, `production-publisher-health` and historical
+`production-terminal-readback`. A blocked downstream pipe cannot turn an
+expired or incomplete observation into a successful exit. Devices, regular
+files and unsupported platforms retain their synchronous I/O limitation.
+No such report by itself qualifies live Provider, service READY, SLO or
+production acceptance; see the
+[production operating contract](docs/implementation/PRODUCTION_OPERATIONS_V1.md).
+
 ## Live engineering controls
 
 `eng run-control inspect|status|steer|interrupt` uses the existing direct-mTLS

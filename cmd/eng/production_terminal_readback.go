@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -34,16 +33,17 @@ func productionTerminalReadback(args []string) error {
 	defer client.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Include retained Core reads and output in the same bounded invocation.
+	ctx, cancel := context.WithTimeout(ctx, production.TerminalReadbackTimeout)
+	defer cancel()
 	report, err := production.ObserveTerminalCore(ctx, client, request)
 	if err != nil {
 		return err
 	}
 	// Only a completely checked Core chain emits a report. A successful readback
 	// still grants no operational or production qualification.
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(report); err != nil {
-		return fmt.Errorf("terminal readback report output failed")
+	if err := writeProductionDiagnostic(ctx, os.Stdout, report); err != nil {
+		return fmt.Errorf("terminal readback report output failed: %w", err)
 	}
-	return nil
+	return ctx.Err()
 }

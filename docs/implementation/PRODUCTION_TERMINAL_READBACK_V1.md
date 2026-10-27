@@ -58,6 +58,14 @@ digest mismatch or relationship mismatch fails with nonzero exit and emits no
 diagnostic report. Printable errors omit raw transport errors, response bodies
 and credential paths. An output-write failure also returns nonzero; as with any
 stream, a failing output device may already have received a partial document.
+The CLI now shares a single 30-second invocation budget across authenticated
+Core readback, JSON serialization and final stdout emission. On Linux, pipe
+stdout uses the existing separate, identity-checked deadline-aware descriptor
+rather than writing through an indefinitely blocked original pipe. A full
+pipe, cancellation or expired deadline returns nonzero, and any partial
+document must be discarded. Other writer/device types and non-Linux platforms
+retain their synchronous operating-system I/O limitation; this is not a
+durable output acknowledgement or independent Evidence acceptance.
 
 ## Historical read APIs
 
