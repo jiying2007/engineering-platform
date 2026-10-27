@@ -47,5 +47,5 @@ func productionPublisherHealth(args []string) error {
 	if err != nil {
 		return err
 	}
-	return printJSON(result)
+	return writeProductionDiagnostic(ctx, os.Stdout, result)
 }
