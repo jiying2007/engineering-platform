@@ -60,9 +60,18 @@ Context root now appears at line 90. Exact branch-only no-model Go AST review
 confirmed **61 unchanged direct origins**. This static enumeration remains
 independent of selected-host execution/stop and does not resolve #229.
 
+A 2026-10-27 Linux configuration-read reliability correction replaces an
+unbounded blocking open with a nonblocking descriptor open while retaining
+host-controlled path authority and the existing secret/public permission
+rules. The same Go AST scanner and branch-only no-model check
+[40435460366](https://github.com/jiying2007/engineering-platform/actions/runs/40435460366)
+confirm exactly 61 existing Context constructors and unchanged lifecycle
+categories. This source digest update does **not** close issue 229 or
+establish cross-platform/production lifecycle evidence.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:defcd971f1bc2c09caf7abf79af088959443216f0b44a0fe0e7dd94317336c7b`
+`sha256:baba177c8479a6d8a7ea975b17b0f4102e4b15df48123a9ff58fcb9cae9c3516`
 
 ## Reviewed categories
 

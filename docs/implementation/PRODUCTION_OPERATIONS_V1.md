@@ -1,7 +1,7 @@
 # Production Operations v1
 
 Date: 2026-10-04
-Updated: 2026-10-25
+Updated: 2026-10-27
 
 Status: **STATIC BASELINE IMPLEMENTED — LIVE OPERATING QUALIFICATION PENDING**
 
@@ -61,7 +61,21 @@ retained bundle digest/size before GitHub mutation.
 ## 3. Configuration and secrets
 
 Environment/configuration files are owner-private regular files and are never
-committed with real secret values.
+committed with real secret values. On Linux, the existing common
+`access.ReadConfiguration` reader now opens a host-owned configuration path
+with `O_NONBLOCK | O_CLOEXEC` before checking the opened descriptor's regular
+file type and the original secret/public permission budget. An accidental or
+concurrently substituted FIFO, including a symlink to FIFO, cannot indefinitely
+wait for a writer before the type check. An explicitly host-controlled symlink
+to a regular file remains accepted to preserve current TLS/policy configuration
+layouts.
+
+This **does not** make arbitrary writable parent directories trustworthy,
+enforce a no-symlink path policy, prove file immutability across multiple
+configuration reads, or bound a stalled remote filesystem. Non-Linux builds
+retain the existing `os.Open` behavior and are not covered by this Linux FIFO
+qualification. The selected production profile remains Linux; do not generalize
+its safety receipt to an unsupported host.
 
 Production requires:
 

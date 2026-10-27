@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
@@ -14,7 +13,7 @@ import (
 // Configuration paths and their parents must be host-controlled. No file bytes,
 // credentials, or parser input are interpolated into configuration errors.
 func ReadConfiguration(path string, secret bool) ([]byte, error) {
-	file, err := os.Open(path)
+	file, err := openConfigurationFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("open configuration: %w", err)
 	}
