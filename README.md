@@ -311,7 +311,12 @@ remaining gates.
 Control API to bind operator input to the actual authorized thread/turn.
 Steering acceptance, cancellation ACK, interrupted event and app-server process
 exit are separate observations. Missing or UNKNOWN receipts block successful
-delivery and are never replayed. See
+delivery and are never replayed. On Linux, `steer --text-file` uses a bounded,
+nonblocking, no-follow descriptor and verifies the original path/file identity
+throughout reading, so FIFO or symlink substitution cannot block a pending
+control request. Platforms without a separately qualified safe file opener
+reject `steer --text-file` rather than reverting to unsafe `Lstat`/`Open`.
+Inspect/status/interrupt continue to use their existing authenticated API paths. See
 [Live Codex controls v1](docs/implementation/LIVE_CODEX_CONTROLS_V1.md).
 The `run-control` surface intentionally covers live Codex steer/interrupt only.
 Core persists pause/resume separately, and exact-epoch Human Takeover is exposed
