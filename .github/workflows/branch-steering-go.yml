@@ -1,0 +1,44 @@
+name: Temporary steering-file boundary qualification (no Codex)
+on:
+  push:
+    branches: [fix/steering-text-fifo-boundary-20261027]
+    paths: [.github/workflows/branch-steering-go.yml]
+permissions:
+  contents: read
+jobs:
+  steering-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Download public Go dependencies
+        run: go mod download
+      - name: Verify exact Go format without mutating checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l cmd/eng/run_control.go cmd/eng/run_control_test.go cmd/eng/steering_text.go cmd/eng/steering_text_linux.go cmd/eng/steering_text_other.go cmd/eng/steering_text_test.go cmd/eng/steering_text_linux_test.go)"
+          test -z "$files" || { printf 'UNFORMATTED_FILES=%s\n' "$files"; gofmt -d cmd/eng/steering_text*.go cmd/eng/run_control.go cmd/eng/run_control_test.go; exit 1; }
+      - name: Steering and Run-control race regression
+        run: go test -count=1 -race -timeout 5m ./cmd/eng -run 'Test(SteeringText|RunControl)'
+      - name: Vet bounded operator control CLI
+        run: go vet ./cmd/eng
+      - name: Produce exact source/context review digest without executing Codex or model
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/context.json"
+          python3 - "$RUNNER_TEMP/context.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          rows=[x for x in data["context_or_call_candidates"] if x["kind"]=="context_constructor"]
+          print("SOURCE_DIGEST="+data["source_files_digest"])
+          print("DIRECT_ORIGINS="+str(len(rows)))
+          for row in rows:
+              if row["path"]=="cmd/eng/run_control.go" and row["kind"]=="context_constructor":
+                  print("CONTEXT_SITE="+row["path"]+":"+str(row["line"])+":"+row["name"])
+          PY
