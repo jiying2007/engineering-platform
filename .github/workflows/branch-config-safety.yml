@@ -1,4 +1,5 @@
 name: Temporary configuration nonblocking regression (no Codex)
+# Requalify exact source after compile-only unused-import correction.
 on:
   push:
     branches: [fix/config-fifo-nonblocking-20261027]
