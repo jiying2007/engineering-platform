@@ -6,7 +6,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
 )
