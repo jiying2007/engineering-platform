@@ -1,5 +1,5 @@
 name: Temporary bounded diagnostics verification (no Codex)
-# Exact-source retry after formatter correction; same checks preserved.
+# Exact-source retry after formatter and terminal import corrections; same checks preserved.
 on:
   push:
     branches: [fix/production-diagnostics-output-budget-20261027]
