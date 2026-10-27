@@ -1,0 +1,41 @@
+name: Temporary configuration nonblocking regression (no Codex)
+on:
+  push:
+    branches: [fix/config-fifo-nonblocking-20261027]
+    paths: [.github/workflows/branch-config-safety.yml]
+permissions:
+  contents: read
+jobs:
+  config-file-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Fetch public modules
+        run: go mod download
+      - name: Fail on Go-format drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l internal/access/files.go internal/access/config_open_linux.go internal/access/config_open_other.go internal/access/config_open_linux_test.go)"
+          test -z "$files" || { printf 'FORMAT_DRIFT=%s\n' "$files"; exit 1; }
+      - name: Race test real access path, TLS and config callers
+        run: go test -count=1 -race -timeout 6m ./internal/access ./internal/controlclient
+      - name: Vet changed access boundary
+        run: go vet ./internal/access ./internal/controlclient
+      - name: Exact source Context inventory (static only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/context.json"
+          python3 - "$RUNNER_TEMP/context.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          rows=[x for x in data["context_or_call_candidates"] if x["kind"]=="context_constructor"]
+          print("SOURCE_DIGEST="+data["source_files_digest"])
+          print("DIRECT_ORIGINS="+str(len(rows)))
+          PY
