@@ -11,9 +11,7 @@ type responseAliasNode struct {
 	ID string `json:"id"`
 }
 
-type responseAliasEmbed struct {
-	responseAliasNode
-}
+type responseAliasEmbed struct{ responseAliasNode }
 
 type responseAliasDual struct {
 	Lower string `json:"id"`
