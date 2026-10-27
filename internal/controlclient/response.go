@@ -59,7 +59,7 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 		typ = typ.Elem()
 	}
 	if typ.Kind() != reflect.Struct {
-		return nil
+		return rejectTypedResponseAliases(data, typ)
 	}
 	var members map[string]json.RawMessage
 	if err := json.Unmarshal(data, &members); err != nil || members == nil {
