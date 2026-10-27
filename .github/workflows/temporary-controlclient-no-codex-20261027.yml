@@ -1,0 +1,52 @@
+name: Temporary Control client Go validation (no Codex)
+
+on:
+  push:
+    branches: [fix/control-nested-response-alias-20261027]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/fix/control-nested-response-alias-20261027'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source candidate (no credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: 94ec1b0d89b36ce6a9b65c1bb14033c5a0566ad3
+          persist-credentials: false
+      - name: Install Go toolchain declared by source
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Assert exact tested source and run only provider-free Go checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/controlclient-proof"
+          test "$(git rev-parse HEAD)" = '94ec1b0d89b36ce6a9b65c1bb14033c5a0566ad3'
+          git rev-parse HEAD | tee "$RUNNER_TEMP/controlclient-proof/source-head.txt"
+          go version | tee "$RUNNER_TEMP/controlclient-proof/go-version.txt"
+          test "$(go version | awk '{print $3}')" = 'go1.26.10'
+          test "$(git hash-object internal/controlclient/response.go)" = 'afa6c2a97b57221012c209edb52add56223ac417'
+          test "$(git hash-object internal/controlclient/response_alias_edges_test.go)" = '689a0f4eac93ccb3b9b6e978cc51db5a0b5ee11b'
+          test "$(git hash-object internal/controlclient/response_alias_invalid_tag_test.go)" = '7047dd524e745258cd70d5310b61d0608b0775c2'
+          files="$(gofmt -l internal/controlclient/response.go internal/controlclient/response_alias_test.go internal/controlclient/response_alias_edges_test.go internal/controlclient/response_alias_invalid_tag_test.go)"
+          test -z "$files" || { echo "not gofmt clean: $files"; exit 1; }
+          timeout 240s go mod download
+          timeout 360s go test -race -count=3 -timeout=5m ./internal/controlclient 2>&1 | tee "$RUNNER_TEMP/controlclient-proof/controlclient-race.txt"
+          timeout 120s go test -count=1 -timeout=90s ./internal/strictjson 2>&1 | tee "$RUNNER_TEMP/controlclient-proof/strictjson.txt"
+          timeout 120s go vet ./internal/controlclient ./internal/strictjson 2>&1 | tee "$RUNNER_TEMP/controlclient-proof/vet.txt"
+          printf 'PACKAGE_SCOPE_ONLY: no Codex, no Work, no Provider, no production qualification\n' | tee "$RUNNER_TEMP/controlclient-proof/scope.txt"
+      - name: Retain source-bound local package evidence, including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: temporary-controlclient-nocodex-${{ github.sha }}
+          path: ${{ runner.temp }}/controlclient-proof/
+          if-no-files-found: warn
+          retention-days: 30
