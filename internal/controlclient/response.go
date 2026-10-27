@@ -99,5 +99,78 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 			}
 		}
 	}
+	return rejectTypedResponseAliases(data, typ)
+}
+
+// rejectTypedResponseAliases rejects JSON spellings which encoding/json would
+// case-fold onto a typed struct member. A differently cased nested identity may
+// otherwise overwrite an earlier value even after strict duplicate-key checks.
+// Opaque map keys and types with their own UnmarshalJSON contract remain intact;
+// nested field presence and domain authority are validated by their consumers.
+var responseJSONUnmarshaler = reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+
+func rejectTypedResponseAliases(data []byte, typ reflect.Type) error {
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+	}
+	if typ.Implements(responseJSONUnmarshaler) || reflect.PointerTo(typ).Implements(responseJSONUnmarshaler) {
+		return nil
+	}
+	switch typ.Kind() {
+	case reflect.Slice, reflect.Array:
+		element := typ.Elem()
+		for element.Kind() == reflect.Pointer || element.Kind() == reflect.Slice || element.Kind() == reflect.Array {
+			element = element.Elem()
+		}
+		if element.Kind() != reflect.Struct {
+			return nil
+		}
+		trimmed := bytes.TrimSpace(data)
+		if len(trimmed) == 0 || trimmed[0] != '[' {
+			return nil
+		}
+		var items []json.RawMessage
+		if err := json.Unmarshal(data, &items); err != nil {
+			return err
+		}
+		for _, item := range items {
+			if err := rejectTypedResponseAliases(item, typ.Elem()); err != nil {
+				return err
+			}
+		}
+	case reflect.Struct:
+		trimmed := bytes.TrimSpace(data)
+		if len(trimmed) == 0 || trimmed[0] != '{' {
+			return nil
+		}
+		var members map[string]json.RawMessage
+		if err := json.Unmarshal(data, &members); err != nil {
+			return err
+		}
+		for i := 0; i < typ.NumField(); i++ {
+			field := typ.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			tag := field.Tag.Get("json")
+			name := strings.Split(tag, ",")[0]
+			if name == "-" || field.Anonymous && name == "" {
+				continue
+			}
+			if name == "" {
+				name = field.Name
+			}
+			for key := range members {
+				if key != name && strings.EqualFold(key, name) {
+					return fmt.Errorf("typed response member case alias rejected")
+				}
+			}
+			if value, present := members[name]; present {
+				if err := rejectTypedResponseAliases(value, field.Type); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
