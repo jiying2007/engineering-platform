@@ -9,6 +9,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"unicode"
 )
 
 func responseDestination(out any) (reflect.Value, error) {
@@ -76,7 +77,7 @@ func requireResponseMembers(data []byte, typ reflect.Type) error {
 		}
 		parts := strings.Split(tag, ",")
 		name := parts[0]
-		if name == "" {
+		if name == "" || !validResponseJSONTag(name) {
 			name = field.Name
 		}
 		optional := false
@@ -114,6 +115,24 @@ func responseUsesJSONUnmarshaler(t reflect.Type) bool {
 	return t.Kind() != reflect.Pointer && reflect.PointerTo(t).Implements(responseJSONUnmarshaler)
 }
 
+// validResponseJSONTag mirrors the name check used by encoding/json. Invalid
+// tag names are ignored by that decoder in favor of the exported Go field
+// name; the alias guard must use the same canonical spelling.
+func validResponseJSONTag(name string) bool {
+	if name == "" {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case strings.ContainsRune("!#$%&()*+-./:;<=>?@[]^_{|}~ ", r):
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // responseTypedFields tracks exact JSON spellings, with direct fields taking
 // priority over anonymously embedded fields. We only need the canonical field
 // names for rejecting case-fold aliases; the decoder retains final field
@@ -139,6 +158,9 @@ func responseTypedFields(t reflect.Type) map[string]reflect.Type {
 				continue
 			}
 			name := strings.Split(tag, ",")[0]
+			if !validResponseJSONTag(name) {
+				name = ""
+			}
 			if field.Anonymous && name == "" && !responseUsesJSONUnmarshaler(field.Type) {
 				embedded := field.Type
 				for embedded.Kind() == reflect.Pointer {
