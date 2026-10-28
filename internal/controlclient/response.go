@@ -138,10 +138,30 @@ func validResponseJSONTag(name string) bool {
 // names for rejecting case-fold aliases; the decoder retains final field
 // selection/ambiguity authority.
 func responseTypedFields(t reflect.Type) map[string]reflect.Type {
-	fields := make(map[string]reflect.Type)
+	// The JSON decoder selects the shallowest visible field for a name;
+	// at equal depth an explicitly named JSON tag takes priority.
+	// Two equally ranked definitions are ambiguous and cannot be a
+	// reliable typed boundary. Do not let DFS traversal order select one.
+	type candidate struct {
+		typ       reflect.Type
+		depth     int
+		tagged    bool
+		ambiguous bool
+	}
+	candidates := make(map[string]candidate)
+	record := func(name string, typ reflect.Type, depth int, tagged bool) {
+		prior, present := candidates[name]
+		switch {
+		case !present || depth < prior.depth || (depth == prior.depth && tagged && !prior.tagged):
+			candidates[name] = candidate{typ: typ, depth: depth, tagged: tagged}
+		case depth == prior.depth && tagged == prior.tagged:
+			prior.ambiguous = true
+			candidates[name] = prior
+		}
+	}
 	visiting := make(map[reflect.Type]bool)
-	var collect func(reflect.Type)
-	collect = func(current reflect.Type) {
+	var collect func(reflect.Type, int)
+	collect = func(current reflect.Type, depth int) {
 		for current.Kind() == reflect.Pointer {
 			current = current.Elem()
 		}
@@ -172,9 +192,8 @@ func responseTypedFields(t reflect.Type) map[string]reflect.Type {
 				}
 			}
 			if !field.IsExported() {
-				// encoding/json still decodes a tagged unexported
-				// anonymous struct through its exported child fields.
-				// Never omit that nested typed boundary from alias checks.
+				// JSON permits named unexported embedded structs;
+				// its exported children are still decoded.
 				embedded := field.Type
 				for embedded.Kind() == reflect.Pointer {
 					embedded = embedded.Elem()
@@ -183,18 +202,23 @@ func responseTypedFields(t reflect.Type) map[string]reflect.Type {
 					continue
 				}
 			}
+			tagged := name != ""
 			if name == "" {
 				name = field.Name
 			}
-			if _, present := fields[name]; !present {
-				fields[name] = field.Type
-			}
+			record(name, field.Type, depth, tagged)
 		}
 		for _, embedded := range promoted {
-			collect(embedded)
+			collect(embedded, depth+1)
 		}
 	}
-	collect(t)
+	collect(t, 0)
+	fields := make(map[string]reflect.Type, len(candidates))
+	for name, c := range candidates {
+		if !c.ambiguous {
+			fields[name] = c.typ
+		}
+	}
 	return fields
 }
 
