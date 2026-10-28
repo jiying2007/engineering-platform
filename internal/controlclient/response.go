@@ -172,7 +172,16 @@ func responseTypedFields(t reflect.Type) map[string]reflect.Type {
 				}
 			}
 			if !field.IsExported() {
-				continue
+				// encoding/json still decodes a tagged unexported
+				// anonymous struct through its exported child fields.
+				// Never omit that nested typed boundary from alias checks.
+				embedded := field.Type
+				for embedded.Kind() == reflect.Pointer {
+					embedded = embedded.Elem()
+				}
+				if !field.Anonymous || name == "" || embedded.Kind() != reflect.Struct {
+					continue
+				}
 			}
 			if name == "" {
 				name = field.Name
