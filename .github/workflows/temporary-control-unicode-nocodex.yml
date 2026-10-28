@@ -1,0 +1,50 @@
+name: Temporary Control Unicode differential Go verification (no Codex)
+
+on:
+  push:
+    branches: [fix/control-nested-response-alias-20261027]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/fix/control-nested-response-alias-20261027'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source with no retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: a66e2f7acda81dadd175b530ea62fc2b3fcdf2cb
+          persist-credentials: false
+      - name: Use exact repository Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Source-bound Unicode regression, Control package Race and vet only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/control-unicode-evidence"
+          test "$(git rev-parse HEAD)" = 'a66e2f7acda81dadd175b530ea62fc2b3fcdf2cb'
+          test "$(git hash-object internal/controlclient/response.go)" = 'd78953580ab93dd0e508e498e4e3d67a4a5a8a9d'
+          test "$(git hash-object internal/controlclient/response_alias_unicode_fold_test.go)" = '44692f3fefcb8973ea13f424a57fd2a96a10737c'
+          go version | tee "$RUNNER_TEMP/control-unicode-evidence/go-version.txt"
+          test "$(go version | awk '{print $3}')" = 'go1.26.10'
+          test -z "$(gofmt -l internal/controlclient/*.go)"
+          timeout 180s go mod download
+          timeout 240s go test -race -count=10 -timeout=3m ./internal/controlclient -run '^TestTypedResponseUnicodeFoldDifferential$' 2>&1 | tee "$RUNNER_TEMP/control-unicode-evidence/unicode-race.txt"
+          timeout 300s go test -race -count=3 -timeout=4m ./internal/controlclient ./internal/strictjson 2>&1 | tee "$RUNNER_TEMP/control-unicode-evidence/package-race.txt"
+          timeout 180s go vet ./... 2>&1 | tee "$RUNNER_TEMP/control-unicode-evidence/go-vet-all.txt"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/control-unicode-evidence/exact-source.txt"
+          printf 'SUPPLEMENTARY_ONLY: no Codex/Work/Provider or production qualification\n' | tee "$RUNNER_TEMP/control-unicode-evidence/scope.txt"
+      - name: Retain immutable checked-source evidence even on failed run
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: control-unicode-no-codex-${{ github.sha }}
+          path: ${{ runner.temp }}/control-unicode-evidence/
+          if-no-files-found: warn
+          retention-days: 30
