@@ -133,13 +133,18 @@ current main accepts schema v2 only.
 
 ### Host-controlled input files (Linux, 2026-10-29)
 
-The offline Contract, Codex compatibility receipt, three policy inputs and
-qualification-kit member reads reuse the same Linux nonblocking, no-follow
-file-descriptor opener as operator steering text. Each source must be a
-nonempty bounded regular file. The reader checks the original file identity,
-type, size and mode against the opened descriptor and again after reading,
-and refuses drift, a replaced symlink/FIFO, truncation or growth. Qualification
-kit members still require mode 0600.
+The offline Contract, Codex compatibility receipt and three policy inputs
+reuse the Linux nonblocking, no-follow file-descriptor opener from operator
+steering text. Qualification-kit verification now anchors directory listing
+and every member read to the same opened `os.Root`, after verifying the
+original absolute, unsymlinked owner-private directory (mode 0700). It checks
+the directory inode and pathname again before accepting the kit.
+
+Each member uses a directory-relative, nonblocking, no-follow descriptor.
+The shared bounded reader verifies file identity, type, size, mode and
+modification time against both the opened descriptor and anchored path after
+reading, rejecting symlink/FIFO substitution and source drift. Kit members
+remain mode 0600, and unexpected directory entries are rejected.
 
 This safety-sensitive input path fails closed on non-Linux systems until a
 separately qualified no-follow, nonblocking opener is provided. Run offline
