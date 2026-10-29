@@ -145,6 +145,10 @@ The shared bounded reader verifies file identity, type, size, mode and
 modification time against both the opened descriptor and anchored path after
 reading, rejecting symlink/FIFO substitution and source drift. Kit members
 remain mode 0600, and unexpected directory entries are rejected.
+The seven-file kit enumerator reads at most eight directory entries, so a
+malformed directory with many extra names is rejected without unbounded
+`ReadDir(-1)` memory allocation. Every accepted member still undergoes the
+existing independent exact-byte and cross-binding digest checks.
 
 This safety-sensitive input path fails closed on non-Linux systems until a
 separately qualified no-follow, nonblocking opener is provided. Run offline
