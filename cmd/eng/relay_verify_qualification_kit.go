@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,13 +38,27 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	if err != nil || resolved != dir {
 		return kit, fmt.Errorf("qualification kit directory symlink alias is not allowed")
 	}
-	info, err := os.Lstat(dir)
-	if err != nil || !info.IsDir() || info.Mode().Perm() != 0o700 {
+	before, err := os.Lstat(dir)
+	if err != nil || !before.IsDir() || before.Mode().Perm() != 0o700 {
 		return kit, fmt.Errorf("qualification kit directory must be owner-private mode 0700")
 	}
-	entries, err := os.ReadDir(dir)
+	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return kit, err
+	}
+	defer root.Close()
+	opened, err := root.Stat(".")
+	if err != nil || !os.SameFile(before, opened) || !opened.IsDir() || opened.Mode().Perm() != 0o700 {
+		return kit, fmt.Errorf("qualification kit directory changed before read")
+	}
+	directoryFile, err := root.Open(".")
+	if err != nil {
+		return kit, err
+	}
+	entries, readErr := directoryFile.ReadDir(-1)
+	closeErr := directoryFile.Close()
+	if readErr != nil || closeErr != nil {
+		return kit, fmt.Errorf("read qualification kit directory: %w", errors.Join(readErr, closeErr))
 	}
 	expected := map[string]bool{
 		relayqualification.KitContractFile:       true,
@@ -57,16 +72,22 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	if len(entries) != len(expected) {
 		return kit, fmt.Errorf("qualification kit must contain exactly %d files", len(expected))
 	}
-	files := map[string][]byte{}
+	files := make(map[string][]byte, len(expected))
 	for _, entry := range entries {
 		if !expected[entry.Name()] || entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
 			return kit, fmt.Errorf("unexpected qualification kit entry %q", entry.Name())
 		}
-		data, err := readRelayKitFile(filepath.Join(dir, entry.Name()))
+		data, err := readRelayRootInput(root, entry.Name(), 2<<20, true)
 		if err != nil {
 			return kit, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
 		files[entry.Name()] = data
+	}
+	after, err := os.Lstat(dir)
+	rootAfter, rootErr := root.Stat(".")
+	if err != nil || rootErr != nil || !os.SameFile(before, after) || !os.SameFile(before, rootAfter) ||
+		!after.IsDir() || after.Mode().Perm() != 0o700 || !rootAfter.IsDir() || rootAfter.Mode().Perm() != 0o700 {
+		return kit, fmt.Errorf("qualification kit directory changed during read")
 	}
 	kit.ContractJSON = files[relayqualification.KitContractFile]
 	kit.CodexConfig = files[relayqualification.KitCodexConfigFile]
@@ -76,12 +97,4 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	kit.ManifestJSON = files[relayqualification.KitManifestFile]
 	kit.Checksums = files[relayqualification.KitChecksumsFile]
 	return kit, nil
-}
-
-func readRelayKitFile(path string) ([]byte, error) {
-	data, err := readRelayInput(path, 2<<20, true)
-	if err != nil {
-		return nil, fmt.Errorf("bounded owner-private regular file required: %w", err)
-	}
-	return data, nil
 }
