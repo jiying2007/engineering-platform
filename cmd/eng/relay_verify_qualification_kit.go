@@ -79,27 +79,9 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 }
 
 func readRelayKitFile(path string) ([]byte, error) {
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm() != 0o600 ||
-		before.Size() <= 0 || before.Size() > 2<<20 {
-		return nil, fmt.Errorf("bounded owner-private regular file required")
-	}
-	file, err := os.Open(path)
+	data, err := readRelayInput(path, 2<<20, true)
 	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !os.SameFile(before, opened) {
-		return nil, fmt.Errorf("qualification kit file changed before read")
-	}
-	data, err := io.ReadAll(io.LimitReader(file, (2<<20)+1))
-	if err != nil || len(data) == 0 || len(data) > 2<<20 {
-		return nil, fmt.Errorf("qualification kit file read failed or exceeds bound")
-	}
-	after, err := os.Lstat(path)
-	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
-		return nil, fmt.Errorf("qualification kit file changed during read")
+		return nil, fmt.Errorf("bounded owner-private regular file required: %w", err)
 	}
 	return data, nil
 }
