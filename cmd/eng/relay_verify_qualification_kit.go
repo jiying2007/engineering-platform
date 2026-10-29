@@ -55,7 +55,7 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	if err != nil {
 		return kit, err
 	}
-	entries, readErr := directoryFile.ReadDir(-1)
+	entries, readErr := readBoundedRelayKitEntries(directoryFile)
 	closeErr := directoryFile.Close()
 	if readErr != nil || closeErr != nil {
 		return kit, fmt.Errorf("read qualification kit directory: %w", errors.Join(readErr, closeErr))
@@ -97,4 +97,15 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	kit.ManifestJSON = files[relayqualification.KitManifestFile]
 	kit.Checksums = files[relayqualification.KitChecksumsFile]
 	return kit, nil
+}
+
+// A qualification kit has exactly seven named members. Read only one more
+// entry than allowed, so an attacker-controlled owner-private directory with
+// arbitrarily many files cannot cause unbounded allocations during rejection.
+// ReadDir(n>0) returns at most n entries. The caller rejects any count != 7.
+func readBoundedRelayKitEntries(directory *os.File) ([]os.DirEntry, error) {
+	if directory == nil {
+		return nil, fmt.Errorf("qualification kit directory handle is required")
+	}
+	return directory.ReadDir(8)
 }
