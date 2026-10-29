@@ -131,6 +131,22 @@ eng relay-prequalification --contract relay-contract-v2.json
 This recomputes all identity digests. A v1 JSON contract fails closed because
 current main accepts schema v2 only.
 
+### Host-controlled input files (Linux, 2026-10-29)
+
+The offline Contract, Codex compatibility receipt, three policy inputs and
+qualification-kit member reads reuse the same Linux nonblocking, no-follow
+file-descriptor opener as operator steering text. Each source must be a
+nonempty bounded regular file. The reader checks the original file identity,
+type, size and mode against the opened descriptor and again after reading,
+and refuses drift, a replaced symlink/FIFO, truncation or growth. Qualification
+kit members still require mode 0600.
+
+This safety-sensitive input path fails closed on non-Linux systems until a
+separately qualified no-follow, nonblocking opener is provided. Run offline
+qualification on the trusted Ubuntu host instead of silently reverting to
+a path-only read. These checks do not authenticate a document's author, prove
+the supplied policies truthful or qualify any credential/model turn.
+
 ## Exact Codex config rendering
 
 Render the exact future user-level provider TOML without contacting the relay:
