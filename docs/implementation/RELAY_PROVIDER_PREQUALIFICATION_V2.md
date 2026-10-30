@@ -245,8 +245,17 @@ eng relay-qualification-kit \
 ```
 
 The command performs no authentication and no model turn. It creates a new
-directory with mode 0700 and never overwrites an existing path. Every retained
-file is created with mode 0600:
+directory with mode 0700 and never overwrites an existing path. All output
+files are created exclusively (mode 0600) relative to the **same pinned
+original directory handle**, with original-directory identity checks around
+writes. A completed kit is independently re-read and verified against its
+exact contract, manifest and raw-byte digests before reporting success.
+
+A failed output remains an occupied owner-private directory for explicit
+operator inspection/disposal. The writer **never runs a recursive delete by
+the mutable output pathname**, because concurrent replacement could otherwise
+delete unrelated files. The operator must verify the directory identity before
+cleaning up a failed output. The retained kit files are:
 
 - `relay-contract-v2.json` — normalized Contract bytes;
 - `relay-codex-config.toml` — exact Codex user-level custom-provider config;
