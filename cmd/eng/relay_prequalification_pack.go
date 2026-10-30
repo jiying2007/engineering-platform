@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jiying2007/engineering-platform/internal/relayqualification"
 )
@@ -74,26 +73,5 @@ func relayPrequalificationPack(args []string) error {
 }
 
 func readRelayPolicyFile(path string) ([]byte, error) {
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() || before.Size() <= 0 || before.Size() > 1<<20 {
-		return nil, fmt.Errorf("bounded non-empty regular file required")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !os.SameFile(before, opened) {
-		return nil, fmt.Errorf("policy file changed before read")
-	}
-	data, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
-	if err != nil || len(data) == 0 || len(data) > 1<<20 {
-		return nil, fmt.Errorf("policy file read failed or exceeds bound")
-	}
-	after, err := os.Lstat(path)
-	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
-		return nil, fmt.Errorf("policy file changed during read")
-	}
-	return data, nil
+	return readRelayInput(path, 1<<20, false)
 }

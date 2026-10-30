@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,13 +38,27 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	if err != nil || resolved != dir {
 		return kit, fmt.Errorf("qualification kit directory symlink alias is not allowed")
 	}
-	info, err := os.Lstat(dir)
-	if err != nil || !info.IsDir() || info.Mode().Perm() != 0o700 {
+	before, err := os.Lstat(dir)
+	if err != nil || !before.IsDir() || before.Mode().Perm() != 0o700 {
 		return kit, fmt.Errorf("qualification kit directory must be owner-private mode 0700")
 	}
-	entries, err := os.ReadDir(dir)
+	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return kit, err
+	}
+	defer root.Close()
+	opened, err := root.Stat(".")
+	if err != nil || !os.SameFile(before, opened) || !opened.IsDir() || opened.Mode().Perm() != 0o700 {
+		return kit, fmt.Errorf("qualification kit directory changed before read")
+	}
+	directoryFile, err := root.Open(".")
+	if err != nil {
+		return kit, err
+	}
+	entries, readErr := readBoundedRelayKitEntries(directoryFile)
+	closeErr := directoryFile.Close()
+	if readErr != nil || closeErr != nil {
+		return kit, fmt.Errorf("read qualification kit directory: %w", errors.Join(readErr, closeErr))
 	}
 	expected := map[string]bool{
 		relayqualification.KitContractFile:       true,
@@ -57,16 +72,22 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	if len(entries) != len(expected) {
 		return kit, fmt.Errorf("qualification kit must contain exactly %d files", len(expected))
 	}
-	files := map[string][]byte{}
+	files := make(map[string][]byte, len(expected))
 	for _, entry := range entries {
 		if !expected[entry.Name()] || entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
 			return kit, fmt.Errorf("unexpected qualification kit entry %q", entry.Name())
 		}
-		data, err := readRelayKitFile(filepath.Join(dir, entry.Name()))
+		data, err := readRelayRootInput(root, entry.Name(), 2<<20, true)
 		if err != nil {
 			return kit, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
 		files[entry.Name()] = data
+	}
+	after, err := os.Lstat(dir)
+	rootAfter, rootErr := root.Stat(".")
+	if err != nil || rootErr != nil || !os.SameFile(before, after) || !os.SameFile(before, rootAfter) ||
+		!after.IsDir() || after.Mode().Perm() != 0o700 || !rootAfter.IsDir() || rootAfter.Mode().Perm() != 0o700 {
+		return kit, fmt.Errorf("qualification kit directory changed during read")
 	}
 	kit.ContractJSON = files[relayqualification.KitContractFile]
 	kit.CodexConfig = files[relayqualification.KitCodexConfigFile]
@@ -78,28 +99,13 @@ func readRelayQualificationKitDir(dir string) (relayqualification.QualificationK
 	return kit, nil
 }
 
-func readRelayKitFile(path string) ([]byte, error) {
-	before, err := os.Lstat(path)
-	if err != nil || !before.Mode().IsRegular() || before.Mode().Perm() != 0o600 ||
-		before.Size() <= 0 || before.Size() > 2<<20 {
-		return nil, fmt.Errorf("bounded owner-private regular file required")
+// A qualification kit has exactly seven named members. Read only one more
+// entry than allowed, so an attacker-controlled owner-private directory with
+// arbitrarily many files cannot cause unbounded allocations during rejection.
+// ReadDir(n>0) returns at most n entries. The caller rejects any count != 7.
+func readBoundedRelayKitEntries(directory *os.File) ([]os.DirEntry, error) {
+	if directory == nil {
+		return nil, fmt.Errorf("qualification kit directory handle is required")
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	opened, err := file.Stat()
-	if err != nil || !os.SameFile(before, opened) {
-		return nil, fmt.Errorf("qualification kit file changed before read")
-	}
-	data, err := io.ReadAll(io.LimitReader(file, (2<<20)+1))
-	if err != nil || len(data) == 0 || len(data) > 2<<20 {
-		return nil, fmt.Errorf("qualification kit file read failed or exceeds bound")
-	}
-	after, err := os.Lstat(path)
-	if err != nil || !os.SameFile(before, after) || after.Size() != before.Size() {
-		return nil, fmt.Errorf("qualification kit file changed during read")
-	}
-	return data, nil
+	return directory.ReadDir(8)
 }

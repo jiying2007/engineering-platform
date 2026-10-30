@@ -131,6 +131,31 @@ eng relay-prequalification --contract relay-contract-v2.json
 This recomputes all identity digests. A v1 JSON contract fails closed because
 current main accepts schema v2 only.
 
+### Host-controlled input files (Linux, 2026-10-29)
+
+The offline Contract, Codex compatibility receipt and three policy inputs
+reuse the Linux nonblocking, no-follow file-descriptor opener from operator
+steering text. Qualification-kit verification now anchors directory listing
+and every member read to the same opened `os.Root`, after verifying the
+original absolute, unsymlinked owner-private directory (mode 0700). It checks
+the directory inode and pathname again before accepting the kit.
+
+Each member uses a directory-relative, nonblocking, no-follow descriptor.
+The shared bounded reader verifies file identity, type, size, mode and
+modification time against both the opened descriptor and anchored path after
+reading, rejecting symlink/FIFO substitution and source drift. Kit members
+remain mode 0600, and unexpected directory entries are rejected.
+The seven-file kit enumerator reads at most eight directory entries, so a
+malformed directory with many extra names is rejected without unbounded
+`ReadDir(-1)` memory allocation. Every accepted member still undergoes the
+existing independent exact-byte and cross-binding digest checks.
+
+This safety-sensitive input path fails closed on non-Linux systems until a
+separately qualified no-follow, nonblocking opener is provided. Run offline
+qualification on the trusted Ubuntu host instead of silently reverting to
+a path-only read. These checks do not authenticate a document's author, prove
+the supplied policies truthful or qualify any credential/model turn.
+
 ## Exact Codex config rendering
 
 Render the exact future user-level provider TOML without contacting the relay:
@@ -220,8 +245,17 @@ eng relay-qualification-kit \
 ```
 
 The command performs no authentication and no model turn. It creates a new
-directory with mode 0700 and never overwrites an existing path. Every retained
-file is created with mode 0600:
+directory with mode 0700 and never overwrites an existing path. All output
+files are created exclusively (mode 0600) relative to the **same pinned
+original directory handle**, with original-directory identity checks around
+writes. A completed kit is independently re-read and verified against its
+exact contract, manifest and raw-byte digests before reporting success.
+
+A failed output remains an occupied owner-private directory for explicit
+operator inspection/disposal. The writer **never runs a recursive delete by
+the mutable output pathname**, because concurrent replacement could otherwise
+delete unrelated files. The operator must verify the directory identity before
+cleaning up a failed output. The retained kit files are:
 
 - `relay-contract-v2.json` — normalized Contract bytes;
 - `relay-codex-config.toml` — exact Codex user-level custom-provider config;
