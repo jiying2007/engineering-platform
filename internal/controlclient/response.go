@@ -274,13 +274,6 @@ func walkTypedResponseAliases(d *json.Decoder, typ reflect.Type, cache map[refle
 				element = typ.Elem()
 			}
 		}
-		// encoding/json accepts duplicate exact names and lets a later value
-		// overwrite an earlier typed member. Reject that ambiguity for typed
-		// structs, while preserving case-sensitive map/custom JSON semantics.
-		var seen map[string]struct{}
-		if fields != nil {
-			seen = make(map[string]struct{})
-		}
 		for d.More() {
 			keyToken, err := d.Token()
 			if err != nil {
@@ -289,12 +282,6 @@ func walkTypedResponseAliases(d *json.Decoder, typ reflect.Type, cache map[refle
 			key, ok := keyToken.(string)
 			if !ok {
 				return fmt.Errorf("typed response object key required")
-			}
-			if seen != nil {
-				if _, duplicate := seen[key]; duplicate {
-					return fmt.Errorf("duplicate typed response member rejected")
-				}
-				seen[key] = struct{}{}
 			}
 			child := element
 			if fields != nil {
