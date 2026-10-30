@@ -1,18 +1,16 @@
+//go:build linux
+
 package main
 
 import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"testing"
 )
 
 func TestRelayBoundedInputRejectsUnsafeFiles(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux no-follow input qualification")
-	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "contract")
 	expected := []byte("non-secret-policy")

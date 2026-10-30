@@ -1,18 +1,16 @@
+//go:build linux
+
 package main
 
 import (
 	"bytes"
 	"os"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"testing"
 )
 
 func TestRelayRootInputAnchoredAfterDirectoryReplacement(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Linux anchored no-follow input qualification")
-	}
 	parent := t.TempDir()
 	kitPath := filepath.Join(parent, "kit")
 	movedPath := filepath.Join(parent, "original")
