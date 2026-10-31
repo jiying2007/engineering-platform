@@ -1,0 +1,118 @@
+name: Temporary Engineering Platform held-PR exact-source verification (no Codex)
+
+# One-off, provider-free audit branch. Does not run canonical PR CI, create
+# reviews/approvals, override protection, or certify production readiness.
+on:
+  push:
+    branches: [audit/ep-nocodex-exact-head-20261031]
+    paths:
+      - .github/workflows/temporary-ep-held-pr-exact-head-nocodex-20261031.yml
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: no-codex-exact-source-${{ matrix.scope }}
+    if: github.repository == 'jiying2007/engineering-platform' && github.ref == 'refs/heads/audit/ep-nocodex-exact-head-20261031'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scope: control
+            pr: 300
+            source_sha: 3d97f92e71d988653e8af9124776364b17df7aeb
+            tree_sha: dcf32fa2695f046006257e1736d822f92adb40ca
+            package: ./internal/controlclient
+          - scope: relay
+            pr: 301
+            source_sha: 9e35e4bb7f7edcd8a8ff477c61143e4d8f4c3d10
+            tree_sha: 6472559858724c3c5f229622e0767272cde24494
+            package: ./cmd/eng
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+      SOURCE_SHA: ${{ matrix.source_sha }}
+      SOURCE_TREE: ${{ matrix.tree_sha }}
+      PACKAGE: ${{ matrix.package }}
+      SCOPE: ${{ matrix.scope }}
+    steps:
+      - name: Checkout immutable held PR HEAD without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.source_sha }}
+          persist-credentials: false
+      - name: Set up repo-pinned Go version
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify immutable source, format, race tests, vet, and Windows test compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof="$RUNNER_TEMP/nocodex-exact-source"
+          mkdir -p "$proof"
+          echo "$SOURCE_SHA" > "$proof/required-head.txt"
+          echo "$SOURCE_TREE" > "$proof/required-tree.txt"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          git rev-parse HEAD | tee "$proof/observed-head.txt"
+          git rev-parse 'HEAD^{tree}' | tee "$proof/observed-tree.txt"
+          go version | tee "$proof/toolchain.txt"
+          test "$(go version | awk '{print $3}')" = 'go1.26.10'
+          if command -v codex >/dev/null 2>&1; then
+            echo "Unexpected Codex executable in source verification job" >&2
+            exit 1
+          fi
+          test -z "$(gofmt -l .)"
+          timeout 240s go mod download
+          timeout 180s go mod tidy
+          git diff --exit-code -- go.mod go.sum
+          if [ "$SCOPE" = control ]; then
+            timeout 360s go test -race -count=10 -timeout 4m "$PACKAGE" 2>&1 | tee "$proof/targeted-race.txt"
+          else
+            timeout 360s go test -race -count=5 -timeout 4m "$PACKAGE" -run '^TestRelay' 2>&1 | tee "$proof/targeted-race.txt"
+          fi
+          namespace_tmp="$RUNNER_TEMP/ep-held-pr-nocodex-go"
+          mkdir "$namespace_tmp"
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            command -v apparmor_parser >/dev/null
+            printf 'abi <abi/4.0>,\nprofile ep-namespace-go-tests %s/go-build*/b*/*.test flags=(unconfined) {\n  userns,\n}\n' "$namespace_tmp" > "$RUNNER_TEMP/ep-held-pr-nocodex.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/ep-held-pr-nocodex.apparmor"
+          fi
+          export TMPDIR="$namespace_tmp" EP_REQUIRE_PID_NAMESPACE_TESTS=1
+          timeout 720s go test -race -timeout 5m ./... 2>&1 | tee "$proof/full-repo-race.txt"
+          timeout 240s go vet ./... 2>&1 | tee "$proof/vet.txt"
+          # Extra portability probe only, not an asserted full Windows qualification.
+          if timeout 180s env GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go test -c "$PACKAGE" -o "$proof/portability.exe" >"$proof/windows-cross-compile.txt" 2>&1; then
+            echo 'WINDOWS_PACKAGE_COMPILE=PASS' | tee "$proof/windows-status.txt"
+          else
+            echo 'WINDOWS_PACKAGE_COMPILE=FAILED_OR_UNQUALIFIED' | tee "$proof/windows-status.txt"
+          fi
+          rm -f "$proof/portability.exe"
+          git status --porcelain | tee "$proof/worktree.txt"
+          echo 'PROVIDER_FREE_SOURCE_TEST_ONLY: no Codex CLI/Cloud, ChatGPT Work, model turn, credential, or production qualification' | tee "$proof/scope.txt"
+      - name: Keep test and provenance evidence even on failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: held-pr-${{ matrix.scope }}-nocodex-${{ github.sha }}
+          path: ${{ runner.temp }}/nocodex-exact-source/
+          if-no-files-found: warn
+          retention-days: 30
