@@ -20,11 +20,11 @@ type AttentionItem struct {
 // production qualification result. An empty list means there was no actionable
 // signal in this snapshot, not that the service is healthy or work is complete.
 type OperationalAttention struct {
-	SchemaVersion    string          `json:"schema_version"`
-	SourceScope      string          `json:"source_scope"`
-	CapturedAt       time.Time       `json:"captured_at"`
+	SchemaVersion     string          `json:"schema_version"`
+	SourceScope       string          `json:"source_scope"`
+	CapturedAt        time.Time       `json:"captured_at"`
 	RequiresAttention bool           `json:"requires_attention"`
-	Items            []AttentionItem `json:"items"`
+	Items             []AttentionItem `json:"items"`
 }
 
 // ProjectOperationalAttention uses only the existing, validated status snapshot.
