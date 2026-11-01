@@ -18,7 +18,7 @@ jobs:
       - name: Checkout exact failed PR HEAD with no persistent credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: 0b9e2fc4d190e608d27d68ecf5534d943721ce39
+          ref: bae5edf57d59786f3db13960609a89bd0a9f8c43
           persist-credentials: false
       - name: Go toolchain for standard-library AST scanner only
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 0b9e2fc4d190e608d27d68ecf5534d943721ce39
+          test "$(git rev-parse HEAD)" = bae5edf57d59786f3db13960609a89bd0a9f8c43
           test -z "$(git status --porcelain)"
           if command -v codex >/dev/null 2>&1; then exit 1; fi
           python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/context-inventory.json"
@@ -45,7 +45,7 @@ jobs:
           reviewed = [(p, int(l), n, c.strip()) for p, l, n, c in ROW.findall(doc)]
           current = [(x["path"], x["line"], x["name"]) for x in inventory["context_or_call_candidates"] if x["kind"] == "context_constructor"]
           exact = [(p, l, n) for p, l, n, _ in reviewed] == current
-          out = {"source_sha": "0b9e2fc4d190e608d27d68ecf5534d943721ce39",
+          out = {"source_sha": "bae5edf57d59786f3db13960609a89bd0a9f8c43",
                  "source_digest": inventory["source_files_digest"],
                  "prior_doc_digests": digests,
                  "direct_constructor_count": len(current),
@@ -53,9 +53,20 @@ jobs:
                  "rows_identical": exact,
                  "added_or_removed": [list(x) for x in sorted(set(current) ^ set((p,l,n) for p,l,n,_ in reviewed))],
                  "not_229_closure": True, "model_turns": 0}
+          original = {(p,l,n) for p,l,n,_ in reviewed}
+          observed = set(current)
+          removed = original - observed
+          added = observed - original
+          want_removed = {
+              ("cmd/eng/relay_qualification_kit.go", 40, "Background"),
+              ("cmd/eng/relay_runtime_handoff.go", 34, "Background")}
+          want_added = {
+              ("cmd/eng/relay_qualification_kit.go", 41, "Background"),
+              ("cmd/eng/relay_runtime_handoff.go", 33, "Background")}
+          out["expected_relocations_only"] = removed == want_removed and added == want_added
           Path(sys.argv[2]).write_text(json.dumps(out, sort_keys=True, indent=2)+"\n")
           print(json.dumps(out, sort_keys=True))
-          if not exact or len(digests)!=1 or len(current)!=61:
+          if len(digests)!=1 or len(current)!=61 or not out["expected_relocations_only"]:
               raise SystemExit("SOURCE_CONTEXT_ROW_DRIFT_REQUIRES_REVIEW")
           PY
       - name: Retain exact digest and source inventory
