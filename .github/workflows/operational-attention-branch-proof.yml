@@ -1,0 +1,52 @@
+name: Operational attention branch-only Go proof
+
+# Temporary source check. Not a substitute for protected required CI, review,
+# real provider acceptance, or any run that can use Codex/Work quota.
+on:
+  push:
+    branches:
+      - feat/read-only-operational-attention-20261101
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operational-attention-proof-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  exact-source-go:
+    name: operational-attention-source-go1.26
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify immutable source and formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(gofmt -l internal/api/operational_attention.go internal/api/operational_attention_test.go internal/production/attention.go internal/production/attention_test.go)"
+      - name: Go unit tests and source validation without Codex
+        shell: bash
+        run: |
+          set -euo pipefail
+          go test -count=1 -timeout 6m ./internal/production ./internal/api
+          go vet ./internal/production ./internal/api
+      - name: Capture explicit source-only scope
+        shell: bash
+        run: |
+          {
+            echo "## Branch-only source validation (not required protected CI)"
+            echo "- Exact git source: $GITHUB_SHA"
+            echo "- Provider/model turn: NOT RUN"
+            echo "- Codex/Work invocation: NOT RUN"
+            echo "- Production, signing, review, protected-merge: NOT CLAIMED"
+          } >> "$GITHUB_STEP_SUMMARY"
