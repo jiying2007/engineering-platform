@@ -83,7 +83,7 @@ func TestOperationalAttentionRejectsUntrustedAndStaleStatus(t *testing.T) {
 	if _, err := ProjectOperationalAttention(forged, s.CapturedAt); err == nil {
 		t.Fatal("forged READY was accepted as source")
 	}
-	for _, at := range []time.Time{s.CapturedAt.Add(31*time.Second), s.CapturedAt.Add(-6*time.Second), {}} {
+	for _, at := range []time.Time{s.CapturedAt.Add(31 * time.Second), s.CapturedAt.Add(-6 * time.Second), {}} {
 		if _, err := ProjectOperationalAttention(status, at); err == nil {
 			t.Fatal("stale or invalid observation accepted", at)
 		}
