@@ -1,0 +1,109 @@
+name: Source-only verification (supplementary, no Codex)
+
+# Read-only source quality evidence. NOT the current trusted CI v2 receipt,
+# runtime compatibility qualification, release authorization, or required gate.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+      - ci/source-only-qualification-20261101
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ep-source-only-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source:
+    name: source-only-go
+    if: github.repository == 'jiying2007/engineering-platform'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: engineering_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d engineering_platform"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      POSTGRES_TEST_URL: postgres://postgres:postgres@127.0.0.1:5432/engineering_platform?sslmode=disable
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+    steps:
+      - name: Checkout exact event source without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up declared Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run bounded provider-free source qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/source-only-qualification"
+          mkdir -p "$report"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git rev-parse HEAD | tee "$report/source-sha.txt"
+          git rev-parse 'HEAD^{tree}' | tee "$report/source-tree.txt"
+          printf '%s\n' "$BASE_SHA" > "$report/pr-base-sha.txt"
+          printf 'run=%s\nattempt=%s\nevent=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_EVENT_NAME" > "$report/run-identity.txt"
+          printf '%s\n' 'SOURCE_ONLY: NOT_TRUSTED_CI_V2; NOT_RUNTIME_QUALIFIED; NOT_PROVIDER_QUALIFIED; NOT_PRODUCTION_QUALIFIED' > "$report/scope.txt"
+          go version | tee "$report/go-toolchain.txt"
+          if command -v codex >/dev/null 2>&1; then
+            echo "Real Codex executable found in source-only runner; refuse to run" >&2
+            exit 1
+          fi
+          test -z "$(gofmt -l .)"
+          for attempt in 1 2 3; do
+            if timeout 180s go mod download; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "bounded go mod download failed" >&2
+              exit 1
+            fi
+            sleep "$attempt"
+          done
+          timeout 180s go mod tidy
+          git diff --exit-code -- go.mod go.sum
+          test -z "$(git status --porcelain -- go.mod go.sum)"
+          namespace_tmp="$RUNNER_TEMP/ep-source-only-go-tests"
+          mkdir -p "$namespace_tmp"
+          if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = 1 ]; then
+            command -v apparmor_parser >/dev/null
+            printf 'abi <abi/4.0>,\nprofile ep-namespace-go-tests %s/go-build*/b*/*.test flags=(unconfined) {\n  userns,\n}\n' "$namespace_tmp" > "$RUNNER_TEMP/ep-source-only.apparmor"
+            sudo apparmor_parser -r "$RUNNER_TEMP/ep-source-only.apparmor"
+          fi
+          export TMPDIR="$namespace_tmp" EP_REQUIRE_PID_NAMESPACE_TESTS=1
+          timeout 720s go test -race -timeout 5m ./... 2>&1 | tee "$report/full-repo-race.txt"
+          echo "FULL_REPOSITORY_RACE=PASS" >> "$report/verified-results.txt"
+          timeout 240s go vet ./... 2>&1 | tee "$report/go-vet.txt"
+          echo "GO_VET=PASS" >> "$report/verified-results.txt"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain -- go.mod go.sum)"
+          echo "EXACT_SOURCE_AND_MODULE_HYGIENE=PASS" >> "$report/verified-results.txt"
+      - name: Retain source-only results including failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: source-only-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/source-only-qualification/
+          if-no-files-found: warn
+          retention-days: 30
