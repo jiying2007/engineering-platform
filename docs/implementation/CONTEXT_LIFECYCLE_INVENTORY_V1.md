@@ -86,9 +86,17 @@ with all 61 reviewed constructor paths, line numbers, names and categories
 unchanged. This updates the source digest only; #229 and host qualification
 remain OPEN.
 
+On 2026-11-01, a source-only synthetic Control+Relay combination was
+independently inventoried by Go AST [run 41263104165](https://github.com/jiying2007/engineering-platform/actions/runs/41263104165)
+([original artifact 13065664484](https://github.com/jiying2007/engineering-platform/actions/runs/41263104165/artifacts/13065664484)).
+The 61 direct constructor categories were unchanged; only the two existing
+Relay Context callsites moved: qualification-kit line 40 -> 41 and
+runtime-handoff line 34 -> 33. This is a **pre-merge source provenance
+candidate**, not a substitute for a new protected-main CI or #229 host proof.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:a89bae3f8028d0a716c1ef2d0c176aa95705edd38122de4ce223d5e1312c56d3`
+`sha256:139be8111e0855d4b96da0cf76bdadcbc691d0f0752547ffa28c2e4d4319535b`
 
 ## Reviewed categories
 
@@ -175,8 +183,8 @@ packages are shown explicitly, not counted as proven production requests.
 | `cmd/eng/production_publisher_health.go:42` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_status.go:101` | `Background` | Signal-owned command/service root |
 | `cmd/eng/production_terminal_readback.go:34` | `Background` | Signal-owned command/service root |
-| `cmd/eng/relay_qualification_kit.go:40` | `Background` | Explicitly timed command root |
-| `cmd/eng/relay_runtime_handoff.go:34` | `Background` | Explicitly timed command root |
+| `cmd/eng/relay_qualification_kit.go:41` | `Background` | Explicitly timed command root |
+| `cmd/eng/relay_runtime_handoff.go:33` | `Background` | Explicitly timed command root |
 | `cmd/eng/remote.go:41` | `Background` | Command with downstream budget |
 | `cmd/eng/run_continue.go:69` | `Background` | Explicitly timed command root |
 | `cmd/eng/run_control.go:90` | `Background` | Explicitly timed command root |
