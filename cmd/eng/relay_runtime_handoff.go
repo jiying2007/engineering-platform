@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"time"
 
 	"github.com/jiying2007/engineering-platform/internal/relayqualification"
@@ -42,13 +41,9 @@ func relayRuntimeHandoff(args []string) error {
 
 func readRelayQualification(path string) (codexapp.QualificationReceipt, error) {
 	var receipt codexapp.QualificationReceipt
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 64<<10 {
-		return receipt, fmt.Errorf("bounded regular Codex qualification file required")
-	}
-	data, err := os.ReadFile(path)
+	data, err := readRelayInput(path, 64<<10, false)
 	if err != nil {
-		return receipt, err
+		return receipt, fmt.Errorf("bounded regular Codex qualification file required: %w", err)
 	}
 	if err := strictjson.Decode(data, &receipt); err != nil {
 		return codexapp.QualificationReceipt{}, fmt.Errorf("strict Codex qualification: %w", err)

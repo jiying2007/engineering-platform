@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jiying2007/engineering-platform/internal/relayqualification"
 	"github.com/jiying2007/engineering-platform/internal/strictjson"
@@ -30,13 +29,9 @@ func relayPrequalification(args []string) error {
 
 func readRelayContract(path string) (relayqualification.Contract, error) {
 	var contract relayqualification.Contract
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 64<<10 {
-		return contract, fmt.Errorf("bounded regular relay contract file required")
-	}
-	data, err := os.ReadFile(path)
+	data, err := readRelayInput(path, 64<<10, false)
 	if err != nil {
-		return contract, err
+		return contract, fmt.Errorf("bounded regular relay contract file required: %w", err)
 	}
 	if err := strictjson.Decode(data, &contract); err != nil {
 		return relayqualification.Contract{}, fmt.Errorf("strict relay contract: %w", err)
