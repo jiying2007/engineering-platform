@@ -78,9 +78,17 @@ origins**, the existing lifetime classifications, and a one-line move of the
 terminal Core-readback signal root. This is source provenance and a local
 blocked-pipe regression, not selected-host or #229 production acceptance.
 
+On 2026-11-01, the Control response JSON hardening in PR #300 changed
+production Go source bytes without changing any direct Context constructor.
+Exact source-bound Go AST audit [41262767310](https://github.com/jiying2007/engineering-platform/actions/runs/41262767310)
+retained [artifact 13065569276](https://github.com/jiying2007/engineering-platform/actions/runs/41262767310/artifacts/13065569276),
+with all 61 reviewed constructor paths, line numbers, names and categories
+unchanged. This updates the source digest only; #229 and host qualification
+remain OPEN.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:7a8f747dfd90b099785c8b1de459a9982cc7556eaad97a194e154ee35d4f50e7`
+`sha256:a89bae3f8028d0a716c1ef2d0c176aa95705edd38122de4ce223d5e1312c56d3`
 
 ## Reviewed categories
 
