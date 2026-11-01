@@ -45,6 +45,7 @@ var routeCapabilities = map[string]string{
 	"GET /api/v1/capabilities":                          access.Read,
 	"GET /api/v1/recovery":                              access.Read,
 	"GET /api/v1/operations/status":                     access.Read,
+	"GET /api/v1/operations/attention":                  access.Read,
 	"GET /api/v1/operations/capacity":                   access.Read,
 	"POST /api/v1/recovery/begin":                       access.RecoveryBegin,
 	"POST /api/v1/recovery/complete":                    access.RecoveryComplete,

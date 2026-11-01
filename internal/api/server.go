@@ -80,6 +80,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/capabilities", s.handleCapabilities)
 	s.mux.HandleFunc("GET /api/v1/recovery", s.handleGetRecovery)
 	s.mux.HandleFunc("GET /api/v1/operations/status", s.handleOperationalStatus)
+	s.mux.HandleFunc("GET /api/v1/operations/attention", s.handleOperationalAttention)
 	s.mux.HandleFunc("GET /api/v1/operations/capacity", s.handleOperationalCapacity)
 	s.mux.HandleFunc("POST /api/v1/recovery/begin", s.handleBeginRecovery)
 	s.mux.HandleFunc("POST /api/v1/recovery/complete", s.handleCompleteRecovery)

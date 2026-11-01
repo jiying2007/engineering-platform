@@ -94,9 +94,18 @@ Relay Context callsites moved: qualification-kit line 40 -> 41 and
 runtime-handoff line 34 -> 33. This is a **pre-merge source provenance
 candidate**, not a substitute for a new protected-main CI or #229 host proof.
 
+The 2026-11-01 operational attention read-only projection was tested against the
+merged protected-main source that already includes #300 and #301. An independent
+[exact Go AST source inventory run 41265904587](https://github.com/jiying2007/engineering-platform/actions/runs/41265904587)
+read the complete `cmd/` and `internal/` production Go byte inventory and
+confirmed all **61 unchanged direct Context constructors and exact reviewed
+path/line/classification rows**. Only the source-file digest below advances; this
+is NOT #229 context-propagation closure, a runtime trust decision, or production
+qualification.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:139be8111e0855d4b96da0cf76bdadcbc691d0f0752547ffa28c2e4d4319535b`
+`sha256:4fccd66c41aa9d17a15704e39d7891b71905fba474d385a5e3351b59ba7828f6`
 
 ## Reviewed categories
 

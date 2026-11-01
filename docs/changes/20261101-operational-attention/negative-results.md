@@ -1,0 +1,10 @@
+# Negative results and remaining limitations
+
+1. **Not a notification service**: projections do not send, batch or deduplicate messages. No measurable end-user notification reduction is claimed until a real authorized delivery system and baseline A/B exist.
+2. **Aggregate not identity**: count changes are not stable event IDs; a repeated unknown Action with the same count can be a new incident. No automatic dedup, retry or rearm based solely on these counters.
+3. **No inferred incident age**: PLANNED/DISPATCHED and normal queues are suppressed from this projection without per-record timing evidence, while remaining visible in existing status and blocking canonical authority.
+4. **Not product READY**: even an empty projection is no evidence of worker service health, provider qualification, field tests, SLO or external effect resolution.
+5. **No high-privilege runtime**: DSH danger-full-access and worker home are not adopted. External advice cannot change Action authority.
+6. **Source-only verification is not required CI**: exact-source [run #41265017089](https://github.com/jiying2007/engineering-platform/actions/runs/41265017089) passed `gofmt`, complete package tests and `go vet`. It did NOT provide trusted five-job PR CI, independent review, authenticated production observation, deployment, notification delivery, or any model turn.
+7. **Bounded resource authorization**: the user later explicitly authorized **zero-model-turn CLI compatibility checks only**, not actual model execution, `turn/start`, Codex Cloud programming, Work or credential/model quota. The existing CI invokes `initialize` and `thread/start`; read real run receipts before accepting this as exercised safely. If any unauthorized model turn or credential use is observed, stop and retain a blocker.
+8. **Concurrent main change**: PR #300 modified `controlclient` and merged while this branch was under test. A protected PR must bind the new exact base and re-run required checks; historical CI cannot substitute.
