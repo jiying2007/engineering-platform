@@ -39,8 +39,10 @@ jobs:
           inventory = json.loads(Path(sys.argv[1]).read_text())
           doc = Path("docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md").read_text()
           digests = re.findall(r"`(sha256:[0-9a-f]{64})`", doc)
-          pat = r"^\\| `([^`]+):(\\d+)` \\| `(Background|TODO|WithoutCancel)` \\| ([^|]+) \\|$"
-          reviewed = [(p, int(l), n, c.strip()) for p, l, n, c in re.findall(pat, doc, re.M)]
+          import sys as _sys
+          _sys.path.insert(0, "scripts")
+          from verify_context_inventory import ROW
+          reviewed = [(p, int(l), n, c.strip()) for p, l, n, c in ROW.findall(doc)]
           current = [(x["path"], x["line"], x["name"]) for x in inventory["context_or_call_candidates"] if x["kind"] == "context_constructor"]
           exact = [(p, l, n) for p, l, n, _ in reviewed] == current
           out = {"source_sha": "0b9e2fc4d190e608d27d68ecf5534d943721ce39",
@@ -51,7 +53,7 @@ jobs:
                  "rows_identical": exact,
                  "added_or_removed": [list(x) for x in sorted(set(current) ^ set((p,l,n) for p,l,n,_ in reviewed))],
                  "not_229_closure": True, "model_turns": 0}
-          Path(sys.argv[2]).write_text(json.dumps(out, sort_keys=True, indent=2)+"\\n")
+          Path(sys.argv[2]).write_text(json.dumps(out, sort_keys=True, indent=2)+"\n")
           print(json.dumps(out, sort_keys=True))
           if not exact or len(digests)!=1 or len(current)!=61:
               raise SystemExit("SOURCE_CONTEXT_ROW_DRIFT_REQUIRES_REVIEW")
