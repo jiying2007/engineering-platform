@@ -17,10 +17,10 @@ func TestOperationalAttentionAPIRequiresTrustedReadAndPreservesSource(t *testing
 	pki := testsupport.NewPKI(t)
 	policy, _ := apiCapacityPolicy(t)
 	s := production.Snapshot{
-		Version: production.OperationalStatusVersion,
-		CapturedAt: time.Now().UTC(),
-		RecoveryMode: "NORMAL",
-		WorkerPolls: []production.WorkerPollObservation{},
+		Version:           production.OperationalStatusVersion,
+		CapturedAt:        time.Now().UTC(),
+		RecoveryMode:      "NORMAL",
+		WorkerPolls:       []production.WorkerPollObservation{},
 		UnknownOperations: 2,
 	}
 	status, err := production.EvaluateSnapshot(s)
