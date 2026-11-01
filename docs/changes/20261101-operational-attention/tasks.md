@@ -2,12 +2,12 @@
 
 | Task | Status | Evidence |
 | --- | --- | --- |
-| ATT-01 projection over existing validated v6 status | IMPLEMENTED, verify pending | internal/production/attention.go |
-| ATT-02 authenticated and read-only GET route | IMPLEMENTED, verify pending | internal/api/operational_attention.go; server.go; authenticated.go |
-| ATT-03 positive/negative projection and authorization tests | IMPLEMENTED, verify pending | attention_test.go; operational_attention_test.go |
-| ATT-04 docs/rollback & contract review | IMPLEMENTED, verify pending | requirements/design/negative-results |
-| ATT-05 gofmt / local Go tests | NOT RUN | depends on locally available qualified Go toolchain, otherwise report |
-| ATT-06 PR-head source CI / independent review / fresh-main | BLOCKED by current PR CI's Codex CLI invocation | existing #302 no-Codex source qualification proposal; do not bypass |
+| ATT-01 projection over existing validated v6 status | VERIFIED — source-only | internal/production/attention.go; branch-only run #41265017089 |
+| ATT-02 authenticated and read-only GET route | VERIFIED — source-only | internal/api/operational_attention.go; server.go; authenticated.go; same run |
+| ATT-03 positive/negative projection and authorization tests | VERIFIED — source-only | real `go test -count=1 -timeout 6m ./internal/production ./internal/api` PASS |
+| ATT-04 docs/rollback & contract review | WRITTEN — review pending | requirements/design/negative-results; review not implied by CI |
+| ATT-05 gofmt + Go 1.26.10 / vet | PASS — branch-only | [run #41265017089](https://github.com/jiying2007/engineering-platform/actions/runs/41265017089), exact source af27045fea4f83f4dc3b9ae400cfea2ce8499287 |
+| ATT-06 PR-head required five-job CI / actual review / fresh-main | WAITING_CI | Open normal protected PR on current main. Previously restricted Codex CLI startup is now explicitly authorized **only for zero-model-turn compatibility qualification**, with no `turn/start`, credentials, or shared quota; any contrary evidence stops this path. |
 | ATT-07 event-level dedup and actual notification delivery | OUT OF SCOPE | requires incident identity and verified source/owner policy |
 
-Stop on source/schema/authority conflict. Don't raise Product qualification. The branch is not a merged production release until required checks pass.
+The branch-only workflow was temporary and removed after source verification. Existing Go source blobs remain unchanged; the proof is not a trusted canonical CI artifact. Do not raise Product qualification, settle #228/#229, or claim any real notification delivery. 
