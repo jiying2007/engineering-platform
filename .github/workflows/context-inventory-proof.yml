@@ -1,0 +1,54 @@
+name: Context source inventory one-shot diagnostic
+
+# Diagnostic only: no authority or protected CI substitution. Remove after use.
+on:
+  push:
+    branches: [feat/read-only-operational-attention-20261101]
+    paths: [.github/workflows/context-inventory-proof.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  source-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Recompute exact Go AST Context inventory, review unchanged origins
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/context-inventory.json"
+          python3 - "$RUNNER_TEMP/context-inventory.json" <<'PY'
+          import json, re, sys
+          from pathlib import Path
+          data = json.loads(Path(sys.argv[1]).read_text())
+          doc = Path("docs/implementation/CONTEXT_LIFECYCLE_INVENTORY_V1.md").read_text()
+          row = re.compile(r"^\| `([^`]+):(\d+)` \| `(Background|TODO|WithoutCancel)` \| ([^|]+) \|$", re.M)
+          actual = [(x["path"], x["line"], x["name"]) for x in data["context_or_call_candidates"] if x["kind"] == "context_constructor"]
+          reviewed = [(path, int(line), name) for path, line, name, _ in row.findall(doc)]
+          print("EXACT_SOURCE_DIGEST=" + data["source_files_digest"])
+          print("DIRECT_CONSTRUCTORS=" + str(len(actual)))
+          print("REVIEWED_ROWS_MATCH=" + str(actual == reviewed))
+          print("EXACT_GIT_SHA=" + data["git_head"])
+          if actual != reviewed:
+              print("FIRST_MISMATCHES=" + repr([(i, actual[i] if i < len(actual) else None, reviewed[i] if i < len(reviewed) else None) for i in range(max(len(actual), len(reviewed))) if i >= len(actual) or i >= len(reviewed) or actual[i] != reviewed[i]][:12]))
+              raise SystemExit("Context constructor classification changed, requires targeted independent review")
+          PY
+      - name: Record limits without promotion claim
+        run: |
+          {
+            echo "## Source inventory diagnostic"
+            echo "- No model turn, credential, Codex CLI or external effect: NOT RUN"
+            echo "- Source digest and row parity: see prior job log"
+            echo "- Full trusted CI, reviewer, main merge: NOT IMPLIED"
+          } >> "$GITHUB_STEP_SUMMARY"
