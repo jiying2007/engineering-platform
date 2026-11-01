@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -46,7 +47,9 @@ func TestOperationalAttentionAPIRequiresTrustedReadAndPreservesSource(t *testing
 		t.Fatalf("untrusted or cacheable attention response: %d %#v", response.StatusCode, response.Header)
 	}
 	var projection production.OperationalAttention
-	mustJSON(t, response.Body, &projection)
+	if err := json.NewDecoder(response.Body).Decode(&projection); err != nil {
+		t.Fatal(err)
+	}
 	if !projection.RequiresAttention || len(projection.Items) != 1 ||
 		projection.Items[0].Reason != "unknown_external_actions" ||
 		projection.Items[0].Count != 2 ||
