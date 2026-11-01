@@ -52,3 +52,4 @@ jobs:
             echo "- Source digest and row parity: see prior job log"
             echo "- Full trusted CI, reviewer, main merge: NOT IMPLIED"
           } >> "$GITHUB_STEP_SUMMARY"
+# Integrated protected-main SHA: bb95c137e75d08f82501a3db396c15a0e85bda90
