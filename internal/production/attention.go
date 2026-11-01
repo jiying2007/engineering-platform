@@ -23,7 +23,7 @@ type OperationalAttention struct {
 	SchemaVersion     string          `json:"schema_version"`
 	SourceScope       string          `json:"source_scope"`
 	CapturedAt        time.Time       `json:"captured_at"`
-	RequiresAttention bool           `json:"requires_attention"`
+	RequiresAttention bool            `json:"requires_attention"`
 	Items             []AttentionItem `json:"items"`
 }
 
