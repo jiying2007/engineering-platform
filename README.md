@@ -153,14 +153,14 @@ Recovery, Verification and Review all carry that same provider identity.
 - **default internal development lane:** trusted Ubuntu host with a
   ChatGPT-authenticated Codex CLI, exact compatibility qualification, isolated
   Codex HOME and the existing Core/Worker/Action Gateway/Evidence chain;
-- **optional unattended lane:** managed-workspace WIF for GitHub-hosted or other
-  workload-identity execution; repository mechanics are ready, but the external
-  workspace administrator provider/rule and first real live qualification are
-  still pending in #103;
-- **optional future company relay/model gateway:** a separate provider lane that
-  requires its own compatibility, credential, privacy, retry/UNKNOWN and
-  provenance review plus an explicitly admitted Provider v3 identity. It is not
-  a WIF fallback and is currently rejected by provider admission.
+- **deferred WIF alternative:** the managed-workspace WIF path remains structurally
+  defined but has no live qualification; #103 closed `not_planned` on
+  2026-10-29. No administrator rule or credential qualification is implied.
+- **priority unattended candidate (not admitted):** the separate company Relay
+  Provider v3 lane has an offline repository prequalification kit (#301), but
+  #106 still requires a real non-secret gateway contract, provider/source and
+  credential qualification, and independently scoped unattended proof. It
+  cannot silently replace WIF or the trusted self-hosted lane.
 
 Feature #54 and Debug #55 are already CLOSED and their retained results were
 promoted to protected main after Verification/Review/Closure. Do not rerun them
@@ -265,17 +265,18 @@ repository is not an unqualified internally closed RC or production READY.**
 The retained Feature and Debug Closure chains establish the historical M1
 baseline; they do not qualify later Recovery/Action changes, live Provider
 effects, selected-host production performance or unattended credentials.
-The five separately tracked open gates are internal P0
+Current open maturity gates are internal P0
 [#228](https://github.com/jiying2007/engineering-platform/issues/228)
 (effectful Action original-dispatcher quiescence and independent Recovery
 observation), internal P1
 [#229](https://github.com/jiying2007/engineering-platform/issues/229)
-(remaining Context/maintenance and selected-host long-run evidence), and
-external [#103](https://github.com/jiying2007/engineering-platform/issues/103)
-(managed WIF), [#106](https://github.com/jiying2007/engineering-platform/issues/106)
-(optional relay/provider), and
+(remaining Context/maintenance and selected-host long-run evidence), external
+[#106](https://github.com/jiying2007/engineering-platform/issues/106)
+(Relay provider qualification), and
 [#105](https://github.com/jiying2007/engineering-platform/issues/105)
-(production/unattended acceptance). Do not treat healthy GitHub CI or an
+(production/unattended acceptance). Former WIF gate
+[#103](https://github.com/jiying2007/engineering-platform/issues/103)
+was closed `not_planned` on 2026-10-29; that is deferral, not qualification. Do not treat healthy GitHub CI or an
 isolated PostgreSQL fault-injection test as evidence of a live remote Provider
 quiescence, production SLO or independent human approval. The single current
 maturity authority remains [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md).
