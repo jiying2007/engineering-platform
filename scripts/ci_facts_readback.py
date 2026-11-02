@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Bounded readback of exact CI facts; never infer API success from needs."""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -70,6 +71,16 @@ def page(raw, key):
     return rows
 
 
+def utc_timestamp(value, label):
+    require(isinstance(value, str) and
+            re.fullmatch(r"\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", value),
+            "invalid " + label)
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise ValueError("invalid " + label) from exc
+
+
 def verify_run(raw, expected):
     run = document(raw)
     require(positive(run.get("id")) and run["id"] == expected["run_id"] and
@@ -83,6 +94,9 @@ def verify_run(raw, expected):
     # The collecting job is part of this run, so the run itself can be unfinished.
     require(isinstance(run.get("status"), str) and run["status"] in PENDING | {"completed"}, "invalid workflow run status")
     require(run.get("conclusion") in (None, "success"), "workflow run has an unsuccessful conclusion")
+    # The attempt-specific start is essential for separating historical uploads
+    # from a duplicate emitted during the current attempt.
+    return utc_timestamp(run.get("run_started_at"), "workflow attempt start")
 
 
 def jobs_ready(raw, expected, seen_ids):
@@ -115,8 +129,8 @@ def jobs_ready(raw, expected, seen_ids):
     return set(selected) == set(REQUIRED) and ready
 
 
-def artifacts_ready(raw, expected, seen_metadata):
-    selected = set()
+def artifacts_ready(raw, expected, seen_metadata, attempt_started):
+    selected, seen_ids, historical = set(), set(), {}
     ready = True
     for artifact in page(raw, "artifacts"):
         name = artifact.get("name")
@@ -124,14 +138,33 @@ def artifacts_ready(raw, expected, seen_metadata):
         if not name.startswith(PREFIXES):
             continue
         require(name in expected["producer_artifact_ids"], "artifact source-name drift")
+        artifact_id = artifact.get("id")
+        require(positive(artifact_id) and artifact_id not in seen_ids,
+                "invalid or duplicate required artifact ID")
+        seen_ids.add(artifact_id)
+        run = artifact.get("workflow_run")
+        require(isinstance(run, dict) and positive(run.get("id")) and
+                run["id"] == expected["run_id"] and
+                run.get("head_sha") == expected["source_sha"], "artifact run/source drift")
+        created = utc_timestamp(artifact.get("created_at"), "artifact creation time")
+        expected_id = expected["producer_artifact_ids"][name]
+        if artifact_id != expected_id:
+            # GitHub retains the same named artifact when a cancelled run is
+            # retried. Ignore ONLY a historical artifact from this same run
+            # predating the current attempt, and keep the raw API page intact.
+            # A duplicate from the current attempt, unknown age or wrong
+            # source remains a hard failure. At most one old upload per prior
+            # attempt may exist for each required producer name.
+            require(expected["run_attempt"] > 1 and created < attempt_started,
+                    "duplicate required artifact in current attempt")
+            historical[name] = historical.get(name, 0) + 1
+            require(historical[name] < expected["run_attempt"],
+                    "excessive prior-attempt artifacts")
+            continue
         require(name not in selected, "duplicate required artifact")
         selected.add(name)
-        require(positive(artifact.get("id")) and artifact["id"] == expected["producer_artifact_ids"][name],
-                "artifact differs from producer upload ID")
-        run = artifact.get("workflow_run")
-        require(isinstance(run, dict) and positive(run.get("id")) and run["id"] == expected["run_id"] and
-                run.get("head_sha") == expected["source_sha"], "artifact run/source drift")
-        require(artifact.get("expired") is False, "required artifact expired or expiration unknown")
+        require(artifact.get("expired") is False,
+                "required artifact expired or expiration unknown")
         digest, size = artifact.get("digest"), artifact.get("size_in_bytes")
         require(digest is None or isinstance(digest, str) and (not digest or DIGEST.fullmatch(digest)),
                 "invalid required artifact digest")
@@ -218,10 +251,12 @@ def collect(expected, output, fetch, *, budget=MAX_SECONDS, interval=POLL_SECOND
         for poll in range(1, int(budget / interval) + 2):
             remaining()
             report["poll_count"] = poll
-            verify_run(read("run.json", run_path), expected)
+            attempt_started = verify_run(read("run.json", run_path), expected)
             jobs = read("jobs.json", run_path + "/jobs?per_page=100")
             jobs_done = jobs_ready(jobs, expected, seen_ids)
-            artifacts_done = artifacts_ready(read("artifacts.json", "/actions/runs/%d/artifacts?per_page=100" % expected["run_id"]), expected, seen_metadata)
+            artifacts_done = artifacts_ready(
+                read("artifacts.json", "/actions/runs/%d/artifacts?per_page=100" % expected["run_id"]),
+                expected, seen_metadata, attempt_started)
             if jobs_done and artifacts_done:
                 # Keep the existing complete timing/provenance validator as the
                 # final success gate, and preserve its exact input bytes on disk.

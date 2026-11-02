@@ -601,8 +601,11 @@ jobs:
             --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" --event "$GITHUB_EVENT_NAME" \
             --binary-artifact-id "$BINARY_ARTIFACT_ID" --codex-artifact-id "$CODEX_ARTIFACT_ID" \
             --out "$RUNNER_TEMP"
-          binary_id="$(jq -er --arg name "engineering-binaries-$SOURCE_SHA" '.artifacts[] | select(.name==$name) | .id' "$RUNNER_TEMP/artifacts.json")"
-          codex_id="$(jq -er --arg name "codex-compatibility-qualification-$SOURCE_SHA" '.artifacts[] | select(.name==$name) | .id' "$RUNNER_TEMP/artifacts.json")"
+          # The API lists artifacts from ALL attempts in this workflow run.
+          # Select exactly the IDs returned by the successful upstream producers;
+          # never join on artifact name alone after an attempt rerun.
+          binary_id="$(jq -er --arg name "engineering-binaries-$SOURCE_SHA" --argjson id "$BINARY_ARTIFACT_ID" '.artifacts[] | select(.name==$name and .id==$id) | .id' "$RUNNER_TEMP/artifacts.json")"
+          codex_id="$(jq -er --arg name "codex-compatibility-qualification-$SOURCE_SHA" --argjson id "$CODEX_ARTIFACT_ID" '.artifacts[] | select(.name==$name and .id==$id) | .id' "$RUNNER_TEMP/artifacts.json")"
           test -n "$binary_id" -a -n "$codex_id"
 
           curl -fsSL -L "${auth[@]}" "$api/actions/artifacts/$binary_id/zip" -o "$RUNNER_TEMP/binaries.zip"
@@ -618,7 +621,8 @@ jobs:
             jq -e --arg sha "$SOURCE_SHA" '.status=="BYTES_VERIFIED" and .source_commit==$sha and .binary_count==6' >/dev/null
 
           jobs="$(jq -c '[.jobs[] | select(.name=="go" or .name=="offline-container-integration" or .name=="postgres-authority-restore-drill" or .name=="codex-app-server-qualification") | {name:.name,id:.id,conclusion:.conclusion}] | sort_by(.name)' "$RUNNER_TEMP/jobs.json")"
-          artifacts="$(jq -c --arg binary "engineering-binaries-$SOURCE_SHA" --arg codex "codex-compatibility-qualification-$SOURCE_SHA" '[.artifacts[] | select(.name==$binary or .name==$codex) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
+          artifacts="$(jq -c --arg binary "engineering-binaries-$SOURCE_SHA" --arg codex "codex-compatibility-qualification-$SOURCE_SHA" --argjson binary_id "$BINARY_ARTIFACT_ID" --argjson codex_id "$CODEX_ARTIFACT_ID" '[.artifacts[] | select((.name==$binary and .id==$binary_id) or (.name==$codex and .id==$codex_id)) | {name:.name,id:.id,digest:.digest,size:.size_in_bytes}] | sort_by(.name)' "$RUNNER_TEMP/artifacts.json")"
+          test "$(jq 'length' <<<"$artifacts")" -eq 2
           files="$(jq -c '.' "$manifest")"
           tested_sha="$(git rev-parse HEAD)"
           event="$GITHUB_EVENT_NAME"

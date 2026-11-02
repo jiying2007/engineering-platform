@@ -27,11 +27,14 @@ def facts():
                      "path": ".github/workflows/ci.yml", "event": "pull_request",
                      "repository": {"full_name": "example/engineering-platform", "id": 10},
                      "head_repository": {"full_name": "fork/engineering-platform", "id": 20},
-                     "head_branch": "main", "status": "in_progress", "conclusion": None},
+                     "head_branch": "main", "status": "in_progress", "conclusion": None,
+                     "run_started_at": "2026-10-08T00:00:00Z"},
         "jobs.json": source(),
         "artifacts.json": {"total_count": 2, "artifacts": [
             {"id": i + 201, "name": prefix + SHA, "digest": "sha256:" + str(i + 1) * 64,
-             "size_in_bytes": 100 + i, "expired": False, "workflow_run": {"id": 456, "head_sha": SHA}}
+             "size_in_bytes": 100 + i, "expired": False,
+             "created_at": "2026-10-08T00:00:04Z",
+             "workflow_run": {"id": 456, "head_sha": SHA}}
             for i, prefix in enumerate(PREFIXES)]},
     }
 
@@ -234,6 +237,69 @@ class CIFactsReadbackTests(unittest.TestCase):
         frame = facts()
         frame["jobs.json"]["jobs"][1]["id"] = frame["jobs.json"]["jobs"][0]["id"]
         self.rejected(frame, "duplicate required job ID")
+
+    def test_rerun_uses_producer_id_and_preserves_previous_attempt_artifacts(self):
+        frame, identity = facts(), expected()
+        identity["run_attempt"] = frame["run.json"]["run_attempt"] = 2
+        for job in frame["jobs.json"]["jobs"]:
+            if job.get("name") != "trusted-ci-artifact-evidence":
+                job["run_attempt"] = 2
+        frame["run.json"]["run_started_at"] = "2026-10-09T00:00:00Z"
+        current = frame["artifacts.json"]["artifacts"][0]
+        current["created_at"] = "2026-10-09T00:00:02Z"
+        old = copy.deepcopy(current)
+        old["id"] = 303
+        old["created_at"] = "2026-10-08T00:00:03Z"
+        old["digest"] = "sha256:" + "f" * 64
+        # Reused Codex job and its original upload can legitimately predate
+        # the new attempt. The producer-upload ID is still exact.
+        frame["artifacts.json"]["artifacts"].append(old)
+        frame["artifacts.json"]["total_count"] += 1
+        self.assertEqual(self.attempt([frame], identity)["status"], "READY")
+        self.assertEqual(len(json.loads(self.output.joinpath("artifacts.json").read_text())["artifacts"]), 3)
+
+        for mutate in (
+            lambda a: a.update(created_at="2026-10-09T00:00:03Z"),
+            lambda a: a.pop("created_at"),
+            lambda a: a.update(workflow_run={"id": 456, "head_sha": "b" * 40}),
+            lambda a: a.update(name="engineering-binaries-" + "b" * 40),
+            lambda a: a.update(id=201),
+        ):
+            with self.subTest(mutate=mutate):
+                invalid = copy.deepcopy(frame)
+                mutate(invalid["artifacts.json"]["artifacts"][-1])
+                with self.assertRaises(ValueError):
+                    self.attempt([invalid], identity)
+                self.assertEqual(self.saved_report()["status"], "REJECTED")
+
+    def test_rerun_rejects_too_many_previous_uploads_and_first_attempt_duplicates(self):
+        frame, identity = facts(), expected()
+        old = copy.deepcopy(frame["artifacts.json"]["artifacts"][0])
+        old.update(id=301, created_at="2026-10-07T23:59:59Z")
+        frame["artifacts.json"]["artifacts"].append(old)
+        frame["artifacts.json"]["total_count"] += 1
+        self.rejected(frame, "duplicate required artifact")
+
+        identity["run_attempt"] = frame["run.json"]["run_attempt"] = 2
+        for job in frame["jobs.json"]["jobs"]:
+            if job.get("name") != "trusted-ci-artifact-evidence":
+                job["run_attempt"] = 2
+        next_old = copy.deepcopy(old)
+        next_old["id"] = 302
+        frame["artifacts.json"]["artifacts"].append(next_old)
+        frame["artifacts.json"]["total_count"] += 1
+        with self.assertRaisesRegex(ValueError, "excessive prior-attempt artifacts"):
+            self.attempt([frame], identity)
+
+    def test_current_attempt_requires_valid_run_start_and_artifact_times(self):
+        for value in (None, "invalid", "2026-99-99T00:00:00Z", "2026-10-08T00:00:00+00:00"):
+            with self.subTest(value=value):
+                frame = facts()
+                frame["run.json"]["run_started_at"] = value
+                self.rejected(frame, "invalid workflow attempt start")
+        frame = facts()
+        frame["artifacts.json"]["artifacts"][0]["created_at"] = "invalid"
+        self.rejected(frame, "invalid artifact creation time")
 
     def test_malformed_artifact_fields_are_not_mistaken_for_visibility_delay(self):
         for digest, size in (("bad", 0), (None, -1), (None, False), ("", "100"),
