@@ -53,15 +53,16 @@ class FakeClock:
 
 
 class Replay:
-    def __init__(self, frames):
+    def __init__(self, frames, run_attempt):
         self.frames, self.poll, self.calls = frames, -1, []
+        self.run_attempt = run_attempt
 
     def __call__(self, path, timeout):
         self.calls.append((path, timeout))
-        if path == "/actions/runs/456/attempts/1":
+        if path == f"/actions/runs/456/attempts/{self.run_attempt}":
             name = "run.json"
             self.poll += 1
-        elif path == "/actions/runs/456/attempts/1/jobs?per_page=100":
+        elif path == f"/actions/runs/456/attempts/{self.run_attempt}/jobs?per_page=100":
             name = "jobs.json"
         elif path == "/actions/runs/456/artifacts?per_page=100":
             name = "artifacts.json"
@@ -76,8 +77,9 @@ class Replay:
 class CIFactsReadbackTests(unittest.TestCase):
     def attempt(self, frames, identity=None, **options):
         self.output = Path(self.enterContext(tempfile.TemporaryDirectory()))
-        self.clock, self.fetch = FakeClock(), Replay(frames)
-        return collect(identity or expected(), self.output, self.fetch, clock=self.clock.monotonic,
+        frozen_identity = identity or expected()
+        self.clock, self.fetch = FakeClock(), Replay(frames, frozen_identity["run_attempt"])
+        return collect(frozen_identity, self.output, self.fetch, clock=self.clock.monotonic,
                        sleep=self.clock.sleep, **options)
 
     def saved_report(self):
