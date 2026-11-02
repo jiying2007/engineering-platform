@@ -12,7 +12,6 @@
     105
   ],
   "deferred_credential_gates": [
-    103,
     106
   ]
 }
@@ -22,6 +21,39 @@ This is the single live implementation-status authority. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.
+
+## Current checkpoint reconciliation — 2026-11-01
+
+The protected `main` commit `992b5ab448c215db4e1b26e1490890b055c4a39f`
+contains merged [#300](https://github.com/jiying2007/engineering-platform/pull/300)
+(Control response validation),
+[#301](https://github.com/jiying2007/engineering-platform/pull/301)
+(Relay offline file/kit safety), and
+[#303](https://github.com/jiying2007/engineering-platform/pull/303)
+(authenticated read-only operational attention). The exact #303 PR-head
+[CI 41265983621](https://github.com/jiying2007/engineering-platform/actions/runs/41265983621)
+and separate protected-main
+[CI 41267196247](https://github.com/jiying2007/engineering-platform/actions/runs/41267196247)
+each completed all five required jobs successfully. The main push also passed
+[pre-live 41267196200](https://github.com/jiying2007/engineering-platform/actions/runs/41267196200)
+and [branch-retirement 41268564305](https://github.com/jiying2007/engineering-platform/actions/runs/41268564305).
+[#302](https://github.com/jiying2007/engineering-platform/pull/302)
+closed **without** merge; no optional source-only workflow or CI policy
+migration from that PR is present on this main.
+
+The new attention endpoint is a bounded **advisory read-only projection**.
+An empty attention list is not a READY result, a verified notification,
+or permission to retry any external action.
+
+The earlier WIF qualification issue
+[#103](https://github.com/jiying2007/engineering-platform/issues/103)
+closed `not_planned` on 2026-10-29; that did not qualify WIF.
+The selected *candidate*, not an admitted provider, is the #106 Relay lane
+pending a real gateway contract and qualified unattended identity.
+Older dated paragraphs below describing #103 as open are historical.
+The machine-readable deferred credential gate list now tracks #106 only.
+Internal readiness remains `BLOCKED` on #228/#229; external production
+acceptance #105 and actual provider/host/SLO/Recovery proof remain unfulfilled.
 
 ## Bounded operational diagnostic output — 2026-10-27
 

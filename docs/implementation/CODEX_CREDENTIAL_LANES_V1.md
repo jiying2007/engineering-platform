@@ -112,7 +112,9 @@ Use this lane when:
 - credential lifecycle should be managed centrally by workspace administrators;
 - repository/ref/workflow/audience claims need server-side workload fencing.
 
-Issue #103 tracks the first live qualification.
+Issue #103 was closed `not_planned` on 2026-10-29. WIF remains a
+structurally described, unqualified alternative; any future deployment needs
+a separately authorized decision, a live provider/rule and retained evidence.
 
 WIF failure must fail closed. It must never silently fall back to a saved
 ChatGPT login, API key or relay.
@@ -160,8 +162,8 @@ Allowed high-level combinations are:
 | Lane | Current status | Default use |
 | --- | --- | --- |
 | trusted self-hosted saved ChatGPT login | **PROVEN / DEFAULT INTERNAL** | Ubuntu R&D development and trusted self-hosted execution |
-| managed-workspace WIF | **READY, EXTERNAL ADMIN QUALIFICATION PENDING** | unattended/GitHub-hosted workload identity |
-| company relay / model gateway | **NOT YET QUALIFIED** | optional future multi-provider/company-governed execution |
+| managed-workspace WIF | **DEFERRED; NOT LIVE QUALIFIED** (#103 closed `not_planned`) | alternative unattended/GitHub-hosted identity, not selected |
+| company relay / model gateway | **PRIORITY CANDIDATE; OFFLINE PREQUALIFICATION ONLY** (#106) | selected for investigation, not admitted or verified |
 
 Selection is part of the Core-authorized Profile digest and retained evidence.
 Runtime must not "try the next credential" or provider after an authentication
@@ -196,10 +198,13 @@ Current product posture is deliberately three-tiered:
 1. **Internal engineering:** trusted self-hosted ChatGPT-authenticated Codex CLI
    is the default and already proven.
 2. **Unattended automation:** qualify at least one explicit machine credential
-   lane. Managed-workspace WIF is currently the most developed candidate.
-3. **Multi-provider/company gateway:** evaluate separately only when there is a
-   real organizational requirement. Do not add it merely as a workaround for a
-   missing WIF administrator action.
+   lane. The current first *candidate* is Relay under #106, not a ready or
+   admitted Provider; a real non-secret gateway contract must be obtained first.
+3. **Alternative WIF / company gateway:** WIF is deferred (#103 closed
+   `not_planned`). Neither lane may bypass Core authorization, provenance,
+   credential ownership, real provider qualification or independent production
+   acceptance. An unavailable Relay must fail closed, not fall back to WIF
+   or personal saved credentials.
 
 Production readiness remains unclaimed until the selected unattended credential
 lane and the operational acceptance criteria in issue #105 have retained
