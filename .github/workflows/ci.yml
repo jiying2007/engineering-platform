@@ -46,6 +46,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Fail fast on deterministic CI evidence contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The trusted evidence job repeats these after producer completion.
+          # Running them before Go setup prevents a 15-20 minute late failure.
+          python3 -B scripts/test_ci_facts_readback.py
+          python3 -B scripts/test_ci_job_timing.py
       - name: Require immutable workflow dependencies
         shell: bash
         run: |
