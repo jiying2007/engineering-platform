@@ -25,7 +25,10 @@ jobs:
     # 39532457963 exceeded the 15-minute ceiling without a recorded test failure.
     # Keep every check and package deadline; allow measured runner variance.
     # This timeout is a CI safety ceiling, not a production latency SLO.
-    timeout-minutes: 20
+    # PR 306 CI 41578952246 cancelled Go at 20 minutes during
+    # per-test passing recovery regressions. This ceiling is not a product SLO.
+    # Preserve every individual test deadline and all required checks.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-alpine

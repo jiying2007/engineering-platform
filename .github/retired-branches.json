@@ -123,6 +123,18 @@
       "tree": "19fc158e9c512d8d65a7254d1a09dc06cff5b34d"
     },
     {
+      "branch": "fix/audit-20261021",
+      "expected_head": "b992b2abe86291a7faf20265bd9d81cd69a5d5f9",
+      "integrated_commit": "484dfb25d70998b43eb0fb94f2a06204deaf8c89",
+      "tree": "ec73dec8e45bdc39b0c35e5bd7cc6f4d69548540"
+    },
+    {
+      "branch": "fix/production-audit-20261021",
+      "expected_head": "70d99f74738e458a91a389f18efdf7088275600a",
+      "integrated_commit": "e10a8025d0c78ba404b2b16822fec60822cda90b",
+      "tree": "e6d987dd5ea7c0bef0490a11ebd45c08fa855483"
+    },
+    {
       "branch": "fix/publisher-authenticated-redirect-policy-20261008",
       "expected_head": "41a24723b8a935831f9d4e2a5f5f1373d474a3ac",
       "integrated_commit": "53d7c48f35623873bcd27756d628e14e347e8b18",
@@ -219,6 +231,18 @@
       "tree": "e3e4c51ffe45e00c90423832a3a3cf5de1fa3a28"
     },
     {
+      "branch": "opt/ci-fast-fail-readback-20261103",
+      "expected_head": "634317374e125ff84feec9679112131162463c19",
+      "integrated_commit": "fc616c9dba8ba3e9ed7af49411aef71f050c0e96",
+      "tree": "37e0a30a9e6d6ab3186f8acef8509dcd2c639d2d"
+    },
+    {
+      "branch": "refactor/context-only-concrete-surface-20261013",
+      "expected_head": "9735e64fb24889308cd9409eac20d144d5473ba6",
+      "integrated_commit": "474d6a8b0e406a7730cc5edc561923ce40921a75",
+      "tree": "fb1d6d58d60d1c9cc894da122011241bab11a39b"
+    },
+    {
       "branch": "test/rc-artifact-enospc",
       "expected_head": "14a2e0cf36bfcb431e35c256ffc681fd0334c7f2",
       "integrated_commit": "cc502e26b2543fc3ccab1c409db5f363aa55fabf",
@@ -253,24 +277,6 @@
       "expected_head": "4721420788a964e9977314986c3ca9eb45488333",
       "integrated_commit": "1677454ec598b49c5a4b52f72e6c1361ab69bed1",
       "tree": "e30d7f473ca9b6c801ffe0d4744061fca04006de"
-    },
-    {
-      "branch": "refactor/context-only-concrete-surface-20261013",
-      "expected_head": "9735e64fb24889308cd9409eac20d144d5473ba6",
-      "integrated_commit": "474d6a8b0e406a7730cc5edc561923ce40921a75",
-      "tree": "fb1d6d58d60d1c9cc894da122011241bab11a39b"
-    },
-    {
-      "branch": "fix/audit-20261021",
-      "expected_head": "b992b2abe86291a7faf20265bd9d81cd69a5d5f9",
-      "integrated_commit": "484dfb25d70998b43eb0fb94f2a06204deaf8c89",
-      "tree": "ec73dec8e45bdc39b0c35e5bd7cc6f4d69548540"
-    },
-    {
-      "branch": "fix/production-audit-20261021",
-      "expected_head": "70d99f74738e458a91a389f18efdf7088275600a",
-      "integrated_commit": "e10a8025d0c78ba404b2b16822fec60822cda90b",
-      "tree": "e6d987dd5ea7c0bef0490a11ebd45c08fa855483"
     }
   ]
 }
