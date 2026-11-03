@@ -38,7 +38,7 @@ class WorkflowPinsTest(unittest.TestCase):
                 self.assertEqual(go.count(command), 1)
                 self.assertEqual(evidence.count(command), 1)
                 self.assertLess(go.index(command), go.index("      - uses: actions/setup-go@"))
-                self.assertLess(go.index(command), go.index("      - name: Test\\n"))
+                self.assertLess(go.index(command), go.index("      - name: Test"))
         self.assertLess(
             go.index("      - name: Fail fast on deterministic CI evidence contracts"),
             go.index("      - name: Download Go modules with bounded retry"),
