@@ -95,6 +95,25 @@ run_eng run example --task "$eng_package/examples/task.md" > "$eng_smoke/run.jso
 eng_task_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$eng_smoke/run.json" 2>> "$eng_log")"
 run_eng status "$eng_task_id" > "$eng_smoke/status.json" 2>> "$eng_log"
 run_eng logs "$eng_task_id" > "$eng_smoke/runtime.log" 2>> "$eng_log"
+# Second real Git checkout: a master-default repository with no .eng.yaml,
+# no --base and no configured checks. Its intentional waiting -> accept path
+# proves first use need not invent a "main" branch or forge test success.
+eng_stage='master-default onboarding and no-check acceptance'
+eng_git init -b master "$eng_demo/master-repo" >> "$eng_log" 2>&1
+printf 'master default example\n' > "$eng_demo/master-repo/README.md"
+eng_git -C "$eng_demo/master-repo" add README.md >> "$eng_log" 2>&1
+eng_git -C "$eng_demo/master-repo" -c user.name='eng example' \
+  -c user.email='eng-example@localhost' commit -m 'Initialize master checkout' >> "$eng_log" 2>&1
+master_original_sha="$(eng_git -C "$eng_demo/master-repo" rev-parse HEAD)"
+run_eng project add master-example "$eng_demo/master-repo" --runtime fixture > "$eng_smoke/master-project.json" 2>> "$eng_log"
+if run_eng run master-example --task "$eng_package/examples/task.md" > "$eng_smoke/master-waiting.json" 2>> "$eng_log"; then
+  printf 'No-check task bypassed required manual acceptance.\n' >> "$eng_log"
+  exit 1
+fi
+master_task_id="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$eng_smoke/master-waiting.json" 2>> "$eng_log")"
+run_eng accept "$master_task_id" --note "Reviewed deterministic smoke output; no model or hardware claimed" > "$eng_smoke/master-accepted.json" 2>> "$eng_log"
+test "$(eng_git -C "$eng_demo/master-repo" rev-parse HEAD)" = "$master_original_sha"
+test -z "$(eng_git -C "$eng_demo/master-repo" status --porcelain)"
 eng_stage='local result assertions'
 test "$(eng_git -C "$eng_demo/repo" rev-parse HEAD)" = "$eng_original_sha"
 test -z "$(eng_git -C "$eng_demo/repo" status --porcelain)"
@@ -130,6 +149,12 @@ content = pathlib.Path(artifact["path"]).read_bytes()
 assert artifact["digest"] == "sha256:" + hashlib.sha256(content).hexdigest(), artifact
 assert b"No model or device was used" in content
 assert (root / "runtime.log").stat().st_size > 0
+master_project = json.loads((root / "master-project.json").read_text())
+master_waiting = json.loads((root / "master-waiting.json").read_text())
+master_accepted = json.loads((root / "master-accepted.json").read_text())
+assert master_project["base"] == "master", master_project
+assert master_waiting["state"] == "waiting" and "No checks configured" in master_waiting["reason"], master_waiting
+assert master_accepted["state"] == "done" and master_accepted["id"] == master_waiting["id"], master_accepted
 print(json.dumps({"release_smoke": "passed", "damaged_package_rejected": True,
                   "task_id": status["task"]["id"], "result_commit": result["result_commit"],
                   "scope": "local command fixture and real Git; no model or device call"}, indent=2))
