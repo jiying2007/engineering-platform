@@ -65,7 +65,9 @@ jobs:
         shell: bash
         env:
           ENG_VERSION: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: bash tool/scripts/build-release.sh
+        run: |
+          bash tool/scripts/build-release.sh
+          cp "$RUNNER_TEMP/eng-test-events.jsonl" tool/dist/eng-test-events.jsonl
       - name: Install and run the packaged no-model example
         shell: bash
         run: bash tool/scripts/smoke-release.sh tool/dist/eng-linux-amd64.tgz
@@ -76,6 +78,6 @@ jobs:
           path: |
             tool/dist/eng-linux-amd64.tgz
             tool/dist/eng-linux-amd64.tgz.sha256
-            ${{ runner.temp }}/eng-test-events.jsonl
+            tool/dist/eng-test-events.jsonl
           retention-days: 90
           if-no-files-found: error
