@@ -25,7 +25,7 @@ Usage: eng [--data-dir DIR] COMMAND
   doctor                              Check local prerequisites without a model call
   runtime add NAME --model|--no-model [--stdin task|none] [--timeout 30m] -- COMMAND [ARG...]
   runtime list
-  project add NAME PATH [--config FILE] [--runtime NAME] [--base main] [--replace]
+  project add NAME PATH [--config FILE] [--runtime NAME] [--base REF] [--replace]
   project list
   run PROJECT --task FILE              Create and run a task, or queue it for serve
   submit PROJECT --task FILE           Create a queued task
