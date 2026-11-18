@@ -31,7 +31,7 @@ func gitEnvironment() []string {
 			env = append(env, value)
 		}
 	}
-	return append(env, "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_GLOBAL=/dev/null")
+	return append(env, "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
 }
 
 func gitCommand(ctx context.Context, root string, args ...string) *exec.Cmd {
@@ -53,6 +53,78 @@ func gitOutput(ctx context.Context, root string, args ...string) (string, error)
 	return strings.TrimSpace(string(raw)), nil
 }
 
+// Git smudge/clean/process drivers execute arbitrary local programs during
+// worktree checkout, add and sometimes inspection. A short-lived Git process
+// cannot supervise the driver's descendants; fail before preparing a worktree
+// rather than reporting a stopped task while a filter process survives.
+func rejectExecutableGitFilters(ctx context.Context, root string) error {
+	cmd := gitCommand(ctx, root, "config", "--includes", "--name-only", "--get-regexp", `^filter\\..*\\.(process|clean|smudge)package local
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"syscall"
+)
+
+type RepositoryInfo struct {
+	Root      string `json:"root"`
+	CommonDir string `json:"common_dir"`
+	BaseSHA   string `json:"base_sha"`
+}
+
+func gitEnvironment() []string {
+	env := make([]string, 0, len(os.Environ())+2)
+	for _, value := range os.Environ() {
+		if !strings.HasPrefix(value, "GIT_") {
+			env = append(env, value)
+		}
+	}
+	return append(env, "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+}
+
+func gitCommand(ctx context.Context, root string, args ...string) *exec.Cmd {
+	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.fsmonitor=false", "-C", root}
+	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
+	cmd.Env = gitEnvironment()
+	// These bounded local Git operations must not outlive a killed scheduler.
+	// Native runtimes use the separately persisted process-group handshake.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	return cmd
+}
+
+func gitOutput(ctx context.Context, root string, args ...string) (string, error) {
+	cmd := gitCommand(ctx, root, args...)
+	raw, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git %s: %w: %.2048s", args[0], err, strings.TrimSpace(string(raw)))
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+)
+	_, err := cmd.Output()
+	if err == nil {
+		return fmt.Errorf("repository defines executable Git filters; remove them or use an independently supervised checkout")
+	}
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return nil // no executable filter drivers configured
+	}
+	return fmt.Errorf("inspect executable Git filters: %w", err)
+}
+
 // InspectRepository resolves the actual common directory so aliases, linked
 // worktrees and separate eng data directories cannot bypass the repository lock.
 func InspectRepository(ctx context.Context, root, base string) (RepositoryInfo, error) {
@@ -71,6 +143,9 @@ func InspectRepository(ctx context.Context, root, base string) (RepositoryInfo, 
 	}
 	top, err = filepath.EvalSymlinks(top)
 	if err != nil {
+		return result, err
+	}
+	if err := rejectExecutableGitFilters(ctx, top); err != nil {
 		return result, err
 	}
 	common, err := gitOutput(ctx, abs, "rev-parse", "--git-common-dir")
