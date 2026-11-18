@@ -44,6 +44,8 @@ eng --data-dir "$eng_demo/state" project add example "$eng_demo/repo" \
   --config .eng.yaml
 eng --data-dir "$eng_demo/state" doctor
 eng --data-dir "$eng_demo/state" run example --task "$eng_package/examples/task.md"
+# 或者对非敏感的小任务，直接提供一段要求：
+# eng --data-dir "$eng_demo/state" run example --text 'Add the requested README example'
 eng --data-dir "$eng_demo/state" status
 ```
 
@@ -101,10 +103,14 @@ eng project add pcr02-linux /work/pcr02 --config .eng.yaml
 
 ```text
 eng run pcr02-linux --task issue-123.md
+# 无需预先创建任务文件，也可以执行非敏感要求：
+eng run pcr02-linux --text '修复已有的日志解析单测并运行配置检查'
 eng status
 eng status TASK_ID
 eng logs TASK_ID
 ```
+
+`run`、`submit` 均接受互斥的 `--task FILE` 或 `--text TEXT`；`resume TASK_ID` 也可用 `--text TEXT` 指定新的任务要求。所有输入均须非空、最大 1 MiB，并冻结在本次 attempt 中。**`--text` 内容可能出现在 shell 历史和进程命令行；涉及敏感资料时使用受权限保护的 `--task FILE`**。这不会自动验证模型授权或减少凭据风险。
 
 `TASK_ID` 使用运行或状态输出的真实编号。状态和结构化命令结果采用 JSON，`logs` 返回日志文本。`logs TASK_ID --stderr` 查看 Runtime 标准错误，`--attempt N` 选择历史执行，`--tail 200` 选择末尾行数；检查日志和产物位于状态中标明的 attempt 目录。全局选项 `--data-dir /local/path` 放在子命令之前。
 
@@ -130,6 +136,7 @@ eng stop TASK_ID
 eng recover
 eng resume TASK_ID
 eng resume TASK_ID --task followup.md
+eng resume TASK_ID --text '已修复上一轮问题，现在按相同验收条件复测'
 ```
 
 先查看 status/logs，解决缺少材料或检查失败，再显式 resume。恢复保留原工作区和历史 attempt；重新调用 Runtime 会建立新 attempt，不声称等同于模型厂商的会话 continue。恢复检查尚不能确认旧进程结束时，任务保持待处理，不通过手改数据库或删除锁文件绕过。
