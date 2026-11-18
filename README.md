@@ -40,7 +40,7 @@ worktree 不是 OS 沙盒。同一账号下的代码能接触该账号可访问�
 
 ## 构建与验证
 
-源码入口是独立 Go module [`tool/`](tool)。在 Linux 上使用 Go 1.26.10、Git 和本机 C 编译器：
+源码入口是独立 Go module [`tool/`](tool)。在 Linux 上使用 Go 1.26.11、Git 和本机 C 编译器：
 
 ```bash
 make check
