@@ -106,6 +106,11 @@ import sys
 
 root, package = map(pathlib.Path, sys.argv[1:])
 assert (package / "MIGRATION.md").is_file()
+# Daily task templates must survive packaging, checksum and installation without
+# fetching an optional reference repository or loading a model.
+for template in ("debug-fix.md", "feature-change.md", "review-release.md"):
+    data = (package / "examples" / "templates" / template).read_text(encoding="utf-8")
+    assert len(data) > 200 and data.startswith("# "), template
 assert "](MIGRATION.md)" in (package / "README.md").read_text()
 doctor = json.loads((root / "doctor.json").read_text())
 assert doctor["ready"] and doctor["model_invocations"] == 0, doctor

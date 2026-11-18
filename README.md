@@ -55,7 +55,7 @@ make release
 
 - [完整操作说明](tool/README.md)：配置、执行、排队、发布、备份与回退。
 - [旧平台迁移说明](docs/small-team-migration.md)：按项目切换、保留历史事实、新状态从新任务开始。
-- [digital-worker 三类任务模板](https://github.com/jiying2007/digital-worker#三类任务模板)：按需复制，不是安装依赖。
+- [排查与修复](tool/examples/templates/debug-fix.md)、[功能与变更](tool/examples/templates/feature-change.md)、[审查与发布准备](tool/examples/templates/review-release.md)：随 `eng` 发行包附带，直接复制到项目 Issue 或任务文件，无需其他仓库。
 - 已有 ADK、模型 CLI 和项目工具链继续使用，不新增 Skill 系统、账号平台或 Web 前后端。
 
 ## 历史平台的范围
