@@ -166,7 +166,9 @@ eng publish TASK_ID --repo OWNER/REPO
 
 发布结果未知时保留待核对记录。再次调用先读取远端；一次未查到目标不能授权盲目重发。恢复旧备份后同样先核对实际外部事实，不依据旧快照自动补做 push 或 PR。仍无法确认时按现有 GitHub/Git 流程人工处理。
 
-实际项目代码由现有 ADK 和已获准 Runtime 处理。`digital-worker` 的任务模板与方法参考可按需使用；两个仓库互不构成安装依赖。
+实际项目代码由现有 ADK 和已获准 Runtime 处理。三类任务模板已随发行包内置在 `examples/templates/`： [排查与修复](examples/templates/debug-fix.md)、[功能与变更](examples/templates/feature-change.md)、[审查与发布准备](examples/templates/review-release.md)。复制为自己的 `task.md` 后由 `eng run PROJECT --task task.md` 执行，日常不依赖另外的领域仓库。
+
+模板仅规定清楚的输入和交付记录，不代表 Runtime 能自动验证所有内容；设备验证、发布权限和项目验收仍以实际项目为准。
 
 ## 数据、备份和升级
 
