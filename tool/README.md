@@ -63,6 +63,8 @@ eng runtime add team-default --model --stdin task --timeout 45m -- /absolute/pat
 
 将上面的可执行路径和参数替换为已验证的实际命令；这是接口示意，不是某个模型 CLI 的预置配置。必须显式指定 `--model` 或 `--no-model`。`--no-model` 用于确定不调用模型的本地命令，不会检查程序内部是否偷偷调用模型。`--stdin task` 传入任务正文；确实不需要标准输入的命令可用 `--stdin none`。
 
+Runtime 可以是 PATH 中的程序、绝对路径，或位于项目 Git 仓库中的相对可执行路径（例如 `./scripts/approved-agent.sh`）。相对路径在 `project add` 关联项目后由 `doctor` 核对，在任务的独立 worktree 内实际执行；不会误用执行 `eng runtime add` 时的当前目录。登记成功不表示脚本有效、模型已登录或存在使用额度。
+
 凭据沿用 Runtime 或操作系统的私有配置，不放进项目 YAML、任务文本或命令参数。已有 Codex/ChatGPT Work 共享额度限制仍适用；登记 Runtime 不扩大执行授权。
 
 ### 2. 登记项目与检查
