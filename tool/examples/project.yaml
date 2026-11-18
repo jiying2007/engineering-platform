@@ -1,6 +1,7 @@
 # Project registration name and local repository path are supplied to the CLI.
 # Replace the commands with this project's existing checks before registration.
-base: main
+# Optional: pin another branch or commit. By default registration uses the checked-out branch.
+# base: main
 runtime: team-default
 checks:
   - name: build
