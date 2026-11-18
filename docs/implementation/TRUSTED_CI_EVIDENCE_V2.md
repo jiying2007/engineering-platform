@@ -45,7 +45,7 @@ tags, branches, short hashes and dynamic references in the repository's direct
 single-line `uses` format. An update must review the upstream commit and run the
 same required gates; a fixed SHA proves identity, not the safety of its contents.
 
-The Go toolchain selected by `go-version-file: go.mod` is currently 1.26.10.
+The Go toolchain selected by `go-version-file: go.mod` is currently 1.26.11.
 The `go` job installs `govulncheck` v1.9.0 into a job-private directory, scans
 production source dependencies against the official Go vulnerability database,
 and retains its toolchain and text report as `go-vulnerability-scan-<sha>`.

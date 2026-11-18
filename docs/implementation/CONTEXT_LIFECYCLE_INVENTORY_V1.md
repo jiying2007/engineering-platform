@@ -103,9 +103,15 @@ path/line/classification rows**. Only the source-file digest below advances; thi
 is NOT #229 context-propagation closure, a runtime trust decision, or production
 qualification.
 
+On 2026-11-18, the retained no-model AST inventory was recalculated for
+PR #307 after the Cortex-M0 scratch compiler fixture preserved the LLVM binary's
+resolved path for runtime library lookup. The exact source digest below advances;
+the scanner still enumerates 61 directly reviewed origins without a lifecycle
+category change. This is neither #229 closure nor device or production proof.
+
 Production `cmd` / `internal` Go source digest from the existing scanner:
 
-`sha256:4fccd66c41aa9d17a15704e39d7891b71905fba474d385a5e3351b59ba7828f6`
+`sha256:f9bcfe81c902d36496664e1b058cd747c8b75892459da8956a790372e0d81125`
 
 ## Reviewed categories
 

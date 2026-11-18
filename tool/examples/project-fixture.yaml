@@ -1,0 +1,7 @@
+base: main
+runtime: fixture
+checks:
+  - name: output-exists
+    argv: ["test", "-s", "eng-fixture-output.txt"]
+    timeout: 1m
+artifacts: ["eng-fixture-output.txt"]

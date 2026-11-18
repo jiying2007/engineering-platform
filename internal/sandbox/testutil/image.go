@@ -170,9 +170,22 @@ func copyARMCompiler(t *testing.T, dir string, run func(string, ...string) strin
 	if err != nil {
 		t.Fatal("Cortex-M integration requires ld.lld on the trusted CI host", err)
 	}
-	files := map[string]string{"/usr/bin/clang": clang, "/usr/bin/ld.lld": lld}
+	// Keep the real LLVM binary paths in the scratch image: Clang's
+	// $ORIGIN-based library search depends on its original installation path.
+	// The command-facing /usr/bin names remain symlinks to those exact bytes.
+	files := map[string]string{}
+	aliases := map[string]string{}
 	for dst, src := range map[string]string{"/usr/bin/clang": clang, "/usr/bin/ld.lld": lld} {
-		_ = dst
+		resolved, err := filepath.EvalSymlinks(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[resolved] = resolved
+		if dst != resolved {
+			aliases[dst] = resolved
+		}
+	}
+	for _, src := range []string{clang, lld} {
 		dependencies := run("ldd", src)
 		if strings.Contains(dependencies, "not found") {
 			t.Fatal("missing cross compiler runtime dependency", src)
@@ -206,6 +219,15 @@ func copyARMCompiler(t *testing.T, dir string, run func(string, ...string) strin
 		closeIn, closeOut := in.Close(), out.Close()
 		if copyErr != nil || closeIn != nil || closeOut != nil {
 			t.Fatal("cross compiler tool copy failed", copyErr, closeIn, closeOut)
+		}
+	}
+	for alias, resolved := range aliases {
+		target := filepath.Join(dir, "rootfs", strings.TrimPrefix(alias, "/"))
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(resolved, target); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
