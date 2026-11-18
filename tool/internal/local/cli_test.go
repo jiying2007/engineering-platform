@@ -200,7 +200,6 @@ func TestCLIProjectRelativeRuntimeRunsFromWorktreeNotRegistrationCWD(t *testing.
 	}
 }
 
-
 func TestCLIInlineTaskAndResumeAreRealAttempts(t *testing.T) {
 	store, root := executionStore(t), executionRepository(t)
 	runtime := Runtime{Name: "cat", Argv: []string{"/bin/sh", "-c", "cat > source.txt"}, Stdin: "task", Timeout: "5s", Model: false}
