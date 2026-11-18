@@ -55,7 +55,7 @@ eng --data-dir "$eng_demo/state" status
 
 ### 1. 登记已获准的 Runtime
 
-先确认具体 Runtime 支持的非交互启动、任务输入与停止方式。`eng` 按 `argv` 启动现有程序，不自动选择模型、注册账号或切换费用来源。
+先确认具体 Runtime 支持的非交互启动、任务输入与停止方式。**登记不等于鉴权成功或真实模型可用**；若你尚未批准模型费用，可用下面无模型例子完成执行器验收，但不能据此声称正式研发完成。`eng` 按 `argv` 启动现有程序，不自动选择模型、注册账号或切换费用来源。
 
 ```text
 eng runtime add team-default --model --stdin task --timeout 45m -- /absolute/path/to/approved-runtime ARGUMENTS
@@ -70,7 +70,7 @@ eng runtime add team-default --model --stdin task --timeout 45m -- /absolute/pat
 把发行包的 `examples/project.yaml` 复制为项目 `.eng.yaml`，改成项目实际存在的命令：
 
 ```yaml
-base: main
+# base: main  # 可选；默认冻结当前检出的分支或 detached HEAD commit
 runtime: team-default
 checks:
   - name: build
@@ -84,9 +84,10 @@ artifacts: ["out/*.elf", "out/*.map"]
 
 ```text
 eng project add pcr02-linux /work/pcr02 --config .eng.yaml
+# 当仓库当前为 master、release/* 等分支且 YAML 未指定 base 时，无需另外加 --base
 ```
 
-名称和本机仓库路径由登记命令提供。相对 `--config` 路径按项目目录解析；省略该选项时自动读取项目根目录中存在的 `.eng.yaml`。当前 YAML 支持 `root`、`base`、`runtime`、`checks`、`artifacts`，未知字段和多份 YAML 文档会报错；不填写草案中的 `version` 或 `name` 字段。登记时明确传入的 `PATH` 决定本机仓库位置，覆盖 YAML 中的 `root`；可共享的项目文件通常省略 `root`。未指定 `base` 时使用 `main`；check 未指定 timeout 时为 10 分钟。时限必须为正且不超过 24 小时。
+名称和本机仓库路径由登记命令提供。相对 `--config` 路径按项目目录解析；省略该选项时自动读取项目根目录中存在的 `.eng.yaml`。当前 YAML 支持 `root`、`base`、`runtime`、`checks`、`artifacts`，未知字段和多份 YAML 文档会报错；不填写草案中的 `version` 或 `name` 字段。登记时明确传入的 `PATH` 决定本机仓库位置，覆盖 YAML 中的 `root`；可共享的项目文件通常省略 `root`。未在配置或命令中指定 `base` 时，项目登记自动选择当前检出的分支；若为 detached HEAD，则固定为当时的精确提交 SHA。显式 `base` 不会被回退覆盖；不可解析时提示 `--base`。check 未指定 timeout 时为 10 分钟。时限必须为正且不超过 24 小时。
 
 每个 artifact pattern 都是所需产物，使用任务工作区内的相对路径；只填写任务确实应产生的文件。未跟踪且匹配这些规则的产物复制到 attempt 目录并记录摘要，不自动加入 Git。检查脚本可以执行代码和访问网络，要作为已获准项目代码对待。一次任务会冻结使用的配置，模型在执行中改动 `.eng.yaml` 不会扩大当前任务的动作范围。
 
