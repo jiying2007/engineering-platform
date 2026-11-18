@@ -291,13 +291,13 @@ func projectCommand(ctx context.Context, dataDir string, args []string, errOut i
 		return registrations(dataDir, "projects")
 	}
 	if len(args) < 3 || args[0] != "add" {
-		return nil, errors.New("usage: eng project add NAME PATH [--config FILE] [--runtime NAME] [--base main]")
+		return nil, errors.New("usage: eng project add NAME PATH [--config FILE] [--runtime NAME] [--base REF]")
 	}
 	name, root := args[1], args[2]
 	fs := newFlags("project add", errOut)
 	config := fs.String("config", "", "project YAML file")
 	runtimeName := fs.String("runtime", "", "registered runtime")
-	base := fs.String("base", "", "base branch or exact commit")
+	base := fs.String("base", "", "base branch or exact commit (default: checked-out branch)")
 	replace := fs.Bool("replace", false, "replace this local registration")
 	if err := fs.Parse(args[3:]); err != nil || fs.NArg() != 0 {
 		return nil, errors.New("invalid project add arguments")
@@ -306,7 +306,7 @@ func projectCommand(ctx context.Context, dataDir string, args []string, errOut i
 	if err != nil {
 		return nil, err
 	}
-	p := Project{Name: name, Root: absRoot, Base: "main", Runtime: *runtimeName}
+	p := Project{Name: name, Root: absRoot, Runtime: *runtimeName}
 	if *config == "" {
 		candidate := filepath.Join(absRoot, ".eng.yaml")
 		if _, statErr := os.Stat(candidate); statErr == nil {
@@ -317,17 +317,28 @@ func projectCommand(ctx context.Context, dataDir string, args []string, errOut i
 		if !filepath.IsAbs(*config) {
 			*config = filepath.Join(absRoot, *config)
 		}
-		p, err = LoadProjectOverrides(*config, name, absRoot, *base, *runtimeName)
-		if err != nil {
+		// Read once to preserve explicit YAML base/runtime values. A missing
+		// base is resolved below, not silently replaced with "main".
+		var declared Project
+		if err = decodeConfig(*config, &declared); err != nil {
 			return nil, err
 		}
-		p.Root = absRoot
+		p.Base, p.Checks, p.Artifacts = declared.Base, declared.Checks, declared.Artifacts
+		if p.Runtime == "" {
+			p.Runtime = declared.Runtime
+		}
 	}
 	if *base != "" {
 		p.Base = *base
 	}
 	if *runtimeName != "" {
 		p.Runtime = *runtimeName
+	}
+	if p.Base == "" {
+		p.Base, err = checkedOutProjectBase(ctx, absRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 	p, err = normalizeProject(p)
 	if err != nil {
@@ -337,7 +348,7 @@ func projectCommand(ctx context.Context, dataDir string, args []string, errOut i
 		return nil, err
 	}
 	if _, err = InspectRepository(ctx, p.Root, p.Base); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("project base %q is unavailable; select an existing branch or commit with --base (or edit base in .eng.yaml): %w", p.Base, err)
 	}
 	if _, err = LoadRuntime(filepath.Join(dataDir, "runtimes", p.Runtime+".yaml"), p.Runtime); err != nil {
 		return nil, fmt.Errorf("register the runtime first: %w", err)
@@ -346,6 +357,21 @@ func projectCommand(ctx context.Context, dataDir string, args []string, errOut i
 		return nil, err
 	}
 	return p, nil
+}
+
+// Resolve the user's existing checkout once at registration, never at task
+// execution. Detached HEAD is pinned to its exact commit instead of a
+// floating pseudo-ref, so switching worktrees later cannot change the base.
+func checkedOutProjectBase(ctx context.Context, root string) (string, error) {
+	branch, err := gitOutput(ctx, root, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err == nil && branch != "" {
+		return branch, nil
+	}
+	sha, shaErr := gitOutput(ctx, root, "rev-parse", "--verify", "HEAD")
+	if shaErr != nil {
+		return "", fmt.Errorf("cannot determine a committed project base; make an initial commit or supply --base: %w", shaErr)
+	}
+	return sha, nil
 }
 
 func saveRegistration(dataDir, kind, name string, value any, replace bool) error {
