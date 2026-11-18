@@ -1,361 +1,67 @@
 # engineering-platform
 
-AI-native embedded-software engineering platform for the R&D center.
+面向个人和小团队的本地工程任务工具。当前使用入口是 **[`eng`](tool/README.md)**：一个 Go 二进制、一个本地 SQLite 数据目录、每个任务一个 Git worktree。它调用你已经配置并获准使用的 CLI，运行项目检查，保存日志、差异和产物。
 
-## What this project is
+适用范围是一个 Ubuntu 执行主机上的可信用户和可信项目。个人默认前台运行；需要排队时启用同一程序的 `eng serve`。需求、评审和合并继续使用现有 Issue、Git 与项目 CI。
 
-engineering-platform turns a real embedded engineering work item into a controlled Human + AI execution and assurance loop:
+## 从这里开始
 
-~~~text
-WorkBuddy / CLI / IDE
-        ↓
-WorkItem
-        ↓
-Material Readiness
-        ↓
-Embedded Capability / Skill
-        ↓
-Task Contract + Verification Plan
-        ↓
-Ubuntu Worker + Interactive Runtime
-        ↓
-Engineer + Codex/Claude
-        ↓
-Git / Build / CI / Device
-        ↓
-Artifact + Delivery Receipt
-        ↓
-Evidence
-        ↓
-Verification
-        ↓
-Review when required
-        ↓
-Closure
-~~~
+1. 从 [Eng local CI](https://github.com/jiying2007/engineering-platform/actions/workflows/eng-local.yml) 对应提交的成功运行下载 `eng-linux-amd64` artifact。
+2. 按[安装与首次使用](tool/README.md#安装已有发行包)校验和安装预编译包。
+3. 先运行发行包自带的无模型示例，再登记自己的项目、Runtime 和检查命令。
 
-The first product scope is embedded software engineering:
-- Embedded Linux / BSP
-- MCU / RTOS / bare metal
-- drivers and components
-- boot / storage / OTA
-- debugging and reliability
-- performance
-- multi-component embedded systems
-- later Device/HIL
-
-## Clean-slate architecture
-
-This repository is an independent new platform.
-
-It does **not** preserve compatibility with historical digital-worker schemas, repository boundaries, runtime profiles, or cross-repository ownership.
-
-Useful engineering principles may be re-derived, but the implementation is clean-slate.
-
-Current architecture, policy and status references (the M0/M1 plan is **historical**, not a live operating checklist):
-
-- [Core Architecture v1](docs/architecture/EMBEDDED_AI_ENGINEERING_PLATFORM_CORE_V1.md)
-- [Embedded Domain Capability Model v1](docs/architecture/EMBEDDED_DOMAIN_CAPABILITY_MODEL_V1.md)
-- [Historical Core M0 / M1 Vertical Slice Plan v1](docs/roadmap/CORE_M0_M1_VERTICAL_SLICE_PLAN_V1.md)
-- [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md)
-- [Codex Credential Lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md)
-- [Extension Catalog v1](docs/extensions/EXTENSION_CATALOG_V1.md)
-- [ADR-001 — Clean-Slate Embedded Platform Scope](docs/adr/ADR-001-clean-slate-embedded-platform-scope.md)
-
-Superseded implementation profiles, adoption-plan revisions and transient CI
-checkpoint markers are retained by Git history rather than kept beside current
-authority-bearing documents. Explicit architecture reviews and research remain
-design evidence, not the current M0/M1 implementation checklist.
-
-## Core product principles
-
-1. **Embedded-specific from M1.** Expert/Capability/Skill is core product behavior, not a late marketplace feature.
-2. **Material readiness fails closed.** Missing source/log/device/acceptance material is explicit; the Runtime does not invent it.
-3. **Interactive execution.** Observe, steer, add context, pause, resume, checkpoint and Human Takeover are first-class.
-4. **Runtime provider neutral.** Codex first, Claude later; domain semantics do not depend on provider internals.
-5. **Privileged actions stay outside the Runtime sandbox.** Git push, CI, flash, signing and release go through policy-controlled Action Gateway.
-6. **External side effects are reconciled.** Timeout/UNKNOWN is never blindly retried.
-7. **Artifact and Evidence are exact.** Path/tag/branch is not identity.
-8. **Runtime claim is not Verification.**
-9. **Engineering != Verification != Review.**
-10. **Real engineering Evidence drives maturity.** File/schema/CI existence alone does not prove a Skill or workflow is mature.
-
-## Embedded domain
-
-Initial capabilities:
-
-~~~text
-embedded.architecture
-embedded.linux-bsp
-embedded.mcu-rtos
-embedded.driver-component
-embedded.debug-reliability
-embedded.verification
-~~~
-
-Initial Skills:
-
-~~~text
-material-readiness
-architecture-impact-analysis
-interface-contract-review
-linux-bsp-debug
-linux-bsp-integration
-mcu-rtos-debug
-mcu-rtos-integration
-driver-integration-review
-log-triage
-verification-plan-builder
-~~~
-
-Automatic Planner comes later. Explicit Skill routing is enough for M1.
-All ten Skill contracts remain `DEFINED`, not `PROVEN`; callers can supply
-an optional material-bound `target_context` for typed Linux BSP/MCU routing.
-See [typed target routing and Skill contracts](docs/implementation/EMBEDDED_TARGET_ROUTING_V1.md).
-These metadata records cannot authorize device actions or replace real Skill
-qualification.
-
-The team's long-lived reusable engineering Skill/method assets remain in
-[agent-dev-kit](https://github.com/jiying2007/agent-dev-kit). The ten existing
-`DEFINED` entries here provide bounded, versioned Task/Prompt guidance for this
-platform; they are **not** a second team-wide Skill source of truth and do not
-claim parity or automatic synchronization with agent-dev-kit. Separate Skill
-effectiveness evaluation, maturity promotion and catalog expansion are deferred.
-This does not relax current Task routing, prompt identity or Action Gateway
-gates, or add a cross-repository runtime dependency.
-
-## Current implementation status
-
-The platform is past M1 bootstrap. **Trusted self-hosted M1 phase 1 is
-historically proven** by retained Feature and Debug Closure chains. The
-current posture is **`INTERNAL_P0_RECOVERY_OPEN_EXTERNAL_QUALIFICATION_PENDING`**:
-the originally approved W01-W10 small-team repository slices are closed, but
-the new internal P0 [#228](https://github.com/jiying2007/engineering-platform/issues/228)
-still requires independent reconciliation of potentially effectful
-DISPATCHED/UNKNOWN/RECONCILING/MANUAL Action states. The recovery-only
-schema-v13 planned-reservation path closes only the no-dispatch PLANNED
-subset; it neither confirms remote publication nor authorizes a retry. Transactional admission (#226) and observability (#227)
-are partial hardening, not that terminal Recovery disposition. Unattended
-Provider, real production-host, WorkBuddy/device and independent human
-acceptance are also pending. **This is neither a clean internal RC nor
-production qualification.**
-
-The authoritative live status is
-[Implementation Status](docs/status/IMPLEMENTATION_STATUS.md). Authentication
-and provider selection are summarized in
-[Codex credential lanes v1](docs/implementation/CODEX_CREDENTIAL_LANES_V1.md).
-
-Current execution posture uses **Profile v3**, which freezes
-`provider_id / credential_mode / execution_mode / provider_config_digest` into
-the Core-authorized profile digest. Worker execution, retained receipts,
-Recovery, Verification and Review all carry that same provider identity.
-
-- **default internal development lane:** trusted Ubuntu host with a
-  ChatGPT-authenticated Codex CLI, exact compatibility qualification, isolated
-  Codex HOME and the existing Core/Worker/Action Gateway/Evidence chain;
-- **deferred WIF alternative:** the managed-workspace WIF path remains structurally
-  defined but has no live qualification; #103 closed `not_planned` on
-  2026-10-29. No administrator rule or credential qualification is implied.
-- **priority unattended candidate (not admitted):** the separate company Relay
-  Provider v3 lane has an offline repository prequalification kit (#301), but
-  #106 still requires a real non-secret gateway contract, provider/source and
-  credential qualification, and independently scoped unattended proof. It
-  cannot silently replace WIF or the trusted self-hosted lane.
-
-Feature #54 and Debug #55 are already CLOSED and their retained results were
-promoted to protected main after Verification/Review/Closure. Do not rerun them
-merely to qualify another credential lane.
-
-Production/unattended readiness remains a separate gate (#105). Do not infer it
-from files, schemas, mocks or green CI alone; retained operational Evidence is
-the maturity boundary.
-
-## M0
-
-M0 freezes only contracts required by the first real engineering loop:
-
-- WorkItem / TaskContract
-- MaterialManifest / TargetContext
-- RunInputManifest
-- Run / RunAttempt / execution_epoch
-- Session / Steering / Checkpoint
-- ActionRequest / ActionReceipt / ExternalOperation
-- ArtifactRef / DeliveryReceipt / EvidenceRef
-- VerificationPlan / VerificationReport / ReviewReport
-- ClosureReceipt
-- Debug HypothesisRegistry
-- canonical digest / audit / recovery_epoch
-
-PLM, MES, RMA, DPP, GS1, manufacturing, PSIRT, certification, privacy, fleet and other lifecycle research are **not** M0 blockers.
-
-## M1 design journeys
-
-The following are the canonical product journeys. The retained phase-1 proof
-covers bounded engineering-to-Closure execution, not every interactive control
-in these journeys:
-
-### Feature pilot
-
-~~~text
-WorkBuddy/CLI
- -> TaskContract
- -> Material Ready
- -> Skill route
- -> Codex interactive Run
- -> Steering
- -> Git change
- -> Build/CI
- -> DeliveryReceipt
- -> Evidence
- -> Verification
- -> Closure
-~~~
-
-### Debug pilot
-
-~~~text
-Issue/log
- -> MaterialManifest
- -> HypothesisRegistry
- -> log-triage
- -> embedded debug Skill
- -> experiment/evidence
- -> fix or explicit BLOCK
- -> regression Verification
-~~~
-
-Only after these work reliably does the project move to M2 Device/HIL.
-
-## Current implementation stack
-
-Implemented: Go, PostgreSQL, direct mTLS, Ubuntu Worker, Codex app-server,
-Git/GitHub Actions, an independent Publisher and exact retained evidence.
-Temporal, OPA, S3/MinIO and OpenTelemetry remain design candidates, not deployed
-services or prerequisites of the current small-team baseline. Add a service only
-when a measured implementation gap justifies it.
-
-## Extensions and research
-
-The research archive remains valuable.
-
-Use:
-- [Extension Catalog v1](docs/extensions/EXTENSION_CATALOG_V1.md) to decide when a researched capability should activate.
-- [Open Source Research Index](docs/research/OPEN_SOURCE_REFERENCE_INDEX.md) for detailed standards/tool/reference research.
-
-Examples of later extensions:
-- Device/HIL / labgrid
-- simulation/emulation
-- interface compatibility
-- system safety
-- diagnostics
-- ML/audio/KWS
-- OTA/fleet
-- manufacturing/PLM
-- PSIRT/security
-- certification/compliance
-- RMA
-- DPP/GS1/EPCIS
-
-These are not inherited into Core automatically.
-
-## Repository maturity
-
-**Trusted self-hosted M1 phase 1 is historically proven, but the current
-repository is not an unqualified internally closed RC or production READY.**
-The retained Feature and Debug Closure chains establish the historical M1
-baseline; they do not qualify later Recovery/Action changes, live Provider
-effects, selected-host production performance or unattended credentials.
-Current open maturity gates are internal P0
-[#228](https://github.com/jiying2007/engineering-platform/issues/228)
-(effectful Action original-dispatcher quiescence and independent Recovery
-observation), internal P1
-[#229](https://github.com/jiying2007/engineering-platform/issues/229)
-(remaining Context/maintenance and selected-host long-run evidence), external
-[#106](https://github.com/jiying2007/engineering-platform/issues/106)
-(Relay provider qualification), and
-[#105](https://github.com/jiying2007/engineering-platform/issues/105)
-(production/unattended acceptance). Former WIF gate
-[#103](https://github.com/jiying2007/engineering-platform/issues/103)
-was closed `not_planned` on 2026-10-29; that is deferral, not qualification. Do not treat healthy GitHub CI or an
-isolated PostgreSQL fault-injection test as evidence of a live remote Provider
-quiescence, production SLO or independent human approval. The single current
-maturity authority remains [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md).
-
-The current delivery contract includes all six executables, including
-`publisher-service`. After extracting an authenticated CI artifact and restoring
-its executable modes, verify it without rebuilding missing components:
-
-```sh
-/path/to/bin/eng distribution-verify --dir /path/to/bin
+```text
+eng doctor
+eng runtime add team-default --model --stdin task --timeout 45m -- /absolute/path/to/approved-runtime ARGUMENTS
+eng project add my-project /work/my-project --config .eng.yaml
+eng run my-project --task task.md
+eng status
 ```
 
-Production preflight v2 binds the expected source commit, real host identities,
-configuration/TLS references and binary roles. `--config-only` yields only
-`CONFIG_VALIDATED`; default preflight can yield `HOST_VALIDATED`, never live
-operational qualification. The systemd Control Plane launches with
-`--production`, which prohibits the in-process publisher regardless of a
-conflicting EnvironmentFile.
+Runtime 行是接口示意，必须替换为已核实且获准的命令；不是预置模型配置。安装、doctor 和示例都不调用模型。预编译包使用 SQLite 内嵌驱动，不需要数据库服务、Go 或 C 编译器。
 
-SLO report v2 distinguishes `UNVERIFIED_SUMMARY` from `SOURCE_BYTES_VERIFIED`.
-Neither grants production qualification. On Linux its observations file is now
-opened through the same bounded descriptor-bound/nonblocking/no-follow reader
-as operational SLI v3; without a supported safe opener, non-Linux v2 observation
-file input and v3 manifest input fail closed rather than accepting an unsafe
-replacement race. WorkBuddy integration and the complete
-interactive Worker control path must not be inferred from adapter methods alone.
-See [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) for the current
-remaining gates.
+## 日常需要的功能
 
-The bounded read-only production diagnostic commands reuse the existing Linux
-deadline-aware pipe output when stdout is a pipe. This covers a one-shot
-`production-status` read, explicit progress-window report,
-`production-live-observe`, `production-publisher-health` and historical
-`production-terminal-readback`. A blocked downstream pipe cannot turn an
-expired or incomplete observation into a successful exit. Devices, regular
-files and unsupported platforms retain their synchronous I/O limitation.
-No such report by itself qualifies live Provider, service READY, SLO or
-production acceptance; see the
-[production operating contract](docs/implementation/PRODUCTION_OPERATIONS_V1.md).
+| 需要做的事 | 入口 |
+|---|---|
+| 登记多个本地仓库与实际检查 | `eng project add` |
+| 创建并执行一个任务 | `eng run PROJECT --task FILE` |
+| 查看结果、差异、日志和历史执行 | `eng status TASK`、`eng logs TASK` |
+| 停止整组本地进程，保留现场 | `eng stop TASK` |
+| 观察中断现场；明确发起下一次尝试 | `eng recover`、`eng resume TASK` |
+| 接受没有配置检查的完整本地结果 | `eng accept TASK --note TEXT` |
+| 按需在同一主机排队 | `eng serve`、`eng submit` |
+| 按需创建 GitHub 分支与 PR | `eng publish TASK --repo OWNER/REPO` |
+| 离线备份与原路径恢复 | `eng backup`、`eng restore` |
 
-## Live engineering controls
+任务配置和每次尝试的输入会冻结；检查记录绑定准确的 result commit。超时、崩溃与不确定的外部操作不会触发自动模型重试。没有 usage 的费用是未知值。`done` 表示约定的本地交付，接受业务需求、合并和设备验证仍由项目决定。
 
-`eng run-control inspect|status|steer|interrupt` uses the existing direct-mTLS
-Control API to bind operator input to the actual authorized thread/turn.
-Steering acceptance, cancellation ACK, interrupted event and app-server process
-exit are separate observations. Missing or UNKNOWN receipts block successful
-delivery and are never replayed. On Linux, `steer --text-file` uses a bounded,
-nonblocking, no-follow descriptor and verifies the original path/file identity
-throughout reading, so FIFO or symlink substitution cannot block a pending
-control request. Platforms without a separately qualified safe file opener
-reject `steer --text-file` rather than reverting to unsafe `Lstat`/`Open`.
-Inspect/status/interrupt continue to use their existing authenticated API paths. See
-[Live Codex controls v1](docs/implementation/LIVE_CODEX_CONTROLS_V1.md).
-The `run-control` surface intentionally covers live Codex steer/interrupt only.
-Core persists pause/resume separately, and exact-epoch Human Takeover is exposed
-by `eng human-takeover`; takeover increments the execution epoch and transfers
-control to HUMAN without replaying the model turn. The CLI checks the actual
-Core acknowledgement and performs a separate exact Run/Session GET. Failed
-readback is an uncertain user-visible result, **not** authority for another
-POST. `run-control inspect` rejects returned statuses for another Run, including
-nested Runtime/checkpoint/receipt identities.
+worktree 不是 OS 沙盒。同一账号下的代码能接触该账号可访问的文件和凭据。共享执行账号不应持有 Git 发布凭据；发布可留在成员自己的工作机。需要源码或凭据相互隔离的成员使用各自实例。
 
-### Stopped source recovery
+## 构建与验证
 
-Interrupted/failed engineering turns with a sealed quiescent scope can retain
-private source checkpoints. The authenticated execution status exposes the exact
-descriptor; `eng source-checkpoint verify|restore` can recover bytes to a new
-private directory without account access or a model replay. This is not automatic
-resume or takeover. See [the source-checkpoint contract](docs/implementation/STOPPED_SOURCE_CHECKPOINT_V1.md).
+源码入口是独立 Go module [`tool/`](tool)。在 Linux 上使用 Go 1.26.10、Git 和本机 C 编译器：
 
-### Explicit source continuation
+```bash
+make check
+make build
+./bin/eng doctor
+make release
+```
 
-After a proven requested interruption, `eng run-continue authorize|status`
-connects the retained private source to one new Run under the existing Work,
-frozen Task and original Git base. It requires the authenticated Work owner,
-RunStart + RunControl, exact checkpoint/version/epoch bindings and a new host
-preparation approval. Old execution is stopped without successful Delivery;
-it is not replayed. The new turn rechecks the complete inherited diff.
-See [source continuation contract](docs/implementation/SOURCE_CONTINUATION_V1.md).
-Source continuation does not reconstruct model memory and is not itself Human
-Takeover or production qualification; Human Takeover is the separate exact-epoch
-control-owner transfer path described above.
+`make release` 输出本机架构的发行包；正式 AMD64 CI 包在 Ubuntu 22.04 上构建。测试使用真实 SQLite、Git、进程和确定性本地命令，覆盖状态竞争、崩溃、停止、恢复、备份与发布回查；不调用模型。通过这些测试不代表模型工程质量、实际设备通过或旧平台生产资格完成。
+
+## 方法与迁移
+
+- [完整操作说明](tool/README.md)：配置、执行、排队、发布、备份与回退。
+- [旧平台迁移说明](docs/small-team-migration.md)：按项目切换、保留历史事实、新状态从新任务开始。
+- [digital-worker 三类任务模板](https://github.com/jiying2007/digital-worker#三类任务模板)：按需复制，不是安装依赖。
+- 已有 ADK、模型 CLI 和项目工具链继续使用，不新增 Skill 系统、账号平台或 Web 前后端。
+
+## 历史平台的范围
+
+根目录的旧 `cmd/`、`internal/`、`go.mod`、`deploy/` 和相应架构/资格材料保留为历史实现与证据参考。新 `tool/` 不导入它们，不连接旧 PostgreSQL，也不双写运行状态。旧服务不是新用户的安装步骤；不再据此扩展日常产品。
+
+旧 [Implementation Status](docs/status/IMPLEMENTATION_STATUS.md) 继续描述旧平台尚未解决的恢复、生产主机、Provider 和设备资格事实。这次重设计没有把这些问题改写成已修复，也没有停止用户主机上的服务或删除历史证据。现存受保护分支的旧 CI 检查继续真实运行，新工具另外由 `Eng local CI` 验证；旧检查的绿色结果不替代新工具验证。
+
+完成真实项目的低风险试用、保存旧执行现场并确认未决外部效果后，再退出原有服务。迁移不要求维持长期双运行或兼容层。

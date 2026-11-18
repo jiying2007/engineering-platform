@@ -1,28 +1,30 @@
 GO ?= go
 
-.PHONY: fmt fmt-check test vet build check run-control-plane capabilities
-
-fmt:
-	gofmt -w cmd internal
-
-fmt-check:
-	@test -z "$$(gofmt -l cmd internal)"
-
-test:
-	$(GO) test ./...
-
-vet:
-	$(GO) vet ./...
+.PHONY: build fmt fmt-check test vet check release legacy-check
 
 build:
-	$(GO) build ./cmd/control-plane
-	$(GO) build ./cmd/eng
-	$(GO) build ./cmd/worker
+	mkdir -p bin
+	cd tool && CGO_ENABLED=1 $(GO) build -buildvcs=false -trimpath -o ../bin/eng ./cmd/eng
+
+fmt:
+	cd tool && gofmt -w cmd internal
+
+fmt-check:
+	@test -z "$$(cd tool && gofmt -l cmd internal)"
+
+test:
+	cd tool && CGO_ENABLED=1 $(GO) test -race -count=1 -timeout 3m ./...
+
+vet:
+	cd tool && CGO_ENABLED=1 $(GO) vet ./...
 
 check: fmt-check test vet build
 
-run-control-plane:
-	$(GO) run ./cmd/control-plane
+release:
+	ENG_GO_BIN="$(GO)" bash tool/scripts/build-release.sh
 
-capabilities:
-	$(GO) run ./cmd/eng capabilities
+# Historical regression only; this does not build the active eng product.
+legacy-check:
+	$(GO) test ./...
+	$(GO) vet ./...
+	$(GO) build ./cmd/...

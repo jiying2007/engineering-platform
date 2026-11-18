@@ -1,4 +1,5 @@
 # Go
+/bin/
 /control-plane
 /eng
 /worker

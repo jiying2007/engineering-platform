@@ -1,5 +1,11 @@
 # Implementation Status
 
+> Scope notice — 2026-11-18: this document and its machine-readable gates describe
+> the retained multi-service platform. The active individual/small-team product is
+> [`tool/eng`](../../tool/README.md), with [separate migration instructions](../small-team-migration.md).
+> None of the historical recovery, host, provider or device gates below is closed
+> by the redesign or by the new executor's no-model tests.
+
 <!-- engineering-platform-readiness
 {
   "version": 1,
@@ -17,7 +23,7 @@
 }
 -->
 
-This is the single live implementation-status authority. Detailed contracts are
+This is the implementation-status authority for the retained platform. Detailed contracts are
 linked below; historical checkpoints and receipts remain in Git/PR history, not
 parallel live checklists. Latest comprehensive audit baseline:
 `a0628df29439b4980a9c93ba2d840fa9b8d8319a`.

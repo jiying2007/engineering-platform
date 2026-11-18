@@ -1,0 +1,12 @@
+# Project registration name and local repository path are supplied to the CLI.
+# Replace the commands with this project's existing checks before registration.
+base: main
+runtime: team-default
+checks:
+  - name: build
+    argv: ["bash", "scripts/build.sh"]
+    timeout: 30m
+  - name: test
+    argv: ["bash", "scripts/test.sh"]
+    timeout: 15m
+artifacts: ["out/*.elf", "out/*.map"]
