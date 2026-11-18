@@ -1,0 +1,39 @@
+name: Eng build tools
+
+on:
+  push:
+    branches: [feat/small-team-eng-20261118]
+    paths: [.github/workflows/eng-local.yml, tool/go.mod]
+
+permissions:
+  contents: read
+
+jobs:
+  build-tools:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: tool/go.mod
+          cache: false
+      - name: Prepare offline compiler and pinned dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd tool
+          go mod download
+          stage="$RUNNER_TEMP/eng-build-tools"
+          mkdir -p "$stage"
+          cp -a "$(go env GOROOT)" "$stage/go"
+          cp -a "$(go env GOMODCACHE)" "$stage/mod"
+          cp go.mod go.sum "$stage/"
+          go version > "$stage/toolchain.txt"
+          tar -czf "$RUNNER_TEMP/eng-build-tools.tgz" -C "$stage" .
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: eng-build-tools-${{ github.sha }}
+          path: ${{ runner.temp }}/eng-build-tools.tgz
+          retention-days: 1
+          if-no-files-found: error
