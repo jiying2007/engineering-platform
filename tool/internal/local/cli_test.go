@@ -136,3 +136,66 @@ func TestCLIProjectAddUsesCheckedOutBranchAndHonorsExplicitBase(t *testing.T) {
 		})
 	}
 }
+
+func TestCLIProjectRelativeRuntimeRunsFromWorktreeNotRegistrationCWD(t *testing.T) {
+	store, root := executionStore(t), executionRepository(t)
+	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(root, "scripts", "runtime.sh")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nset -eu\ncat > source.txt\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitOutput(context.Background(), root, "add", "scripts/runtime.sh"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitOutput(context.Background(), root, "commit", "-m", "Add project-local runtime"); err != nil {
+		t.Fatal(err)
+	}
+	// The CLI is intentionally not launched from root, so LookPath against
+	// the registration working directory cannot discover ./scripts/runtime.sh.
+	var stdout, stderr bytes.Buffer
+	code := CLI(context.Background(), []string{
+		"--data-dir", store.DataDir(), "runtime", "add", "local",
+		"--no-model", "--stdin", "task", "--timeout", "5s", "--", "./scripts/runtime.sh",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project-relative runtime rejected before project registration: %s %s", &stdout, &stderr)
+	}
+	config := "runtime: local\nchecks:\n  - name: source\n    argv: [/bin/sh, -c, 'grep -qx after source.txt']\n    timeout: 5s\n"
+	if err := os.WriteFile(filepath.Join(root, ".eng.yaml"), []byte(config), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = CLI(context.Background(), []string{
+		"--data-dir", store.DataDir(), "project", "add", "real", root,
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("project registration with worktree runtime failed: %s %s", &stdout, &stderr)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = CLI(context.Background(), []string{"--data-dir", store.DataDir(), "doctor"}, &stdout, &stderr)
+	var checks doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &checks); err != nil || code != 0 || !checks.Ready {
+		t.Fatalf("real worktree executable not found: status=%d report=%+v error=%v stderr=%s", code, checks, err, &stderr)
+	}
+	taskFile := filepath.Join(t.TempDir(), "task.md")
+	if err := os.WriteFile(taskFile, []byte("after\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	code = CLI(context.Background(), []string{
+		"--data-dir", store.DataDir(), "run", "real", "--task", taskFile,
+	}, &stdout, &stderr)
+	var task Task
+	if err := json.Unmarshal(stdout.Bytes(), &task); err != nil || code != 0 || task.State != StateDone {
+		t.Fatalf("registered worktree runtime did not deliver: code=%d task=%+v error=%v stderr=%s", code, task, err, &stderr)
+	}
+	attempt := lastExecutionAttempt(t, store, task)
+	if !attempt.Result.LocalProcessStopped || attempt.Result.RuntimeExitCode != 0 || attempt.Result.ChecksStatus != "passed" || attempt.Result.RemoteOutcomeUnknown {
+		t.Fatalf("runtime result is not verified locally: %+v", attempt.Result)
+	}
+}
