@@ -277,8 +277,13 @@ func runtimeCommand(dataDir string, args []string, errOut io.Writer) (any, error
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-	if _, err := exec.LookPath(r.Argv[0]); err != nil {
-		return nil, fmt.Errorf("runtime executable: %w", err)
+	// A project-relative program is resolved in its Git worktree at execution.
+	// Registration happens before any project is linked, so checking it against
+	// the caller's current directory would reject a valid existing checkout.
+	if filepath.IsAbs(r.Argv[0]) || !strings.ContainsRune(r.Argv[0], '/') {
+		if _, err := exec.LookPath(r.Argv[0]); err != nil {
+			return nil, fmt.Errorf("runtime executable: %w", err)
+		}
 	}
 	if err := saveRegistration(dataDir, "runtimes", r.Name, r, *replace); err != nil {
 		return nil, err
