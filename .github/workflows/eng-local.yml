@@ -26,6 +26,12 @@ jobs:
         with:
           go-version-file: tool/go.mod
           cache: false
+      - name: Print the exact retained Context inventory digest (diagnostic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/authority_context_inventory.py --root . --out "$RUNNER_TEMP/eng-context-inventory.json"
+          python3 -c 'import json,sys; o=json.load(open(sys.argv[1])); print("CURRENT_CONTEXT_DIGEST="+o["source_files_digest"]); print("CONTEXT_CANDIDATES="+str(len(o["context_or_call_candidates"])))' "$RUNNER_TEMP/eng-context-inventory.json"
       - name: Dependencies and format
         working-directory: tool
         shell: bash
