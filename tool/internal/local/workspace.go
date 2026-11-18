@@ -53,74 +53,18 @@ func gitOutput(ctx context.Context, root string, args ...string) (string, error)
 	return strings.TrimSpace(string(raw)), nil
 }
 
-// Git smudge/clean/process drivers execute arbitrary local programs during
-// worktree checkout, add and sometimes inspection. A short-lived Git process
-// cannot supervise the driver's descendants; fail before preparing a worktree
-// rather than reporting a stopped task while a filter process survives.
+// Git filter drivers can execute arbitrary programs during checkout or add.
+// A short-lived Git process does not supervise their descendants, so reject
+// executable filters before creating a worktree or staging files.
 func rejectExecutableGitFilters(ctx context.Context, root string) error {
-	cmd := gitCommand(ctx, root, "config", "--includes", "--name-only", "--get-regexp", `^filter\\..*\\.(process|clean|smudge)package local
-
-import (
-	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
-	"io/fs"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"sort"
-	"strings"
-	"syscall"
-)
-
-type RepositoryInfo struct {
-	Root      string `json:"root"`
-	CommonDir string `json:"common_dir"`
-	BaseSHA   string `json:"base_sha"`
-}
-
-func gitEnvironment() []string {
-	env := make([]string, 0, len(os.Environ())+2)
-	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "GIT_") {
-			env = append(env, value)
-		}
-	}
-	return append(env, "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
-}
-
-func gitCommand(ctx context.Context, root string, args ...string) *exec.Cmd {
-	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.fsmonitor=false", "-C", root}
-	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
-	cmd.Env = gitEnvironment()
-	// These bounded local Git operations must not outlive a killed scheduler.
-	// Native runtimes use the separately persisted process-group handshake.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
-	return cmd
-}
-
-func gitOutput(ctx context.Context, root string, args ...string) (string, error) {
-	cmd := gitCommand(ctx, root, args...)
-	raw, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w: %.2048s", args[0], err, strings.TrimSpace(string(raw)))
-	}
-	return strings.TrimSpace(string(raw)), nil
-}
-
-)
+	cmd := gitCommand(ctx, root, "config", "--includes", "--name-only", "--get-regexp", "^filter\\..*\\.(process|clean|smudge)$")
 	_, err := cmd.Output()
 	if err == nil {
 		return fmt.Errorf("repository defines executable Git filters; remove them or use an independently supervised checkout")
 	}
 	var exit *exec.ExitError
 	if errors.As(err, &exit) && exit.ExitCode() == 1 {
-		return nil // no executable filter drivers configured
+		return nil
 	}
 	return fmt.Errorf("inspect executable Git filters: %w", err)
 }
