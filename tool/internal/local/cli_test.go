@@ -262,12 +262,13 @@ func TestCLIInlineTextRejectsEmptyAmbiguousAndOversizedWithoutTask(t *testing.T)
 		var stdout, stderr bytes.Buffer
 		all := append([]string{"--data-dir", store.DataDir()}, args...)
 		if code := CLI(context.Background(), all, &stdout, &stderr); code == 0 {
-			t.Fatalf("invalid task input accepted: args=%q stdout=%s", args, &stdout)
+			t.Fatalf("invalid task input accepted: command=%s output_bytes=%d", args[0], stdout.Len())
 		}
 		if !strings.Contains(stderr.String(), "task input") &&
 			!strings.Contains(stderr.String(), "provide exactly one") &&
-			!strings.Contains(stderr.String(), "provide at most one") {
-			t.Fatalf("unexpected invalid-input failure: args=%q stderr=%s", args, &stderr)
+			!strings.Contains(stderr.String(), "provide at most one") &&
+			!strings.Contains(stderr.String(), "inline task text") {
+			t.Fatalf("unexpected invalid-input failure: command=%s stderr=%s", args[0], &stderr)
 		}
 	}
 	tasks, err := store.ListTasks(context.Background())
