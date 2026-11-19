@@ -11,6 +11,13 @@ export PATH="$HOME/.local/bin:$PATH"
 eng doctor
 ```
 
+如果从小型发行包安装，先解压为独立目录，避免覆盖当前目录的文件：
+
+```bash
+tar -xzf eng-v0-linux-python.tgz
+bash eng-v0/scripts/install.sh
+```
+
 安装器**不会覆盖现有 eng**。如果以前安装过 Go 版本，先检查它是否仍有活动任务并备份状态；确认停止后，再运行 `bash v0/scripts/install.sh --replace`，安装器会保留旧二进制副本。安装不调用模型、不会停止旧服务或删除旧数据。
 
 ## 一次明确的 Runtime 配置，然后一条命令运行任务

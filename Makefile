@@ -18,7 +18,7 @@ install:
 
 release:
 	mkdir -p dist
-	tar -czf dist/eng-v0-linux-python.tgz -C v0 eng scripts/install.sh README.md
+	tar --transform='s,^,eng-v0/,' -czf dist/eng-v0-linux-python.tgz -C v0 eng scripts/install.sh README.md
 	(cd dist && sha256sum eng-v0-linux-python.tgz > eng-v0-linux-python.tgz.sha256)
 
 # Historical multi-service code: not needed for normal install or V0 checks.
