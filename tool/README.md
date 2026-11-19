@@ -110,7 +110,7 @@ eng status TASK_ID
 eng logs TASK_ID
 ```
 
-`run`、`submit` 均接受互斥的 `--task FILE` 或 `--text TEXT`；`resume TASK_ID` 也可用 `--text TEXT` 指定新的任务要求。所有输入均须非空、最大 1 MiB，并冻结在本次 attempt 中。**`--text` 内容可能出现在 shell 历史和进程命令行；涉及敏感资料时使用受权限保护的 `--task FILE`**。这不会自动验证模型授权或减少凭据风险。
+`run`、`submit` 均接受互斥的 `--task FILE` 或 `--text TEXT`；`resume TASK_ID` 也可用 `--text TEXT` 指定新的任务要求。文件输入最大 1 MiB；直接命令行文本上限 16 KiB（Linux 单参数长度有限），均不得为空，并冻结在本次 attempt 中。**`--text` 内容可能出现在 shell 历史和进程命令行；涉及敏感资料时使用受权限保护的 `--task FILE`**。这不会自动验证模型授权或减少凭据风险。
 
 `TASK_ID` 使用运行或状态输出的真实编号。状态和结构化命令结果采用 JSON，`logs` 返回日志文本。`logs TASK_ID --stderr` 查看 Runtime 标准错误，`--attempt N` 选择历史执行，`--tail 200` 选择末尾行数；检查日志和产物位于状态中标明的 attempt 目录。全局选项 `--data-dir /local/path` 放在子命令之前。
 
