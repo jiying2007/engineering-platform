@@ -1,0 +1,376 @@
+#!/usr/bin/env python3
+"""eng V0: one foreground engineering task, existing CLI, real Git evidence.
+
+Python 3.10+ standard library; Linux only. No scheduler, database, model SDK,
+network client, automatic retry, publication, or credential handling.
+"""
+import argparse
+import contextlib
+import datetime as dt
+import fcntl
+import hashlib
+import json
+import os
+import pathlib
+import re
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import uuid
+
+MAX_INLINE = 16 * 1024
+MAX_FILE = 1024 * 1024
+
+
+def utcnow():
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def home_dir():
+    return pathlib.Path(os.environ.get("ENG_HOME", pathlib.Path.home() / ".local/state/eng")).expanduser().resolve()
+
+
+def config_path():
+    return pathlib.Path(os.environ.get("ENG_RUNNER_CONFIG", pathlib.Path.home() / ".config/eng/runner.json")).expanduser()
+
+
+def safe_dir(path):
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if path.is_symlink() or not path.is_dir() or path.stat().st_mode & 0o077:
+        raise ValueError("eng state/config directory must be a real private directory (0700)")
+    return path
+
+
+def write_json(path, value):
+    safe_dir(path.parent)
+    fd, name = tempfile.mkstemp(prefix=".eng-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            json.dump(value, out, ensure_ascii=False, indent=2, sort_keys=True)
+            out.write("\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(name, path)
+        with contextlib.suppress(OSError):
+            d = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(d)
+            finally:
+                os.close(d)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(name)
+
+
+def git(cwd, *args, check=True, capture=True):
+    env = os.environ.copy()
+    for name in tuple(env):
+        if name.startswith("GIT_"):
+            del env[name]
+    env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+    env["GIT_CONFIG_SYSTEM"] = "/dev/null"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    command = ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-C", str(cwd), *args]
+    proc = subprocess.run(command, env=env, text=True, stdout=subprocess.PIPE if capture else None,
+                          stderr=subprocess.PIPE, check=False)
+    if check and proc.returncode:
+        raise RuntimeError("git " + args[0] + " failed: " + (proc.stderr or "").strip()[:500])
+    return proc
+
+
+def repo_identity(cwd):
+    root = pathlib.Path(git(cwd, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
+    common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()
+    common = pathlib.Path(common).resolve()
+    base = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip()
+    # Executable Git filters can launch unsupervised subprocesses at checkout/add.
+    probe = git(root, "config", "--local", "--name-only", "--get-regexp",
+                r"^filter\..*\.(process|clean|smudge)$", check=False)
+    if probe.returncode == 0:
+        raise ValueError("repository defines executable Git filters; V0 refuses unsupervised checkout")
+    if probe.returncode != 1:
+        raise ValueError("cannot verify repository Git filters")
+    return root, common, base
+
+
+def runner():
+    path = config_path()
+    if not path.is_file() or path.is_symlink() or path.stat().st_mode & 0o077:
+        raise ValueError("no private approved runner config; run: eng use -- EXECUTABLE ARGUMENTS")
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    argv = spec.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(x, str) and x for x in argv):
+        raise ValueError("invalid runner config; use eng use to recreate it")
+    return argv
+
+
+def use(args):
+    if args and args[0] == "--":
+        args = args[1:]
+    if not args or any(not x.strip() or "\x00" in x for x in args):
+        raise ValueError("usage: eng use -- EXECUTABLE [ARGUMENTS...]")
+    exe = pathlib.Path(args[0]).name.lower()
+    if exe in ("codex", "codex-cli", "chatgpt-work"):
+        raise ValueError("this environment does not authorize Codex/ChatGPT Work quota; select an approved separate runner")
+    if not any(token in x for x in args for token in ("{prompt}", "{task_file}")):
+        # With no placeholder the task text is sent on stdin only.
+        delivery = "stdin"
+    else:
+        delivery = "explicit-placeholder"
+    for x in args:
+        low = x.lower()
+        if low in ("--api-key", "--token", "--password", "--secret") or any(low.startswith(y) for y in ("--api-key=", "--token=", "--password=", "--secret=")):
+            raise ValueError("do not store credentials in runner argv; use the CLI's private credential store")
+    if "/" not in args[0] and shutil.which(args[0]) is None:
+        raise ValueError("runner executable not found in PATH: " + args[0])
+    write_json(config_path(), {"argv": args, "prompt_delivery": delivery, "configured_at": utcnow()})
+    return {"configured": True, "argv": args, "delivery": delivery,
+            "model_auth": "not_verified", "model_calls": 0}
+
+
+def check_exec(value):
+    tokens = shlex.split(value)
+    if not tokens:
+        raise ValueError("--check needs a real executable and arguments")
+    if any("\x00" in t for t in tokens):
+        raise ValueError("NUL in check command")
+    return tokens
+
+
+def read_task(options):
+    if bool(options.text is not None) == bool(options.task is not None):
+        raise ValueError("provide exactly one of task TEXT or --task FILE")
+    if options.text is not None:
+        if len(options.text.encode("utf-8")) > MAX_INLINE:
+            raise ValueError("inline task exceeds 16 KiB; use --task FILE")
+        task = options.text
+    else:
+        path = pathlib.Path(options.task)
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_FILE:
+            raise ValueError("task file must be a regular file <= 1 MiB")
+        task = path.read_text(encoding="utf-8")
+    if not task.strip() or len(task.encode("utf-8")) > MAX_FILE:
+        raise ValueError("task must be nonempty and at most 1 MiB")
+    return task
+
+
+def _stop_group(proc):
+    if proc.poll() is None:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                proc.wait(timeout=3)
+    # A child may have exited while descendants remain in the process group.
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(proc.pid, signal.SIGKILL)
+
+
+def supervised(argv, cwd, stdin, outpath, errpath, seconds):
+    def handle_signal(signum, frame):
+        raise KeyboardInterrupt()
+
+    old_int = signal.signal(signal.SIGINT, handle_signal)
+    old_term = signal.signal(signal.SIGTERM, handle_signal)
+    try:
+        return _supervised(argv, cwd, stdin, outpath, errpath, seconds)
+    finally:
+        signal.signal(signal.SIGINT, old_int)
+        signal.signal(signal.SIGTERM, old_term)
+
+
+def _supervised(argv, cwd, stdin, outpath, errpath, seconds):
+    with open(outpath, "wb") as out, open(errpath, "wb") as err:
+        proc = subprocess.Popen(argv, cwd=str(cwd), stdin=subprocess.PIPE,
+                                stdout=out, stderr=err, start_new_session=True)
+        try:
+            proc.communicate(input=stdin, timeout=seconds)
+        except subprocess.TimeoutExpired:
+            _stop_group(proc)
+            return 124, False, "timeout; external model outcome/cost unknown"
+        except (KeyboardInterrupt, SystemExit):
+            _stop_group(proc)
+            return 130, False, "interrupted; external model outcome/cost unknown"
+        # No background descendants may retain the workspace after parent exit.
+        try:
+            os.killpg(proc.pid, 0)
+        except ProcessLookupError:
+            return proc.returncode, True, ""
+        _stop_group(proc)
+        return proc.returncode, False, "runtime left descendant processes; external effects unknown"
+
+
+def assembled_runner(argv, task, task_path):
+    expanded = []
+    for arg in argv:
+        expanded.append(arg.replace("{task_file}", str(task_path)).replace("{prompt}", task))
+    if any(len(arg.encode("utf-8")) > MAX_INLINE for arg in expanded):
+        raise ValueError("runner uses argv prompt longer than 16 KiB; select a stdin or {task_file} runner")
+    send_stdin = b"" if any("{prompt}" in x or "{task_file}" in x for x in argv) else task.encode("utf-8")
+    return expanded, send_stdin
+
+
+def run_task(options):
+    task = read_task(options)
+    cfg = runner()  # read explicit approved runner before making workspace
+    checks = [check_exec(x) for x in options.check]
+    root, common, base = repo_identity(pathlib.Path.cwd())
+    if options.dry_run:
+        return {"ready_for_local_attempt": True, "git_root": str(root), "baseline": base,
+                "runtime": cfg[0], "runner_auth": "unverified", "model_calls": 0,
+                "checks": checks, "checks_not_executed": True}, 0
+
+    state = home_dir()
+    safe_dir(state)
+    safe_dir(state / "runs")
+    safe_dir(state / "locks")
+    key = hashlib.sha256(str(common).encode()).hexdigest()[:24]
+    with open(state / "locks" / (key + ".lock"), "a+b") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError("this Git repository already has an active eng task")
+        rid = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+        folder = state / "runs" / rid
+        folder.mkdir(mode=0o700)
+        worktree = folder / "worktree"
+        branch = "eng/v0-" + rid
+        taskfile = folder / "task.md"
+        taskfile.write_text(task, encoding="utf-8")
+        taskfile.chmod(0o600)
+        record = {"id": rid, "repo": str(root), "baseline": base, "branch": branch,
+                  "worktree": str(worktree), "task_path": str(taskfile),
+                  "runner": cfg[0], "checks": [], "state": "preparing", "started_at": utcnow(),
+                  "model_usage": "unknown; never assumed zero", "pr_published": False}
+        statusfile = folder / "status.json"
+        write_json(statusfile, record)
+        try:
+            git(root, "worktree", "add", "-b", branch, "--", str(worktree), base)
+            full_argv, stdin = assembled_runner(cfg, task, taskfile)
+            record["state"] = "running"
+            record["runtime_command"] = ["<task text omitted>" if "{prompt}" in original else value
+                                         for original, value in zip(cfg, full_argv)]
+            write_json(statusfile, record)
+            code, stopped, issue = supervised(full_argv, worktree, stdin, folder/"runner.out", folder/"runner.err", options.timeout)
+            record["runtime_exit_code"] = code
+            record["runtime_group_stopped"] = stopped
+            if not stopped:
+                record["state"] = "unknown"
+                record["reason"] = issue
+                return record, 3
+            # Snapshot candidate before checks, so failed checks never destroy work.
+            git(worktree, "add", "-A")
+            staged = git(worktree, "diff", "--cached", "--quiet", check=False)
+            if staged.returncode not in (0, 1):
+                raise RuntimeError("cannot inspect staged candidate")
+            if staged.returncode == 1:
+                git(worktree, "-c", "user.name=eng v0", "-c", "user.email=eng@localhost",
+                    "commit", "-m", "eng v0: task " + rid)
+            result_sha = git(worktree, "rev-parse", "HEAD").stdout.strip()
+            record["result_commit"] = result_sha
+            with open(folder / "diff.patch", "wb") as patch:
+                patch.write(git(worktree, "diff", "--binary", "--no-ext-diff", base, result_sha).stdout.encode())
+            if code != 0:
+                record["state"], record["reason"] = "failed", "runner returned nonzero; result preserved"
+                return record, 1
+            if result_sha == base:
+                record["state"], record["reason"] = "needs_review", "runner produced no Git changes"
+                return record, 2
+            for i, command in enumerate(checks):
+                stdout, stderr = folder / (f"check-{i:02d}.out"), folder / (f"check-{i:02d}.err")
+                code, stopped, issue = supervised(command, worktree, b"", stdout, stderr, options.timeout)
+                check = {"argv": command, "exit_code": code, "source_commit": result_sha,
+                         "local_process_stopped": stopped, "stdout": str(stdout), "stderr": str(stderr)}
+                record["checks"].append(check)
+                if not stopped:
+                    record["state"], record["reason"] = "unknown", issue
+                    return record, 3
+                if code != 0:
+                    record["state"], record["reason"] = "failed", "required check failed"
+                    return record, 1
+                if git(worktree, "status", "--porcelain").stdout or git(worktree, "rev-parse", "HEAD").stdout.strip() != result_sha:
+                    record["state"], record["reason"] = "needs_review", "checks changed the workspace after candidate snapshot"
+                    return record, 2
+            if not checks:
+                record["state"], record["reason"] = "needs_review", "no checks configured; inspect candidate manually"
+                return record, 2
+            record["state"], record["reason"] = "locally_verified", "all explicit local checks passed; semantic review still required"
+            return record, 0
+        except BaseException as exc:
+            record["state"] = "unknown"
+            record["reason"] = type(exc).__name__ + ": " + str(exc)[:300]
+            return record, 3
+        finally:
+            record["finished_at"] = utcnow()
+            write_json(statusfile, record)
+
+
+def doctor():
+    report = {"git": shutil.which("git") is not None, "python": sys.version.split()[0],
+              "runner": "not_configured", "auth": "not_inspected", "model_calls": 0}
+    try:
+        report["runner"] = runner()[0]
+    except Exception as exc:
+        report["runner_error"] = str(exc)
+    try:
+        repo, _, base = repo_identity(pathlib.Path.cwd())
+        report["git_root"] = str(repo)
+        report["base"] = base
+    except Exception as exc:
+        report["git_error"] = str(exc)
+    report["ready_for_local_attempt"] = report["git"] and report["runner"] != "not_configured" and "git_root" in report
+    return report
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(prog="eng", description="One foreground task in a real Git worktree; no model included.")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("doctor")
+    sub.add_parser("status").add_argument("id", nargs="?")
+    use_parser = sub.add_parser("use", help="Register explicitly approved CLI argv; never run it")
+    use_parser.add_argument("argv", nargs=argparse.REMAINDER)
+    run_parser = sub.add_parser("run", help="Run one task in an independent worktree")
+    mx = run_parser.add_mutually_exclusive_group(required=True)
+    mx.add_argument("text", nargs="?", help="Short task text (visible to shell history)")
+    mx.add_argument("--task", metavar="FILE", help="Task file, max 1 MiB")
+    run_parser.add_argument("--check", action="append", default=[], help="Existing project check as quoted argv (repeatable)")
+    run_parser.add_argument("--timeout", type=int, default=1800, help="Per-command seconds, maximum 3600")
+    run_parser.add_argument("--dry-run", action="store_true", help="Preflight only; never call runner or create workspace")
+    opts = parser.parse_args(argv)
+    if opts.command == "use":
+        result, code = use(opts.argv), 0
+    elif opts.command == "doctor":
+        result, code = doctor(), 0
+    elif opts.command == "run":
+        if not 1 <= opts.timeout <= 3600:
+            raise ValueError("timeout must be between 1 and 3600 seconds")
+        result, code = run_task(opts)
+    else:
+        state = home_dir() / "runs"
+        if opts.id:
+            if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}", opts.id):
+                raise ValueError("invalid task id")
+            result = json.loads((state / opts.id / "status.json").read_text(encoding="utf-8"))
+        else:
+            result = []
+            if state.exists():
+                for file in sorted(state.glob("*/status.json"), reverse=True)[:20]:
+                    result.append(json.loads(file.read_text(encoding="utf-8")))
+        code = 0
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return code
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (ValueError, FileNotFoundError, RuntimeError, json.JSONDecodeError) as error:
+        print("eng: " + str(error), file=sys.stderr)
+        sys.exit(1)

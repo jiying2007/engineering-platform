@@ -1,0 +1,39 @@
+name: Eng V0
+
+on:
+  push:
+    branches: [main]
+    paths: ["v0/**", "Makefile", "README.md", ".github/workflows/eng-v0.yml"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths: ["v0/**", "Makefile", "README.md", ".github/workflows/eng-v0.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  v0:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: No-model Git and process smoke (Python 3.10)
+        run: |
+          set -euo pipefail
+          python3 --version
+          make check
+          make build
+          ./bin/eng --help
+          make release
+          sha256sum --check dist/eng-v0-linux-python.tgz.sha256 --ignore-missing
+      - name: Retain small exact V0 package
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: eng-v0-${{ github.sha }}
+          path: |
+            dist/eng-v0-linux-python.tgz
+            dist/eng-v0-linux-python.tgz.sha256
+          if-no-files-found: error
+          retention-days: 30

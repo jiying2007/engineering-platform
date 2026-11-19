@@ -1,30 +1,27 @@
-GO ?= go
+PYTHON ?= python3
 
-.PHONY: build fmt fmt-check test vet check release legacy-check
+.PHONY: check test build install release legacy-check
+
+check: test
+	$(PYTHON) -m py_compile v0/eng
+	bash -n v0/scripts/install.sh
+
+test:
+	$(PYTHON) -m unittest discover -s v0/tests -v
 
 build:
 	mkdir -p bin
-	cd tool && CGO_ENABLED=1 $(GO) build -buildvcs=false -trimpath -o ../bin/eng ./cmd/eng
+	install -m 0755 v0/eng bin/eng
 
-fmt:
-	cd tool && gofmt -w cmd internal
-
-fmt-check:
-	@test -z "$$(cd tool && gofmt -l cmd internal)"
-
-test:
-	cd tool && CGO_ENABLED=1 $(GO) test -race -count=1 -timeout 3m ./...
-
-vet:
-	cd tool && CGO_ENABLED=1 $(GO) vet ./...
-
-check: fmt-check test vet build
+install:
+	bash v0/scripts/install.sh
 
 release:
-	ENG_GO_BIN="$(GO)" bash tool/scripts/build-release.sh
+	mkdir -p dist
+	tar -czf dist/eng-v0-linux-python.tgz -C v0 eng scripts/install.sh README.md
+	(cd dist && sha256sum eng-v0-linux-python.tgz > eng-v0-linux-python.tgz.sha256)
 
-# Historical regression only; this does not build the active eng product.
+# Historical multi-service code: not needed for normal install or V0 checks.
 legacy-check:
-	$(GO) test ./...
-	$(GO) vet ./...
-	$(GO) build ./cmd/...
+	go test ./...
+	go vet ./...
