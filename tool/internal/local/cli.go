@@ -135,7 +135,7 @@ func command(ctx context.Context, s *Store, args []string, out, errOut io.Writer
 		}
 		fs := newFlags(args[0], errOut)
 		file := fs.String("task", "", "instruction file")
-		text := fs.String("text", "", "inline task text (visible in shell history; use --task FILE for sensitive text)")
+		text := fs.String("text", "", "short inline task text (max 16 KiB; visible in shell history; prefer --task FILE for larger or sensitive text)")
 		if err := fs.Parse(args[2:]); err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func command(ctx context.Context, s *Store, args []string, out, errOut io.Writer
 		if fileSet {
 			instruction, err = readInstruction(*file)
 		} else {
-			instruction, err = validateInstruction(*text)
+			instruction, err = validateInlineInstruction(*text)
 		}
 		if err != nil {
 			return nil, err
@@ -210,7 +210,7 @@ func command(ctx context.Context, s *Store, args []string, out, errOut io.Writer
 		if fileSet {
 			instruction, err = readInstruction(*file)
 		} else if textSet {
-			instruction, err = validateInstruction(*text)
+			instruction, err = validateInlineInstruction(*text)
 		}
 		if err != nil {
 			return nil, err
@@ -465,6 +465,15 @@ func instructionFlags(fs *flag.FlagSet) (file, text bool) {
 		}
 	})
 	return file, text
+}
+
+// Shell/process argument-size limits are often much smaller than 1 MiB.
+// Inline text is for short non-sensitive tasks; larger input uses --task FILE.
+func validateInlineInstruction(instruction string) (string, error) {
+	if len(instruction) > 16<<10 {
+		return "", errors.New("inline task text exceeds 16 KiB; use --task FILE for larger input")
+	}
+	return validateInstruction(instruction)
 }
 
 func validateInstruction(instruction string) (string, error) {
