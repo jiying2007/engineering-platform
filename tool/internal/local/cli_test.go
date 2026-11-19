@@ -251,6 +251,7 @@ func TestCLIInlineTextRejectsEmptyAmbiguousAndOversizedWithoutTask(t *testing.T)
 	cases := [][]string{
 		{"run", "missing", "--text", ""},
 		{"submit", "missing", "--text", " \n"},
+		{"run", "missing", "--text", strings.Repeat("x", (16<<10)+1)},
 		{"run", "missing", "--text", strings.Repeat("x", (1<<20)+1)},
 		{"run", "missing", "--task", path, "--text", "from-inline"},
 		{"submit", "missing", "--task", path, "--text", ""},
