@@ -47,7 +47,7 @@ eng run --task /path/to/task.md --check 'make test'
 - 取消、超时或存在无法确认的进程/远端效果，保留 `unknown`（退出码 `3`），**不自动重试**。先查看记录和真实外部结果再操作。
 - 执行上下文、登录/凭据与成本仍归现有 CLI；**未读取到模型用量时始终标为未知，绝不写零费用**。
 
-继续工作时，直接 `cd` 到 `status.json` 中的 `worktree`，审阅并手工处理已有更改；不创建第二套自动 Resume/Reconcile 系统。按现有 Git/`gh` 建 PR、评审和合并；V0 **不会自动 push、合并、创建后台进程或注册定时任务**。同一个 Git common-dir 一次只运行一个 V0 任务。
+继续工作时，直接 `cd` 到 `status.json` 中的 `worktree`，审阅并手工处理已有更改；不创建第二套自动 Resume/Reconcile 系统。按现有 Git/`gh` 建 PR、评审和合并；V0 **不会自动 push、合并、创建后台进程或注册定时任务**。同一状态目录对同一 Git 仓库的任务串行；不同状态目录或旧执行器之间没有跨实例调度，请勿并发共用仓库。
 
 任务不应依赖当前工作区未提交的改动，V0 始终从 Git HEAD 建隔离 worktree。仓库里如有可执行 Git smudge/clean/process filters，会拒绝运行，避免隐式子进程执行。源码仍需可信，进程组不能等同于容器沙盒。
 

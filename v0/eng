@@ -265,6 +265,26 @@ def run_task(options):
                 record["state"] = "unknown"
                 record["reason"] = issue
                 return record, 3
+            # Do not silently put common credential files or huge generated
+            # binaries into the original repository's shared Git object store.
+            # Keep the worktree for manual inspection instead of guessing.
+            untracked = [x for x in git(worktree, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\x00") if x]
+            risky = False
+            for item in untracked:
+                name = pathlib.PurePosixPath(item).name.lower()
+                if (name == ".env" or name.startswith(".env.") or
+                    name in ("id_rsa", "id_ed25519", "credentials.json", "auth.json", "secrets.yaml") or
+                    name.endswith((".pem", ".p12", ".pfx", ".key"))):
+                    risky = True
+                    break
+                if (worktree / item).lstat().st_size > 64 * 1024 * 1024:
+                    risky = True
+                    break
+            if risky or len(untracked) > 1000:
+                record["state"] = "needs_review"
+                record["reason"] = "untracked secret-like or oversized files; manual Git inspection required before any commit"
+                record["untracked_review_count"] = len(untracked)
+                return record, 2
             # Snapshot candidate before checks, so failed checks never destroy work.
             git(worktree, "add", "-A")
             staged = git(worktree, "diff", "--cached", "--quiet", check=False)

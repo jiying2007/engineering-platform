@@ -28,7 +28,7 @@ class EngV0(unittest.TestCase):
         self.git(self.repo, "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "commit", "-m", "initial")
         self.baseline = self.git(self.repo, "rev-parse", "HEAD").stdout.strip()
         self.runner = self.root / "runner.py"
-        self.runner.write_text("""import pathlib, sys, time\ntask = sys.stdin.read()\nif task.startswith('sleep:'):\n    time.sleep(int(task.split(':',1)[1]))\nelif task.startswith('fail:'):\n    pathlib.Path('result.txt').write_text('preserved failure\\n')\n    sys.exit(7)\nelse:\n    pathlib.Path('result.txt').write_text(task + '\\n')\n""")
+        self.runner.write_text("""import pathlib, sys, time\ntask = sys.stdin.read()\nif task.startswith('sleep:'):\n    time.sleep(int(task.split(':',1)[1]))\nelif task.startswith('fail:'):\n    pathlib.Path('result.txt').write_text('preserved failure\\n')\n    sys.exit(7)\nelif task.startswith('secret:'):\n    pathlib.Path('.env').write_text('PRIVATE=do-not-commit\\n')\nelse:\n    pathlib.Path('result.txt').write_text(task + '\\n')\n""")
 
     @staticmethod
     def git(cwd, *args):
@@ -159,6 +159,17 @@ class EngV0(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("executable Git filters", result.stderr)
         self.assertFalse((self.state / "runs").exists())
+
+    def test_secret_like_untracked_output_requires_manual_review(self):
+        self.use_fixture()
+        result = self.eng("run", "secret:fixture", "--check", "true")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        record = self.result(result)
+        self.assertEqual(record["state"], "needs_review")
+        self.assertNotIn("result_commit", record)
+        self.assertEqual(self.git(record["worktree"], "rev-parse", "HEAD").stdout.strip(), self.baseline)
+        self.assertTrue(Path(record["worktree"]).joinpath(".env").is_file())
+        self.assertNotIn("PRIVATE=", result.stdout)
 
     def test_interrupt_stops_local_group_without_automatic_retry(self):
         self.use_fixture()
