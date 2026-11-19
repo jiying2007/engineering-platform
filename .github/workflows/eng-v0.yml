@@ -27,7 +27,7 @@ jobs:
           make build
           ./bin/eng --help
           make release
-          sha256sum --check dist/eng-v0-linux-python.tgz.sha256 --ignore-missing
+          (cd dist && sha256sum --check eng-v0-linux-python.tgz.sha256)
       - name: Retain small exact V0 package
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
