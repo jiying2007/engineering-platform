@@ -106,7 +106,7 @@ eng_git -C "$eng_demo/master-repo" -c user.name='eng example' \
   -c user.email='eng-example@localhost' commit -m 'Initialize master checkout' >> "$eng_log" 2>&1
 master_original_sha="$(eng_git -C "$eng_demo/master-repo" rev-parse HEAD)"
 run_eng project add master-example "$eng_demo/master-repo" --runtime fixture > "$eng_smoke/master-project.json" 2>> "$eng_log"
-if run_eng run master-example --task "$eng_package/examples/task.md" > "$eng_smoke/master-waiting.json" 2>> "$eng_log"; then
+if run_eng run master-example --text 'Prepare a local-only result with no configured checks' > "$eng_smoke/master-waiting.json" 2>> "$eng_log"; then
   printf 'No-check task bypassed required manual acceptance.\n' >> "$eng_log"
   exit 1
 fi

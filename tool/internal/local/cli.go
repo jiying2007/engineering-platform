@@ -27,12 +27,12 @@ Usage: eng [--data-dir DIR] COMMAND
   runtime list
   project add NAME PATH [--config FILE] [--runtime NAME] [--base REF] [--replace]
   project list
-  run PROJECT --task FILE              Create and run a task, or queue it for serve
-  submit PROJECT --task FILE           Create a queued task
+  run PROJECT --task FILE|--text TEXT   Create and run a task, or queue it for serve
+  submit PROJECT --task FILE|--text TEXT  Create a queued task
   status [TASK]                        JSON task, attempts and event history
   logs TASK [--attempt N] [--stderr] [--tail 200]
   stop TASK                           Request process-group cancellation
-  resume TASK [--task FILE]            Explicitly create a new attempt
+  resume TASK [--task FILE|--text TEXT]  Explicitly create a new attempt
   accept TASK --note TEXT              Accept a successful result without configured checks
   recover                             Inspect interrupted work; never invoke a model
   serve                               Own the local queue until stopped
@@ -131,17 +131,25 @@ func command(ctx context.Context, s *Store, args []string, out, errOut io.Writer
 		return projectCommand(ctx, s.DataDir(), args[1:], errOut)
 	case "run", "submit":
 		if len(args) < 2 {
-			return nil, errors.New("usage: eng run|submit PROJECT --task FILE")
+			return nil, errors.New("usage: eng run|submit PROJECT (--task FILE | --text TEXT)")
 		}
 		fs := newFlags(args[0], errOut)
 		file := fs.String("task", "", "instruction file")
+		text := fs.String("text", "", "short inline task text (max 16 KiB; visible in shell history; prefer --task FILE for larger or sensitive text)")
 		if err := fs.Parse(args[2:]); err != nil {
 			return nil, err
 		}
-		if fs.NArg() != 0 || *file == "" {
-			return nil, errors.New("provide one --task FILE")
+		fileSet, textSet := instructionFlags(fs)
+		if fs.NArg() != 0 || fileSet == textSet {
+			return nil, errors.New("provide exactly one of --task FILE or --text TEXT")
 		}
-		instruction, err := readInstruction(*file)
+		var instruction string
+		var err error
+		if fileSet {
+			instruction, err = readInstruction(*file)
+		} else {
+			instruction, err = validateInlineInstruction(*text)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -185,20 +193,27 @@ func command(ctx context.Context, s *Store, args []string, out, errOut io.Writer
 		return s.GetTask(ctx, args[1])
 	case "resume":
 		if len(args) < 2 {
-			return nil, errors.New("usage: eng resume TASK [--task FILE]")
+			return nil, errors.New("usage: eng resume TASK [--task FILE | --text TEXT]")
 		}
 		fs := newFlags("resume", errOut)
 		file := fs.String("task", "", "replacement instruction file")
+		text := fs.String("text", "", "replacement inline task text")
 		if err := fs.Parse(args[2:]); err != nil || fs.NArg() != 0 {
-			return nil, errors.New("usage: eng resume TASK [--task FILE]")
+			return nil, errors.New("usage: eng resume TASK [--task FILE | --text TEXT]")
+		}
+		fileSet, textSet := instructionFlags(fs)
+		if fileSet && textSet {
+			return nil, errors.New("provide at most one replacement: --task FILE or --text TEXT")
 		}
 		var instruction string
 		var err error
-		if *file != "" {
+		if fileSet {
 			instruction, err = readInstruction(*file)
-			if err != nil {
-				return nil, err
-			}
+		} else if textSet {
+			instruction, err = validateInlineInstruction(*text)
+		}
+		if err != nil {
+			return nil, err
 		}
 		task, err := s.EnqueueResume(ctx, args[1], instruction)
 		if err != nil {
@@ -438,15 +453,42 @@ func registrations(dataDir, kind string) ([]string, error) {
 	return names, nil
 }
 
+// Only one input source can be used per attempt. Flag visitation, not string
+// emptiness, also rejects an explicitly empty --text on resume.
+func instructionFlags(fs *flag.FlagSet) (file, text bool) {
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "task":
+			file = true
+		case "text":
+			text = true
+		}
+	})
+	return file, text
+}
+
+// Shell/process argument-size limits are often much smaller than 1 MiB.
+// Inline text is for short non-sensitive tasks; larger input uses --task FILE.
+func validateInlineInstruction(instruction string) (string, error) {
+	if len(instruction) > 16<<10 {
+		return "", errors.New("inline task text exceeds 16 KiB; use --task FILE for larger input")
+	}
+	return validateInstruction(instruction)
+}
+
+func validateInstruction(instruction string) (string, error) {
+	if len(instruction) > 1<<20 || strings.TrimSpace(instruction) == "" {
+		return "", errors.New("task input must be nonempty and at most 1 MiB")
+	}
+	return instruction, nil
+}
+
 func readInstruction(path string) (string, error) {
 	data, err := readRegularFile(path, 1<<20)
 	if err != nil {
 		return "", err
 	}
-	if len(data) > 1<<20 || strings.TrimSpace(string(data)) == "" {
-		return "", errors.New("task input must be nonempty and at most 1 MiB")
-	}
-	return string(data), nil
+	return validateInstruction(string(data))
 }
 
 func newTask(ctx context.Context, s *Store, project, instruction string) (Task, error) {

@@ -199,3 +199,80 @@ func TestCLIProjectRelativeRuntimeRunsFromWorktreeNotRegistrationCWD(t *testing.
 		t.Fatalf("runtime result is not verified locally: %+v", attempt.Result)
 	}
 }
+
+func TestCLIInlineTaskAndResumeAreRealAttempts(t *testing.T) {
+	store, root := executionStore(t), executionRepository(t)
+	runtime := Runtime{Name: "cat", Argv: []string{"/bin/sh", "-c", "cat > source.txt"}, Stdin: "task", Timeout: "5s", Model: false}
+	project := Project{Name: "inline", Root: root, Base: "main", Runtime: "cat", Checks: []Check{
+		{Name: "source", Argv: []string{"/bin/sh", "-c", "grep -qx after source.txt"}, Timeout: "5s"},
+	}}
+	if err := saveRegistration(store.DataDir(), "runtimes", runtime.Name, runtime, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveRegistration(store.DataDir(), "projects", project.Name, project, false); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	args := []string{"--data-dir", store.DataDir(), "run", "inline", "--text", "before"}
+	code := CLI(context.Background(), args, &stdout, &stderr)
+	var first Task
+	if err := json.Unmarshal(stdout.Bytes(), &first); err != nil {
+		t.Fatalf("run must retain JSON even when check fails: %s %s: %v", &stdout, &stderr, err)
+	}
+	if code == 0 || first.State != StateFailed {
+		t.Fatalf("a failing real check cannot deliver: exit=%d %+v stderr=%s", code, first, &stderr)
+	}
+	firstAttempt := lastExecutionAttempt(t, store, first)
+	if firstAttempt.Input != "before" || firstAttempt.Result.RuntimeExitCode != 0 ||
+		firstAttempt.Result.ChecksStatus == "passed" {
+		t.Fatalf("first attempt lost input or fabricated check success: %+v", firstAttempt)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = CLI(context.Background(), []string{"--data-dir", store.DataDir(), "resume", first.ID, "--text", "after"}, &stdout, &stderr)
+	var result Task
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil || code != 0 || result.State != StateDone {
+		t.Fatalf("inline resume not delivered: code=%d %+v %v stderr=%s", code, result, err, &stderr)
+	}
+	attempts, err := store.ListAttempts(context.Background(), first.ID)
+	if err != nil || len(attempts) != 2 || attempts[1].Input != "after" ||
+		attempts[1].Result.ChecksStatus != "passed" || attempts[1].Result.ResultCommit == "" {
+		t.Fatalf("expected exactly two real attempts with independent input and checks: %+v, %v", attempts, err)
+	}
+}
+
+func TestCLIInlineTextRejectsEmptyAmbiguousAndOversizedWithoutTask(t *testing.T) {
+	store := executionStore(t)
+	path := filepath.Join(t.TempDir(), "task.md")
+	if err := os.WriteFile(path, []byte("from-file\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cases := [][]string{
+		{"run", "missing", "--text", ""},
+		{"submit", "missing", "--text", " \n"},
+		{"run", "missing", "--text", strings.Repeat("x", (16<<10)+1)},
+		{"run", "missing", "--text", strings.Repeat("x", (1<<20)+1)},
+		{"run", "missing", "--task", path, "--text", "from-inline"},
+		{"submit", "missing", "--task", path, "--text", ""},
+		{"resume", "task-not-found", "--text", ""},
+		{"resume", "task-not-found", "--task", path, "--text", "different"},
+	}
+	for _, args := range cases {
+		var stdout, stderr bytes.Buffer
+		all := append([]string{"--data-dir", store.DataDir()}, args...)
+		if code := CLI(context.Background(), all, &stdout, &stderr); code == 0 {
+			t.Fatalf("invalid task input accepted: command=%s output_bytes=%d", args[0], stdout.Len())
+		}
+		if !strings.Contains(stderr.String(), "task input") &&
+			!strings.Contains(stderr.String(), "provide exactly one") &&
+			!strings.Contains(stderr.String(), "provide at most one") &&
+			!strings.Contains(stderr.String(), "inline task text") {
+			t.Fatalf("unexpected invalid-input failure: command=%s stderr=%s", args[0], &stderr)
+		}
+	}
+	tasks, err := store.ListTasks(context.Background())
+	if err != nil || len(tasks) != 0 {
+		t.Fatalf("invalid instruction created a task: %+v %v", tasks, err)
+	}
+}
