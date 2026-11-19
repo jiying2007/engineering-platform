@@ -18,7 +18,7 @@ eng run my-project --text '完成一个有验收条件的小任务' # 或 --task
 eng status
 ```
 
-Runtime 行是接口示意，必须替换为已核实且获准的非交互命令；不是预置模型配置，也不验证账号已登录。`project add` 在未声明 `base` 时使用当前检出的分支（detached HEAD 使用精确 SHA），可不创建 `.eng.yaml`；没有验收检查的任务执行后保持 `waiting`，需人工核验并 `eng accept TASK --note ...`。安装、doctor 和示例都不调用模型。命令行里的 `--text` 会被 shell 历史和进程列表记录；敏感任务请用 `--task FILE`。预编译包使用 SQLite 内嵌驱动，不需要数据库服务、Go 或 C 编译器。
+Runtime 行是接口示意，必须替换为已核实且获准的非交互命令；不是预置模型配置，也不验证账号已登录。`project add` 在未声明 `base` 时使用当前检出的分支（detached HEAD 使用精确 SHA），可不创建 `.eng.yaml`；没有验收检查的任务执行后保持 `waiting`，需人工核验并 `eng accept TASK --note ...`。安装、doctor 和示例都不调用模型。命令行里的 `--text` 最多 16 KiB，并会被 shell 历史和进程列表记录；较大或敏感任务请用 `--task FILE`（最多 1 MiB）。预编译包使用 SQLite 内嵌驱动，不需要数据库服务、Go 或 C 编译器。
 
 ## 日常需要的功能
 
