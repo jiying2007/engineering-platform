@@ -1,55 +1,49 @@
-# Engineering Platform｜Codex 真实使用场景驱动的最终决策
+# Engineering Platform｜退役与能力吸收决策
 
-**Final 1.4｜2026-11-19｜个人优先、2–8 人可信研发团队**  
-**公开决策摘要。原始 Codex 会话位于用户私有档案中；不在本公开仓库存放原始日志、个人目录、提示词、工具输出、Provider 凭据或私有档案元数据。**
+**Final 1.5｜2026-11-20｜个人与小团队（目标是少一套运行时）**
 
-## 一、最终决定
+> 本文件是公开的脱敏决策。私有 \`jiying2007/sessions\` 会话原件、原始提示、路径、凭据、费用账单和完整审计均不进入本仓库。本文件决定未来产品边界，不声明历史模型调用/设备资格/生产主机退出已完成。
 
-**保持原生开发工具为主，停止建设第二套 Agent / 工程任务管理平台。** Codex CLI、Codex VS Code 扩展（或另一个明确获准的 CLI）负责实际编码、会话、执行与审批；`codex-tui` 可选用于多仓、多目标 Codex 会话观察和定位；Git、原仓 CI、GitHub/GitLab 负责代码与评审；飞书项目／TAPD 负责产品需求、测试缺陷与业务验收。
+## 1. 决策
 
-**`eng` 不再作为默认 AI 模型执行器。** 仅在真实任务证明存在净收益时，保留确定性的 Git worktree、检查、diff、日志和证据辅助能力；不得为了完整平台而继续增加 Runner 注册、长期任务队列、多模型切换、团队后台或新的工单权威。
+**停止将 \`engineering-platform\`／\`eng\` 作为新用户入口或独立无人值守工程平台发展。** 本仓的代码与 CI 先保留为历史事实、迁移参考和按需提取的安全测试，不新增另一套 SQLite 任务服务、飞书 Bot、MCP server、Agent Loop、PostgreSQL 控制面或 Provider 资格平台。
 
-## 二、依据：原生 Codex 历史比此前方案覆盖得广
+- **交互开发**：原生 Codex CLI/VS Code + 当前 ADK；多目标会话观察仍在 \`codex-tui\`。
+- **无人值守与飞书远程控制**：由既有 \`jiying2007/codex/tools/codex_assets/feishu_codex_bot.py\` 统一拥有。当前有 WebSocket、白名单、SQLite、worktree、runner、systemd；尚需真实重启恢复与授权运行验收。
+- **其他 Agent 调用**：给同一 Codex Bot 增加最小的受控本机 MCP/CLI（或等价受保护接口）；使用同一任务状态机和授权，不建立 eng 第二执行器。不可开放任意远程 Shell。
+- **需求/缺陷**：飞书项目或 TAPD；**代码/事实**：Git/CI/HIL/设备；**方法资产**：ADK；**知识**：Knowledge Hub。
+- **KWS/Audio**：保留原实验流水线，不使用 eng 包装训练/评估或新巡检来冒充实际算法研发。
 
-已通过具授权的 GitHub 连接器审阅用户**私有 Codex 会话仓库的完整 Git Tree**，并对可直接读取的原始 JSONL 做跨月份分层内容审计。原始记录支持以下边界，而不是单一 `codex-tui` 工作流：
+## 2. 为什么不保留 eng 作为 optional runner
 
-- Windows + VS Code 下有 MCU／驱动项目开发与本地 Shell 调用；Linux + VS Code、原生交互 CLI、非交互 `codex exec` 也有实际工作轨迹。
-- 会话元数据有独立的 `originator`、`source`、Provider、CLI 版本、模型和工作目录；存在子 Agent、已完成、已中断及只有启动事件的会话。**文件数、thread 数、Token 事件数、成功研发交付数不可混为一谈。**
-- 历史中可见多种 CLI 版本和 Provider 来源。硬编码特定模型、强制团队锁定相同版本、按 `codex` 进程名判断费用授权都会与真实使用冲突。
-- `token_count` 可能是多次累积快照，不能重复累加；Codex 的 `task_complete` 不等于 Git/CI 通过、设备验收或产品 QA 关闭。
+原生 CLI、已有 \`codex\` 飞书执行服务和 Git/CI 已覆盖会话、代码修改、worktree、检查与本地交付。主线 \`tool/\` Go + SQLite、PR #311 Python V0 若继续执行同一职责，会引入重复凭据和工作区竞争，也延续此前多次重设计但未实质采用的问题。
 
-**证据边界：**完整目录已核验，原始会话的内容审计尚是样本级，压缩/超大文件需用户在已有认证主机上用离线、流式、脱敏工具复查；不宣称已核查所有模型调用、账单或全部 ChatGPT 历史。细节见用户私有审计归档，不进入公开仓库。
+**PR #311 不应合并**；其绿色无模型检查不代表实际 Agent 质量或价值增益。历史 \`cmd/\`／\`internal/\`／\`tool/\` 不直接迁移到新的 Codex 服务。只有出现已证实的跨多个异构模型 Runtime、多主机真实调度需求且 Codex 不能承接，才以新证据重新评估独立工具；不自动恢复旧平台。
 
-## 三、个人与团队的真实工作流
+## 3. 选择性吸收清单（不复制实现）
 
-**日常功能/缺陷：**原始飞书项目或 TAPD 工单（可经企业微信进入）→ 开发者在原生已批准 CLI/IDE 及 ADK 中实施 → 原项目实际检查 → GitHub/GitLab PR/MR 与 CI → 产品/QA 在原工单复测及关闭。仓库 Issue 允许用于技术维护，但不复制业务需求或 Bug。
+| 来源 | 优先级 | 接收者 | 复用的规则/证据 | 不搬入 |
+|---|---|---|---|---|
+| \`tool/internal/local/process_linux.go\`, \`store.go\`, \`serve.go\` | P0 | \`codex\` Bot | 进程身份 PID/start_ticks/boot_id、队列持久化、未知效果不盲重试、状态转移/故障回归 | Go 服务、第二 SQLite/调度器 |
+| \`tool/internal/local/backup.go\` | P0/P1 | \`codex\` Bot | WAL 一致性快照、备份完整性、恢复不隐式重放 | 同机路径专属 eng 数据模型 |
+| \`tool/internal/local/publish.go\` | P1（仅授权后） | \`codex\` Git 交付接口 | 精确 SHA/remote/PR readback、未知结果不重复 Push、发布权限分离 | 自动 Merge / 生产发布 |
+| \`docs/evidence/m1-terminal-facts/\` | 保全 | 本仓历史 + Knowledge Hub 索引 | 原始 run/artifact/commit/digest 范围，Feature/Debug 历史结果 | 重新签发证据或宣称当前设备通过 |
+| \`tool/examples/templates/\` | 去重 | ADK/Codex 已有任务流程 | 只吸收确实缺少的验收负例 | 复制第三套模板 |
 
-**嵌入式与跨仓接口：**Windows IDE 或 Ubuntu 开发机均是一等场景。SoC/MCU、sensor/app/api/hdi 等多仓联调使用版本化 UART/API 契约、各自分支/PR 和真实联调证据；不建立 Agent-to-Agent 消息服务。MCU/FOC/OTA 还需固件身份、测试设备、负载、电流、温升或升级实测，不能由 CI 代替。
+P0 首个落地候选：\`jiying2007/codex\` PR #69（持久化待执行任务载荷，running 重启后 UNKNOWN，不调用模型、不自动重试），实际合入/主机部署仍依项目 CI 和现场验证。
 
-**KWS/Audio 长周期研发：**复用已有 GitHub Actions/合格执行主机进行事件驱动数据、训练、评估和平台资源验证。已有数据和准入证据继续复用，不以无模型准备、自动巡检或新 `eng` 执行包装代替实际算法研究。
+## 4. 退役前必须核验的事实
 
-**团队与多主机：**每位开发者独立凭据和本地会话；不固定全员相同 CLI 版本，运行前按实际目标探测兼容性。Codex target/thread 需结合真实主机和 `CODEX_HOME` / App Server 目标定位，不能凭同名 Git 目录判断是同一实例。`codex-tui` 只投影上游状态，历史 rollout 文件不是实时运行权威。
+1. **旧主机**：明确列出真实执行账号、\`eng\`/Core/Worker/Publisher/systemd 进程、正在执行的 Work/Run、DB/WAL/产物和外部 Push/PR/设备操作；UNKNOWN 不得改为 canceled 或 done。
+2. **保全**：留存仓库完整 Git 历史、M1 历史证据、必要的数据库一致性备份和只读索引；保存 SHA-256 与恢复抽检，不复制密钥/原始会话到公开 repo。
+3. **替代验收**：真实飞书消息→服务→获准 Runtime→实际 Git/测试→飞书回执；重启/失联、同一消息重复投递、超时停止、工作区锁和费用边界各有可复核证据。无模型 CI 只验证工具行为。
+4. **依赖切断**：ADK、Codex、TUI、知识库、现有工程项目不得依赖本仓 live 代码/DB；只读历史引用允许，具体使用者需要明确检查。
+5. **归档**：完成 1–4 后优先 GitHub Archive（保存原 SHA 和历史 URL）；如用户另行要求永久删除，应先验证可恢复的 Git bundle 和外部引用，不以本决策代替删除操作。
 
-## 四、费用、正确性和 V0 准入
+**当前状态**：仓库仍公开且未归档；本决策及 PR 本身没有访问或停止真实用户主机，也没有进行模型调用。旧服务生产 readiness 历史上仍为 BLOCKED，不因新 Codex Bot 路线而变为 PASS。
 
-当前关于 Codex／ChatGPT Work 共享额度的使用限制**继续有效**。历史 ChatGPT 登录、Relay 或中转站配置，不等于当前获得模型执行授权；无明确批准时只做无模型校验，不自动启动 Codex 回合，也不以模拟 Runner 宣称实际研发完成。
+## 5. Codex 使用史的证据边界
 
-PR #311 的 Python V0 仅证明无模型执行路径；不应直接将其变成所有人的默认执行器。若确需保留其独立执行能力，首先解决跨 `ENG_HOME` 的 Git common-dir 互斥、持久进程身份/强制中断后的未知处置、`git add -A` 的敏感文件暂存，以及真实 Runtime 账号/费用/退出语义。**若这些额外维护成本超过它节省的工作步骤，应移除执行包装，只保留辅助命令。**
+私有会话仓完整 Git Tree 已核对：历史来源包括 Windows/Linux VS Code、交互 CLI、\`codex exec\`、子 Agent 和其他客户端。文件数不等于模型调用数，\`task_complete\` 不等于 PR/CI/QA/设备通过；历史 token 事件也不能简单累加。完整内容校验和账单核对必须在用户受控的私有主机上另行完成，不能以采样或目录统计代替。
 
-## 五、验收、停止条件与旧系统退出
-
-| 闸口 | 验收依据 |
-|---|---|
-| 私有档案 | 已完成 Git Tree 核验；全量 JSONL/Zstandard 内容审计仍以本机流式执行和失败清单为准，不能用小样本冒充全部。 |
-| 工具兼容 | Windows VS Code、Ubuntu CLI/SSH、多会话、非交互执行分别按真实能力验证；不强制用户迁移到单一 UI。 |
-| 真实交付 | 经批准的模型/工具产生源码变更、准确提交、项目检查、PR/CI；需要 QA 或设备证据的按各自权威验收。 |
-| 价值验证 | 用两个真实仓库、约五个低风险任务对照原生 CLI + ADK + Git；`eng` 没有可量化净收益则停止发展其执行器。 |
-| 旧平台退出 | 单独核实旧主机进程、UNKNOWN、数据库与历史凭证后再移除旧服务；`digital-worker` GitHub 仓库删除独立验收，不能因文档修改宣称已删除。 |
-
-## 六、原有方案关系
-
-本文件是此前工程平台归档决策的 **Final 1.4 脱敏公开修订**，沿用既有 PR #312 更新；PR #311 是待取舍的 V0 实现候选，不以绿色 CI 自动认定生产可用。不在多个仓库建立新的任务中心、模型 Provider 平台或监控巡检系统。私有会话原件与详细审计留在用户可控的私有仓库／私有文件归档中。
-
-参考：`https://github.com/jiying2007/engineering-platform/pull/312`、`https://github.com/jiying2007/engineering-platform/pull/311`、`https://github.com/jiying2007/codex-tui/blob/main/docs/adr/012-upstream-convergence.md`。
-
-**终态：原生工具负责真实执行，仓库与 CI 负责技术交付，业务系统与设备实测负责验收；codex-tui 只做观察，eng 只有在客观有价值时才作为小工具存在。**
+**终态**：Codex 拥有唯一无人值守入口，codex-tui 只观察，ADK 负责方法，Knowledge Hub 负责知识，Git/CI/设备/飞书项目或 TAPD 仍分别拥有原始事实与业务验收。eng 保留历史后退出。
